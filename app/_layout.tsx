@@ -5,6 +5,9 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { LabReportsProvider } from '../src/context/LabReportsContext';
+import { UserProfileProvider } from '../src/context/UserProfileContext';
+import { LanguageProvider, useLanguage } from '../src/i18n';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -43,13 +46,47 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
+  return (
+    <LanguageProvider>
+      <UserProfileProvider>
+        <LabReportsProvider>
+          <RootLayoutNavContent />
+        </LabReportsProvider>
+      </UserProfileProvider>
+    </LanguageProvider>
+  );
+}
+
+function RootLayoutNavContent() {
   const colorScheme = useColorScheme();
+  const { t } = useLanguage();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="add-report"
+          options={{
+            presentation: 'modal',
+            title: t('addReport.screenTitle'),
+            headerShown: true,
+          }}
+        />
+        <Stack.Screen
+          name="report/[id]"
+          options={{
+            title: t('reportDetail.screenTitle'),
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="modal"
+          options={{
+            presentation: 'modal',
+            title: t('modal.title'),
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

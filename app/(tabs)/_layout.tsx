@@ -5,9 +5,11 @@ import { Platform, Pressable } from 'react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useLanguage } from '../../src/i18n';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useLanguage();
 
   return (
     <Tabs
@@ -20,16 +22,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
+          title: t('tabs.reports'),
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
+                ios: 'doc.text.fill',
+                android: 'description',
+                web: 'description',
               }}
               tintColor={color}
-              size={28}
+              size={24}
             />
           ),
           headerRight: () => (
@@ -51,16 +53,50 @@ export default function TabLayout() {
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
+          title: t('tabs.biomarkers'),
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
+                ios: 'book.fill',
+                android: 'menu_book',
+                web: 'menu_book',
               }}
               tintColor={color}
-              size={28}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="sync"
+        options={{
+          title: t('tabs.sync'),
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{
+                ios: 'arrow.triangle.2.circlepath.circle.fill',
+                android: 'sync',
+                web: 'sync',
+              }}
+              tintColor={color}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: t('tabs.profile'),
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{
+                ios: 'person.crop.circle.fill',
+                android: 'person',
+                web: 'person',
+              }}
+              tintColor={color}
+              size={24}
             />
           ),
         }}
