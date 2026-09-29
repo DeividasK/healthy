@@ -11,7 +11,7 @@ import {
 import { Search, X, Check, Sparkles, CornerDownLeft } from 'lucide-react-native';
 import { BiomarkerDefinition } from '../types/health';
 import { searchBiomarkers, findBiomarkerByKey } from '../data/biomarker-catalog';
-import { useLanguage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../i18n/biomarkers';
 
 interface BiomarkerAutocompleteProps {
@@ -49,7 +49,8 @@ export function BiomarkerAutocomplete({
   selectedKey,
   autoFocus = false,
 }: BiomarkerAutocompleteProps) {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const quickSuggestions = language === 'lt' ? QUICK_SUGGESTIONS_LT : QUICK_SUGGESTIONS_EN;
   const defaultPlaceholder =
     language === 'lt'

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { BiomarkerResult } from '../types/health';
 import { formatValue } from '../utils/units';
-import { useLanguage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../i18n/biomarkers';
 import { WhoopBiomarkerGauge } from './WhoopBiomarkerGauge';
 
@@ -20,7 +20,8 @@ export const WhoopBiomarkerCard: React.FC<WhoopBiomarkerCardProps> = ({
   style,
   gaugeWidth = 126,
 }) => {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const isOutOfRange =
     marker.status === 'low' ||
     marker.status === 'high' ||

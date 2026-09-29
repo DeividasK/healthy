@@ -69,10 +69,10 @@ import {
   importDatabaseSnapshot,
 } from '../../src/database/db';
 import { SyncAuditEntry } from '../../src/database/types';
-import { useLanguage } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
 
 export default function GoogleDriveSyncScreen() {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 

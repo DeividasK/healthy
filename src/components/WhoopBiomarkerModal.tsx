@@ -12,7 +12,7 @@ import { X, AlertCircle, CheckCircle2, TrendingUp, Info } from 'lucide-react-nat
 import { BiomarkerResult, LabReport } from '../types/health';
 import { BIOMARKER_CATALOG } from '../data/biomarker-catalog';
 import { formatValue } from '../utils/units';
-import { useLanguage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName, getBiomarkerDescription } from '../i18n/biomarkers';
 import { WhoopBiomarkerGauge } from './WhoopBiomarkerGauge';
 
@@ -29,7 +29,8 @@ export const WhoopBiomarkerModal: React.FC<WhoopBiomarkerModalProps> = ({
   allReports = [],
   onClose,
 }) => {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   if (!marker) return null;
 
   const displayName = getBiomarkerDisplayName(marker, language);

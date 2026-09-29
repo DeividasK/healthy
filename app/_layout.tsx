@@ -1,13 +1,14 @@
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { LabReportsProvider } from '../src/context/LabReportsContext';
 import { UserProfileProvider } from '../src/context/UserProfileContext';
-import { LanguageProvider, useLanguage } from '../src/i18n';
+import { initI18n } from '../src/i18n/i18n';
+import { useTranslation } from 'react-i18next';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -32,13 +33,21 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
+  const [i18nReady, setI18nReady] = useState(false);
+
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      initI18n().then(() => setI18nReady(true));
     }
   }, [loaded]);
 
-  if (!loaded) {
+  useEffect(() => {
+    if (loaded && i18nReady) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, i18nReady]);
+
+  if (!loaded || !i18nReady) {
     return null;
   }
 
@@ -47,19 +56,17 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   return (
-    <LanguageProvider>
-      <UserProfileProvider>
-        <LabReportsProvider>
-          <RootLayoutNavContent />
-        </LabReportsProvider>
-      </UserProfileProvider>
-    </LanguageProvider>
+    <UserProfileProvider>
+      <LabReportsProvider>
+        <RootLayoutNavContent />
+      </LabReportsProvider>
+    </UserProfileProvider>
   );
 }
 
 function RootLayoutNavContent() {
   const colorScheme = useColorScheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

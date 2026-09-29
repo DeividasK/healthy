@@ -2,13 +2,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, ScrollView, View, Text, useColorScheme } from 'react-native';
 import { ShieldCheck, Database, Sparkles, HeartHandshake, BookOpen, Cloud } from 'lucide-react-native';
 import { useResponsive } from '../src/hooks/useResponsive';
-import { useLanguage } from '../src/i18n';
+import { useTranslation } from 'react-i18next';
 
 export default function ModalScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { modalMaxWidth, containerPadding } = useResponsive();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
 
   return (
     <ScrollView

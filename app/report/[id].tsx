@@ -27,11 +27,12 @@ import { WhoopAmbientHeader } from '../../src/components/WhoopAmbientHeader';
 import { WhoopBiomarkerCard } from '../../src/components/WhoopBiomarkerCard';
 import { WhoopBiomarkerModal } from '../../src/components/WhoopBiomarkerModal';
 import { SAMPLE_WHOOP_LAB_REPORT } from '../../src/data/sampleWhoopLabs';
-import { useLanguage } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../../src/i18n/biomarkers';
 
 export default function ReportDetailScreen() {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const { id } = useLocalSearchParams<{ id: string }>();
   const { reports, getReportById, deleteReport } = useLabReports();
   const { isLargeScreen, contentMaxWidth, containerPadding } = useResponsive();

@@ -5,11 +5,11 @@ import { Platform, Pressable } from 'react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useLanguage } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
 
   return (
     <Tabs

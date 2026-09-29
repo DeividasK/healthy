@@ -29,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import { useLabReports } from '../src/context/LabReportsContext';
 import { useUserProfile } from '../src/context/UserProfileContext';
-import { useLanguage } from '../src/i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../src/i18n/biomarkers';
 import { BiomarkerResult, LabReport } from '../src/types/health';
 import { BiomarkerRowInput } from '../src/components/BiomarkerRowInput';
@@ -40,7 +40,8 @@ export default function AddReportScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { reports, saveReport } = useLabReports();
   const { availableLabs } = useUserProfile();
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { formMaxWidth, containerPadding } = useResponsive();

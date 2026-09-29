@@ -10,7 +10,7 @@
  *   getBiomarkerDisplayName(marker, 'en');
  */
 
-import { useLanguage } from '../index';
+import { useTranslation } from 'react-i18next';
 import { biomarkersLt } from './lt';
 import { biomarkersEn } from './en';
 import { CANONICAL_KEY_ALIASES as KEY_ALIASES } from './types';
@@ -106,7 +106,8 @@ export function getBiomarkerTranslation(
  * app language. Prefer this inside React components.
  */
 export function useBiomarkerTranslations() {
-  const { language } = useLanguage();
+  const { i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
 
   return {
     /** Get the localized display name for a biomarker marker object. */

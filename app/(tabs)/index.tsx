@@ -26,7 +26,7 @@ import {
 } from 'lucide-react-native';
 import { useLabReports } from '../../src/context/LabReportsContext';
 import { useUserProfile } from '../../src/context/UserProfileContext';
-import { useLanguage } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
 import { useResponsive } from '../../src/hooks/useResponsive';
 
 export default function HomeScreen() {
@@ -40,7 +40,7 @@ export default function HomeScreen() {
     syncStatus,
   } = useLabReports();
   const { profile } = useUserProfile();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { isLargeScreen, contentMaxWidth, containerPadding } = useResponsive();

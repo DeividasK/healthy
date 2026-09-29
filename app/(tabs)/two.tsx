@@ -34,7 +34,7 @@ import { useResponsive } from '../../src/hooks/useResponsive';
 import { WhoopBiomarkerCard } from '../../src/components/WhoopBiomarkerCard';
 import { WhoopBiomarkerModal } from '../../src/components/WhoopBiomarkerModal';
 import { WhoopAmbientHeader } from '../../src/components/WhoopAmbientHeader';
-import { useLanguage } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
 import {
   getBiomarkerDisplayName,
   getBiomarkerDescription,
@@ -58,7 +58,8 @@ const CATEGORIES: (BiomarkerCategory | 'All')[] = [
 ];
 
 export default function BiomarkersScreen() {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const { catalog: biomarkerCatalog } = useBiomarkerTranslations();
   const [activeTab, setActiveTab] = useState<'my-biomarkers' | 'catalog'>('my-biomarkers');
   const [search, setSearch] = useState('');

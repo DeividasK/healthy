@@ -12,7 +12,7 @@ import { BiomarkerResult, BiomarkerDefinition } from '../types/health';
 import { findBiomarkerByKey } from '../data/biomarker-catalog';
 import { calculateBiomarkerStatus, getStatusBadgeConfig } from '../utils/units';
 import { BiomarkerAutocomplete } from './BiomarkerAutocomplete';
-import { useLanguage } from '../i18n';
+import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../i18n/biomarkers';
 
 interface BiomarkerRowInputProps {
@@ -28,7 +28,8 @@ export function BiomarkerRowInput({
   onDelete,
   index,
 }: BiomarkerRowInputProps) {
-  const { language, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 

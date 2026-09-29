@@ -24,7 +24,8 @@ import {
 import { useUserProfile } from '../../src/context/UserProfileContext';
 import { BiologicalSex } from '../../src/types/profile';
 import { useResponsive } from '../../src/hooks/useResponsive';
-import { useLanguage, Language } from '../../src/i18n';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage, Language } from '../../src/i18n/i18n';
 
 export default function ProfileScreen() {
   const {
@@ -33,7 +34,8 @@ export default function ProfileScreen() {
     availableLabs,
     isLoading,
   } = useUserProfile();
-  const { language, setLanguage, t } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === 'lt' ? 'lt' : 'en';
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { contentMaxWidth, containerPadding } = useResponsive();
@@ -121,7 +123,7 @@ export default function ProfileScreen() {
   };
 
   const handleLanguageChange = async (newLang: Language) => {
-    await setLanguage(newLang);
+    await changeLanguage(newLang);
   };
 
   return (
