@@ -1,17 +1,11 @@
 import { useFonts } from 'expo-font';
-import { Link, Stack, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
+import { Stack, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
+import { useEffect } from 'react';
+import { Platform, View } from 'react-native';
 import 'react-native-reanimated';
 
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { LabReportsProvider } from '../src/context/LabReportsContext';
-import { UserProfileProvider } from '../src/context/UserProfileContext';
-import { initI18n } from '../src/i18n/i18n';
-import { useTranslation } from 'react-i18next';
 import { AppLogo } from '../src/components/AppLogo';
 
 export {
@@ -20,7 +14,6 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: 'index',
 };
 
@@ -37,21 +30,13 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  const [i18nReady, setI18nReady] = useState(false);
-
   useEffect(() => {
     if (loaded) {
-      initI18n().then(() => setI18nReady(true));
+      SplashScreen.hideAsync();
     }
   }, [loaded]);
 
-  useEffect(() => {
-    if (loaded && i18nReady) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, i18nReady]);
-
-  if (!loaded || !i18nReady) {
+  if (!loaded) {
     return null;
   }
 
@@ -59,18 +44,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  return (
-    <UserProfileProvider>
-      <LabReportsProvider>
-        <RootLayoutNavContent />
-      </LabReportsProvider>
-    </UserProfileProvider>
-  );
-}
-
-function RootLayoutNavContent() {
   const colorScheme = useColorScheme();
-  const { t } = useTranslation();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -87,59 +61,6 @@ function RootLayoutNavContent() {
                 />
               </View>
             ),
-            headerRight: () => (
-              <View
-                style={{
-                  marginRight: Platform.OS === 'ios' ? 0 : 4,
-                }}
-              >
-                <Link href="/profile" asChild>
-                  <Pressable hitSlop={8}>
-                    {({ pressed }) => (
-                      <SymbolView
-                        name={{
-                          ios: 'person.crop.circle',
-                          android: 'person',
-                          web: 'person',
-                        }}
-                        size={25}
-                        tintColor={Colors[colorScheme].text}
-                        style={{ opacity: pressed ? 0.5 : 1 }}
-                      />
-                    )}
-                  </Pressable>
-                </Link>
-              </View>
-            ),
-          }}
-        />
-        <Stack.Screen
-          name="profile"
-          options={{
-            title: t('profile.screenTitle', 'Profile'),
-            headerBackTitle: t('tabs.home', 'Home'),
-          }}
-        />
-        <Stack.Screen
-          name="add-report"
-          options={{
-            presentation: 'modal',
-            title: t('addReport.screenTitle'),
-            headerShown: true,
-          }}
-        />
-        <Stack.Screen
-          name="report/[id]"
-          options={{
-            title: t('reportDetail.screenTitle'),
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="modal"
-          options={{
-            presentation: 'modal',
-            title: t('modal.title'),
           }}
         />
       </Stack>
