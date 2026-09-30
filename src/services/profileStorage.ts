@@ -7,7 +7,7 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   id: 'local_user_default',
   name: '',
   dateOfBirth: '',
-  biologicalSex: 'unspecified',
+  biologicalSex: 'male',
   notes: '',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

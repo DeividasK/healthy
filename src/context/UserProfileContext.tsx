@@ -8,17 +8,12 @@ import React, {
   ReactNode,
 } from 'react';
 import { UserProfile } from '../types/profile';
-import {
-  Laboratory,
-  LABORATORIES,
-} from '../data/laboratories';
 import * as profileStorage from '../services/profileStorage';
 
 interface UserProfileContextValue {
   profile: UserProfile;
   isLoading: boolean;
   error: string | null;
-  availableLabs: Laboratory[];
   updateProfile: (updates: Partial<UserProfile>) => Promise<UserProfile>;
   refreshProfile: () => Promise<void>;
 }
@@ -65,17 +60,11 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // Available laboratories (Lithuania accredited blood labs)
-  const availableLabs = useMemo(() => {
-    return LABORATORIES;
-  }, []);
-
   const value = useMemo<UserProfileContextValue>(
     () => ({
       profile,
       isLoading,
       error,
-      availableLabs,
       updateProfile,
       refreshProfile: loadProfile,
     }),
@@ -83,7 +72,6 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       profile,
       isLoading,
       error,
-      availableLabs,
       updateProfile,
       loadProfile,
     ]

@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, ScrollView, View, Text, useColorScheme } from 'react-native';
-import { ShieldCheck, Database, Sparkles, HeartHandshake, BookOpen, Cloud } from 'lucide-react-native';
+import { ShieldCheck, Database, Sparkles, HeartHandshake, BookOpen } from 'lucide-react-native';
 import { useResponsive } from '../src/hooks/useResponsive';
 import { useTranslation } from 'react-i18next';
 
@@ -136,38 +136,6 @@ export default function ModalScreen() {
         </View>
       </View>
 
-      {/* Feature 4: Self-Hosted Google Drive Sync */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-            borderColor: isDark ? '#334155' : '#E2E8F0',
-          },
-        ]}
-      >
-        <View style={styles.iconCircle}>
-          <Cloud size={22} color="#2563EB" />
-        </View>
-        <View style={styles.cardContent}>
-          <Text
-            style={[
-              styles.cardTitle,
-              { color: isDark ? '#F8FAFC' : '#0F172A' },
-            ]}
-          >
-            {t('modal.driveSyncTitle')}
-          </Text>
-          <Text
-            style={[
-              styles.cardDesc,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            {t('modal.driveSyncDesc')}
-          </Text>
-        </View>
-      </View>
 
       {/* Medical Disclaimer */}
       <View

@@ -33,6 +33,7 @@ export const en: TranslationSchema = {
     recorded: 'Recorded',
   },
   tabs: {
+    home: 'Home',
     reports: 'Reports',
     biomarkers: 'Biomarkers',
     sync: 'Drive Sync',
@@ -111,7 +112,7 @@ export const en: TranslationSchema = {
     testDate: 'Test Date (YYYY-MM-DD) *',
     testDatePlaceholder: '2026-09-29',
     labLabel: 'Laboratory / Provider (Optional)',
-    labPlaceholder: 'Select laboratory...',
+    labPlaceholder: 'e.g. Synlab, Antėja, hospital lab...',
     selectLabTitle: 'Select Laboratory',
     selectLabSubtitle: 'Accredited medical blood testing laboratories',
     searchLabPlaceholder: 'Search laboratory name or city...',

@@ -33,6 +33,7 @@ export interface TranslationSchema {
     recorded: string;
   };
   tabs: {
+    home: string;
     reports: string;
     biomarkers: string;
     sync: string;

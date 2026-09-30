@@ -15,31 +15,21 @@ import {
   Calendar,
   Building2,
   ChevronRight,
-  ShieldCheck,
   Activity,
   FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
-  Cloud,
-  User,
 } from 'lucide-react-native';
-import { AppLogo } from '../../src/components/AppLogo';
-import { useLabReports } from '../../src/context/LabReportsContext';
-import { useUserProfile } from '../../src/context/UserProfileContext';
+import { useLabReports } from '../src/context/LabReportsContext';
 import { useTranslation } from 'react-i18next';
-import { useResponsive } from '../../src/hooks/useResponsive';
+import { useResponsive } from '../src/hooks/useResponsive';
 
 export default function HomeScreen() {
   const {
     reports,
     isLoading,
     refreshReports,
-    totalReports,
-    totalMarkersCount,
-    latestReport,
-    syncStatus,
   } = useLabReports();
-  const { profile } = useUserProfile();
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -64,161 +54,36 @@ export default function HomeScreen() {
         <RefreshControl refreshing={isLoading} onRefresh={refreshReports} />
       }
     >
-      {/* Brand Logo & Badges Header */}
-      <View style={styles.header}>
-        <AppLogo size={38} color={isDark ? '#98CEAA' : '#5A8669'} />
-
-        <View style={styles.headerRightBadges}>
-          <TouchableOpacity
-            style={[
-              styles.profileBadge,
-              { backgroundColor: isDark ? '#1E293B' : '#EFF6FF' },
-            ]}
-            onPress={() => router.push('/(tabs)/profile' as any)}
-            activeOpacity={0.7}
-          >
-            <User size={13} color="#2563EB" />
-            <Text style={styles.profileBadgeText}>
-              {profile.name ? profile.name.split(' ')[0] : t('tabs.profile')}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.syncBadge,
-              { backgroundColor: isDark ? '#1E293B' : '#EFF6FF' },
-            ]}
-            onPress={() => router.push('/(tabs)/sync' as any)}
-            activeOpacity={0.7}
-          >
-            <Cloud size={13} color="#2563EB" />
-            <Text style={styles.syncBadgeText}>
-              {syncStatus.state === 'syncing' ? t('home.syncing') : t('home.driveSync')}
-            </Text>
-          </TouchableOpacity>
-
-          <View
-            style={[
-              styles.privacyBadge,
-              { backgroundColor: isDark ? '#1E293B' : '#ECFDF5' },
-            ]}
-          >
-            <ShieldCheck size={14} color="#10B981" />
-            <Text style={styles.privacyText}>{t('home.onDeviceBadge')}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Hero Primary Action Button */}
-      <TouchableOpacity
-        style={styles.heroButton}
-        onPress={() => router.push('/add-report')}
-        activeOpacity={0.85}
-      >
-        <View style={styles.heroBtnContent}>
-          <View style={styles.heroIconWrapper}>
-            <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
-          </View>
-          <View style={styles.heroTextWrapper}>
-            <Text style={styles.heroBtnTitle}>{t('home.addReportBtn')}</Text>
-            <Text style={styles.heroBtnSubtitle}>
-              {t('home.addReportBtnSubtitle')}
-            </Text>
-          </View>
-        </View>
-        <ChevronRight size={22} color="#FFFFFF" opacity={0.8} />
-      </TouchableOpacity>
-
-      {/* Stats Summary Cards */}
-      <View style={styles.statsContainer}>
-        <View
-          style={[
-            styles.statCard,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-              borderColor: isDark ? '#334155' : '#E2E8F0',
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statLabel,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            {t('home.totalReports')}
-          </Text>
-          <Text
-            style={[
-              styles.statValue,
-              { color: isDark ? '#F8FAFC' : '#0F172A' },
-            ]}
-          >
-            {totalReports}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.statCard,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-              borderColor: isDark ? '#334155' : '#E2E8F0',
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statLabel,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            {t('home.markersTracked')}
-          </Text>
-          <Text style={[styles.statValue, { color: '#2563EB' }]}>
-            {totalMarkersCount}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.statCard,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-              borderColor: isDark ? '#334155' : '#E2E8F0',
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statLabel,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            {t('home.latestDate')}
-          </Text>
-          <Text
-            style={[
-              styles.statValueDate,
-              { color: isDark ? '#F8FAFC' : '#0F172A' },
-            ]}
-            numberOfLines={1}
-          >
-            {latestReport ? latestReport.testDate : '—'}
-          </Text>
-        </View>
-      </View>
-
       {/* Lab Reports History List */}
       <View style={styles.historySection}>
-        <Text
-          style={[
-            styles.sectionTitle,
-            { color: isDark ? '#F8FAFC' : '#0F172A' },
-          ]}
-        >
-          {t('home.recordedReports')}
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: isDark ? '#F8FAFC' : '#0F172A' },
+            ]}
+          >
+            {t('home.recordedReports')}
+          </Text>
+          {reports.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.addSmallBtn,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                  borderColor: isDark ? '#334155' : '#DBEAFE',
+                },
+              ]}
+              onPress={() => router.push('/add-report')}
+              activeOpacity={0.7}
+            >
+              <Plus size={14} color="#2563EB" />
+              <Text style={styles.addSmallBtnText}>
+                {t('common.add', 'Add')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -381,141 +246,33 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    marginTop: 8,
-  },
-  headerRightBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  profileBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  profileBadgeFlag: {
-    fontSize: 13,
-  },
-  profileBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2563EB',
-  },
-  syncBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  syncBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2563EB',
-  },
-  privacyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  privacyText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  heroButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 16,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  heroBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    flex: 1,
-  },
-  heroIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroTextWrapper: {
-    flex: 1,
-  },
-  heroBtnTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  heroBtnSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '400',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  statValueDate: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 4,
-  },
   historySection: {
     marginBottom: 20,
+    marginTop: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 12,
+  },
+  addSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  addSmallBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563EB',
   },
   loadingContainer: {
     padding: 30,

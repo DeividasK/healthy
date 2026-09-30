@@ -1,4 +1,4 @@
-export type BiologicalSex = 'male' | 'female' | 'other' | 'unspecified';
+export type BiologicalSex = 'male' | 'female';
 
 export interface UserProfile {
   id: string;

@@ -10,13 +10,6 @@ import React, {
 } from 'react';
 import { LabReport } from '../types/health';
 import * as storage from '../services/storage';
-import {
-  performSync,
-  subscribeToSyncStatus,
-  triggerDebouncedAutoSync,
-  SyncStatus,
-  getCurrentSyncStatus,
-} from '../services/syncEngine';
 import { DatabaseVersionInfo } from '../database/types';
 import { SAMPLE_WHOOP_LAB_REPORT } from '../data/sampleWhoopLabs';
 
@@ -63,13 +56,11 @@ interface LabReportsContextValue {
   reports: LabReport[];
   isLoading: boolean;
   error: string | null;
-  syncStatus: SyncStatus;
   versionInfo: DatabaseVersionInfo | null;
   refreshReports: () => Promise<void>;
   saveReport: (report: LabReport) => Promise<void>;
   deleteReport: (id: string) => Promise<void>;
   getReportById: (id: string) => LabReport | undefined;
-  triggerSync: (strategy?: 'smart-merge' | 'upload-only' | 'download-only') => Promise<void>;
   loadSampleWhoopReport: () => Promise<void>;
   totalReports: number;
   totalMarkersCount: number;
@@ -82,7 +73,6 @@ const LabReportsContext = createContext<LabReportsContextValue | undefined>(
 
 export function LabReportsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(labReportsReducer, initialState);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(getCurrentSyncStatus);
   const [versionInfo, setVersionInfo] = useState<DatabaseVersionInfo | null>(null);
 
   const loadData = useCallback(async () => {
@@ -104,30 +94,12 @@ export function LabReportsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadData();
-
-    // Subscribe to sync status updates
-    const unsubscribeSync = subscribeToSyncStatus((newStatus) => {
-      setSyncStatus(newStatus);
-      if (newStatus.state === 'success' && newStatus.lastResult?.updatedCount) {
-        // Re-read reports from database when new records arrive from cloud
-        storage.getLabReports().then((data) => {
-          dispatch({ type: 'LOAD_REPORTS_SUCCESS', payload: data });
-        });
-      }
-    });
-
-    return () => {
-      unsubscribeSync();
-    };
   }, [loadData]);
 
   const saveReport = useCallback(async (report: LabReport) => {
     try {
       const updatedReports = await storage.saveLabReport(report);
       dispatch({ type: 'SAVE_REPORT_SUCCESS', payload: updatedReports });
-
-      // Trigger automatic debounced sync with Google Drive
-      triggerDebouncedAutoSync();
     } catch (err: any) {
       dispatch({
         type: 'SET_ERROR',
@@ -141,9 +113,6 @@ export function LabReportsProvider({ children }: { children: ReactNode }) {
     try {
       const updatedReports = await storage.deleteLabReport(id);
       dispatch({ type: 'DELETE_REPORT_SUCCESS', payload: updatedReports });
-
-      // Trigger automatic debounced sync with Google Drive
-      triggerDebouncedAutoSync();
     } catch (err: any) {
       dispatch({
         type: 'SET_ERROR',
@@ -152,15 +121,6 @@ export function LabReportsProvider({ children }: { children: ReactNode }) {
       throw err;
     }
   }, []);
-
-  const triggerSync = useCallback(
-    async (strategy?: 'smart-merge' | 'upload-only' | 'download-only') => {
-      await performSync({ strategy });
-      const freshReports = await storage.getLabReports();
-      dispatch({ type: 'LOAD_REPORTS_SUCCESS', payload: freshReports });
-    },
-    []
-  );
 
   const loadSampleWhoopReport = useCallback(async () => {
     await saveReport(SAMPLE_WHOOP_LAB_REPORT);
@@ -193,13 +153,11 @@ export function LabReportsProvider({ children }: { children: ReactNode }) {
       reports: state.reports,
       isLoading: state.isLoading,
       error: state.error,
-      syncStatus,
       versionInfo,
       refreshReports: loadData,
       saveReport,
       deleteReport,
       getReportById,
-      triggerSync,
       loadSampleWhoopReport,
       ...stats,
     }),
@@ -207,13 +165,11 @@ export function LabReportsProvider({ children }: { children: ReactNode }) {
       state.reports,
       state.isLoading,
       state.error,
-      syncStatus,
       versionInfo,
       loadData,
       saveReport,
       deleteReport,
       getReportById,
-      triggerSync,
       loadSampleWhoopReport,
       stats,
     ]

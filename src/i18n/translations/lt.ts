@@ -33,6 +33,7 @@ export const lt: TranslationSchema = {
     recorded: 'Užfiksuota',
   },
   tabs: {
+    home: 'Pradžia',
     reports: 'Tyrimai',
     biomarkers: 'Rodikliai',
     sync: 'Atsarginė kopija',
@@ -111,7 +112,7 @@ export const lt: TranslationSchema = {
     testDate: 'Tyrimo data (MMMM-MM-DD) *',
     testDatePlaceholder: '2026-09-29',
     labLabel: 'Laboratorija / Įstaiga (Neprivaloma)',
-    labPlaceholder: 'Pasirinkite laboratoriją...',
+    labPlaceholder: 'pvz., Synlab, Antėja...',
     selectLabTitle: 'Pasirinkite laboratoriją',
     selectLabSubtitle: 'Akredituotos medicininės laboratorijos Lietuvoje',
     searchLabPlaceholder: 'Ieškoti laboratorijos ar miesto...',

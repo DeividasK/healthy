@@ -10,8 +10,6 @@ import {
   Platform,
   KeyboardAvoidingView,
   useColorScheme,
-  Modal,
-  FlatList,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -23,12 +21,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   X,
-  ChevronDown,
   Check,
-  Search,
 } from 'lucide-react-native';
 import { useLabReports } from '../src/context/LabReportsContext';
-import { useUserProfile } from '../src/context/UserProfileContext';
 import { useTranslation } from 'react-i18next';
 import { getBiomarkerDisplayName } from '../src/i18n/biomarkers';
 import { BiomarkerResult, LabReport } from '../src/types/health';
@@ -39,7 +34,6 @@ import { useResponsive } from '../src/hooks/useResponsive';
 export default function AddReportScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { reports, saveReport } = useLabReports();
-  const { availableLabs } = useUserProfile();
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'lt' ? 'lt' : 'en';
   const colorScheme = useColorScheme();
@@ -59,20 +53,6 @@ export default function AddReportScreen() {
   const [notes, setNotes] = useState('');
   const [markers, setMarkers] = useState<BiomarkerResult[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [isLabModalOpen, setIsLabModalOpen] = useState(false);
-  const [labSearch, setLabSearch] = useState('');
-
-  const filteredLabs = useMemo(() => {
-    const q = labSearch.trim().toLowerCase();
-    if (!q) return availableLabs;
-    return availableLabs.filter(
-      (l) =>
-        l.name.toLowerCase().includes(q) ||
-        (l.description && l.description.toLowerCase().includes(q)) ||
-        (l.city && l.city.toLowerCase().includes(q))
-    );
-  }, [availableLabs, labSearch]);
 
   // Initialize if editing existing report
   useEffect(() => {
@@ -281,7 +261,7 @@ export default function AddReportScreen() {
               />
             </View>
 
-            {/* Lab / Facility Name Dropdown */}
+            {/* Lab / Facility Name */}
             <View style={[styles.inputGroup, styles.labInputGroup]}>
               <View style={styles.inputLabelRow}>
                 <Building2 size={14} color={isDark ? '#94A3B8' : '#64748B'} />
@@ -294,67 +274,20 @@ export default function AddReportScreen() {
                   {t('addReport.labLabel')}
                 </Text>
               </View>
-              <TouchableOpacity
+              <TextInput
                 style={[
-                  styles.dropdownBtn,
+                  styles.textInput,
                   {
                     backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
                     borderColor: isDark ? '#334155' : '#CBD5E1',
+                    color: isDark ? '#F8FAFC' : '#0F172A',
                   },
                 ]}
-                onPress={() => setIsLabModalOpen(true)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.dropdownBtnLeft}>
-                  <Building2
-                    size={16}
-                    color={
-                      labName
-                        ? '#2563EB'
-                        : isDark
-                        ? '#64748B'
-                        : '#94A3B8'
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.dropdownBtnText,
-                      {
-                        color: labName
-                          ? isDark
-                            ? '#F8FAFC'
-                            : '#0F172A'
-                          : isDark
-                          ? '#64748B'
-                          : '#94A3B8',
-                        fontWeight: labName ? '600' : '400',
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {labName || t('addReport.labPlaceholder')}
-                  </Text>
-                </View>
-
-                <View style={styles.dropdownBtnRight}>
-                  {labName ? (
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setLabName('');
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <X size={16} color={isDark ? '#94A3B8' : '#64748B'} />
-                    </TouchableOpacity>
-                  ) : (
-                    <ChevronDown
-                      size={18}
-                      color={isDark ? '#94A3B8' : '#64748B'}
-                    />
-                  )}
-                </View>
-              </TouchableOpacity>
+                placeholder={t('addReport.labPlaceholder')}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                value={labName}
+                onChangeText={setLabName}
+              />
             </View>
           </View>
 
@@ -471,185 +404,7 @@ export default function AddReportScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Laboratory Selector Modal */}
-      <Modal
-        visible={isLabModalOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setIsLabModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                borderColor: isDark ? '#334155' : '#E2E8F0',
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleGroup}>
-                <Text
-                  style={[
-                    styles.modalTitle,
-                    { color: isDark ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {t('addReport.selectLabTitle')}
-                </Text>
-                <Text
-                  style={[
-                    styles.modalSubtitle,
-                    { color: isDark ? '#94A3B8' : '#64748B' },
-                  ]}
-                >
-                  {t('addReport.selectLabSubtitle')}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setIsLabModalOpen(false)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
-              </TouchableOpacity>
-            </View>
 
-            {/* Modal Search Box */}
-            <View
-              style={[
-                styles.modalSearchBox,
-                {
-                  backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                  borderColor: isDark ? '#334155' : '#E2E8F0',
-                },
-              ]}
-            >
-              <Search size={16} color={isDark ? '#94A3B8' : '#64748B'} />
-              <TextInput
-                style={[
-                  styles.modalSearchInput,
-                  { color: isDark ? '#F8FAFC' : '#0F172A' },
-                ]}
-                placeholder={t('addReport.searchLabPlaceholder')}
-                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-                value={labSearch}
-                onChangeText={setLabSearch}
-                autoCorrect={false}
-              />
-              {labSearch.length > 0 && (
-                <TouchableOpacity onPress={() => setLabSearch('')}>
-                  <X size={14} color={isDark ? '#94A3B8' : '#64748B'} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Clear / Unspecified option */}
-            {labName.length > 0 && (
-              <TouchableOpacity
-                style={[
-                  styles.clearLabOption,
-                  {
-                    borderBottomColor: isDark ? '#334155' : '#E2E8F0',
-                  },
-                ]}
-                onPress={() => {
-                  setLabName('');
-                  setIsLabModalOpen(false);
-                }}
-              >
-                <Text style={styles.clearLabOptionText}>
-                  {t('addReport.clearLabSelection')}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* List of laboratories */}
-            <FlatList
-              data={filteredLabs}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingVertical: 6 }}
-              renderItem={({ item }) => {
-                const isSelected = labName === item.name;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.labModalItem,
-                      isSelected && {
-                        backgroundColor: isDark ? '#2563EB20' : '#EFF6FF',
-                        borderColor: '#2563EB',
-                      },
-                      {
-                        borderColor: isSelected
-                          ? '#2563EB'
-                          : isDark
-                          ? '#334155'
-                          : '#E2E8F0',
-                      },
-                    ]}
-                    onPress={() => {
-                      setLabName(item.name);
-                      setIsLabModalOpen(false);
-                      setLabSearch('');
-                    }}
-                  >
-                    <View style={styles.labModalItemLeft}>
-                      <View style={styles.labModalNameRow}>
-                        <Text
-                          style={[
-                            styles.labModalName,
-                            { color: isDark ? '#F8FAFC' : '#0F172A' },
-                            isSelected && {
-                              color: '#2563EB',
-                              fontWeight: '700',
-                            },
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                      </View>
-                      {item.description && (
-                        <Text
-                          style={[
-                            styles.labModalDesc,
-                            { color: isDark ? '#CBD5E1' : '#64748B' },
-                          ]}
-                        >
-                          {item.description}
-                        </Text>
-                      )}
-                      {item.city && (
-                        <Text
-                          style={[
-                            styles.labModalCity,
-                            { color: isDark ? '#94A3B8' : '#64748B' },
-                          ]}
-                        >
-                          📍 {item.city}
-                        </Text>
-                      )}
-                    </View>
-
-                    {isSelected && <Check size={18} color="#2563EB" />}
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyLabsList}>
-                  <Text
-                    style={[
-                      styles.emptyLabsText,
-                      { color: isDark ? '#94A3B8' : '#64748B' },
-                    ]}
-                  >
-                    {t('addReport.noLabsMatch')}
-                  </Text>
-                </View>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -788,122 +543,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  dropdownBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 44,
-  },
-  dropdownBtnLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  dropdownBtnRight: {
-    paddingLeft: 4,
-  },
-  dropdownBtnText: {
-    fontSize: 15,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    maxHeight: '80%',
-    padding: 20,
-    paddingBottom: 36,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
-  },
-  modalHeaderTitleGroup: {
-    flex: 1,
-    marginRight: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  modalSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 42,
-    marginBottom: 10,
-  },
-  modalSearchInput: {
-    flex: 1,
-    fontSize: 14,
-  },
-  clearLabOption: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    marginBottom: 6,
-  },
-  clearLabOptionText: {
-    fontSize: 13,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
-  labModalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  labModalItemLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  labModalNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  labModalName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  labModalDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  labModalCity: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  emptyLabsList: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyLabsText: {
-    fontSize: 13,
   },
 });

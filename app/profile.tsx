@@ -1,37 +1,34 @@
-import React, { useState, useEffect, useMemo } from 'react';
 import {
-  View,
+  Calendar,
+  Check,
+  Globe,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  User,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Alert,
-  Platform,
   useColorScheme,
+  View,
 } from 'react-native';
-import {
-  User,
-  Calendar,
-  FileText,
-  Save,
-  Check,
-  Building2,
-  ShieldCheck,
-  Sparkles,
-  Globe,
-} from 'lucide-react-native';
-import { useUserProfile } from '../../src/context/UserProfileContext';
-import { BiologicalSex } from '../../src/types/profile';
-import { useResponsive } from '../../src/hooks/useResponsive';
-import { useTranslation } from 'react-i18next';
-import { changeLanguage, Language } from '../../src/i18n/i18n';
+import { useUserProfile } from '../src/context/UserProfileContext';
+import { useResponsive } from '../src/hooks/useResponsive';
+import { changeLanguage, Language } from '../src/i18n/i18n';
+import { BiologicalSex } from '../src/types/profile';
 
 export default function ProfileScreen() {
   const {
     profile,
     updateProfile,
-    availableLabs,
     isLoading,
   } = useUserProfile();
   const { t, i18n } = useTranslation();
@@ -43,9 +40,8 @@ export default function ProfileScreen() {
   const [name, setName] = useState(profile.name || '');
   const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth || '');
   const [biologicalSex, setBiologicalSex] = useState<BiologicalSex>(
-    profile.biologicalSex || 'unspecified'
+    profile.biologicalSex === 'female' ? 'female' : 'male'
   );
-  const [notes, setNotes] = useState(profile.notes || '');
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
@@ -55,8 +51,7 @@ export default function ProfileScreen() {
     if (!isLoading) {
       setName(profile.name || '');
       setDateOfBirth(profile.dateOfBirth || '');
-      setBiologicalSex(profile.biologicalSex || 'unspecified');
-      setNotes(profile.notes || '');
+      setBiologicalSex(profile.biologicalSex === 'female' ? 'female' : 'male');
     }
   }, [profile, isLoading]);
 
@@ -79,8 +74,6 @@ export default function ProfileScreen() {
   const biologicalSexOptions: { label: string; value: BiologicalSex }[] = [
     { label: t('profile.sexMale'), value: 'male' },
     { label: t('profile.sexFemale'), value: 'female' },
-    { label: t('profile.sexOther'), value: 'other' },
-    { label: t('profile.sexUnspecified'), value: 'unspecified' },
   ];
 
   const handleSave = async () => {
@@ -105,7 +98,6 @@ export default function ProfileScreen() {
         name: name.trim(),
         dateOfBirth: dateOfBirth.trim() || undefined,
         biologicalSex,
-        notes: notes.trim() || undefined,
       });
 
       setShowSavedToast(true);
@@ -414,38 +406,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Clinical Notes */}
-        <View style={styles.inputGroup}>
-          <View style={styles.inputLabelRow}>
-            <FileText size={14} color={isDark ? '#94A3B8' : '#64748B'} />
-            <Text
-              style={[
-                styles.inputLabel,
-                { color: isDark ? '#94A3B8' : '#64748B' },
-              ]}
-            >
-              {t('profile.notesLabel')}
-            </Text>
-          </View>
-          <TextInput
-            style={[
-              styles.textInput,
-              styles.notesInput,
-              {
-                backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                borderColor: isDark ? '#334155' : '#CBD5E1',
-                color: isDark ? '#F8FAFC' : '#0F172A',
-              },
-            ]}
-            placeholder={t('profile.notesPlaceholder')}
-            placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
         {/* Save Button */}
         <TouchableOpacity
           style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
@@ -466,102 +426,6 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      {/* Available Laboratories Card */}
-      <View
-        style={[
-          styles.labsCard,
-          {
-            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-            borderColor: isDark ? '#334155' : '#E2E8F0',
-          },
-        ]}
-      >
-        <View style={styles.labsCardHeader}>
-          <View>
-            <View style={styles.labsCardTitleRow}>
-              <Building2 size={18} color="#2563EB" />
-              <Text
-                style={[
-                  styles.cardTitle,
-                  { color: isDark ? '#F8FAFC' : '#0F172A', marginBottom: 0 },
-                ]}
-              >
-                {t('profile.labsTitle')} ({availableLabs.length})
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.labsSubtitle,
-                { color: isDark ? '#94A3B8' : '#64748B' },
-              ]}
-            >
-              {t('profile.labsSubtitle')}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.labsList}>
-          {availableLabs.map((lab) => (
-            <View
-              key={lab.id}
-              style={[
-                styles.labItem,
-                {
-                  backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                  borderColor: isDark ? '#334155' : '#E2E8F0',
-                },
-              ]}
-            >
-              <View style={styles.labItemMain}>
-                <View style={styles.labItemHeader}>
-                  <Text
-                    style={[
-                      styles.labItemName,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
-                    {lab.name}
-                  </Text>
-                </View>
-
-                {lab.description && (
-                  <Text
-                    style={[
-                      styles.labItemDesc,
-                      { color: isDark ? '#CBD5E1' : '#64748B' },
-                    ]}
-                  >
-                    {lab.description}
-                  </Text>
-                )}
-
-                <View style={styles.labItemFooter}>
-                  {lab.city && (
-                    <Text
-                      style={[
-                        styles.labItemMeta,
-                        { color: isDark ? '#94A3B8' : '#64748B' },
-                      ]}
-                    >
-                      📍 {lab.city}
-                    </Text>
-                  )}
-                  {lab.website && (
-                    <Text
-                      style={[
-                        styles.labItemMeta,
-                        { color: '#2563EB' },
-                      ]}
-                    >
-                      🔗 {lab.website.replace('https://', '')}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -714,10 +578,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
   },
-  notesInput: {
-    minHeight: 64,
-    textAlignVertical: 'top',
-  },
   fieldHelperText: {
     fontSize: 12,
     marginBottom: 8,
@@ -776,65 +636,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#065F46',
     fontWeight: '600',
-  },
-  labsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  labsCardHeader: {
-    marginBottom: 14,
-  },
-  labsCardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  labsSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  labsList: {
-    gap: 10,
-  },
-  labItem: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-  },
-  labItemMain: {
-    flex: 1,
-  },
-  labItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  labItemName: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  labItemDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 6,
-  },
-  labItemFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  labItemMeta: {
-    fontSize: 11,
-    fontWeight: '500',
   },
 });
