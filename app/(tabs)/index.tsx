@@ -20,10 +20,10 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
-  Heart,
   Cloud,
   User,
 } from 'lucide-react-native';
+import { AppLogo } from '../../src/components/AppLogo';
 import { useLabReports } from '../../src/context/LabReportsContext';
 import { useUserProfile } from '../../src/context/UserProfileContext';
 import { useTranslation } from 'react-i18next';
@@ -64,29 +64,9 @@ export default function HomeScreen() {
         <RefreshControl refreshing={isLoading} onRefresh={refreshReports} />
       }
     >
-      {/* Brand & Privacy Header */}
+      {/* Brand Logo & Badges Header */}
       <View style={styles.header}>
-        <View>
-          <View style={styles.brandRow}>
-            <Heart size={22} color="#EF4444" fill="#EF4444" />
-            <Text
-              style={[
-                styles.brandTitle,
-                { color: isDark ? '#F8FAFC' : '#0F172A' },
-              ]}
-            >
-              Healthy
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.subtitle,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            {t('home.subtitle')}
-          </Text>
-        </View>
+        <AppLogo size={38} color={isDark ? '#98CEAA' : '#5A8669'} />
 
         <View style={styles.headerRightBadges}>
           <TouchableOpacity
@@ -403,25 +383,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
     marginTop: 8,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  brandTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '500',
   },
   headerRightBadges: {
     flexDirection: 'row',
