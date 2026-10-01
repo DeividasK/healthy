@@ -8,17 +8,26 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
 3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
 
+## Node Version Management
+
+Ensure active Node version matches `package.json` (`devEngines.runtime.version`, e.g. `22.23.2`).
+Use `fnv` (Fast Node Manager / `fnm`) to manage Node versions. Non-interactive subshells must activate it before running commands:
+
+```bash
+eval "$(fnv env --shell zsh)"
+```
+
 ## Commands
 
 Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 
 ```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
+eval "$(fnv env --shell zsh)" && npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
+eval "$(fnv env --shell zsh)" && npx expo start              # start the dev server
+eval "$(fnv env --shell zsh)" && npx expo lint               # lint
+eval "$(fnv env --shell zsh)" && npx tsc --noEmit            # typecheck
+eval "$(fnv env --shell zsh)" && npx expo-doctor             # diagnose dependency and config issues
+eval "$(fnv env --shell zsh)" && npx expo install --fix      # fix incompatible package versions
 ```
 
 Run lint and typecheck before declaring any task done.
