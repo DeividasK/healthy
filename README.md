@@ -25,8 +25,6 @@ A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application
   - **Dynamic Live Flagging**: Real-time visual status indicators (🟢 Normal, 🔵 Low, 🔴 High, 🚨 Critical) calculated live as values are entered.
 - **Design System**: Fully responsive mobile-first UI with automatic **Dark Mode** and **Light Mode** support.
 
----
-
 ## 🚀 Running the App
 
 Run locally using `pnpm`:
