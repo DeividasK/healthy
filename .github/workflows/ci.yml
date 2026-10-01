@@ -15,14 +15,11 @@ jobs:
         with:
           cache: true
 
-      - name: Install dependencies
-        run: pnpm install
-
       - name: TypeScript Check
         run: npx tsc --noEmit
 
       - name: Build Web Static Export
-        run: npx expo export --platform web
+        run: pnpm build:web
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
