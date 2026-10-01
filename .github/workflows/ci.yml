@@ -2,6 +2,9 @@ name: CI
 
 on:
   push:
+    branches:
+      # Disable temporarily
+      - non-existent-branch
 
 jobs:
   test:
