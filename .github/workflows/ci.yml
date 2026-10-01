@@ -2,29 +2,49 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      - "main"
+
+env:
+  PNPM_CONFIG_STRICT_DEP_BUILDS: 'false'
 
 jobs:
-  test:
-    name: Typecheck & E2E Tests
+  checks:
+    name: Typecheck, Lint & Format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/setup@v1
         with:
           cache: true
 
       - name: TypeScript Check
-        run: npx tsc --noEmit
+        run: pnpm tsc --noEmit
+
+      - name: Lint
+        run: pnpm expo lint
+
+      - name: Format Check
+        run: pnpm format:check
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v1
+        with:
+          cache: true
 
       - name: Build Web Static Export
         uses: ./.github/actions/build-web
-
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
 
       - name: Run E2E Tests
         run: pnpm test:e2e
@@ -36,3 +56,42 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  deploy-to-github-pages:
+    name: Build & Deploy to GitHub Pages
+    needs: [checks, e2e]
+    # Only run on main branch
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v1
+        with:
+          cache: true
+
+      - name: Build for GitHub Pages
+        uses: ./.github/actions/build-web
+        with:
+          base-url: /healthy
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -44,7 +44,10 @@ export async function initializeDatabase(): Promise<void> {
       `);
     }
   } catch (err) {
-    console.warn('Native SQLite init failed, falling back to AsyncStorage:', err);
+    console.warn(
+      'Native SQLite init failed, falling back to AsyncStorage:',
+      err
+    );
     nativeDb = null;
   }
 
@@ -62,24 +65,35 @@ export async function insertDiagnosticReportRecord(
 
   const now = new Date().toISOString();
   const effectiveDate = report.effectiveDateTime || now.split('T')[0];
-  const notesText = report.note && report.note.length > 0 ? report.note.map(n => n.text).join('\n') : null;
+  const notesText =
+    report.note && report.note.length > 0
+      ? report.note.map((n) => n.text).join('\n')
+      : null;
 
   if (Platform.OS !== 'web' && nativeDb) {
     await nativeDb.withTransactionAsync(async () => {
       await nativeDb.runAsync(
         `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?);`,
-        [report.id, effectiveDate, report.status, notesText, JSON.stringify(report), now, now]
+        [
+          report.id,
+          effectiveDate,
+          report.status,
+          notesText,
+          JSON.stringify(report),
+          now,
+          now,
+        ]
       );
 
-      await nativeDb.runAsync(
-        `DELETE FROM observations WHERE report_id = ?;`,
-        [report.id]
-      );
+      await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
+        report.id,
+      ]);
 
       for (const obs of observations) {
         const loinc = obs.code.coding?.[0]?.code || '';
-        const name = obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
+        const name =
+          obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
         const val = obs.valueQuantity?.value ?? 0;
         const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
 
@@ -94,8 +108,12 @@ export async function insertDiagnosticReportRecord(
   }
 
   // Web / AsyncStorage Fallback
-  const existingReportsRaw = await AsyncStorage.getItem(ASYNC_STORAGE_REPORTS_KEY);
-  const existingReports: Record<string, any> = existingReportsRaw ? JSON.parse(existingReportsRaw) : {};
+  const existingReportsRaw = await AsyncStorage.getItem(
+    ASYNC_STORAGE_REPORTS_KEY
+  );
+  const existingReports: Record<string, any> = existingReportsRaw
+    ? JSON.parse(existingReportsRaw)
+    : {};
   existingReports[report.id] = {
     id: report.id,
     effective_date: effectiveDate,
@@ -105,11 +123,18 @@ export async function insertDiagnosticReportRecord(
     created_at: now,
     updated_at: now,
   };
-  await AsyncStorage.setItem(ASYNC_STORAGE_REPORTS_KEY, JSON.stringify(existingReports));
+  await AsyncStorage.setItem(
+    ASYNC_STORAGE_REPORTS_KEY,
+    JSON.stringify(existingReports)
+  );
 
-  const existingObsRaw = await AsyncStorage.getItem(ASYNC_STORAGE_OBSERVATIONS_KEY);
-  const existingObs: Record<string, any[]> = existingObsRaw ? JSON.parse(existingObsRaw) : {};
-  existingObs[report.id] = observations.map(obs => {
+  const existingObsRaw = await AsyncStorage.getItem(
+    ASYNC_STORAGE_OBSERVATIONS_KEY
+  );
+  const existingObs: Record<string, any[]> = existingObsRaw
+    ? JSON.parse(existingObsRaw)
+    : {};
+  existingObs[report.id] = observations.map((obs) => {
     const loinc = obs.code.coding?.[0]?.code || '';
     const name = obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
     const val = obs.valueQuantity?.value ?? 0;
@@ -125,13 +150,18 @@ export async function insertDiagnosticReportRecord(
       created_at: now,
     };
   });
-  await AsyncStorage.setItem(ASYNC_STORAGE_OBSERVATIONS_KEY, JSON.stringify(existingObs));
+  await AsyncStorage.setItem(
+    ASYNC_STORAGE_OBSERVATIONS_KEY,
+    JSON.stringify(existingObs)
+  );
 }
 
 /**
  * Retrieves all stored diagnostic reports with their nested observations.
  */
-export async function fetchAllDiagnosticReportRecords(): Promise<DiagnosticReportRecord[]> {
+export async function fetchAllDiagnosticReportRecords(): Promise<
+  DiagnosticReportRecord[]
+> {
   await initializeDatabase();
 
   if (Platform.OS !== 'web' && nativeDb) {
@@ -146,7 +176,9 @@ export async function fetchAllDiagnosticReportRecords(): Promise<DiagnosticRepor
         `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC;`,
         [r.id]
       );
-      const observations: FHIRObservation[] = obsRows.map((o: any) => JSON.parse(o.fhir_json));
+      const observations: FHIRObservation[] = obsRows.map((o: any) =>
+        JSON.parse(o.fhir_json)
+      );
       records.push({ report: parsedReport, observations });
     }
     return records;
@@ -167,7 +199,9 @@ export async function fetchAllDiagnosticReportRecords(): Promise<DiagnosticRepor
   return reportList.map((r: any) => {
     const report: FHIRDiagnosticReport = JSON.parse(r.fhir_json);
     const obsList = obsObj[r.id] || [];
-    const observations: FHIRObservation[] = obsList.map((o: any) => JSON.parse(o.fhir_json));
+    const observations: FHIRObservation[] = obsList.map((o: any) =>
+      JSON.parse(o.fhir_json)
+    );
     return { report, observations };
   });
 }
@@ -175,12 +209,18 @@ export async function fetchAllDiagnosticReportRecords(): Promise<DiagnosticRepor
 /**
  * Deletes a diagnostic report and its associated observations.
  */
-export async function deleteDiagnosticReportRecord(reportId: string): Promise<void> {
+export async function deleteDiagnosticReportRecord(
+  reportId: string
+): Promise<void> {
   await initializeDatabase();
 
   if (Platform.OS !== 'web' && nativeDb) {
-    await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [reportId]);
-    await nativeDb.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [reportId]);
+    await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
+      reportId,
+    ]);
+    await nativeDb.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [
+      reportId,
+    ]);
     return;
   }
 
@@ -189,13 +229,19 @@ export async function deleteDiagnosticReportRecord(reportId: string): Promise<vo
   if (reportsRaw) {
     const reportsObj = JSON.parse(reportsRaw);
     delete reportsObj[reportId];
-    await AsyncStorage.setItem(ASYNC_STORAGE_REPORTS_KEY, JSON.stringify(reportsObj));
+    await AsyncStorage.setItem(
+      ASYNC_STORAGE_REPORTS_KEY,
+      JSON.stringify(reportsObj)
+    );
   }
 
   const obsRaw = await AsyncStorage.getItem(ASYNC_STORAGE_OBSERVATIONS_KEY);
   if (obsRaw) {
     const obsObj = JSON.parse(obsRaw);
     delete obsObj[reportId];
-    await AsyncStorage.setItem(ASYNC_STORAGE_OBSERVATIONS_KEY, JSON.stringify(obsObj));
+    await AsyncStorage.setItem(
+      ASYNC_STORAGE_OBSERVATIONS_KEY,
+      JSON.stringify(obsObj)
+    );
   }
 }

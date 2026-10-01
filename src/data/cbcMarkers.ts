@@ -49,7 +49,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 11.0,
       text: '4.5 - 11.0 10*3/uL',
     },
-    description: 'Total number of white blood cells; key indicator of infection, inflammation, or immune health.',
+    description:
+      'Total number of white blood cells; key indicator of infection, inflammation, or immune health.',
   },
   {
     id: 'cbc_rbc',
@@ -68,7 +69,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 5.9,
       text: '4.2 - 5.9 10*6/uL',
     },
-    description: 'Number of oxygen-carrying red blood cells per volume of blood.',
+    description:
+      'Number of oxygen-carrying red blood cells per volume of blood.',
   },
   {
     id: 'cbc_hemoglobin',
@@ -88,7 +90,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 17.5,
       text: '13.5 - 17.5 g/dL',
     },
-    description: 'Iron-containing oxygen transport metalloprotein in red blood cells.',
+    description:
+      'Iron-containing oxygen transport metalloprotein in red blood cells.',
   },
   {
     id: 'cbc_hematocrit',
@@ -107,7 +110,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 50.0,
       text: '38.8 - 50.0 %',
     },
-    description: 'Percentage proportion of blood volume that is occupied by red blood cells.',
+    description:
+      'Percentage proportion of blood volume that is occupied by red blood cells.',
   },
   {
     id: 'cbc_platelets',
@@ -127,7 +131,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 450,
       text: '150 - 450 10*3/uL',
     },
-    description: 'Cell fragments essential for normal blood clotting and vessel repair.',
+    description:
+      'Cell fragments essential for normal blood clotting and vessel repair.',
   },
   {
     id: 'cbc_mcv',
@@ -137,9 +142,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: 'fL',
     ucumCode: 'fL',
-    units: [
-      { label: 'fL', ucum: 'fL', factor: 1 },
-    ],
+    units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
     referenceRange: {
       low: 80,
       high: 100,
@@ -183,7 +186,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       high: 36,
       text: '32 - 36 g/dL',
     },
-    description: 'Average concentration of hemoglobin within a given volume of packed red blood cells.',
+    description:
+      'Average concentration of hemoglobin within a given volume of packed red blood cells.',
   },
   {
     id: 'cbc_rdw_cv',
@@ -193,15 +197,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 11.5,
       high: 14.5,
       text: '11.5 - 14.5 %',
     },
-    description: 'Measurement of the variation in red blood cell volume and size (coefficient of variation).',
+    description:
+      'Measurement of the variation in red blood cell volume and size (coefficient of variation).',
   },
   {
     id: 'cbc_rdw_sd',
@@ -211,15 +214,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: 'fL',
     ucumCode: 'fL',
-    units: [
-      { label: 'fL', ucum: 'fL', factor: 1 },
-    ],
+    units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
     referenceRange: {
       low: 39,
       high: 46,
       text: '39 - 46 fL',
     },
-    description: 'Actual measurement of the width of red blood cell volume distribution curve at 20% height.',
+    description:
+      'Actual measurement of the width of red blood cell volume distribution curve at 20% height.',
   },
   {
     id: 'cbc_mpv',
@@ -229,15 +231,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: 'fL',
     ucumCode: 'fL',
-    units: [
-      { label: 'fL', ucum: 'fL', factor: 1 },
-    ],
+    units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
     referenceRange: {
       low: 7.5,
       high: 11.5,
       text: '7.5 - 11.5 fL',
     },
-    description: 'Average size of platelets; reflects platelet production and bone marrow function.',
+    description:
+      'Average size of platelets; reflects platelet production and bone marrow function.',
   },
   {
     id: 'cbc_neutrophils_pct',
@@ -247,15 +248,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 40,
       high: 70,
       text: '40 - 70 %',
     },
-    description: 'Percentage of white blood cells that are neutrophils, vital for combating acute bacterial infections.',
+    description:
+      'Percentage of white blood cells that are neutrophils, vital for combating acute bacterial infections.',
   },
   {
     id: 'cbc_neutrophils_abs',
@@ -284,15 +284,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 20,
       high: 40,
       text: '20 - 40 %',
     },
-    description: 'Percentage of white blood cells that are lymphocytes (T cells, B cells, NK cells).',
+    description:
+      'Percentage of white blood cells that are lymphocytes (T cells, B cells, NK cells).',
   },
   {
     id: 'cbc_lymphocytes_abs',
@@ -321,15 +320,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 2,
       high: 8,
       text: '2 - 8 %',
     },
-    description: 'Percentage of white blood cells that are monocytes, precursor cells to macrophages.',
+    description:
+      'Percentage of white blood cells that are monocytes, precursor cells to macrophages.',
   },
   {
     id: 'cbc_monocytes_abs',
@@ -358,15 +356,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 1,
       high: 4,
       text: '1 - 4 %',
     },
-    description: 'Percentage of white blood cells involved in allergic responses and parasitic defense.',
+    description:
+      'Percentage of white blood cells involved in allergic responses and parasitic defense.',
   },
   {
     id: 'cbc_eosinophils_abs',
@@ -395,15 +392,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
-    units: [
-      { label: '%', ucum: '%', factor: 1 },
-    ],
+    units: [{ label: '%', ucum: '%', factor: 1 }],
     referenceRange: {
       low: 0.5,
       high: 1.0,
       text: '0.5 - 1.0 %',
     },
-    description: 'Percentage of granulocytes releasing histamine and heparin during inflammatory reactions.',
+    description:
+      'Percentage of granulocytes releasing histamine and heparin during inflammatory reactions.',
   },
   {
     id: 'cbc_basophils_abs',
@@ -443,8 +439,8 @@ export function searchCBCMarkers(query: string): CBCBiomarkerDefinition[] {
 /**
  * Finds a CBC biomarker by its canonical key or LOINC code.
  */
-export function getCBCMarker(idOrLoinc: string): CBCBiomarkerDefinition | undefined {
-  return CBC_MARKERS.find(
-    (m) => m.id === idOrLoinc || m.loinc === idOrLoinc
-  );
+export function getCBCMarker(
+  idOrLoinc: string
+): CBCBiomarkerDefinition | undefined {
+  return CBC_MARKERS.find((m) => m.id === idOrLoinc || m.loinc === idOrLoinc);
 }

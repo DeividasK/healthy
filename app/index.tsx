@@ -4,13 +4,13 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DiagnosticReportRecord } from '../src/database/types';
 import { getAllReports } from '../src/services/diagnosticReportService';
 import { FHIRObservation } from '../src/types/fhir';
@@ -61,7 +61,9 @@ export default function HomeScreen() {
     if (interpretationCode === 'N') {
       return (
         <View style={[styles.statusBadge, styles.statusNormal]}>
-          <Text style={[styles.statusText, styles.statusTextNormal]}>Normal</Text>
+          <Text style={[styles.statusText, styles.statusTextNormal]}>
+            Normal
+          </Text>
         </View>
       );
     }
@@ -131,7 +133,11 @@ export default function HomeScreen() {
                   {/* Card Header: Date & Report Code */}
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
-                      <Calendar color="#414844" size={16} style={{ marginRight: 6 }} />
+                      <Calendar
+                        color="#414844"
+                        size={16}
+                        style={{ marginRight: 6 }}
+                      />
                       <Text style={styles.cardDate}>
                         {formatDate(record.report.effectiveDateTime || '')}
                       </Text>
@@ -149,7 +155,9 @@ export default function HomeScreen() {
                   {/* Notes if available */}
                   {noteText && (
                     <View style={styles.cardNoteContainer}>
-                      <Text style={styles.cardNoteText}>"{noteText}"</Text>
+                      <Text style={styles.cardNoteText}>
+                        &quot;{noteText}&quot;
+                      </Text>
                     </View>
                   )}
 
@@ -160,9 +168,14 @@ export default function HomeScreen() {
                   <View style={styles.observationsContainer}>
                     {record.observations.map((obs) => {
                       const markerName =
-                        obs.code.coding?.[0]?.display || obs.code.text || 'Biomarker';
+                        obs.code.coding?.[0]?.display ||
+                        obs.code.text ||
+                        'Biomarker';
                       const value = obs.valueQuantity?.value;
-                      const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
+                      const unit =
+                        obs.valueQuantity?.unit ||
+                        obs.valueQuantity?.code ||
+                        '';
                       const refLow = obs.referenceRange?.[0]?.low?.value;
                       const refHigh = obs.referenceRange?.[0]?.high?.value;
 

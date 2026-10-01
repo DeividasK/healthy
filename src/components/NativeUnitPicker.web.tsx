@@ -48,7 +48,11 @@ export function NativeUnitPicker({
           'data-testid': `${testID}-select`,
         },
         units.map((u) =>
-          React.createElement('option', { key: u.ucum || u.label, value: u.label }, u.label)
+          React.createElement(
+            'option',
+            { key: u.ucum || u.label, value: u.label },
+            u.label
+          )
         )
       )}
     </View>

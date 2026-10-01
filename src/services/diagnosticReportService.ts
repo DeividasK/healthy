@@ -52,7 +52,10 @@ export function buildFHIRObservation(
     if (item.referenceLow !== undefined && item.value < item.referenceLow) {
       code = 'L';
       display = 'Low';
-    } else if (item.referenceHigh !== undefined && item.value > item.referenceHigh) {
+    } else if (
+      item.referenceHigh !== undefined &&
+      item.value > item.referenceHigh
+    ) {
       code = 'H';
       display = 'High';
     }
@@ -60,7 +63,8 @@ export function buildFHIRObservation(
       {
         coding: [
           {
-            system: 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
+            system:
+              'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
             code,
             display,
           },
@@ -77,7 +81,8 @@ export function buildFHIRObservation(
       {
         coding: [
           {
-            system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+            system:
+              'http://terminology.hl7.org/CodeSystem/observation-category',
             code: 'laboratory',
             display: 'Laboratory',
           },
@@ -236,4 +241,3 @@ export async function getReportById(
   const reports = await getAllReports();
   return reports.find((r) => r.report.id === reportId) || null;
 }
-

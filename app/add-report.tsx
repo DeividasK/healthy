@@ -6,26 +6,21 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Platform,
   Alert,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  Calendar,
-  Plus,
-  X,
-  ChevronDown,
-  Clock,
-  FileText,
-  Search,
-} from 'lucide-react-native';
+import { ArrowLeft, Plus, X, Clock, FileText } from 'lucide-react-native';
 import { NativeDatePicker } from '../src/components/NativeDatePicker';
 import { NativeTimePicker } from '../src/components/NativeTimePicker';
 import { NativeUnitPicker } from '../src/components/NativeUnitPicker';
-import { CBC_MARKERS, CBCBiomarkerDefinition, searchCBCMarkers } from '../src/data/cbcMarkers';
+import {
+  CBC_MARKERS,
+  CBCBiomarkerDefinition,
+  searchCBCMarkers,
+} from '../src/data/cbcMarkers';
 import { formatLocalDate } from '../src/utils/dateUtils';
 import {
   createAndSaveDiagnosticReport,
@@ -44,7 +39,10 @@ interface ActiveMarkerItem {
 /**
  * Checks if a given date and optional time is in the future.
  */
-export function isDateTimeInFuture(date: Date, timeStr: string | null): boolean {
+export function isDateTimeInFuture(
+  date: Date,
+  timeStr: string | null
+): boolean {
   const now = new Date();
   const target = new Date(date);
   if (timeStr) {
@@ -52,7 +50,15 @@ export function isDateTimeInFuture(date: Date, timeStr: string | null): boolean 
     target.setHours(h || 0, m || 0, 0, 0);
     return target.getTime() > now.getTime();
   }
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const todayEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
   return target.getTime() > todayEnd.getTime();
 }
 
@@ -121,15 +127,20 @@ export default function AddLabResultsScreen() {
         }
 
         // Map observations to activeItems
-        const loadedItems: ActiveMarkerItem[] = record.observations.map((obs) => {
-          const loinc = obs.code.coding?.[0]?.code || '';
-          const name = obs.code.coding?.[0]?.display || obs.code.text || 'Biomarker';
-          const val = obs.valueQuantity?.value !== undefined ? obs.valueQuantity.value.toString() : '';
-          const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
-          const ucum = obs.valueQuantity?.code || unit;
+        const loadedItems: ActiveMarkerItem[] = record.observations.map(
+          (obs) => {
+            const loinc = obs.code.coding?.[0]?.code || '';
+            const name =
+              obs.code.coding?.[0]?.display || obs.code.text || 'Biomarker';
+            const val =
+              obs.valueQuantity?.value !== undefined
+                ? obs.valueQuantity.value.toString()
+                : '';
+            const unit =
+              obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
+            const ucum = obs.valueQuantity?.code || unit;
 
-          const def =
-            CBC_MARKERS.find((m) => m.loinc === loinc) || {
+            const def = CBC_MARKERS.find((m) => m.loinc === loinc) || {
               id: `marker_${loinc}`,
               name,
               aliases: [name],
@@ -141,14 +152,15 @@ export default function AddLabResultsScreen() {
               description: name,
             };
 
-          return {
-            id: obs.id || `${def.id}_${Date.now()}`,
-            definition: def,
-            valueStr: val,
-            selectedUnit: unit,
-            selectedUcum: ucum,
-          };
-        });
+            return {
+              id: obs.id || `${def.id}_${Date.now()}`,
+              definition: def,
+              valueStr: val,
+              selectedUnit: unit,
+              selectedUcum: ucum,
+            };
+          }
+        );
 
         setActiveItems(loadedItems);
       } catch (err) {
@@ -236,7 +248,9 @@ export default function AddLabResultsScreen() {
 
   // Filtered CBC markers for autocomplete (shows all when query is empty)
   const filteredMarkers = useMemo(() => {
-    const alreadySelectedIds = new Set(activeItems.map((item) => item.definition.id));
+    const alreadySelectedIds = new Set(
+      activeItems.map((item) => item.definition.id)
+    );
     const results = searchCBCMarkers(searchQuery);
     return results.filter((m) => !alreadySelectedIds.has(m.id));
   }, [searchQuery, activeItems]);
@@ -252,7 +266,15 @@ export default function AddLabResultsScreen() {
 
   const handleDateChange = (newDate: Date) => {
     const now = new Date();
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const todayEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
     if (newDate.getTime() > todayEnd.getTime()) {
       showAlert('Invalid Date', 'Test date cannot be in the future.');
       return;
@@ -278,14 +300,6 @@ export default function AddLabResultsScreen() {
     }
     setTestTime(newTime);
   };
-
-  // Format date display (e.g., "Sep 30")
-  const formattedDate = useMemo(() => {
-    return selectedDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  }, [selectedDate]);
 
   // Add a marker from search
   const handleSelectMarker = (marker: CBCBiomarkerDefinition) => {
@@ -329,13 +343,18 @@ export default function AddLabResultsScreen() {
   // Save report
   const handleSave = async () => {
     if (activeItems.length === 0) {
-      showAlert('No Tests Added', 'Please add at least one lab test result before saving.');
+      showAlert(
+        'No Tests Added',
+        'Please add at least one lab test result before saving.'
+      );
       return;
     }
 
     // Validate that values are entered
     const invalidItems = activeItems.filter(
-      (item) => !item.valueStr.trim() || isNaN(parseFloat(item.valueStr.replace(',', '.')))
+      (item) =>
+        !item.valueStr.trim() ||
+        isNaN(parseFloat(item.valueStr.replace(',', '.')))
     );
 
     if (invalidItems.length > 0) {
@@ -419,7 +438,9 @@ export default function AddLabResultsScreen() {
           >
             <ArrowLeft color="#ffffff" size={24} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{reportId ? 'Edit Lab Results' : 'Add Lab Results'}</Text>
+          <Text style={styles.headerTitle}>
+            {reportId ? 'Edit Lab Results' : 'Add Lab Results'}
+          </Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -493,7 +514,11 @@ export default function AddLabResultsScreen() {
           {/* Active Tests List */}
           <View style={styles.activeTestsList}>
             {activeItems.map((item, index) => (
-              <View key={item.id} style={styles.markerItem} testID={`marker-card-${index}`}>
+              <View
+                key={item.id}
+                style={styles.markerItem}
+                testID={`marker-card-${index}`}
+              >
                 {/* Marker Header */}
                 <View style={styles.markerHeader}>
                   <Text style={styles.markerTitle} numberOfLines={1}>
@@ -524,7 +549,9 @@ export default function AddLabResultsScreen() {
                     testID={`unit-picker-button-${index}`}
                     selectedUnit={item.selectedUnit}
                     units={item.definition.units}
-                    onSelect={(unitLabel, ucum) => handleSelectUnit(index, unitLabel, ucum)}
+                    onSelect={(unitLabel, ucum) =>
+                      handleSelectUnit(index, unitLabel, ucum)
+                    }
                   />
                 </View>
               </View>
@@ -562,7 +589,10 @@ export default function AddLabResultsScreen() {
 
             {/* Dropdown with all options / filtered options */}
             {isSearchFocused && filteredMarkers.length > 0 && (
-              <View style={styles.autocompleteContainer} testID="autocomplete-list">
+              <View
+                style={styles.autocompleteContainer}
+                testID="autocomplete-list"
+              >
                 <ScrollView
                   style={styles.autocompleteScroll}
                   nestedScrollEnabled
@@ -574,7 +604,8 @@ export default function AddLabResultsScreen() {
                       testID={`autocomplete-item-${marker.id}`}
                       style={[
                         styles.autocompleteItem,
-                        focusedMarkerId === marker.id && styles.autocompleteItemFocused,
+                        focusedMarkerId === marker.id &&
+                          styles.autocompleteItemFocused,
                       ]}
                       onPress={() => handleSelectMarker(marker)}
                       onFocus={() => {
@@ -593,7 +624,8 @@ export default function AddLabResultsScreen() {
                       <Text
                         style={[
                           styles.autocompleteItemTitle,
-                          focusedMarkerId === marker.id && styles.autocompleteItemTitleFocused,
+                          focusedMarkerId === marker.id &&
+                            styles.autocompleteItemTitleFocused,
                         ]}
                       >
                         {marker.name}
@@ -604,13 +636,15 @@ export default function AddLabResultsScreen() {
               </View>
             )}
 
-            {isSearchFocused && searchQuery.trim().length > 0 && filteredMarkers.length === 0 && (
-              <View style={styles.autocompleteEmpty}>
-                <Text style={styles.autocompleteEmptyText}>
-                  No CBC markers match "{searchQuery}".
-                </Text>
-              </View>
-            )}
+            {isSearchFocused &&
+              searchQuery.trim().length > 0 &&
+              filteredMarkers.length === 0 && (
+                <View style={styles.autocompleteEmpty}>
+                  <Text style={styles.autocompleteEmptyText}>
+                    No CBC markers match &quot;{searchQuery}&quot;.
+                  </Text>
+                </View>
+              )}
           </View>
         </ScrollView>
 
@@ -651,7 +685,11 @@ export default function AddLabResultsScreen() {
                     setTestTime(`${h}:${m}`);
                   }}
                 >
-                  <Clock color="#3d6450" size={20} style={{ marginRight: 12 }} />
+                  <Clock
+                    color="#3d6450"
+                    size={20}
+                    style={{ marginRight: 12 }}
+                  />
                   <Text style={styles.plusMenuItemText}>Add Time</Text>
                 </TouchableOpacity>
               )}
@@ -665,7 +703,11 @@ export default function AddLabResultsScreen() {
                     setShowNotesInput(true);
                   }}
                 >
-                  <FileText color="#3d6450" size={20} style={{ marginRight: 12 }} />
+                  <FileText
+                    color="#3d6450"
+                    size={20}
+                    style={{ marginRight: 12 }}
+                  />
                   <Text style={styles.plusMenuItemText}>Add Notes</Text>
                 </TouchableOpacity>
               )}

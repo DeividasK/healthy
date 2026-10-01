@@ -19,7 +19,7 @@ A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application
 - **Privacy & Storage**: 100% local-first via `@react-native-async-storage/async-storage` (SQLite/AsyncStorage on mobile, IndexedDB/localStorage on web). Medical data never leaves the user's device.
 - **Biomarker Catalog & Standards**:
   - Catalog of **223 clinical blood biomarkers** curated from official **LOINC** (Logical Observation Identifiers Names and Codes) and **UCUM** international clinical chemistry standards.
-  - **Smart Autocomplete**: Allows users to search by clinical name (e.g. *Hemoglobin A1c*) or common abbreviations / aliases (*"a1c"*, *"wbc"*, *"tsh"*, *"ldl"*, *"crp"*).
+  - **Smart Autocomplete**: Allows users to search by clinical name (e.g. _Hemoglobin A1c_) or common abbreviations / aliases (_"a1c"_, _"wbc"_, _"tsh"_, _"ldl"_, _"crp"_).
   - Selecting a biomarker auto-populates category, default unit, and physiological reference intervals (Min/Max).
   - **Dual-Unit Support**: Seamless toggle and mathematical conversion between **SI units** (`mmol/L`, `µmol/L`) and **Conventional US units** (`mg/dL`, `g/dL`), with synchronized reference ranges.
   - **Dynamic Live Flagging**: Real-time visual status indicators (🟢 Normal, 🔵 Low, 🔴 High, 🚨 Critical) calculated live as values are entered.

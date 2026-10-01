@@ -32,7 +32,15 @@ export function NativeDatePicker({
       const [year, month, day] = val.split('-').map(Number);
       const newDate = new Date(year, month - 1, day);
       const now = new Date();
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const todayEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+        999
+      );
       if (newDate.getTime() > todayEnd.getTime()) {
         return;
       }

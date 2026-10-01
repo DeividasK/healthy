@@ -1,14 +1,14 @@
-name: "Build Web"
-description: "Build Expo web static export with caching across CI checks"
+name: 'Build Web'
+description: 'Build Expo web static export with caching across CI checks'
 
 inputs:
   base-url:
-    description: "Base URL prefix for Expo export (e.g. /healthy)"
+    description: 'Base URL prefix for Expo export (e.g. /healthy)'
     required: false
-    default: ""
+    default: ''
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Cache Web Build Output
       id: web-build-cache
