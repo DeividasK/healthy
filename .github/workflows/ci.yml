@@ -8,7 +8,7 @@ env:
 
 jobs:
   checks:
-    name: Typecheck & E2E Tests
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -54,7 +54,7 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
-  
+
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
     needs: [checks, e2e]
