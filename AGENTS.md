@@ -10,24 +10,19 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Node Version Management
 
-Ensure active Node version matches `package.json` (`devEngines.runtime.version`, e.g. `22.23.2`).
-Use `fnv` (Fast Node Manager / `fnm`) to manage Node versions. Non-interactive subshells must activate it before running commands:
-
-```bash
-eval "$(fnv env --shell zsh)"
-```
+Node version is managed via `fnm` and automatically loaded across shells via `~/.zshenv` to match `package.json` (`devEngines.runtime.version`, e.g. `22.23.2`).
 
 ## Commands
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
+This project uses `pnpm`. Use `pnpm` and `pnpm dlx` for package execution:
 
 ```bash
-eval "$(fnv env --shell zsh)" && npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-eval "$(fnv env --shell zsh)" && npx expo start              # start the dev server
-eval "$(fnv env --shell zsh)" && npx expo lint               # lint
-eval "$(fnv env --shell zsh)" && npx tsc --noEmit            # typecheck
-eval "$(fnv env --shell zsh)" && npx expo-doctor             # diagnose dependency and config issues
-eval "$(fnv env --shell zsh)" && npx expo install --fix      # fix incompatible package versions
+pnpm expo install <package>  # ALWAYS use instead of pnpm add — resolves SDK-compatible versions
+pnpm expo start              # start the dev server
+pnpm expo lint               # lint
+pnpm tsc --noEmit            # typecheck
+pnpm dlx expo-doctor         # diagnose dependency and config issues
+pnpm expo install --fix      # fix incompatible package versions
 ```
 
 Run lint and typecheck before declaring any task done.
@@ -40,11 +35,11 @@ Run lint and typecheck before declaring any task done.
 
 ## Building with EAS
 
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
+Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `pnpm dlx eas-cli <command>`; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
+- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `pnpm expo run:ios|android` locally, or `pnpm dlx eas-cli build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
