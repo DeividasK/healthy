@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches:
-      # Exclude main
-      - "!main"
+    branches-ignore:
+      - "main"
 
 jobs:
   test:
