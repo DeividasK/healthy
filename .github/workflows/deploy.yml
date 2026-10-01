@@ -31,7 +31,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Build Web Static Export
-        run: pnpm build:web
+        uses: ./.github/actions/build-web
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
@@ -63,12 +63,9 @@ jobs:
           cache: true
 
       - name: Build for GitHub Pages
-        env:
-          EXPO_BASE_URL: /healthy
-        run: |
-          pnpm build:web
-          touch dist/.nojekyll
-          cp dist/+not-found.html dist/404.html
+        uses: ./.github/actions/build-web
+        with:
+          base-url: /healthy
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -22,7 +22,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Build Web Static Export
-        run: pnpm build:web
+        uses: ./.github/actions/build-web
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
