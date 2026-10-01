@@ -149,7 +149,7 @@ export default function HomeScreen() {
                   {/* Notes if available */}
                   {noteText && (
                     <View style={styles.cardNoteContainer}>
-                      <Text style={styles.cardNoteText}>"{noteText}"</Text>
+                      <Text style={styles.cardNoteText}>&quot;{noteText}&quot;</Text>
                     </View>
                   )}
 

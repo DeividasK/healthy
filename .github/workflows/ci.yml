@@ -2,8 +2,6 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      - "main"
 
 jobs:
   test:
@@ -18,13 +16,16 @@ jobs:
           cache: true
 
       - name: TypeScript Check
-        run: npx tsc --noEmit
+        run: pnpm tsc --noEmit
+
+      - name: Lint
+        run: pnpm expo lint
 
       - name: Build Web Static Export
         uses: ./.github/actions/build-web
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E Tests
         run: pnpm test:e2e
@@ -36,3 +37,37 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  deploy-to-github-pages:
+    name: Build & Deploy to GitHub Pages
+    needs: test
+    # Only run on main branch
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: pnpm/setup@v1
+        with:
+          cache: true
+
+      - name: Build for GitHub Pages
+        uses: ./.github/actions/build-web
+        with:
+          base-url: /healthy
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

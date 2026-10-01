@@ -14,13 +14,10 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowLeft,
-  Calendar,
   Plus,
   X,
-  ChevronDown,
   Clock,
   FileText,
-  Search,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '../src/components/NativeDatePicker';
 import { NativeTimePicker } from '../src/components/NativeTimePicker';
@@ -279,13 +276,6 @@ export default function AddLabResultsScreen() {
     setTestTime(newTime);
   };
 
-  // Format date display (e.g., "Sep 30")
-  const formattedDate = useMemo(() => {
-    return selectedDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  }, [selectedDate]);
 
   // Add a marker from search
   const handleSelectMarker = (marker: CBCBiomarkerDefinition) => {
@@ -607,7 +597,7 @@ export default function AddLabResultsScreen() {
             {isSearchFocused && searchQuery.trim().length > 0 && filteredMarkers.length === 0 && (
               <View style={styles.autocompleteEmpty}>
                 <Text style={styles.autocompleteEmptyText}>
-                  No CBC markers match "{searchQuery}".
+                  No CBC markers match &quot;{searchQuery}&quot;.
                 </Text>
               </View>
             )}
