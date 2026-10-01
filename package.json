@@ -42,7 +42,7 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@eslint/compat": "^2.1.1",
+    "@eslint/config-helpers": "^0.7.0",
     "@playwright/test": "^1.63.0",
     "@types/react": "~19.2.2",
     "eslint": "^9.7.0",
