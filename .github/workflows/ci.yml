@@ -7,7 +7,7 @@ env:
   PNPM_CONFIG_STRICT_DEP_BUILDS: 'false'
 
 jobs:
-  test:
+  checks:
     name: Typecheck & E2E Tests
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +27,17 @@ jobs:
       - name: Format Check
         run: pnpm format:check
 
+  e2e:
+    name: Typecheck & E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: pnpm/setup@v1
+        with:
+          cache: true
+
       - name: Build Web Static Export
         uses: ./.github/actions/build-web
 
@@ -43,10 +54,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
-
+  
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
-    needs: test
+    needs: [checks, e2e]
     # Only run on main branch
     if: github.ref == 'refs/heads/main'
     environment:
