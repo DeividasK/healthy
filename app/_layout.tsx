@@ -63,6 +63,13 @@ function RootLayoutNav() {
             ),
           }}
         />
+        <Stack.Screen
+          name="add-report"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );
