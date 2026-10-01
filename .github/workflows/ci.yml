@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches:
-      # Disable temporarily
-      - non-existent-branch
+      # Exclude main
+      - "!main"
 
 jobs:
   test:
