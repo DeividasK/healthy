@@ -1,0 +1,39 @@
+name: "Build Web"
+description: "Build Expo web static export with caching across CI checks"
+
+inputs:
+  base-url:
+    description: "Base URL prefix for Expo export (e.g. /healthy)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Web Build Output
+      id: web-build-cache
+      uses: actions/cache@v4
+      with:
+        path: dist
+        key: ${{ runner.os }}-web-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
+
+    - name: Cache Metro Bundler
+      uses: actions/cache@v4
+      with:
+        path: .expo/cache
+        key: ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
+        restore-keys: |
+          ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-
+          ${{ runner.os }}-metro-
+
+    - name: Build Web Static Export
+      if: steps.web-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        EXPO_BASE_URL: ${{ inputs.base-url }}
+      run: |
+        pnpm build:web
+        if [ -n "${{ inputs.base-url }}" ]; then
+          touch dist/.nojekyll
+          cp dist/+not-found.html dist/404.html
+        fi
