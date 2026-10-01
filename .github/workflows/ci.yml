@@ -3,6 +3,9 @@ name: CI
 on:
   push:
 
+env:
+  PNPM_CONFIG_STRICT_DEP_BUILDS: 'false'
+
 jobs:
   test:
     name: Typecheck & E2E Tests
