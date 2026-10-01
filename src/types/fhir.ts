@@ -21,7 +21,7 @@ export interface FHIRQuantity {
   comparator?: '<' | '<=' | '>=' | '>';
   unit?: string;
   system?: string; // Standard: "http://unitsofmeasure.org" (UCUM)
-  code?: string;   // UCUM unit code, e.g. "g/dL", "10*3/uL", "%"
+  code?: string; // UCUM unit code, e.g. "g/dL", "10*3/uL", "%"
 }
 
 export interface FHIRReference {
@@ -45,7 +45,13 @@ export interface FHIRAnnotation {
 export interface FHIRObservation {
   resourceType: 'Observation';
   id: string;
-  status: 'registered' | 'preliminary' | 'final' | 'amended' | 'corrected' | 'cancelled';
+  status:
+    | 'registered'
+    | 'preliminary'
+    | 'final'
+    | 'amended'
+    | 'corrected'
+    | 'cancelled';
   category?: FHIRCodeableConcept[];
   code: FHIRCodeableConcept;
   subject?: FHIRReference;
@@ -60,7 +66,15 @@ export interface FHIRObservation {
 export interface FHIRDiagnosticReport {
   resourceType: 'DiagnosticReport';
   id: string;
-  status: 'registered' | 'partial' | 'preliminary' | 'final' | 'amended' | 'corrected' | 'appended' | 'cancelled';
+  status:
+    | 'registered'
+    | 'partial'
+    | 'preliminary'
+    | 'final'
+    | 'amended'
+    | 'corrected'
+    | 'appended'
+    | 'cancelled';
   category?: FHIRCodeableConcept[];
   code: FHIRCodeableConcept; // General report code (e.g. LOINC 11502-2) or panel code (e.g. LOINC 58410-2)
   subject?: FHIRReference;

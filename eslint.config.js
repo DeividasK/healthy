@@ -3,6 +3,7 @@ const { defineConfig } = require('eslint/config');
 const { includeIgnoreFile } = require('@eslint/config-helpers');
 const expoConfig = require('eslint-config-expo/flat.js');
 const jsxA11y = require('eslint-plugin-jsx-a11y');
+const prettierRecommended = require('eslint-plugin-prettier/recommended');
 const path = require('node:path');
 
 const gitignorePath = path.resolve(__dirname, '.gitignore');
@@ -23,4 +24,5 @@ module.exports = defineConfig([
       '@typescript-eslint/no-deprecated': 'error',
     },
   },
+  prettierRecommended,
 ]);

@@ -202,33 +202,39 @@ The design system implements **Level 2 (Rounded)** curvature. This geometry bala
 ## Components
 
 ### Buttons
+
 - **Primary**: Solid Sage Green (`#5A826D`), white text, 8px radius, height 40px (desktop) / 44px (mobile), medium tracking. Hover transitions to `#4B6D5A` with subtle micro-scale (0.995).
 - **Secondary (Clinical Outline)**: Pure white background, 1px border in `#CBD5E1`, text in `#0F172A`. Hover transitions border to `#5A826D` with `#F2F6F3` background tint.
 - **Tertiary (Insight/AI Action)**: Tinted neutral background (`rgba(90, 130, 109, 0.08)`), text `#5A826D`, zero border, reinforced with a subtle spark icon.
 
 ### Form Inputs & Selectors
-- Background `#FFFFFF`, 1px border `#E2E8F0`, 8px radius, horizontal padding 14px, vertical 10px. 
+
+- Background `#FFFFFF`, 1px border `#E2E8F0`, 8px radius, horizontal padding 14px, vertical 10px.
 - Focus state activates an immediate `#5A826D` border with a 3px ring in `rgba(90, 130, 109, 0.15)`.
 - Numeric metric fields (e.g., blood glucose, systolic/diastolic) enforce `JetBrains Mono` at 1.125rem with fixed trailing units pinned to the right margin.
 
 ### Telemetry Cards & Lab Visualizers
+
 - Pure white container, 16px radius, 20px internal padding.
 - Card Header: Category indicator in uppercase `JetBrains Mono` (0.7rem), metric title in `Plus Jakarta Sans` (1rem, bold), paired with a local synchronization icon.
 - Metric Body: Prominent primary readout (e.g., "118/78") in `JetBrains Mono` (1.75rem), accompanied by an embedded status pill (`Normal`, `Elevated`, `Attention`) tinted with matching semantic tones.
 - Sparkline baseline uses 2px vector paths with a gradient fill descending to zero opacity.
 
 ### Privacy & Vault Badges
+
 - Continuous reassurance component indicating local-only SQLite/indexedDB persistence.
 - Small pill shape, background `rgba(16, 185, 129, 0.1)`, 1px border `rgba(16, 185, 129, 0.25)`, text in `#047857`.
 - Houses a lock icon and micro-label: `100% LOCAL-FIRST • ENCRYPTED`.
 
 ### Checkboxes, Radios & Switches
+
 - 8-point geometric check squares with 4px inner radius.
 - Unchecked: 1.5px border `#94A3B8`.
 - Checked: Solid `#5A826D` fill with crisp white vector tick.
 - Metric toggles (e.g., showing/hiding systolic vs diastolic traces) use pill toggles with a distinct sliding white circular thumb on a `#5A826D` or `#E2E8F0` track.
 
 ### Biomarker Reference Range Sliders
+
 - Visual linear scale showing standard deviation / clinical reference brackets.
 - A horizontal rail with subtle tinted background zones (Green = Optimal, Yellow = Borderline, Coral = High).
 - A distinct vertical diamond marker pinpointing the user's latest recorded test result with numeric label pinned directly above.

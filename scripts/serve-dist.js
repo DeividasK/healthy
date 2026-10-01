@@ -53,5 +53,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Static server running at http://localhost:${port}/ serving ${distDir}`);
+  console.log(
+    `Static server running at http://localhost:${port}/ serving ${distDir}`
+  );
 });
