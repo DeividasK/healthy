@@ -11,5 +11,16 @@ module.exports = defineConfig([
   expoConfig,
   jsxA11y.flatConfigs.recommended,
   includeIgnoreFile(gitignorePath),
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-deprecated': 'error',
+    },
+  },
 ]);
-

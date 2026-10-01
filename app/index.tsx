@@ -4,13 +4,13 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DiagnosticReportRecord } from '../src/database/types';
 import { getAllReports } from '../src/services/diagnosticReportService';
 import { FHIRObservation } from '../src/types/fhir';
