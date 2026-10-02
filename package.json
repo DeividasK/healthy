@@ -13,6 +13,8 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "expo": "~57.0.26",
     "expo-auth-session": "~57.0.13",
     "expo-constants": "~57.0.20",
@@ -30,16 +32,20 @@
     "expo-web-browser": "~57.0.3",
     "i18next": "^26.4.2",
     "lucide-react-native": "^1.48.0",
+    "nativewind": "^4.2.7",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-i18next": "^17.0.15",
     "react-native": "0.86.3",
+    "react-native-css-interop": "0.2.7",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@chromatic-com/playwright": "^1.0.0",
@@ -53,6 +59,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "serve": "^14.2.6",
     "typescript": "~6.0.3"
   },
