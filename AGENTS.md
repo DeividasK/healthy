@@ -31,8 +31,16 @@ pnpm expo install --fix      # fix incompatible package versions
 ### Verification Guidelines
 
 - **Always run**: `pnpm tsc --noEmit` and `pnpm expo lint` before declaring any task done.
-- **Visual Tests (`pnpm test:visual`)**: ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
-- **E2E Tests (`pnpm test:e2e`)**: Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
+- **Visual Tests (`pnpm test:visual`)**:
+  - You **MUST** write visual tests for new views.
+  - You **MUST NOT** write a new test if an existing visual test covers the changes/new additions.
+  - You **MUST** call out new visual tests that will be added or ones that you expect to be affected if none will be added.
+  - ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+- **E2E Tests (`pnpm test:e2e`)**:
+  - You **MUST** write E2E tests for new views and user flows.
+  - Tests **MUST** be updated if possible to keep testing succinct.
+  - Implementation plans **MUST** describe new E2E tests that will be written.
+  - Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
 
 ## Navigation & Routing
 

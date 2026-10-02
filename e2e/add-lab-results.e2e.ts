@@ -18,10 +18,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     // 1. Visit homepage
     await page.goto('/');
 
-    // 2. Click "+ Add results" button
-    const addResultsBtn = page.getByTestId('add-results-button');
-    await expect(addResultsBtn).toBeVisible();
-    await addResultsBtn.click();
+    // 2. Click floating "+" button -> "Add Lab Results"
+    await page.getByTestId('floating-add-button').click();
+    const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
+    await expect(addLabResultsMenuBtn).toBeVisible();
+    await addLabResultsMenuBtn.click();
 
     // 3. Verify navigation to Add Lab Results screen
     await expect(page).toHaveURL(/.*add-report/);

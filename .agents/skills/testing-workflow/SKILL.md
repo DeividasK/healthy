@@ -1,0 +1,34 @@
+---
+name: testing-workflow
+description: >-
+  Guidelines for authoring, updating, and running verification, linting, typechecks, visual tests (Chromatic), and E2E tests based on the nature of the change.
+---
+
+# Testing and Verification Workflow
+
+Follow these rules when designing, updating, and executing test suites:
+
+## Always Required
+
+- **Typecheck**: `pnpm tsc --noEmit`
+- **Lint**: `pnpm expo lint`
+- **Formatting**: `pnpm format:check` (or `pnpm format`)
+
+## End-to-End Tests (`pnpm test:e2e`)
+
+- **Mandatory for New Views & Flows**: You **MUST** write E2E tests for new views and user flows.
+- **Succinct & Maintainable**: Tests **MUST** be updated if possible to keep testing succinct (avoid duplicate test cases when existing tests can be updated or expanded).
+- **Plan Disclosure**: The implementation plan **MUST** describe new E2E tests that will be written.
+- **When to Run**: Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
+
+## Visual Tests (`pnpm test:visual`)
+
+- **Mandatory for New Views**: You **MUST** write visual tests for new views.
+- **No Redundancy**: You **MUST NOT** write a new test if an existing visual test already covers the changes or new additions.
+- **Plan Disclosure**: You **MUST** call out in implementation plans new visual tests that will be added, or the ones you expect to be affected if none will be added.
+- **When to Run**: ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+
+## Version Control & Git Guidelines
+
+- **NEVER run `git commit` or `git push` on the user's behalf.**
+- Leave changes uncommitted in the working tree after verifying them. Let the user inspect and commit/push themselves.

@@ -12,10 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Plus, X, Clock, FileText } from 'lucide-react-native';
+import { ArrowLeft, X, Clock, FileText } from 'lucide-react-native';
 import { NativeDatePicker } from '../src/components/NativeDatePicker';
 import { NativeTimePicker } from '../src/components/NativeTimePicker';
 import { NativeUnitPicker } from '../src/components/NativeUnitPicker';
+import { PlusCircleButton } from '../src/components/PlusCircleButton';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -473,14 +474,10 @@ export default function AddLabResultsScreen() {
 
             {/* Plus Button - only shown if either Time or Notes hasn't been added yet */}
             {canAddMore && (
-              <TouchableOpacity
+              <PlusCircleButton
                 testID="plus-menu-button"
-                style={styles.plusButton}
                 onPress={() => setShowPlusMenu(true)}
-                activeOpacity={0.8}
-              >
-                <Plus color={COLORS.light.iconMuted} size={18} />
-              </TouchableOpacity>
+              />
             )}
           </View>
 
@@ -790,16 +787,6 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '500',
-  },
-  plusButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    backgroundColor: COLORS.light.card,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   notesContainer: {
     backgroundColor: COLORS.light.card,
