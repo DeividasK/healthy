@@ -3,9 +3,6 @@ name: CI
 on:
   push:
 
-env:
-  PNPM_CONFIG_STRICT_DEP_BUILDS: 'false'
-
 jobs:
   checks:
     name: Typecheck, Lint & Format
@@ -57,9 +54,48 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  visual:
+    name: Visual Regression (Chromatic)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: pnpm/setup@v1
+        with:
+          cache: true
+
+      - name: Build Web Static Export
+        uses: ./.github/actions/build-web
+
+      - name: Run Visual Tests
+        run: pnpm test:visual
+
+      - name: Upload Test Results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-test-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Publish to Chromatic
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: pnpm chromatic
+
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
-    needs: [checks, e2e]
+    needs: [checks, e2e, visual]
     # Only run on main branch
     if: github.ref == 'refs/heads/main'
     permissions:

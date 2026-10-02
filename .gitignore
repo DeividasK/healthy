@@ -46,3 +46,8 @@ yarn-error.*
 # Playwright & tests
 test-results/
 playwright-report/
+storybook-static/
+
+# Storybook
+build-archive.log
+chromatic.log

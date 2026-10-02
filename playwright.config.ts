@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import type { ChromaticConfig } from '@chromatic-com/playwright';
 
-export default defineConfig({
+export default defineConfig<ChromaticConfig>({
   testDir: './e2e',
   fullyParallel: false,
   workers: 1,
@@ -15,6 +16,16 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: /.*\.e2e\.ts/,
+    },
+    {
+      name: 'visual',
+      use: {
+        viewport: { width: 360, height: 740 },
+        colorScheme: 'light',
+        disableAutoSnapshot: true,
+      },
+      testMatch: /.*\.visual\.ts/,
     },
   ],
   webServer: {
