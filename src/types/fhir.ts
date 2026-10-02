@@ -89,3 +89,25 @@ export interface DiagnosticReportBundle {
   report: FHIRDiagnosticReport;
   observations: FHIRObservation[];
 }
+
+export type FHIREpisodeOfCareStatus =
+  'active' | 'onhold' | 'finished' | 'cancelled';
+
+export interface FHIREpisodeOfCare {
+  resourceType: 'EpisodeOfCare';
+  id: string;
+  status: FHIREpisodeOfCareStatus;
+  type?: FHIRCodeableConcept[];
+  diagnosis?: {
+    condition?: FHIRReference;
+    role?: FHIRCodeableConcept;
+    rank?: number;
+  }[];
+  patient?: FHIRReference;
+  period?: {
+    start?: string;
+    end?: string;
+  };
+  description?: string;
+  note?: FHIRAnnotation[];
+}

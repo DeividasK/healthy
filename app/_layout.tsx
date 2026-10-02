@@ -67,6 +67,34 @@ function RootLayoutNav() {
             presentation: Platform.OS === 'ios' ? 'modal' : 'card',
           }}
         />
+        <Stack.Screen
+          name="lab-result/add"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="lab-result/[id]/edit"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="health-case/add"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="health-case/[id]/edit"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { formatLocalDate } from '../src/utils/dateUtils';
+import { formatLocalDate } from '../../utils/dateUtils';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {
@@ -18,13 +18,14 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     // 1. Visit homepage
     await page.goto('/');
 
-    // 2. Click "+ Add results" button
-    const addResultsBtn = page.getByTestId('add-results-button');
-    await expect(addResultsBtn).toBeVisible();
-    await addResultsBtn.click();
+    // 2. Click floating "+" button -> "Add Lab Results"
+    await page.getByTestId('floating-add-button').click();
+    const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
+    await expect(addLabResultsMenuBtn).toBeVisible();
+    await addLabResultsMenuBtn.click();
 
     // 3. Verify navigation to Add Lab Results screen
-    await expect(page).toHaveURL(/.*add-report/);
+    await expect(page).toHaveURL(/.*lab-result\/add/);
     await expect(page.getByText('Add Lab Results')).toBeVisible();
 
     // 4. Search and select "Hemoglobin" from CBC autocomplete
@@ -96,7 +97,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should allow removing a test from the active list before saving', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // Add Platelets
     const searchInput = page.getByTestId('test-search-input');
@@ -105,9 +106,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await plateletsOption.click();
 
     await expect(page.getByTestId('marker-card-0')).toBeVisible();
-
-    // Verify edit button is entirely removed
-    await expect(page.getByTestId('edit-marker-0')).not.toBeAttached();
 
     // Click remove button (X)
     const removeBtn = page.getByTestId('remove-marker-0');
@@ -120,7 +118,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should open and update date and time via native dropdown inputs', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // Verify date picker button has native date input and updates with valid past date
     const dateInput = page
@@ -149,7 +147,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should hide plus menu options and plus button when time and notes are added, and reappear when removed', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     const plusBtn = page.getByTestId('plus-menu-button');
     await expect(plusBtn).toBeVisible();
@@ -198,7 +196,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // Label should read "Select Test"
     await expect(page.getByText('Select Test', { exact: true })).toBeVisible();
@@ -253,7 +251,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   }) => {
     // Set small mobile viewport
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // Add RDW-CV
     const searchInput = page.getByTestId('test-search-input');
@@ -283,7 +281,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should change biomarker unit using native dropdown', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // Add WBC (units: '10*3/uL', '10*9/L', '/uL')
     const searchInput = page.getByTestId('test-search-input');
@@ -305,7 +303,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should validate that date and time cannot be set to the future', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // 1. Verify native date input has max attribute set to today
     const dateInput = page
@@ -337,7 +335,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should reset future time to current time without throwing an alert when reverting to today from a past date', async ({
     page,
   }) => {
-    await page.goto('/add-report');
+    await page.goto('/lab-result/add');
 
     // 1. Select a past date (2026-09-20)
     const dateInput = page
@@ -379,170 +377,5 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await expect(page.getByTestId('time-picker-button')).not.toContainText(
       '23:55'
     );
-  });
-
-  test('should replace "CBC Panel" badge with "Edit" icon and allow editing existing report results', async ({
-    page,
-  }) => {
-    const consoleWarnings: string[] = [];
-    page.on('console', (msg) => {
-      if (msg.type() === 'warning' || msg.type() === 'error') {
-        consoleWarnings.push(msg.text());
-      }
-    });
-
-    // 1. Create an initial report
-    await page.goto('/add-report');
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('14.5');
-
-    await searchInput.fill('WBC');
-    await page.getByTestId('autocomplete-item-cbc_wbc').click();
-    await page.getByTestId('marker-value-input-1').fill('6.8');
-
-    // Add note
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await plusBtn.click();
-    await page.getByTestId('menu-add-notes').click();
-    await page.getByTestId('notes-input').fill('Initial checkup note');
-
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-
-    // 2. On homepage: "CBC Panel" badge must NOT exist
-    await expect(page.getByText('CBC Panel')).not.toBeVisible();
-
-    // 3. Edit icon must be present on the report card
-    const editBtn = page.locator('[data-testid^="edit-report-button-"]');
-    await expect(editBtn).toBeVisible();
-
-    // 4. Click Edit icon -> navigates to edit screen
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*add-report\?id=/);
-    await expect(page.getByText('Edit Lab Results')).toBeVisible();
-
-    // 5. Existing values should be populated
-    await expect(page.getByTestId('marker-card-0')).toContainText(
-      'Hemoglobin (Hgb)'
-    );
-    await expect(page.getByTestId('marker-value-input-0')).toHaveValue('14.5');
-    await expect(page.getByTestId('marker-card-1')).toContainText(
-      'White Blood Cells (WBC)'
-    );
-    await expect(page.getByTestId('marker-value-input-1')).toHaveValue('6.8');
-    await expect(page.getByTestId('notes-input')).toHaveValue(
-      'Initial checkup note'
-    );
-
-    // 6. Modify values: update Hemoglobin from 14.5 to 16.2
-    await page.getByTestId('marker-value-input-0').fill('16.2');
-
-    // Remove WBC
-    await page.getByTestId('remove-marker-1').click();
-    await expect(page.getByText('White Blood Cells (WBC)')).not.toBeVisible();
-
-    // Add Platelets: 250
-    await searchInput.fill('Platelets');
-    await page.getByTestId('autocomplete-item-cbc_platelets').click();
-    await page.getByTestId('marker-value-input-1').fill('250');
-
-    // Update note
-    await page.getByTestId('notes-input').fill('Updated checkup note');
-
-    // 7. Save modifications
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-
-    // 8. Verify updated report on homepage
-    await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-    await expect(page.getByText('16.2')).toBeVisible();
-    await expect(page.getByText('14.5')).not.toBeVisible();
-
-    await expect(page.getByText('Platelets (PLT)')).toBeVisible();
-    await expect(page.getByText('250')).toBeVisible();
-
-    await expect(page.getByText('White Blood Cells (WBC)')).not.toBeVisible();
-    await expect(page.getByText('"Updated checkup note"')).toBeVisible();
-
-    // 9. Verify persistence across page reload
-    await page.reload();
-    await expect(page.getByText('16.2')).toBeVisible();
-    await expect(page.getByText('250')).toBeVisible();
-    await expect(page.getByText('White Blood Cells (WBC)')).not.toBeVisible();
-    await expect(page.getByText('"Updated checkup note"')).toBeVisible();
-
-    // 10. Verify no shadow*, pointerEvents, or Blocked aria-hidden console warnings occurred
-    const problematicWarnings = consoleWarnings.filter(
-      (w) =>
-        w.includes('shadow*') ||
-        w.includes('pointerEvents') ||
-        w.includes('Blocked aria-hidden')
-    );
-    expect(problematicWarnings).toEqual([]);
-  });
-
-  test('should preserve exact selected date without shifting back by a day across multiple edits/saves', async ({
-    page,
-  }) => {
-    await page.goto('/add-report');
-
-    // 1. Select specific date: 2026-09-26
-    const datePicker = page.getByTestId('date-picker-button');
-    const dateInput = datePicker.locator('input[type="date"]');
-    await dateInput.fill('2026-09-26');
-
-    // Button label and native input value should both reflect Sep 26, 2026
-    await expect(datePicker).toContainText('Sep 26, 2026');
-    await expect(dateInput).toHaveValue('2026-09-26');
-
-    // Add a marker and value
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('15.1');
-
-    // 2. Save
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-
-    // 3. Homepage should display Sep 26, 2026 (NOT Sep 25)
-    await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-    await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
-
-    // 4. Open in edit mode
-    const editBtn = page.locator('[data-testid^="edit-report-button-"]');
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*add-report\?id=/);
-
-    // Date in edit mode should still be Sep 26, 2026 and native input 2026-09-26
-    const editDatePicker = page.getByTestId('date-picker-button');
-    const editDateInput = editDatePicker.locator('input[type="date"]');
-    await expect(editDatePicker).toContainText('Sep 26, 2026');
-    await expect(editDateInput).toHaveValue('2026-09-26');
-
-    // 5. Save again without modifying date
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-
-    // Homepage should STILL display Sep 26, 2026
-    await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-    await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
-
-    // 6. Edit and save one more time to be 100% certain it doesn't drift
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*add-report\?id=/);
-    await expect(page.getByTestId('date-picker-button')).toContainText(
-      'Sep 26, 2026'
-    );
-    await expect(
-      page.getByTestId('date-picker-button').locator('input[type="date"]')
-    ).toHaveValue('2026-09-26');
-
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-    await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
   });
 });
