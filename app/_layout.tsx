@@ -1,5 +1,5 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider, DefaultTheme } from 'expo-router';
+import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
@@ -8,6 +8,7 @@ import '../global.css';
 
 import { AppLogo } from '../src/components/AppLogo';
 import { COLORS } from '../src/theme/colors';
+import { NAV_THEME } from '../src/theme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -46,7 +47,7 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   return (
-    <ThemeProvider value={DefaultTheme}>
+    <ThemeProvider value={NAV_THEME.light}>
       <Stack>
         <Stack.Screen
           name="index"
