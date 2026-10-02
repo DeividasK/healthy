@@ -81,6 +81,7 @@ export function HealthCaseForm({
     Boolean(initialValues?.description)
   );
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const currentStatusObj =
@@ -110,6 +111,8 @@ export function HealthCaseForm({
           }
         }
       );
+    } else if (Platform.OS === 'android') {
+      setShowStatusModal(true);
     }
   };
 
@@ -348,6 +351,33 @@ export function HealthCaseForm({
                 ]
               : []),
           ]}
+        />
+
+        {/* Status Selection Modal for Android */}
+        <AddOptionsModal
+          visible={showStatusModal}
+          onClose={() => setShowStatusModal(false)}
+          overlayTestID="status-menu-overlay"
+          cardTestID="status-menu-card"
+          options={HEALTH_CASE_STATUS_OPTIONS.map((opt) => ({
+            id: opt.value,
+            label: opt.label,
+            icon: (
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: opt.dotColor,
+                  marginRight: 12,
+                }}
+              />
+            ),
+            testID: `status-option-${opt.value}`,
+            onPress: () => {
+              handleStatusSelect(opt.value);
+            },
+          }))}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -12,8 +12,8 @@ export function EditHealthCaseView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [initialValues, setInitialValues] =
     useState<HealthCaseFormValues | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(id));
+  const [notFound, setNotFound] = useState(!id);
 
   useEffect(() => {
     if (!id) return;

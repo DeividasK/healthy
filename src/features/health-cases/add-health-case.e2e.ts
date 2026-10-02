@@ -22,9 +22,7 @@ test.describe('Add Health Case Flow', () => {
 
     // Select status "On Hold"
     const statusSelect = page.getByTestId('status-picker-select');
-    if (await statusSelect.isVisible()) {
-      await statusSelect.selectOption('onhold');
-    }
+    await statusSelect.selectOption('onhold');
 
     // Enter case title
     const titleInput = page.getByTestId('case-title-input');

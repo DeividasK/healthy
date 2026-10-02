@@ -300,8 +300,15 @@ export async function insertEpisodeOfCareRecord(
 
   if (Platform.OS !== 'web' && nativeDb) {
     await nativeDb.runAsync(
-      `INSERT OR REPLACE INTO episodes_of_care (id, status, start_date, title, description, fhir_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO episodes_of_care (id, status, start_date, title, description, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         status = excluded.status,
+         start_date = excluded.start_date,
+         title = excluded.title,
+         description = excluded.description,
+         fhir_json = excluded.fhir_json,
+         updated_at = excluded.updated_at;`,
       [
         episode.id,
         episode.status,
@@ -326,7 +333,7 @@ export async function insertEpisodeOfCareRecord(
     title,
     description: descriptionText,
     fhir_json: JSON.stringify(episode),
-    created_at: now,
+    created_at: episodesObj[episode.id]?.created_at ?? now,
     updated_at: now,
   };
   await AsyncStorage.setItem(
