@@ -13,7 +13,7 @@ import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,
   deleteDiagnosticReportRecord,
-} from '../database/db';
+} from '../features/lab-results/labResultsRepository';
 import { DiagnosticReportRecord } from '../database/types';
 
 export interface BiomarkerInputItem {

@@ -5,7 +5,7 @@ import {
   fetchAllEpisodeOfCareRecords,
   fetchEpisodeOfCareById,
   deleteEpisodeOfCareRecord,
-} from '../database/db';
+} from '../features/health-cases/healthCasesRepository';
 
 export interface HealthCaseInput {
   id?: string;
