@@ -288,6 +288,27 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
       const records: DiagnosticReportRecord[] = reportRows.map((r) => {
         const parsedReport: FHIRDiagnosticReport = JSON.parse(r.fhir_json);
         const observations = obsByReport[r.id] || [];
+
+        if (parsedReport.result && parsedReport.result.length > 0) {
+          const idOrder = new Map(
+            parsedReport.result.map((ref, idx) => [
+              ref.reference?.replace('Observation/', ''),
+              idx,
+            ])
+          );
+          observations.sort((a, b) => {
+            const idxA = idOrder.get(a.id) ?? 9999;
+            const idxB = idOrder.get(b.id) ?? 9999;
+            return idxA - idxB;
+          });
+        } else {
+          observations.sort((a, b) => {
+            const nameA = a.code.coding?.[0]?.display || a.code.text || '';
+            const nameB = b.code.coding?.[0]?.display || b.code.text || '';
+            return nameA.localeCompare(nameB);
+          });
+        }
+
         return { report: parsedReport, observations };
       });
 

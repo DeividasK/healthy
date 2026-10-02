@@ -95,6 +95,21 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
       const observations: FHIRObservation[] = obsRows.map((o: any) =>
         JSON.parse(o.fhir_json)
       );
+
+      if (parsedReport.result && parsedReport.result.length > 0) {
+        const idOrder = new Map(
+          parsedReport.result.map((ref, idx) => [
+            ref.reference?.replace('Observation/', ''),
+            idx,
+          ])
+        );
+        observations.sort((a, b) => {
+          const idxA = idOrder.get(a.id) ?? 9999;
+          const idxB = idOrder.get(b.id) ?? 9999;
+          return idxA - idxB;
+        });
+      }
+
       records.push({ report: parsedReport, observations });
     }
     return records;
