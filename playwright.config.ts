@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import type { ChromaticConfig } from '@chromatic-com/playwright';
 
 export default defineConfig<ChromaticConfig>({
-  testDir: './e2e',
+  testDir: './app',
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,

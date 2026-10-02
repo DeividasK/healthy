@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ChevronDown, X } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, FileText, X } from 'lucide-react-native';
 import { NativeDatePicker } from './NativeDatePicker';
 import { PlusCircleButton } from './PlusCircleButton';
+import { AddOptionsModal } from './AddOptionsModal';
 import { FHIREpisodeOfCareStatus } from '../types/fhir';
 import { formatLocalDate } from '../utils/dateUtils';
 import { COLORS } from '../theme/colors';
@@ -79,6 +80,7 @@ export function HealthCaseForm({
   const [showDescription, setShowDescription] = useState(
     Boolean(initialValues?.description)
   );
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const currentStatusObj =
@@ -262,7 +264,7 @@ export function HealthCaseForm({
             {!showDescription && (
               <PlusCircleButton
                 testID="add-description-button"
-                onPress={() => setShowDescription(true)}
+                onPress={() => setShowPlusMenu(true)}
               />
             )}
           </View>
@@ -324,6 +326,33 @@ export function HealthCaseForm({
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Plus Action Modal */}
+        <AddOptionsModal
+          visible={showPlusMenu}
+          onClose={() => setShowPlusMenu(false)}
+          options={[
+            ...(!showDescription
+              ? [
+                  {
+                    id: 'add-description',
+                    label: 'Add Description',
+                    icon: (
+                      <FileText
+                        color={COLORS.light.primary}
+                        size={20}
+                        style={{ marginRight: 12 }}
+                      />
+                    ),
+                    testID: 'menu-add-description',
+                    onPress: () => {
+                      setShowDescription(true);
+                    },
+                  },
+                ]
+              : []),
+          ]}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

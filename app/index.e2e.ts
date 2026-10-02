@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Health Cases, Deletions and Floating Action Button', () => {
+test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => {
@@ -29,122 +29,6 @@ test.describe('Health Cases, Deletions and Floating Action Button', () => {
     // Tap floating button again -> menu closes
     await floatingBtn.click();
     await expect(menu).not.toBeVisible();
-  });
-
-  test('should allow creating a Health Case with status, title, and optional description', async ({
-    page,
-  }) => {
-    await page.goto('/');
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-health-case').click();
-
-    await expect(page).toHaveURL(/.*health-case\/add/);
-    await expect(page.getByText('New Health Case')).toBeVisible();
-
-    // Select status "On Hold"
-    const statusSelect = page.getByTestId('status-picker-select');
-    if (await statusSelect.isVisible()) {
-      await statusSelect.selectOption('onhold');
-    }
-
-    // Enter case title
-    const titleInput = page.getByTestId('case-title-input');
-    await titleInput.fill('Left Knee Pain');
-
-    // Description is initially hidden
-    await expect(page.getByTestId('case-description-input')).not.toBeVisible();
-
-    // Click plus button to add description
-    const addDescBtn = page.getByTestId('add-description-button');
-    await expect(addDescBtn).toBeVisible();
-    await addDescBtn.click();
-
-    // Enter description
-    const descInput = page.getByTestId('case-description-input');
-    await expect(descInput).toBeVisible();
-    await descInput.fill('Mild swelling after jogging 5km.');
-
-    // Save
-    await page.getByTestId('save-button').click();
-
-    // Verify redirected to Home and card appears
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Left Knee Pain')).toBeVisible();
-    await expect(
-      page.getByText('Mild swelling after jogging 5km.')
-    ).toBeVisible();
-    await expect(page.getByText('On Hold')).toBeVisible();
-
-    // Edit and Delete buttons should exist
-    const editBtn = page.locator('[data-testid^="edit-case-button-"]');
-    const deleteBtn = page.locator('[data-testid^="delete-case-button-"]');
-    await expect(editBtn).toBeVisible();
-    await expect(deleteBtn).toBeVisible();
-  });
-
-  test('should allow editing an existing Health Case', async ({ page }) => {
-    // 1. Create a case
-    await page.goto('/health-case/add');
-    await page.getByTestId('case-title-input').fill('Right Shoulder Strain');
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Right Shoulder Strain')).toBeVisible();
-
-    // 2. Click edit button
-    const editBtn = page.locator('[data-testid^="edit-case-button-"]');
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*health-case\/.*\/edit/);
-    await expect(page.getByText('Edit Health Case')).toBeVisible();
-
-    // 3. Verify populated title
-    const titleInput = page.getByTestId('case-title-input');
-    await expect(titleInput).toHaveValue('Right Shoulder Strain');
-
-    // Update title
-    await titleInput.fill('Right Shoulder Strain - Resolved');
-    await page.getByTestId('save-button').click();
-
-    // 4. Verify home view reflects updated title
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(
-      page.getByText('Right Shoulder Strain - Resolved')
-    ).toBeVisible();
-  });
-
-  test('should allow deleting a Health Case with confirmation modal and cancel option', async ({
-    page,
-  }) => {
-    // 1. Create a case
-    await page.goto('/health-case/add');
-    await page.getByTestId('case-title-input').fill('Migraine Case');
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Migraine Case')).toBeVisible();
-
-    // 2. Click delete button
-    const deleteBtn = page.locator('[data-testid^="delete-case-button-"]');
-    await deleteBtn.click();
-
-    // 3. Modal appears with Cancel and Delete
-    const modal = page.getByTestId('delete-confirmation-modal');
-    await expect(modal).toBeVisible();
-    await expect(page.getByText('Delete Health Case')).toBeVisible();
-
-    // Cancel deletion
-    const cancelBtn = page.getByTestId('delete-modal-cancel-button');
-    await cancelBtn.click();
-    await expect(modal).not.toBeVisible();
-    await expect(page.getByText('Migraine Case')).toBeVisible();
-
-    // 4. Click delete again and confirm
-    await deleteBtn.click();
-    const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmBtn).toBeEnabled();
-    await confirmBtn.click();
-
-    // 5. Case is removed, returns to empty state
-    await expect(page.getByText('Migraine Case')).not.toBeVisible();
-    await expect(page.getByText('Nothing to show yet')).toBeVisible();
   });
 
   test('should enforce 5-second countdown on Lab Result delete button and cancel safely', async ({

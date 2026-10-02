@@ -17,6 +17,7 @@ import { NativeDatePicker } from '../src/components/NativeDatePicker';
 import { NativeTimePicker } from '../src/components/NativeTimePicker';
 import { NativeUnitPicker } from '../src/components/NativeUnitPicker';
 import { PlusCircleButton } from '../src/components/PlusCircleButton';
+import { AddOptionsModal } from '../src/components/AddOptionsModal';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -662,56 +663,53 @@ export default function AddLabResultsScreen() {
         </View>
 
         {/* Plus Action Overlay ("Add Time", "Add Notes") */}
-        {showPlusMenu && (
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              testID="plus-menu-overlay"
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => setShowPlusMenu(false)}
-            />
-            <View style={styles.plusMenuCard}>
-              {!hasTime && (
-                <TouchableOpacity
-                  testID="menu-add-time"
-                  style={styles.plusMenuItem}
-                  onPress={() => {
-                    setShowPlusMenu(false);
-                    const now = new Date();
-                    const h = now.getHours().toString().padStart(2, '0');
-                    const m = now.getMinutes().toString().padStart(2, '0');
-                    setTestTime(`${h}:${m}`);
-                  }}
-                >
-                  <Clock
-                    color={COLORS.light.primary}
-                    size={20}
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text style={styles.plusMenuItemText}>Add Time</Text>
-                </TouchableOpacity>
-              )}
-              {!hasTime && !hasNotes && <View style={styles.plusMenuDivider} />}
-              {!hasNotes && (
-                <TouchableOpacity
-                  testID="menu-add-notes"
-                  style={styles.plusMenuItem}
-                  onPress={() => {
-                    setShowPlusMenu(false);
-                    setShowNotesInput(true);
-                  }}
-                >
-                  <FileText
-                    color={COLORS.light.primary}
-                    size={20}
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text style={styles.plusMenuItemText}>Add Notes</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
+        <AddOptionsModal
+          visible={showPlusMenu}
+          onClose={() => setShowPlusMenu(false)}
+          options={[
+            ...(!hasTime
+              ? [
+                  {
+                    id: 'add-time',
+                    label: 'Add Time',
+                    icon: (
+                      <Clock
+                        color={COLORS.light.primary}
+                        size={20}
+                        style={{ marginRight: 12 }}
+                      />
+                    ),
+                    testID: 'menu-add-time',
+                    onPress: () => {
+                      const now = new Date();
+                      const h = now.getHours().toString().padStart(2, '0');
+                      const m = now.getMinutes().toString().padStart(2, '0');
+                      setTestTime(`${h}:${m}`);
+                    },
+                  },
+                ]
+              : []),
+            ...(!hasNotes
+              ? [
+                  {
+                    id: 'add-notes',
+                    label: 'Add Notes',
+                    icon: (
+                      <FileText
+                        color={COLORS.light.primary}
+                        size={20}
+                        style={{ marginRight: 12 }}
+                      />
+                    ),
+                    testID: 'menu-add-notes',
+                    onPress: () => {
+                      setShowNotesInput(true);
+                    },
+                  },
+                ]
+              : []),
+          ]}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -999,47 +997,5 @@ const styles = StyleSheet.create({
     color: COLORS.light.primaryForeground,
     fontSize: 16,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: COLORS.light.modalBackdrop,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    zIndex: 1000,
-  },
-  plusMenuCard: {
-    width: 220,
-    backgroundColor: COLORS.light.card,
-    borderRadius: 12,
-    padding: 8,
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebModalCard,
-      },
-      default: {
-        shadowColor: COLORS.light.shadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 5,
-      },
-    }),
-  },
-  plusMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  plusMenuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  plusMenuDivider: {
-    height: 1,
-    backgroundColor: COLORS.light.dropdownSeparator,
   },
 });
