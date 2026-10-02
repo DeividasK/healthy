@@ -15,6 +15,7 @@ import { DiagnosticReportRecord } from '../src/database/types';
 import { getAllReports } from '../src/services/diagnosticReportService';
 import { FHIRObservation } from '../src/types/fhir';
 import { formatDisplayDate } from '../src/utils/dateUtils';
+import { COLORS } from '../src/theme/colors';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -89,13 +90,13 @@ export default function HomeScreen() {
       <View style={styles.container}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3d6450" />
+            <ActivityIndicator size="large" color={COLORS.light.primary} />
           </View>
         ) : records.length === 0 ? (
           /* Empty State when no results yet */
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconContainer}>
-              <FileText color="#3d6450" size={36} />
+              <FileText color={COLORS.light.primary} size={36} />
             </View>
             <Text style={styles.emptyTitle}>No Results Yet</Text>
             <Text style={styles.emptySubtitle}>
@@ -107,7 +108,11 @@ export default function HomeScreen() {
               onPress={() => navigateToAddReport()}
               activeOpacity={0.8}
             >
-              <Plus color="#ffffff" size={18} style={{ marginRight: 6 }} />
+              <Plus
+                color={COLORS.light.primaryForeground}
+                size={18}
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.emptyAddButtonText}>Add results</Text>
             </TouchableOpacity>
           </View>
@@ -134,7 +139,7 @@ export default function HomeScreen() {
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
                       <Calendar
-                        color="#414844"
+                        color={COLORS.light.iconMuted}
                         size={16}
                         style={{ marginRight: 6 }}
                       />
@@ -148,7 +153,7 @@ export default function HomeScreen() {
                       onPress={() => navigateToAddReport(record.report.id)}
                       activeOpacity={0.7}
                     >
-                      <Pencil color="#414844" size={18} />
+                      <Pencil color={COLORS.light.iconMuted} size={18} />
                     </TouchableOpacity>
                   </View>
 
@@ -218,11 +223,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f9faf6',
+    backgroundColor: COLORS.light.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#f9faf6',
+    backgroundColor: COLORS.light.background,
   },
   loadingContainer: {
     flex: 1,
@@ -239,7 +244,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#d1e9cd',
+    backgroundColor: COLORS.light.emptyIconContainer,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -247,12 +252,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#414844',
+    color: COLORS.light.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
@@ -260,13 +265,13 @@ const styles = StyleSheet.create({
   emptyAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#3d6450',
+    backgroundColor: COLORS.light.primary,
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 9999,
   },
   emptyAddButtonText: {
-    color: '#ffffff',
+    color: COLORS.light.primaryForeground,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -279,17 +284,17 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   reportCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     borderRadius: 16,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#e2e3df',
+    borderColor: COLORS.light.cardBorder,
     ...Platform.select({
       web: {
-        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
+        boxShadow: COLORS.light.shadowWebCard,
       },
       default: {
-        shadowColor: '#0f172a',
+        shadowColor: COLORS.light.cardShadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 6,
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
   cardDate: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
   },
   editReportButton: {
     padding: 6,
@@ -318,18 +323,18 @@ const styles = StyleSheet.create({
   },
   cardNoteContainer: {
     marginTop: 8,
-    backgroundColor: '#f9faf6',
+    backgroundColor: COLORS.light.background,
     padding: 8,
     borderRadius: 8,
   },
   cardNoteText: {
     fontSize: 13,
-    color: '#414844',
+    color: COLORS.light.textSecondary,
     fontStyle: 'italic',
   },
   cardDivider: {
     height: 1,
-    backgroundColor: '#eeeeeb',
+    backgroundColor: COLORS.light.divider,
     marginVertical: 12,
   },
   observationsContainer: {
@@ -348,11 +353,11 @@ const styles = StyleSheet.create({
   obsName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
   },
   obsReference: {
     fontSize: 12,
-    color: '#717973',
+    color: COLORS.light.muted,
     marginTop: 2,
   },
   obsRight: {
@@ -367,13 +372,13 @@ const styles = StyleSheet.create({
   obsValue: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   obsUnit: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#414844',
+    color: COLORS.light.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statusBadge: {
@@ -383,28 +388,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusNormal: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: COLORS.light.badgeNormalBg,
+    borderColor: COLORS.light.badgeNormalBorder,
   },
   statusLow: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: COLORS.light.badgeLowBg,
+    borderColor: COLORS.light.badgeLowBorder,
   },
   statusHigh: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    backgroundColor: COLORS.light.badgeHighBg,
+    borderColor: COLORS.light.badgeHighBorder,
   },
   statusText: {
     fontSize: 11,
     fontWeight: '700',
   },
   statusTextNormal: {
-    color: '#10B981',
+    color: COLORS.light.badgeNormalText,
   },
   statusTextLow: {
-    color: '#3B82F6',
+    color: COLORS.light.badgeLowText,
   },
   statusTextHigh: {
-    color: '#EF4444',
+    color: COLORS.light.badgeHighText,
   },
 });

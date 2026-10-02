@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import '../global.css';
 
 import { AppLogo } from '../src/components/AppLogo';
+import { COLORS } from '../src/theme/colors';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -53,7 +54,7 @@ function RootLayoutNav() {
             title: '',
             headerLeft: () => (
               <View style={{ marginLeft: Platform.OS === 'ios' ? 0 : 4 }}>
-                <AppLogo size={30} color="#5A8669" />
+                <AppLogo size={30} color={COLORS.light.primaryLogo} />
               </View>
             ),
           }}

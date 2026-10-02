@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Clock, X } from 'lucide-react-native';
+import { COLORS } from '../theme/colors';
 
 export interface NativeTimePickerProps {
   value: string; // "HH:mm"
@@ -39,7 +40,7 @@ export function NativeTimePicker({
 
   return (
     <View style={styles.timePill} testID={testID}>
-      <Clock color="#414844" size={16} style={styles.pillIcon} />
+      <Clock color={COLORS.light.iconMuted} size={16} style={styles.pillIcon} />
       <Text style={styles.pillText}>{value}</Text>
       {React.createElement('input', {
         ref: inputRef,
@@ -66,7 +67,7 @@ export function NativeTimePicker({
         onPress={onRemove}
         style={styles.removeButton}
       >
-        <X color="#717973" size={14} />
+        <X color={COLORS.light.iconClear} size={14} />
       </TouchableOpacity>
     </View>
   );
@@ -77,9 +78,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eeeeeb',
+    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 9999,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   pillText: {
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '500',
     marginRight: 6,

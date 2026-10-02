@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Calendar } from 'lucide-react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { COLORS } from '../theme/colors';
 
 export interface NativeDatePickerProps {
   value: Date;
@@ -43,7 +44,11 @@ export function NativeDatePicker({
       activeOpacity={0.8}
       testID={testID}
     >
-      <Calendar color="#414844" size={18} style={styles.pillIcon} />
+      <Calendar
+        color={COLORS.light.iconMuted}
+        size={18}
+        style={styles.pillIcon}
+      />
       <Text style={styles.datePillText}>{formattedDate}</Text>
     </TouchableOpacity>
   );
@@ -53,9 +58,9 @@ const styles = StyleSheet.create({
   datePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eeeeeb',
+    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 9999,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -64,7 +69,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   datePillText: {
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '600',
   },
