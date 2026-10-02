@@ -42,9 +42,11 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@chromatic-com/playwright": "^1.0.0",
     "@eslint/config-helpers": "^0.7.0",
     "@playwright/test": "^1.63.0",
     "@types/react": "~19.2.2",
+    "chromatic": "^18.10.1",
     "eslint": "^9.7.0",
     "eslint-config-expo": "~57.0.2",
     "eslint-config-prettier": "^10.1.8",
@@ -61,7 +63,9 @@
     "web": "expo start --web",
     "build:web": "expo export --platform web",
     "build:pages": "EXPO_BASE_URL=/healthy expo export --platform web && touch dist/.nojekyll && cp dist/+not-found.html dist/404.html",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium",
+    "test:visual": "playwright test --project=visual",
+    "chromatic": "chromatic --playwright",
     "lint": "expo lint",
     "format:check": "prettier --check .",
     "format": "prettier --write ."
