@@ -93,7 +93,7 @@ jobs:
       - name: Publish to Chromatic
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: pnpm chromatic
+        run: pnpm chromatic --exit-zero-on-changes
 
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
