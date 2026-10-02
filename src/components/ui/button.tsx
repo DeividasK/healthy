@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/cn';
+import { useColorScheme } from '../../lib/useColorScheme';
 
 const buttonVariants = cva(
   'flex-row items-center justify-center gap-2 rounded-lg font-medium transition-opacity active:opacity-85',
@@ -89,7 +90,15 @@ export const Button = React.forwardRef<View, ButtonProps>(
     },
     ref
   ) => {
+    const { colors } = useColorScheme();
     const content = title ?? children;
+
+    const spinnerColor =
+      variant === 'destructive'
+        ? colors.destructiveForeground
+        : variant === 'primary' || !variant
+          ? colors.primaryForeground
+          : colors.primary;
 
     return (
       <Pressable
@@ -103,14 +112,7 @@ export const Button = React.forwardRef<View, ButtonProps>(
         {...props}
       >
         {loading ? (
-          <ActivityIndicator
-            size="small"
-            color={
-              variant === 'primary' || variant === 'destructive'
-                ? '#FFFFFF'
-                : '#5A826D'
-            }
-          />
+          <ActivityIndicator size="small" color={spinnerColor} />
         ) : (
           <>
             {icon}

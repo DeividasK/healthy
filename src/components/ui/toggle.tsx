@@ -8,7 +8,7 @@ export interface ToggleProps extends SwitchProps {
 
 export const Toggle = React.forwardRef<Switch, ToggleProps>(
   ({ value, onValueChange, disabled, className, ...props }, ref) => {
-    const { colors, isDarkColorScheme } = useColorScheme();
+    const { colors } = useColorScheme();
 
     return (
       <Switch
@@ -17,11 +17,11 @@ export const Toggle = React.forwardRef<Switch, ToggleProps>(
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{
-          false: isDarkColorScheme ? '#334155' : '#E2E8F0',
+          false: colors.border,
           true: colors.primary,
         }}
         thumbColor="#FFFFFF"
-        ios_backgroundColor={isDarkColorScheme ? '#334155' : '#E2E8F0'}
+        ios_backgroundColor={colors.border}
         {...props}
       />
     );

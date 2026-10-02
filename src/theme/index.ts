@@ -1,9 +1,9 @@
-import { DarkTheme, DefaultTheme } from 'expo-router';
+import { DefaultTheme } from 'expo-router';
 import { COLORS } from './colors';
 
 export type NavigationTheme = typeof DefaultTheme;
 
-export const NAV_THEME: { light: NavigationTheme; dark: NavigationTheme } = {
+export const NAV_THEME: { light: NavigationTheme } = {
   light: {
     ...DefaultTheme,
     dark: false,
@@ -15,19 +15,6 @@ export const NAV_THEME: { light: NavigationTheme; dark: NavigationTheme } = {
       border: COLORS.light.border,
       primary: COLORS.light.primary,
       notification: COLORS.light.destructive,
-    },
-  },
-  dark: {
-    ...DarkTheme,
-    dark: true,
-    colors: {
-      ...DarkTheme.colors,
-      background: COLORS.dark.background,
-      card: COLORS.dark.card,
-      text: COLORS.dark.foreground,
-      border: COLORS.dark.border,
-      primary: COLORS.dark.primary,
-      notification: COLORS.dark.destructive,
     },
   },
 };

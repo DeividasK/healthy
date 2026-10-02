@@ -9,12 +9,10 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary/10 border-primary/20 text-primary',
-        normal:
-          'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-400',
-        low: 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400',
-        high: 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-400',
-        caution:
-          'bg-amber-50 border-amber-200 text-amber-600 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-400',
+        normal: 'bg-emerald-50 border-emerald-200 text-emerald-600',
+        low: 'bg-blue-50 border-blue-200 text-blue-600',
+        high: 'bg-rose-50 border-rose-200 text-rose-600',
+        caution: 'bg-amber-50 border-amber-200 text-amber-600',
         outline: 'border-border text-foreground bg-transparent',
         secondary: 'bg-muted border-transparent text-muted-foreground',
       },
@@ -35,10 +33,10 @@ const badgeTextVariants = cva('font-bold tracking-wide select-none', {
   variants: {
     variant: {
       default: 'text-primary',
-      normal: 'text-emerald-600 dark:text-emerald-400',
-      low: 'text-blue-600 dark:text-blue-400',
-      high: 'text-rose-600 dark:text-rose-400',
-      caution: 'text-amber-600 dark:text-amber-400',
+      normal: 'text-emerald-600',
+      low: 'text-blue-600',
+      high: 'text-rose-600',
+      caution: 'text-amber-600',
       outline: 'text-foreground',
       secondary: 'text-muted-foreground',
     },

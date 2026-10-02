@@ -20,27 +20,6 @@ export const THEME_COLORS = {
     alertBlue: '#3B82F6',
     privacyGreen: '#10B981',
   },
-  dark: {
-    background: '#0F172A',
-    foreground: '#F8FAFC',
-    card: '#161B22',
-    cardForeground: '#F8FAFC',
-    primary: '#98CEAA',
-    primaryForeground: '#0F172A',
-    secondary: '#546A54',
-    secondaryForeground: '#F8FAFC',
-    muted: '#1E293B',
-    mutedForeground: '#94A3B8',
-    destructive: '#F87171',
-    destructiveForeground: '#FFFFFF',
-    border: '#334155',
-    input: '#334155',
-    ring: '#98CEAA',
-    alertRose: '#F43F5E',
-    alertAmber: '#F59E0B',
-    alertBlue: '#60A5FA',
-    privacyGreen: '#34D399',
-  },
 } as const;
 
 export const COLORS = THEME_COLORS;

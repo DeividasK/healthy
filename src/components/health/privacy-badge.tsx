@@ -20,7 +20,7 @@ export const PrivacyBadge = React.forwardRef<View, PrivacyBadgeProps>(
         {...props}
       >
         <Lock size={12} color="#059669" />
-        <Text className="text-[10px] font-bold tracking-wider text-emerald-700 dark:text-emerald-400">
+        <Text className="text-[10px] font-bold tracking-wider text-emerald-700">
           {label}
         </Text>
       </View>

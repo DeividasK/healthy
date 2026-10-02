@@ -23,7 +23,7 @@ A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application
   - Selecting a biomarker auto-populates category, default unit, and physiological reference intervals (Min/Max).
   - **Dual-Unit Support**: Seamless toggle and mathematical conversion between **SI units** (`mmol/L`, `µmol/L`) and **Conventional US units** (`mg/dL`, `g/dL`), with synchronized reference ranges.
   - **Dynamic Live Flagging**: Real-time visual status indicators (🟢 Normal, 🔵 Low, 🔴 High, 🚨 Critical) calculated live as values are entered.
-- **Design System**: Fully responsive mobile-first UI with automatic **Dark Mode** and **Light Mode** support.
+- **Design System**: Fully responsive mobile-first UI styled with NativeWind and Tailwind CSS.
 
 ## 🚀 Running the App
 
