@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage } from '../testing/testStorage';
 
 test.describe('Add Health Case Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
+    await clearAppStorage(page);
     await page.reload();
   });
 
