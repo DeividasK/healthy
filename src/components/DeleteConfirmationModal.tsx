@@ -106,7 +106,7 @@ export function DeleteConfirmationModal({
   visible,
   title,
   message,
-  requireCountdown = false,
+  requireCountdown = true,
   countdownDuration = 5,
   onConfirm,
   onCancel,

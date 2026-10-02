@@ -64,10 +64,15 @@ test.describe('Edit Health Case Flow', () => {
     await expect(modal).not.toBeVisible();
     await expect(page.getByText('Migraine Case')).toBeVisible();
 
-    // 4. Click delete again and confirm
+    // 4. Click delete again and verify 5-second countdown
     await deleteBtn.click();
     const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmBtn).toBeEnabled();
+    await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
+    await expect(confirmBtn).toContainText('Delete (');
+
+    // Wait until countdown reaches 0 and button becomes enabled with text "Delete"
+    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
     await confirmBtn.click();
 
     // 5. Case is removed, returns to empty state

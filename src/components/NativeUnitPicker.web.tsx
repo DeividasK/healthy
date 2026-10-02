@@ -32,6 +32,8 @@ export function NativeUnitPicker({
       {React.createElement(
         'select',
         {
+          id: `${testID}-native-select`,
+          name: `${testID}-unit`,
           value: selectedUnit,
           onChange: handleChange,
           style: {

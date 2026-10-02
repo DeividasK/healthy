@@ -33,20 +33,21 @@ pnpm expo install --fix      # fix incompatible package versions
 - **Always run**: `pnpm tsc --noEmit` and `pnpm expo lint` before declaring any task done.
 - **Visual Tests (`pnpm test:visual`)**:
   - You **MUST** write visual tests for new views.
-  - Visual tests for that view **MUST** be collocated next to the view and named accordingly (e.g. `app/<view-name>.visual.ts`).
+  - Visual tests for that view **MUST** be collocated next to the view inside `src/features/<feature>/` and named accordingly (e.g. `src/features/<feature>/<view-name>.visual.ts`).
   - You **MUST NOT** write a new test if an existing visual test covers the changes/new additions.
   - You **MUST** call out new visual tests that will be added or ones that you expect to be affected if none will be added.
   - ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
 - **E2E Tests (`pnpm test:e2e`)**:
   - You **MUST** write E2E tests for new views and user flows.
-  - E2E tests for that view **MUST** be collocated next to the view and named accordingly (e.g. `app/<view-name>.e2e.ts`).
+  - E2E tests for that view **MUST** be collocated next to the view inside `src/features/<feature>/` and named accordingly (e.g. `src/features/<feature>/<view-name>.e2e.ts`).
   - Tests **MUST** be updated if possible to keep testing succinct.
   - Implementation plans **MUST** describe new E2E tests that will be written.
   - Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
 
 ## Navigation & Routing
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
+- Use **Expo Router** for all navigation. Routes live in `app/` — keep files in `app/` strictly as thin wrappers that import and render views from `src/features/`.
+- Views, view-specific subcomponents, and their tests live in `src/features/<feature>/`. Do NOT put non-route code, subcomponents, or tests inside `app/` (Expo Router scans `app/` for routes, and Metro will crawl test dependencies like Playwright if placed there).
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
@@ -61,5 +62,7 @@ Docs: https://docs.expo.dev/eas/index.md
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `pnpm expo run:ios|android` locally, or `pnpm dlx eas-cli build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
 - **Component Reuse**: Always prioritize reusing existing UI components (e.g. pickers, buttons, pills, modals) before creating new ones. In implementation plans, explicitly audit and suggest existing components to be reused beforehand. Never copy-paste styles across files: if styles are only used in one place, they can be written in that place, but when they need to be reused, extract a separate reusable component.
+- **Component & Test Collocation**: Views, view-specific components (e.g. `HealthCaseForm`, `LabResultForm`), and their E2E and visual tests **MUST** be collocated in feature folders inside `src/features/<feature>/` (e.g. `src/features/health-cases/`). ONLY components that are genuinely shared across multiple features live in `src/components/`. The `app/` directory is strictly reserved for thin route definitions.
+- **Form Field Attributes**: All form fields (`<TextInput>`, `<input>`, `<select>`, `<textarea>`) **MUST** have an `id` (or `nativeID`) and `name` attribute to prevent browser/accessibility warnings and ensure proper autofill and test targeting.
 - **New Component Confirmation**: Always explicitly list and confirm in the plan if any new components need to be created, justifying why an existing component cannot be reused.
 - **Database Migrations & Breaking Changes**: All database changes must have migrations, and migrations must be highlighted in the plan. You MUST explicitly highlight any breaking changes (or explicitly confirm that changes are non-breaking/additive).

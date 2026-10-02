@@ -1,16 +1,3 @@
-import React from 'react';
-import { HealthCaseForm } from '../../src/components/HealthCaseForm';
-import { createOrUpdateHealthCase } from '../../src/services/healthCaseService';
+import { AddHealthCaseView } from '../../src/features/health-cases/AddHealthCaseView';
 
-export default function AddHealthCaseScreen() {
-  const handleSave = async (values: {
-    title: string;
-    status: any;
-    startDate: string;
-    description?: string;
-  }) => {
-    await createOrUpdateHealthCase(values);
-  };
-
-  return <HealthCaseForm onSave={handleSave} />;
-}
+export default AddHealthCaseView;

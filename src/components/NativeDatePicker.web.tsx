@@ -68,6 +68,8 @@ export function NativeDatePicker({
       {React.createElement('input', {
         ref: inputRef,
         type: 'date',
+        id: `${testID}-native-input`,
+        name: `${testID}-date`,
         max: todayStr,
         value: dateValueStr,
         onChange: handleNativeChange,

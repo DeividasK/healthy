@@ -45,6 +45,8 @@ export function NativeTimePicker({
       {React.createElement('input', {
         ref: inputRef,
         type: 'time',
+        id: `${testID}-native-input`,
+        name: `${testID}-time`,
         max: maxTime,
         value: value,
         onChange: handleNativeChange,

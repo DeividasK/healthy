@@ -7,7 +7,7 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
   ? config.resolver.blockList
   : [config.resolver.blockList].filter(Boolean);
 
-// Exclude collocated e2e and visual test files from Metro bundling and Expo Router route discovery
+// Exclude e2e and visual test files from Metro bundling
 config.resolver.blockList = [
   ...defaultBlockList,
   /.*\.e2e\.[jt]sx?$/,

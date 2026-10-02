@@ -14,12 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronDown, FileText, X } from 'lucide-react-native';
-import { NativeDatePicker } from './NativeDatePicker';
-import { PlusCircleButton } from './PlusCircleButton';
-import { AddOptionsModal } from './AddOptionsModal';
-import { FHIREpisodeOfCareStatus } from '../types/fhir';
-import { formatLocalDate } from '../utils/dateUtils';
-import { COLORS } from '../theme/colors';
+import { NativeDatePicker } from '../../components/NativeDatePicker';
+import { PlusCircleButton } from '../../components/PlusCircleButton';
+import { AddOptionsModal } from '../../components/AddOptionsModal';
+import { FHIREpisodeOfCareStatus } from '../../types/fhir';
+import { formatLocalDate } from '../../utils/dateUtils';
+import { COLORS } from '../../theme/colors';
 
 export const HEALTH_CASE_STATUS_OPTIONS: {
   value: FHIREpisodeOfCareStatus;
@@ -105,32 +105,17 @@ export function HealthCaseForm({
           title: 'Select Status',
         },
         (buttonIndex) => {
-          if (
-            buttonIndex !== cancelButtonIndex &&
-            buttonIndex < HEALTH_CASE_STATUS_OPTIONS.length
-          ) {
+          if (buttonIndex !== cancelButtonIndex) {
             handleStatusSelect(HEALTH_CASE_STATUS_OPTIONS[buttonIndex].value);
           }
         }
-      );
-    } else if (Platform.OS === 'android') {
-      Alert.alert(
-        'Select Status',
-        undefined,
-        [
-          ...HEALTH_CASE_STATUS_OPTIONS.map((s) => ({
-            text: s.label,
-            onPress: () => handleStatusSelect(s.value),
-          })),
-          { text: 'Cancel', style: 'cancel' },
-        ],
-        { cancelable: true }
       );
     }
   };
 
   const handleSubmit = async () => {
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       showAlert('Required Field', 'Please enter a case title.');
       return;
     }
@@ -140,13 +125,12 @@ export function HealthCaseForm({
       const formattedDate = formatLocalDate(selectedDate);
       await onSave({
         id: initialValues?.id,
-        title: title.trim(),
+        title: trimmedTitle,
         status,
         startDate: formattedDate,
-        description:
-          showDescription && description.trim()
-            ? description.trim()
-            : undefined,
+        description: showDescription
+          ? description.trim() || undefined
+          : undefined,
       });
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -213,9 +197,11 @@ export function HealthCaseForm({
                   { backgroundColor: currentStatusObj.dotColor },
                 ]}
               />
-              <Text style={styles.pillText}>{currentStatusObj.label}</Text>
+              <Text style={styles.statusPillText}>
+                {currentStatusObj.label}
+              </Text>
               <ChevronDown
-                color={COLORS.light.iconMuted}
+                color={COLORS.light.iconClear}
                 size={16}
                 style={{ marginLeft: 4 }}
               />
@@ -224,6 +210,8 @@ export function HealthCaseForm({
                 React.createElement(
                   'select',
                   {
+                    id: 'status-picker-select',
+                    name: 'status',
                     value: status,
                     onChange: (e: any) =>
                       handleStatusSelect(
@@ -274,6 +262,10 @@ export function HealthCaseForm({
             <Text style={styles.inputLabel}>Case Title</Text>
             <TextInput
               testID="case-title-input"
+              id="case-title-input"
+              nativeID="case-title-input"
+              name="title"
+              accessibilityLabel="Case Title"
               style={styles.textInput}
               placeholder="Left Knee Pain"
               placeholderTextColor={COLORS.light.placeholder}
@@ -300,6 +292,10 @@ export function HealthCaseForm({
               </View>
               <TextInput
                 testID="case-description-input"
+                id="case-description-input"
+                nativeID="case-description-input"
+                name="description"
+                accessibilityLabel="Case Description"
                 style={styles.descriptionInput}
                 placeholder="Enter case description..."
                 placeholderTextColor={COLORS.light.placeholder}
@@ -368,106 +364,107 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   header: {
+    backgroundColor: COLORS.light.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: COLORS.light.primary,
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
-    color: COLORS.light.primaryForeground,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    color: COLORS.light.primaryForeground,
   },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 20,
   },
   statusPill: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.light.card,
+    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
     borderColor: COLORS.light.pillBorder,
     borderRadius: 9999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    position: 'relative',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: 6,
   },
-  pillText: {
-    color: COLORS.light.foreground,
+  statusPillText: {
     fontSize: 14,
     fontWeight: '600',
+    color: COLORS.light.foreground,
   },
   inputSection: {
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.light.foreground,
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: COLORS.light.card,
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
     color: COLORS.light.foreground,
   },
   descriptionContainer: {
-    backgroundColor: COLORS.light.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    padding: 14,
     marginBottom: 20,
   },
   descriptionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   descriptionInput: {
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
     color: COLORS.light.foreground,
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
   bottomBar: {
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.light.divider,
     backgroundColor: COLORS.light.card,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.light.border,
   },
   saveButton: {
     backgroundColor: COLORS.light.primary,
-    borderRadius: 9999,
     paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -477,9 +474,9 @@ const styles = StyleSheet.create({
       default: {
         shadowColor: COLORS.light.primary,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.25,
         shadowRadius: 4,
-        elevation: 3,
+        elevation: 2,
       },
     }),
   },
