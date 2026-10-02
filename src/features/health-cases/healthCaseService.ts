@@ -1,11 +1,11 @@
 import * as Crypto from 'expo-crypto';
-import { FHIREpisodeOfCare, FHIREpisodeOfCareStatus } from '../types/fhir';
+import { FHIREpisodeOfCare, FHIREpisodeOfCareStatus } from '../../types/fhir';
 import {
   insertEpisodeOfCareRecord,
   fetchAllEpisodeOfCareRecords,
   fetchEpisodeOfCareById,
   deleteEpisodeOfCareRecord,
-} from '../features/health-cases/healthCasesRepository';
+} from './healthCasesRepository';
 
 export interface HealthCaseInput {
   id?: string;

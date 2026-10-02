@@ -22,11 +22,11 @@ import { DiagnosticReportRecord } from '../../database/types';
 import {
   getAllReports,
   deleteReport,
-} from '../../services/diagnosticReportService';
+} from '../lab-results/diagnosticReportService';
 import {
   getAllHealthCases,
   deleteHealthCase,
-} from '../../services/healthCaseService';
+} from '../health-cases/healthCaseService';
 import { FHIRObservation, FHIREpisodeOfCare } from '../../types/fhir';
 import { formatDisplayDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';

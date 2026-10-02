@@ -3,18 +3,18 @@ import {
   FHIRDiagnosticReport,
   FHIRObservation,
   DiagnosticReportBundle,
-} from '../types/fhir';
+} from '../../types/fhir';
 import {
   GENERAL_LAB_REPORT_LOINC,
   CBC_PANEL_LOINC,
   CBC_MARKERS,
-} from '../data/cbcMarkers';
+} from '../../data/cbcMarkers';
 import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,
   deleteDiagnosticReportRecord,
-} from '../features/lab-results/labResultsRepository';
-import { DiagnosticReportRecord } from '../database/types';
+} from './labResultsRepository';
+import { DiagnosticReportRecord } from '../../database/types';
 
 export interface BiomarkerInputItem {
   id: string; // marker canonical id or loinc
