@@ -21,11 +21,18 @@ pnpm expo install <package>  # ALWAYS use instead of pnpm add — resolves SDK-c
 pnpm expo start              # start the dev server
 pnpm expo lint               # lint
 pnpm tsc --noEmit            # typecheck
+pnpm format:check            # check formatting
+pnpm test:e2e                # E2E functional tests
+pnpm test:visual             # visual regression tests (Chromatic)
 pnpm dlx expo-doctor         # diagnose dependency and config issues
 pnpm expo install --fix      # fix incompatible package versions
 ```
 
-Run lint and typecheck before declaring any task done.
+### Verification Guidelines
+
+- **Always run**: `pnpm tsc --noEmit` and `pnpm expo lint` before declaring any task done.
+- **Visual Tests (`pnpm test:visual`)**: ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+- **E2E Tests (`pnpm test:e2e`)**: Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
 
 ## Navigation & Routing
 

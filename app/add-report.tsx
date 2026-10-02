@@ -22,6 +22,7 @@ import {
   searchCBCMarkers,
 } from '../src/data/cbcMarkers';
 import { formatLocalDate } from '../src/utils/dateUtils';
+import { COLORS } from '../src/theme/colors';
 import {
   createAndSaveDiagnosticReport,
   BiomarkerInputItem,
@@ -436,7 +437,7 @@ export default function AddLabResultsScreen() {
             }}
             activeOpacity={0.7}
           >
-            <ArrowLeft color="#ffffff" size={24} />
+            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {reportId ? 'Edit Lab Results' : 'Add Lab Results'}
@@ -478,7 +479,7 @@ export default function AddLabResultsScreen() {
                 onPress={() => setShowPlusMenu(true)}
                 activeOpacity={0.8}
               >
-                <Plus color="#414844" size={18} />
+                <Plus color={COLORS.light.iconMuted} size={18} />
               </TouchableOpacity>
             )}
           </View>
@@ -495,14 +496,14 @@ export default function AddLabResultsScreen() {
                     setTestNotes(null);
                   }}
                 >
-                  <X color="#717973" size={16} />
+                  <X color={COLORS.light.iconClear} size={16} />
                 </TouchableOpacity>
               </View>
               <TextInput
                 testID="notes-input"
                 style={styles.notesInput}
                 placeholder="Enter report notes (e.g., fasting, laboratory name)..."
-                placeholderTextColor="#717973"
+                placeholderTextColor={COLORS.light.placeholder}
                 multiline
                 numberOfLines={3}
                 value={testNotes || ''}
@@ -529,7 +530,7 @@ export default function AddLabResultsScreen() {
                     style={styles.iconAction}
                     onPress={() => handleRemoveMarker(index)}
                   >
-                    <X color="#717973" size={18} />
+                    <X color={COLORS.light.iconClear} size={18} />
                   </TouchableOpacity>
                 </View>
 
@@ -540,7 +541,7 @@ export default function AddLabResultsScreen() {
                     testID={`marker-value-input-${index}`}
                     style={styles.valueInput}
                     placeholder="Value"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={COLORS.light.placeholderInput}
                     keyboardType="decimal-pad"
                     value={item.valueStr}
                     onChangeText={(val) => handleValueChange(index, val)}
@@ -571,7 +572,7 @@ export default function AddLabResultsScreen() {
                 testID="test-search-input"
                 style={styles.searchInput}
                 placeholder="Enter test, e.g., HbA1c, ASP..."
-                placeholderTextColor="#717973"
+                placeholderTextColor={COLORS.light.placeholder}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 onFocus={() => setIsSearchFocused(true)}
@@ -582,7 +583,7 @@ export default function AddLabResultsScreen() {
                   onPress={() => setSearchQuery('')}
                   style={styles.searchClearButton}
                 >
-                  <X color="#717973" size={18} />
+                  <X color={COLORS.light.iconClear} size={18} />
                 </TouchableOpacity>
               )}
             </View>
@@ -686,7 +687,7 @@ export default function AddLabResultsScreen() {
                   }}
                 >
                   <Clock
-                    color="#3d6450"
+                    color={COLORS.light.primary}
                     size={20}
                     style={{ marginRight: 12 }}
                   />
@@ -704,7 +705,7 @@ export default function AddLabResultsScreen() {
                   }}
                 >
                   <FileText
-                    color="#3d6450"
+                    color={COLORS.light.primary}
                     size={20}
                     style={{ marginRight: 12 }}
                   />
@@ -722,13 +723,13 @@ export default function AddLabResultsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f9faf6',
+    backgroundColor: COLORS.light.background,
   },
   keyboardContainer: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#3d6450',
+    backgroundColor: COLORS.light.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -739,7 +740,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    color: '#ffffff',
+    color: COLORS.light.primaryForeground,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.2,
@@ -760,9 +761,9 @@ const styles = StyleSheet.create({
   datePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eeeeeb',
+    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 9999,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -770,9 +771,9 @@ const styles = StyleSheet.create({
   timePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eeeeeb',
+    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 9999,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -781,12 +782,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   datePillText: {
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '600',
   },
   pillText: {
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -795,16 +796,16 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 9999,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
-    backgroundColor: '#ffffff',
+    borderColor: COLORS.light.pillBorder,
+    backgroundColor: COLORS.light.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notesContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     padding: 12,
     marginBottom: 16,
   },
@@ -817,11 +818,11 @@ const styles = StyleSheet.create({
   notesLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#414844',
+    color: COLORS.light.textSecondary,
   },
   notesInput: {
     fontSize: 14,
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     minHeight: 48,
     textAlignVertical: 'top',
   },
@@ -841,7 +842,7 @@ const styles = StyleSheet.create({
   markerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     flex: 1,
     marginRight: 8,
   },
@@ -857,7 +858,7 @@ const styles = StyleSheet.create({
   equalsSign: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#414844',
+    color: COLORS.light.textSecondary,
     marginRight: 2,
     flexShrink: 0,
   },
@@ -866,12 +867,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
     height: 44,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
@@ -879,9 +880,9 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -890,7 +891,7 @@ const styles = StyleSheet.create({
   },
   unitPickerText: {
     fontSize: 13,
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     fontWeight: '600',
   },
   addTestSection: {
@@ -899,7 +900,7 @@ const styles = StyleSheet.create({
   addTestLabel: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
     marginBottom: 6,
   },
   searchInputContainer: {
@@ -911,13 +912,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     borderRadius: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     paddingHorizontal: 14,
     paddingRight: 36,
     fontSize: 15,
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
   },
   searchClearButton: {
     position: 'absolute',
@@ -925,18 +926,18 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   autocompleteContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     marginTop: 4,
     overflow: 'hidden',
     ...Platform.select({
       web: {
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
+        boxShadow: COLORS.light.shadowWebDropdown,
       },
       default: {
-        shadowColor: '#000',
+        shadowColor: COLORS.light.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 6,
@@ -951,52 +952,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f0',
+    borderBottomColor: COLORS.light.dropdownSeparator,
   },
   autocompleteItemFocused: {
-    backgroundColor: '#f3f4f0',
+    backgroundColor: COLORS.light.dropdownHighlight,
   },
   autocompleteItemTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
   },
   autocompleteItemTitleFocused: {
-    color: '#3d6450',
+    color: COLORS.light.primary,
     fontWeight: '700',
   },
   autocompleteEmpty: {
     padding: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#c1c8c2',
+    borderColor: COLORS.light.pillBorder,
     marginTop: 4,
   },
   autocompleteEmptyText: {
     fontSize: 13,
-    color: '#717973',
+    color: COLORS.light.muted,
     textAlign: 'center',
   },
   bottomSaveContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#f9faf6',
+    backgroundColor: COLORS.light.background,
     borderTopWidth: 1,
-    borderTopColor: '#e2e3df',
+    borderTopColor: COLORS.light.cardBorder,
   },
   saveButton: {
-    backgroundColor: '#3d6450',
+    backgroundColor: COLORS.light.primary,
     height: 48,
     borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       web: {
-        boxShadow: '0 2px 4px rgba(61, 100, 80, 0.15)',
+        boxShadow: COLORS.light.shadowWebPrimaryButton,
       },
       default: {
-        shadowColor: '#3d6450',
+        shadowColor: COLORS.light.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.15,
         shadowRadius: 4,
@@ -1008,13 +1009,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: COLORS.light.primaryForeground,
     fontSize: 16,
     fontWeight: '700',
   },
   modalOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: COLORS.light.modalBackdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1022,15 +1023,15 @@ const styles = StyleSheet.create({
   },
   plusMenuCard: {
     width: 220,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.light.card,
     borderRadius: 12,
     padding: 8,
     ...Platform.select({
       web: {
-        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
+        boxShadow: COLORS.light.shadowWebModalCard,
       },
       default: {
-        shadowColor: '#000',
+        shadowColor: COLORS.light.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 10,
@@ -1048,10 +1049,10 @@ const styles = StyleSheet.create({
   plusMenuItemText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a1c1a',
+    color: COLORS.light.foreground,
   },
   plusMenuDivider: {
     height: 1,
-    backgroundColor: '#f3f4f0',
+    backgroundColor: COLORS.light.dropdownSeparator,
   },
 });

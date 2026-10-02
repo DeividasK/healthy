@@ -1,12 +1,14 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
+import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import 'react-native-reanimated';
+import '../global.css';
 
-import { useColorScheme } from '@/components/useColorScheme';
 import { AppLogo } from '../src/components/AppLogo';
+import { COLORS } from '../src/theme/colors';
+import { NAV_THEME } from '../src/theme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -44,10 +46,8 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={NAV_THEME.light}>
       <Stack>
         <Stack.Screen
           name="index"
@@ -55,10 +55,7 @@ function RootLayoutNav() {
             title: '',
             headerLeft: () => (
               <View style={{ marginLeft: Platform.OS === 'ios' ? 0 : 4 }}>
-                <AppLogo
-                  size={30}
-                  color={colorScheme === 'dark' ? '#98CEAA' : '#5A8669'}
-                />
+                <AppLogo size={30} color={COLORS.light.primaryLogo} />
               </View>
             ),
           }}

@@ -1,5 +1,6 @@
 import React from 'react';
 import Svg, { SvgProps, Path } from 'react-native-svg';
+import { COLORS } from '../theme/colors';
 
 export interface AppLogoProps extends SvgProps {
   size?: number;
@@ -11,7 +12,7 @@ export const APP_LOGO_PATH =
 
 export function AppLogo({
   size = 36,
-  color = '#739F82',
+  color = COLORS.light.primaryLogo,
   style,
   ...props
 }: AppLogoProps) {
