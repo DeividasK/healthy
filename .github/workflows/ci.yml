@@ -56,6 +56,8 @@ jobs:
 
   visual:
     name: Visual Regression (Chromatic)
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
