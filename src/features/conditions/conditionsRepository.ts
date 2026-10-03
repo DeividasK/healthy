@@ -15,6 +15,10 @@ import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 export async function insertConditionRecord(
   condition: Condition
 ): Promise<void> {
+  if (!condition.id) {
+    throw new Error('Condition requires an id to be persisted');
+  }
+
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -36,7 +40,7 @@ export async function insertConditionRecord(
     const bodySite = condition.bodySite?.[0]?.text || null;
     const abatementDate = condition.abatementDateTime || null;
 
-    const condId = condition.id || '';
+    const condId = condition.id;
 
     await nativeDb.runAsync(
       `INSERT INTO conditions (id, clinical_status, verification_status, onset_date, title, severity, body_site, abatement_date, description, fhir_json, created_at, updated_at)
