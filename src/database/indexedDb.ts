@@ -1,8 +1,4 @@
-import {
-  FHIRDiagnosticReport,
-  FHIRObservation,
-  FHIREpisodeOfCare,
-} from '../types/fhir';
+import type { DiagnosticReport, Observation, EpisodeOfCare } from 'fhir/r5';
 import { DiagnosticReportRecord } from './types';
 
 export const INDEXED_DB_NAME = 'healthy_db';
@@ -13,8 +9,8 @@ export async function getWebDatabase(): Promise<null> {
 }
 
 export async function insertDiagnosticReportWeb(
-  _report: FHIRDiagnosticReport,
-  _observations: FHIRObservation[]
+  _report: DiagnosticReport,
+  _observations: Observation[]
 ): Promise<void> {}
 
 export async function fetchAllDiagnosticReportsWeb(): Promise<
@@ -28,18 +24,16 @@ export async function deleteDiagnosticReportWeb(
 ): Promise<void> {}
 
 export async function insertEpisodeOfCareWeb(
-  _episode: FHIREpisodeOfCare
+  _episode: EpisodeOfCare
 ): Promise<void> {}
 
-export async function fetchAllEpisodesOfCareWeb(): Promise<
-  FHIREpisodeOfCare[]
-> {
+export async function fetchAllEpisodesOfCareWeb(): Promise<EpisodeOfCare[]> {
   return [];
 }
 
 export async function fetchEpisodeOfCareByIdWeb(
   _id: string
-): Promise<FHIREpisodeOfCare | null> {
+): Promise<EpisodeOfCare | null> {
   return null;
 }
 

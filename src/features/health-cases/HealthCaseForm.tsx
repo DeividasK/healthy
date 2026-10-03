@@ -17,12 +17,12 @@ import { ArrowLeft, ChevronDown, FileText, X } from 'lucide-react-native';
 import { NativeDatePicker } from '../../components/NativeDatePicker';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { AddOptionsModal } from '../../components/AddOptionsModal';
-import { FHIREpisodeOfCareStatus } from '../../types/fhir';
+import type { EpisodeOfCare } from 'fhir/r5';
 import { formatLocalDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
 
 export const HEALTH_CASE_STATUS_OPTIONS: {
-  value: FHIREpisodeOfCareStatus;
+  value: EpisodeOfCare['status'];
   label: string;
   dotColor: string;
 }[] = [
@@ -35,7 +35,7 @@ export const HEALTH_CASE_STATUS_OPTIONS: {
 export interface HealthCaseFormValues {
   id?: string;
   title: string;
-  status: FHIREpisodeOfCareStatus;
+  status: EpisodeOfCare['status'];
   startDate: Date;
   description?: string;
 }
@@ -46,7 +46,7 @@ export interface HealthCaseFormProps {
   onSave: (values: {
     id?: string;
     title: string;
-    status: FHIREpisodeOfCareStatus;
+    status: EpisodeOfCare['status'];
     startDate: string;
     description?: string;
   }) => Promise<void>;
@@ -68,7 +68,7 @@ export function HealthCaseForm({
   const router = useRouter();
 
   const [title, setTitle] = useState(initialValues?.title || '');
-  const [status, setStatus] = useState<FHIREpisodeOfCareStatus>(
+  const [status, setStatus] = useState<EpisodeOfCare['status']>(
     initialValues?.status || 'active'
   );
   const [selectedDate, setSelectedDate] = useState<Date>(
@@ -88,7 +88,7 @@ export function HealthCaseForm({
     HEALTH_CASE_STATUS_OPTIONS.find((s) => s.value === status) ||
     HEALTH_CASE_STATUS_OPTIONS[0];
 
-  const handleStatusSelect = (newStatus: FHIREpisodeOfCareStatus) => {
+  const handleStatusSelect = (newStatus: EpisodeOfCare['status']) => {
     setStatus(newStatus);
   };
 
@@ -218,8 +218,9 @@ export function HealthCaseForm({
                     value: status,
                     onChange: (e: any) =>
                       handleStatusSelect(
-                        e.target.value as FHIREpisodeOfCareStatus
+                        e.target.value as EpisodeOfCare['status']
                       ),
+
                     style: {
                       position: 'absolute',
                       top: 0,

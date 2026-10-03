@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { FHIRDiagnosticReport, FHIRObservation } from '../../types/fhir';
+import type { DiagnosticReport, Observation } from 'fhir/r5';
 import { DiagnosticReportRecord } from '../../database/types';
 import { initializeDatabase, getNativeDb } from '../../database/db';
 import {
@@ -12,8 +12,8 @@ import {
  * Persists a FHIR DiagnosticReport and its Observations.
  */
 export async function insertDiagnosticReportRecord(
-  report: FHIRDiagnosticReport,
-  observations: FHIRObservation[]
+  report: DiagnosticReport,
+  observations: Observation[]
 ): Promise<void> {
   await initializeDatabase();
 
@@ -31,12 +31,14 @@ export async function insertDiagnosticReportRecord(
         ? report.note.map((n) => n.text).join('\n')
         : null;
 
+    const reportId = report.id || '';
+
     await nativeDb.withTransactionAsync(async () => {
       await nativeDb.runAsync(
         `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?);`,
         [
-          report.id,
+          reportId,
           effectiveDate,
           report.status,
           notesText,
@@ -47,7 +49,7 @@ export async function insertDiagnosticReportRecord(
       );
 
       await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
-        report.id,
+        reportId,
       ]);
 
       for (const obs of observations) {
@@ -60,7 +62,16 @@ export async function insertDiagnosticReportRecord(
         await nativeDb.runAsync(
           `INSERT OR REPLACE INTO observations (id, report_id, loinc_code, name, value, unit, fhir_json, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [obs.id, report.id, loinc, name, val, unit, JSON.stringify(obs), now]
+          [
+            obs.id || '',
+            reportId,
+            loinc,
+            name,
+            val,
+            unit,
+            JSON.stringify(obs),
+            now,
+          ]
         );
       }
     });
@@ -87,12 +98,12 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
 
     const records: DiagnosticReportRecord[] = [];
     for (const r of reportRows) {
-      const parsedReport: FHIRDiagnosticReport = JSON.parse(r.fhir_json);
+      const parsedReport: DiagnosticReport = JSON.parse(r.fhir_json);
       const obsRows = await nativeDb.getAllAsync(
         `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC;`,
         [r.id]
       );
-      const observations: FHIRObservation[] = obsRows.map((o: any) =>
+      const observations: Observation[] = obsRows.map((o: any) =>
         JSON.parse(o.fhir_json)
       );
 
@@ -104,8 +115,8 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
           ])
         );
         observations.sort((a, b) => {
-          const idxA = idOrder.get(a.id) ?? 9999;
-          const idxB = idOrder.get(b.id) ?? 9999;
+          const idxA = idOrder.get(a.id || '') ?? 9999;
+          const idxB = idOrder.get(b.id || '') ?? 9999;
           return idxA - idxB;
         });
       }

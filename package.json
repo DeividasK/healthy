@@ -51,6 +51,7 @@
     "@chromatic-com/playwright": "^1.0.0",
     "@eslint/config-helpers": "^0.7.0",
     "@playwright/test": "^1.63.0",
+    "@types/fhir": "^0.0.44",
     "@types/node": "^22.20.4",
     "@types/react": "~19.2.2",
     "chromatic": "^18.10.1",

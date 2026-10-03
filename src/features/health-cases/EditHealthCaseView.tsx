@@ -37,14 +37,21 @@ export function EditHealthCaseView() {
 
         const title =
           episode.type?.[0]?.text ||
-          episode.diagnosis?.[0]?.condition?.display ||
-          episode.description ||
+          episode.diagnosis?.[0]?.condition?.[0]?.concept?.text ||
+          episode.diagnosis?.[0]?.condition?.[0]?.reference?.display ||
+          (episode.diagnosis?.[0] as any)?.condition?.display ||
+          (episode as any).description ||
           '';
 
         const descText =
-          episode.note && episode.note.length > 0
-            ? episode.note.map((n) => n.text).join('\n')
-            : undefined;
+          ((episode as any).note && (episode as any).note.length > 0
+            ? (episode as any).note.map((n: any) => n.text).join('\n')
+            : undefined) ||
+          (episode.text?.div
+            ? episode.text.div.replace(/^<div[^>]*>|<\/div>$/gi, '')
+            : undefined) ||
+          (episode as any).description ||
+          undefined;
 
         setInitialValues({
           id: episode.id,
