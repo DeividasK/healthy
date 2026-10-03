@@ -29,6 +29,7 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
 
   dbInitPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
+      dbInitPromise = null;
       reject(new Error('IndexedDB is not supported in this environment.'));
       return;
     }
@@ -94,6 +95,7 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
     };
 
     request.onerror = () => {
+      dbInitPromise = null;
       reject(request.error);
     };
 
