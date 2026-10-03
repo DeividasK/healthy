@@ -29,7 +29,7 @@ import {
   createAndSaveDiagnosticReport,
   BiomarkerInputItem,
   getReportById,
-} from '../../services/diagnosticReportService';
+} from './diagnosticReportService';
 
 export interface ActiveMarkerItem {
   id: string;

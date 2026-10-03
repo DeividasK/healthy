@@ -1,4 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
+import { clearAppStorage } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -8,21 +9,13 @@ test.use({
 
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
-async function clearStorage(page: any) {
-  await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-}
-
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime(FIXED_DATE);
   });
 
   test('Add Report View - Initial Clean Form', async ({ page }, testInfo) => {
-    await clearStorage(page);
+    await clearAppStorage(page);
     await page.goto('/lab-result/add');
 
     await expect(page.getByText('Add Lab Results')).toBeVisible();
@@ -35,7 +28,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   test('Add Report View - Autocomplete Dropdown Open', async ({
     page,
   }, testInfo) => {
-    await clearStorage(page);
+    await clearAppStorage(page);
     await page.goto('/lab-result/add');
 
     const searchInput = page.getByTestId('test-search-input');
@@ -55,7 +48,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   });
 
   test('Add Report View - Populated Biomarkers', async ({ page }, testInfo) => {
-    await clearStorage(page);
+    await clearAppStorage(page);
     await page.goto('/lab-result/add');
 
     const searchInput = page.getByTestId('test-search-input');
@@ -83,7 +76,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   test('Add Report View - Expanded Time and Notes', async ({
     page,
   }, testInfo) => {
-    await clearStorage(page);
+    await clearAppStorage(page);
     await page.goto('/lab-result/add');
 
     // Add a marker

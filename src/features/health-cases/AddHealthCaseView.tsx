@@ -1,6 +1,6 @@
 import React from 'react';
 import { HealthCaseForm } from './HealthCaseForm';
-import { createOrUpdateHealthCase } from '../../services/healthCaseService';
+import { createOrUpdateHealthCase } from './healthCaseService';
 
 export function AddHealthCaseView() {
   const handleSave = async (values: {

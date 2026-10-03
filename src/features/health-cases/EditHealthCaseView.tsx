@@ -5,7 +5,7 @@ import { HealthCaseForm, HealthCaseFormValues } from './HealthCaseForm';
 import {
   getHealthCaseById,
   createOrUpdateHealthCase,
-} from '../../services/healthCaseService';
+} from './healthCaseService';
 import { COLORS } from '../../theme/colors';
 
 export function EditHealthCaseView() {

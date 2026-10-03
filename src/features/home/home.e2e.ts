@@ -3,9 +3,15 @@ import { test, expect } from '@playwright/test';
 test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       localStorage.clear();
       sessionStorage.clear();
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase('healthy_db');
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      });
     });
     await page.reload();
   });
@@ -34,9 +40,9 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
   test('should enforce 5-second countdown on Lab Result delete button and cancel safely', async ({
     page,
   }) => {
-    // 1. Seed a lab result report in localStorage
+    // 1. Seed a lab result report in IndexedDB
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const now = '2026-10-02T10:00:00.000Z';
       const report = {
         resourceType: 'DiagnosticReport',
@@ -66,37 +72,64 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
         },
       ];
 
-      localStorage.setItem(
-        '@healthy_diagnostic_reports_v1',
-        JSON.stringify({
-          'rep-test-del-1': {
-            id: 'rep-test-del-1',
-            effective_date: '2026-10-02',
-            status: 'final',
-            notes: null,
-            fhir_json: JSON.stringify(report),
-            created_at: now,
-            updated_at: now,
-          },
-        })
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('healthy_db', 2);
+        req.onupgradeneeded = () => {
+          const d = req.result;
+          if (!d.objectStoreNames.contains('diagnostic_reports')) {
+            const s = d.createObjectStore('diagnostic_reports', {
+              keyPath: 'id',
+            });
+            s.createIndex('effective_date', 'effective_date', {
+              unique: false,
+            });
+          }
+          if (!d.objectStoreNames.contains('observations')) {
+            const s = d.createObjectStore('observations', { keyPath: 'id' });
+            s.createIndex('report_id', 'report_id', { unique: false });
+          }
+          if (!d.objectStoreNames.contains('episodes_of_care')) {
+            const s = d.createObjectStore('episodes_of_care', {
+              keyPath: 'id',
+            });
+            s.createIndex('start_date', 'start_date', { unique: false });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const tx = db.transaction(
+        ['diagnostic_reports', 'observations'],
+        'readwrite'
       );
-      localStorage.setItem(
-        '@healthy_observations_v1',
-        JSON.stringify({
-          'rep-test-del-1': [
-            {
-              id: 'obs-test-del-1',
-              report_id: 'rep-test-del-1',
-              loinc_code: '718-7',
-              name: 'Hemoglobin',
-              value: 14.2,
-              unit: 'g/dL',
-              fhir_json: JSON.stringify(obs[0]),
-              created_at: now,
-            },
-          ],
-        })
-      );
+      tx.objectStore('diagnostic_reports').put({
+        id: 'rep-test-del-1',
+        effective_date: '2026-10-02',
+        status: 'final',
+        notes: null,
+        fhir_json: JSON.stringify(report),
+        created_at: now,
+        updated_at: now,
+      });
+      tx.objectStore('observations').put({
+        id: 'obs-test-del-1',
+        report_id: 'rep-test-del-1',
+        loinc_code: '718-7',
+        name: 'Hemoglobin',
+        value: 14.2,
+        unit: 'g/dL',
+        fhir_json: JSON.stringify(obs[0]),
+        created_at: now,
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
     });
 
     await page.reload();
@@ -143,5 +176,144 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(modal).not.toBeVisible();
     await expect(reportCard).not.toBeVisible();
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
+  });
+
+  test('should persist and retrieve records in IndexedDB across reloads, allowing inspection of healthy_db', async ({
+    page,
+  }) => {
+    // 1. Visit home
+    await page.goto('/');
+
+    // 2. Put a report into IndexedDB directly
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('healthy_db', 2);
+        req.onupgradeneeded = () => {
+          const d = req.result;
+          if (!d.objectStoreNames.contains('diagnostic_reports')) {
+            const s = d.createObjectStore('diagnostic_reports', {
+              keyPath: 'id',
+            });
+            s.createIndex('effective_date', 'effective_date', {
+              unique: false,
+            });
+          }
+          if (!d.objectStoreNames.contains('observations')) {
+            const s = d.createObjectStore('observations', { keyPath: 'id' });
+            s.createIndex('report_id', 'report_id', { unique: false });
+          }
+          if (!d.objectStoreNames.contains('episodes_of_care')) {
+            const s = d.createObjectStore('episodes_of_care', {
+              keyPath: 'id',
+            });
+            s.createIndex('start_date', 'start_date', { unique: false });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const tx = db.transaction(
+        ['diagnostic_reports', 'observations'],
+        'readwrite'
+      );
+      tx.objectStore('diagnostic_reports').put({
+        id: 'rep-idb-inspect-1',
+        effective_date: '2026-10-02',
+        status: 'final',
+        notes: 'IndexedDB inspection test',
+        fhir_json: JSON.stringify({
+          resourceType: 'DiagnosticReport',
+          id: 'rep-idb-inspect-1',
+          status: 'final',
+          code: {
+            coding: [{ system: 'http://loinc.org', code: '58410-2' }],
+            text: 'CBC',
+          },
+          effectiveDateTime: '2026-10-02',
+          note: [{ text: 'IndexedDB inspection test' }],
+        }),
+        created_at: '2026-10-02T10:00:00.000Z',
+        updated_at: '2026-10-02T10:00:00.000Z',
+      });
+
+      tx.objectStore('observations').put({
+        id: 'obs-idb-inspect-1',
+        report_id: 'rep-idb-inspect-1',
+        loinc_code: '718-7',
+        name: 'Hemoglobin',
+        value: 15.5,
+        unit: 'g/dL',
+        fhir_json: JSON.stringify({
+          resourceType: 'Observation',
+          id: 'obs-idb-inspect-1',
+          status: 'final',
+          code: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '718-7',
+                display: 'Hemoglobin',
+              },
+            ],
+            text: 'Hemoglobin',
+          },
+          valueQuantity: { value: 15.5, unit: 'g/dL', code: 'g/dL' },
+        }),
+        created_at: '2026-10-02T10:00:00.000Z',
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    });
+
+    // 3. Reload page and verify data is read from IndexedDB
+    await page.reload();
+    await expect(
+      page.getByTestId('report-card-rep-idb-inspect-1')
+    ).toBeVisible();
+    await expect(page.getByText('Hemoglobin')).toBeVisible();
+    await expect(page.getByText('15.5')).toBeVisible();
+
+    // 4. Verify directly in IndexedDB that object stores exist and contain the stored rows
+    const inspected = await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('healthy_db', 2);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const tx = db.transaction(
+        ['diagnostic_reports', 'observations'],
+        'readonly'
+      );
+      const repReq = tx
+        .objectStore('diagnostic_reports')
+        .get('rep-idb-inspect-1');
+      const obsReq = tx.objectStore('observations').get('obs-idb-inspect-1');
+
+      return new Promise<any>((resolve, reject) => {
+        tx.oncomplete = () => {
+          db.close();
+          resolve({
+            report: repReq.result,
+            observation: obsReq.result,
+          });
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    });
+
+    expect(inspected.report).toBeDefined();
+    expect(inspected.report.id).toBe('rep-idb-inspect-1');
+    expect(inspected.report.status).toBe('final');
+    expect(inspected.observation).toBeDefined();
+    expect(inspected.observation.value).toBe(15.5);
+    expect(inspected.observation.unit).toBe('g/dL');
   });
 });

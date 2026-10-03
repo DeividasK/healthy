@@ -1,4 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
+import { seedHealthCase } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -7,50 +8,6 @@ test.use({
 });
 
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
-
-async function seedHealthCase(
-  page: any,
-  caseItem: {
-    id: string;
-    title: string;
-    status: string;
-    startDate: string;
-    description?: string;
-  }
-) {
-  await page.goto('/');
-  await page.evaluate((c: any) => {
-    localStorage.clear();
-    sessionStorage.clear();
-    const casesObj: Record<string, any> = {};
-    const episode = {
-      resourceType: 'EpisodeOfCare',
-      id: c.id,
-      status: c.status,
-      period: { start: c.startDate },
-      type: [{ text: c.title }],
-      diagnosis: [{ condition: { display: c.title } }],
-      description: c.title,
-      note: c.description
-        ? [{ text: c.description, time: '2026-10-02T10:00:00.000Z' }]
-        : undefined,
-    };
-    casesObj[c.id] = {
-      id: c.id,
-      status: c.status,
-      start_date: c.startDate,
-      title: c.title,
-      description: c.description || null,
-      fhir_json: JSON.stringify(episode),
-      created_at: '2026-10-02T10:00:00.000Z',
-      updated_at: '2026-10-02T10:00:00.000Z',
-    };
-    localStorage.setItem(
-      '@healthy_episodes_of_care_v1',
-      JSON.stringify(casesObj)
-    );
-  }, caseItem);
-}
 
 test.describe('Edit Health Case View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {

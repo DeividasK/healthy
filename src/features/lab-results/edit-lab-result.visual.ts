@@ -1,4 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
+import { seedReports } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -7,107 +8,6 @@ test.use({
 });
 
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
-
-// Helper to seed reports directly into web AsyncStorage (localStorage)
-async function seedReports(page: any, reports: any[]) {
-  await page.goto('/');
-  await page.evaluate((reportsList: any[]) => {
-    localStorage.clear();
-    sessionStorage.clear();
-
-    const reportsObj: Record<string, any> = {};
-    const obsObj: Record<string, any[]> = {};
-
-    for (const r of reportsList) {
-      reportsObj[r.id] = {
-        id: r.id,
-        effective_date: r.effectiveDate,
-        status: 'final',
-        notes: r.notes || null,
-        fhir_json: JSON.stringify({
-          resourceType: 'DiagnosticReport',
-          id: r.id,
-          status: 'final',
-          code: {
-            coding: [
-              {
-                system: 'http://loinc.org',
-                code: '58410-2',
-                display: 'Complete blood count (CBC) panel',
-              },
-            ],
-            text: 'Complete Blood Count',
-          },
-          effectiveDateTime: r.effectiveDateTime || r.effectiveDate,
-          note: r.notes ? [{ text: r.notes }] : undefined,
-        }),
-        created_at: '2026-10-02T10:00:00.000Z',
-        updated_at: '2026-10-02T10:00:00.000Z',
-      };
-
-      obsObj[r.id] = r.observations.map((obs: any, idx: number) => {
-        const obsId = `obs-${r.id}-${idx}`;
-        const fhirObs = {
-          resourceType: 'Observation',
-          id: obsId,
-          status: 'final',
-          code: {
-            coding: [
-              {
-                system: 'http://loinc.org',
-                code: obs.loinc,
-                display: obs.name,
-              },
-            ],
-            text: obs.name,
-          },
-          valueQuantity: {
-            value: obs.value,
-            unit: obs.unit,
-            system: 'http://unitsofmeasure.org',
-            code: obs.unit,
-          },
-          interpretation: obs.interpretationCode
-            ? [
-                {
-                  coding: [
-                    {
-                      system:
-                        'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
-                      code: obs.interpretationCode,
-                      display:
-                        obs.interpretationCode === 'N'
-                          ? 'Normal'
-                          : obs.interpretationCode === 'L'
-                            ? 'Low'
-                            : 'High',
-                    },
-                  ],
-                },
-              ]
-            : undefined,
-        };
-
-        return {
-          id: obsId,
-          report_id: r.id,
-          loinc_code: obs.loinc,
-          name: obs.name,
-          value: obs.value,
-          unit: obs.unit,
-          fhir_json: JSON.stringify(fhirObs),
-          created_at: '2026-10-02T10:00:00.000Z',
-        };
-      });
-    }
-
-    localStorage.setItem(
-      '@healthy_diagnostic_reports_v1',
-      JSON.stringify(reportsObj)
-    );
-    localStorage.setItem('@healthy_observations_v1', JSON.stringify(obsObj));
-  }, reports);
-}
 
 test.describe('Edit Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {

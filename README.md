@@ -16,7 +16,7 @@ A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application
 
 - **Platforms**: Web, iOS, Android using **Expo SDK 57 (React Native 0.86, React 19, TypeScript)**.
 - **Package Manager**: **`pnpm`** (configured with `.npmrc` -> `node-linker=hoisted` for Metro compatibility).
-- **Privacy & Storage**: 100% local-first via `@react-native-async-storage/async-storage` (SQLite/AsyncStorage on mobile, IndexedDB/localStorage on web). Medical data never leaves the user's device.
+- **Privacy & Storage**: 100% local-first (SQLite on native iOS/Android, IndexedDB on web). Medical data never leaves the user's device.
 - **Biomarker Catalog & Standards**:
   - Catalog of **223 clinical blood biomarkers** curated from official **LOINC** (Logical Observation Identifiers Names and Codes) and **UCUM** international clinical chemistry standards.
   - **Smart Autocomplete**: Allows users to search by clinical name (e.g. _Hemoglobin A1c_) or common abbreviations / aliases (_"a1c"_, _"wbc"_, _"tsh"_, _"ldl"_, _"crp"_).
