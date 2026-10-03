@@ -9,18 +9,18 @@ test.use({
 
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
-test.describe('Add Health Case View - Visual Regression', () => {
+test.describe('Add Condition View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime(FIXED_DATE);
   });
 
-  test('Health Case View - Add New Form', async ({ page }, testInfo) => {
+  test('Condition View - Add New Form', async ({ page }, testInfo) => {
     await clearAppStorage(page);
-    await page.goto('/health-case/add');
+    await page.goto('/condition/add');
 
-    await expect(page.getByText('New Health Case')).toBeVisible();
-    await expect(page.getByTestId('case-title-input')).toBeVisible();
+    await expect(page.getByText('New Condition')).toBeVisible();
+    await expect(page.getByTestId('condition-title-input')).toBeVisible();
 
-    await takeSnapshot(page, 'Health Case View - Add New Form', testInfo);
+    await takeSnapshot(page, 'Condition View - Add New Form', testInfo);
   });
 });

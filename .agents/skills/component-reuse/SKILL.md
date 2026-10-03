@@ -13,7 +13,7 @@ When planning or implementing UI features in this codebase:
    - If styles are only used in a single place/file, they can remain written in that place.
    - When styles or UI elements need to be reused in more than one place, **extract a separate reusable component** instead of duplicating style objects across different files.
 3. **Collocate View-Specific Components**:
-   - Components that belong to a single view or feature (e.g. `HealthCaseForm`, `LabResultForm`) **MUST** be collocated in their feature folder inside `src/features/<feature>/`.
+   - Components that belong to a single view or feature (e.g. `ConditionForm`, `LabResultForm`) **MUST** be collocated in their feature folder inside `src/features/<feature>/`.
    - Do NOT place subcomponents or non-route files inside `app/` (which is strictly for thin route definitions).
    - ONLY components that are used across multiple distinct views/domains should live in the shared `src/components/` folder.
 4. **Form Field Accessibility & Attributes**:

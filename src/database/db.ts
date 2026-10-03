@@ -4,7 +4,7 @@ import { getWebDatabase } from './indexedDb';
 
 // Re-export feature repositories for backward compatibility and clean access
 export * from '../features/lab-results/labResultsRepository';
-export * from '../features/health-cases/healthCasesRepository';
+export * from '../features/conditions/conditionsRepository';
 
 const DB_NAME = 'healthy.db';
 let nativeDb: any = null;
@@ -69,20 +69,25 @@ export async function initializeDatabase(): Promise<void> {
         `);
       }
 
-      // Migration v2: episodes_of_care (Health Cases)
-      if (currentVersion < 2) {
+      // Migration v3: conditions (destructive migration from episodes_of_care)
+      if (currentVersion < 3) {
         await nativeDb.execAsync(`
-          CREATE TABLE IF NOT EXISTS episodes_of_care (
+          DROP TABLE IF EXISTS episodes_of_care;
+          CREATE TABLE IF NOT EXISTS conditions (
             id TEXT PRIMARY KEY,
-            status TEXT NOT NULL,
-            start_date TEXT NOT NULL,
+            clinical_status TEXT NOT NULL,
+            verification_status TEXT NOT NULL,
+            onset_date TEXT NOT NULL,
             title TEXT NOT NULL,
+            severity TEXT,
+            body_site TEXT,
+            abatement_date TEXT,
             description TEXT,
             fhir_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           );
-          PRAGMA user_version = 2;
+          PRAGMA user_version = 3;
         `);
       }
     }

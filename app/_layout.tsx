@@ -82,14 +82,14 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
-          name="health-case/add"
+          name="condition/add"
           options={{
             headerShown: false,
             presentation: Platform.OS === 'ios' ? 'modal' : 'card',
           }}
         />
         <Stack.Screen
-          name="health-case/[id]/edit"
+          name="condition/[id]/edit"
           options={{
             headerShown: false,
             presentation: Platform.OS === 'ios' ? 'modal' : 'card',
