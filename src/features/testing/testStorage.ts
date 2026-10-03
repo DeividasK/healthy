@@ -24,7 +24,7 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
   await clearAppStorage(page);
   await page.evaluate(async (reportsList: any[]) => {
     await new Promise<void>((resolve, reject) => {
-      const openReq = indexedDB.open('healthy_db', 2);
+      const openReq = indexedDB.open('healthy_db', 3);
       openReq.onupgradeneeded = () => {
         const db = openReq.result;
         if (!db.objectStoreNames.contains('diagnostic_reports')) {
@@ -37,11 +37,17 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
           const s = db.createObjectStore('observations', { keyPath: 'id' });
           s.createIndex('report_id', 'report_id', { unique: false });
         }
-        if (!db.objectStoreNames.contains('episodes_of_care')) {
-          const s = db.createObjectStore('episodes_of_care', {
+        if (db.objectStoreNames.contains('episodes_of_care')) {
+          db.deleteObjectStore('episodes_of_care');
+        }
+        if (!db.objectStoreNames.contains('conditions')) {
+          const s = db.createObjectStore('conditions', {
             keyPath: 'id',
           });
-          s.createIndex('start_date', 'start_date', { unique: false });
+          s.createIndex('onset_date', 'onset_date', { unique: false });
+          s.createIndex('clinical_status', 'clinical_status', {
+            unique: false,
+          });
         }
       };
 
@@ -57,7 +63,6 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
         for (const r of reportsList) {
           reportStore.put({
             id: r.id,
-            case_id: r.caseId || null,
             effective_date: r.effectiveDate,
             status: 'final',
             notes: r.notes || null,
@@ -155,22 +160,28 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
 }
 
 /**
- * Seeds an EpisodeOfCare (Health Case) record directly into IndexedDB.
+ * Seeds a Condition record directly into IndexedDB.
  */
-export async function seedHealthCase(
+export async function seedCondition(
   page: Page,
   c: {
     id: string;
     title: string;
-    status: string;
-    startDate: string;
+    clinicalStatus?: string;
+    verificationStatus?: string;
+    onsetDate?: string;
+    startDate?: string;
+    severity?: string;
+    bodySite?: string;
+    abatementDate?: string;
+    notes?: string;
     description?: string;
   }
 ): Promise<void> {
   await clearAppStorage(page);
-  await page.evaluate(async (caseItem) => {
+  await page.evaluate(async (conditionItem) => {
     await new Promise<void>((resolve, reject) => {
-      const openReq = indexedDB.open('healthy_db', 2);
+      const openReq = indexedDB.open('healthy_db', 3);
       openReq.onupgradeneeded = () => {
         const db = openReq.result;
         if (!db.objectStoreNames.contains('diagnostic_reports')) {
@@ -183,39 +194,89 @@ export async function seedHealthCase(
           const s = db.createObjectStore('observations', { keyPath: 'id' });
           s.createIndex('report_id', 'report_id', { unique: false });
         }
-        if (!db.objectStoreNames.contains('episodes_of_care')) {
-          const s = db.createObjectStore('episodes_of_care', {
+        if (db.objectStoreNames.contains('episodes_of_care')) {
+          db.deleteObjectStore('episodes_of_care');
+        }
+        if (!db.objectStoreNames.contains('conditions')) {
+          const s = db.createObjectStore('conditions', {
             keyPath: 'id',
           });
-          s.createIndex('start_date', 'start_date', { unique: false });
+          s.createIndex('onset_date', 'onset_date', { unique: false });
+          s.createIndex('clinical_status', 'clinical_status', {
+            unique: false,
+          });
         }
       };
 
       openReq.onsuccess = () => {
         const db = openReq.result;
-        const tx = db.transaction('episodes_of_care', 'readwrite');
-        const store = tx.objectStore('episodes_of_care');
+        const tx = db.transaction('conditions', 'readwrite');
+        const store = tx.objectStore('conditions');
 
-        const episode = {
-          resourceType: 'EpisodeOfCare',
-          id: caseItem.id,
-          status: caseItem.status,
-          period: { start: caseItem.startDate },
-          type: [{ text: caseItem.title }],
-          diagnosis: [{ condition: { display: caseItem.title } }],
-          description: caseItem.title,
-          note: caseItem.description
-            ? [{ text: caseItem.description, time: '2026-10-02T10:00:00.000Z' }]
+        const clinicalStatus = conditionItem.clinicalStatus || 'active';
+        const verificationStatus =
+          conditionItem.verificationStatus || 'unconfirmed';
+        const onsetDate =
+          conditionItem.onsetDate || conditionItem.startDate || '2026-10-02';
+        const notes = conditionItem.notes || conditionItem.description || null;
+
+        const condition = {
+          resourceType: 'Condition',
+          id: conditionItem.id,
+          clinicalStatus: {
+            coding: [
+              {
+                system:
+                  'http://terminology.hl7.org/CodeSystem/condition-clinical',
+                code: clinicalStatus,
+              },
+            ],
+          },
+          verificationStatus: {
+            coding: [
+              {
+                system:
+                  'http://terminology.hl7.org/CodeSystem/condition-ver-status',
+                code: verificationStatus,
+              },
+            ],
+          },
+          code: { text: conditionItem.title },
+          subject: { display: 'Self' },
+          onsetDateTime: onsetDate,
+          severity: conditionItem.severity
+            ? {
+                coding: [
+                  {
+                    system: 'http://hl7.org/fhir/ValueSet/condition-severity',
+                    code: conditionItem.severity,
+                    display:
+                      conditionItem.severity.charAt(0).toUpperCase() +
+                      conditionItem.severity.slice(1),
+                  },
+                ],
+              }
+            : undefined,
+          bodySite: conditionItem.bodySite
+            ? [{ text: conditionItem.bodySite }]
+            : undefined,
+          abatementDateTime: conditionItem.abatementDate || undefined,
+          note: notes
+            ? [{ text: notes, time: '2026-10-02T10:00:00.000Z' }]
             : undefined,
         };
 
         store.put({
-          id: caseItem.id,
-          status: caseItem.status,
-          start_date: caseItem.startDate,
-          title: caseItem.title,
-          description: caseItem.description || null,
-          fhir_json: JSON.stringify(episode),
+          id: conditionItem.id,
+          clinical_status: clinicalStatus,
+          verification_status: verificationStatus,
+          onset_date: onsetDate,
+          title: conditionItem.title,
+          severity: conditionItem.severity || null,
+          body_site: conditionItem.bodySite || null,
+          abatement_date: conditionItem.abatementDate || null,
+          description: notes,
+          fhir_json: JSON.stringify(condition),
           created_at: '2026-10-02T10:00:00.000Z',
           updated_at: '2026-10-02T10:00:00.000Z',
         });

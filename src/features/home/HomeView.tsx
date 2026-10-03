@@ -24,13 +24,13 @@ import {
   deleteReport,
 } from '../lab-results/diagnosticReportService';
 import {
-  getAllHealthCases,
-  deleteHealthCase,
-} from '../health-cases/healthCaseService';
+  getAllConditions,
+  deleteCondition,
+} from '../conditions/conditionService';
 
-import type { Observation, EpisodeOfCare } from 'fhir/r5';
+import type { Observation, Condition } from 'fhir/r5';
 import { formatDisplayDate } from '../../utils/dateUtils';
-import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
+import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
@@ -38,7 +38,7 @@ import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModa
 export function HomeView() {
   const router = useRouter();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
-  const [healthCases, setHealthCases] = useState<EpisodeOfCare[]>([]);
+  const [conditions, setConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Floating + menu state
@@ -47,7 +47,7 @@ export function HomeView() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     visible: boolean;
-    type: 'report' | 'case';
+    type: 'report' | 'condition';
     id: string;
     title: string;
     message: string;
@@ -64,12 +64,12 @@ export function HomeView() {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [reportsData, casesData] = await Promise.all([
+      const [reportsData, conditionsData] = await Promise.all([
         getAllReports(),
-        getAllHealthCases(),
+        getAllConditions(),
       ]);
       setRecords(reportsData);
-      setHealthCases(casesData);
+      setConditions(conditionsData);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
@@ -110,14 +110,14 @@ export function HomeView() {
     });
   };
 
-  const handleDeleteCaseClick = (id: string) => {
+  const handleDeleteConditionClick = (id: string) => {
     setDeleteModal({
       visible: true,
-      type: 'case',
+      type: 'condition',
       id,
-      title: 'Delete Health Case',
+      title: 'Delete Condition',
       message:
-        'Are you sure you want to delete this health case? This action cannot be undone.',
+        'Are you sure you want to delete this condition? This action cannot be undone.',
       requireCountdown: true,
     });
   };
@@ -127,7 +127,7 @@ export function HomeView() {
       if (deleteModal.type === 'report') {
         await deleteReport(deleteModal.id);
       } else {
-        await deleteHealthCase(deleteModal.id);
+        await deleteCondition(deleteModal.id);
       }
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
@@ -162,23 +162,41 @@ export function HomeView() {
     );
   };
 
-  const getCaseStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; dot: string }> = {
-      active: { label: 'Active', dot: '#10B981' },
-      onhold: { label: 'On Hold', dot: '#F59E0B' },
-      finished: { label: 'Finished', dot: '#717973' },
-      cancelled: { label: 'Cancelled', dot: '#F43F5E' },
-    };
-    const config = statusMap[status] || { label: status, dot: '#717973' };
+  const getConditionStatusBadge = (condition: Condition) => {
+    const clinicalStatus =
+      condition.clinicalStatus?.coding?.[0]?.code || 'active';
+    const verificationStatus =
+      condition.verificationStatus?.coding?.[0]?.code || 'unconfirmed';
+
+    let label = 'Active';
+    let dot = '#10B981';
+
+    if (verificationStatus === 'unconfirmed') {
+      label = 'Unconfirmed';
+      dot = '#F59E0B';
+    } else if (verificationStatus === 'provisional') {
+      label = 'Provisional';
+      dot = '#3B82F6';
+    } else if (clinicalStatus === 'inactive') {
+      label = 'Inactive';
+      dot = '#6B7280';
+    } else if (clinicalStatus === 'remission') {
+      label = 'Remission';
+      dot = '#8B5CF6';
+    } else if (clinicalStatus === 'resolved') {
+      label = 'Resolved';
+      dot = '#717973';
+    }
+
     return (
-      <View style={styles.caseStatusBadge}>
-        <View style={[styles.statusDot, { backgroundColor: config.dot }]} />
-        <Text style={styles.caseStatusText}>{config.label}</Text>
+      <View style={styles.conditionStatusBadge}>
+        <View style={[styles.statusDot, { backgroundColor: dot }]} />
+        <Text style={styles.conditionStatusText}>{label}</Text>
       </View>
     );
   };
 
-  const hasAnyData = records.length > 0 || healthCases.length > 0;
+  const hasAnyData = records.length > 0 || conditions.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -188,7 +206,7 @@ export function HomeView() {
             <ActivityIndicator size="large" color={COLORS.light.primary} />
           </View>
         ) : !hasAnyData ? (
-          /* Empty State when no results or health cases yet */
+          /* Empty State when no results or conditions yet */
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconContainer}>
               <FileText color={COLORS.light.primary} size={36} />
@@ -199,43 +217,43 @@ export function HomeView() {
             </Text>
           </View>
         ) : (
-          /* Results and Health Cases View */
+          /* Results and Conditions View */
           <ScrollView
             testID="results-scroll-view"
             style={styles.scrollList}
             contentContainerStyle={styles.scrollListContent}
           >
-            {/* Health Cases Section */}
-            {healthCases.length > 0 && (
+            {/* Conditions Section */}
+            {conditions.length > 0 && (
               <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Health Cases</Text>
-                {healthCases.map((caseItem) => {
-                  const title = getEpisodeTitle(caseItem);
-                  const noteText = getEpisodeDescription(caseItem);
-                  const caseId = caseItem.id || '';
+                <Text style={styles.sectionTitle}>Conditions</Text>
+                {conditions.map((conditionItem) => {
+                  const title = getConditionTitle(conditionItem);
+                  const noteText = getConditionNotes(conditionItem);
+                  const condId = conditionItem.id || '';
 
                   return (
                     <View
-                      key={caseId || 'case'}
+                      key={condId || 'condition'}
                       style={styles.reportCard}
-                      testID={`case-card-${caseId}`}
+                      testID={`condition-card-${condId}`}
                     >
-                      {/* Case Header: Status, Date & Action Icons */}
+                      {/* Card Header: Status, Date & Action Icons */}
                       <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
-                          {getCaseStatusBadge(caseItem.status)}
+                          {getConditionStatusBadge(conditionItem)}
                           <Calendar
                             color={COLORS.light.iconMuted}
                             size={16}
                             style={{ marginLeft: 8, marginRight: 6 }}
                           />
                           <Text style={styles.cardDate}>
-                            {formatDate(caseItem.period?.start || '')}
+                            {formatDate(conditionItem.onsetDateTime || '')}
                           </Text>
                         </View>
                         <View style={styles.cardHeaderActions}>
                           <TouchableOpacity
-                            testID={`edit-case-button-${caseId}`}
+                            testID={`edit-condition-button-${condId}`}
                             style={styles.editReportButton}
                             onPress={() => {
                               if (
@@ -246,16 +264,16 @@ export function HomeView() {
                                   document.activeElement as HTMLElement
                                 )?.blur?.();
                               }
-                              router.push(`/health-case/${caseId}/edit`);
+                              router.push(`/condition/${condId}/edit`);
                             }}
                             activeOpacity={0.7}
                           >
                             <Pencil color={COLORS.light.iconMuted} size={18} />
                           </TouchableOpacity>
                           <TouchableOpacity
-                            testID={`delete-case-button-${caseId}`}
+                            testID={`delete-condition-button-${condId}`}
                             style={styles.deleteReportButton}
-                            onPress={() => handleDeleteCaseClick(caseId)}
+                            onPress={() => handleDeleteConditionClick(condId)}
                             activeOpacity={0.7}
                           >
                             <Trash2 color={COLORS.light.iconMuted} size={18} />
@@ -263,9 +281,9 @@ export function HomeView() {
                         </View>
                       </View>
 
-                      {/* Case Title */}
-                      <View style={styles.caseTitleContainer}>
-                        <Text style={styles.caseTitleText}>{title}</Text>
+                      {/* Condition Title */}
+                      <View style={styles.conditionTitleContainer}>
+                        <Text style={styles.conditionTitleText}>{title}</Text>
                       </View>
 
                       {/* Notes / Description if available */}
@@ -285,7 +303,7 @@ export function HomeView() {
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
               <View style={styles.sectionContainer}>
-                {healthCases.length > 0 && (
+                {conditions.length > 0 && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
                 {records.map((record) => {
@@ -400,11 +418,11 @@ export function HomeView() {
         {showAddMenu && (
           <View style={styles.floatingMenu} testID="floating-add-menu">
             <TouchableOpacity
-              testID="menu-add-health-case"
+              testID="menu-add-condition"
               style={styles.menuItem}
               onPress={() => {
                 setShowAddMenu(false);
-                router.push('/health-case/add');
+                router.push('/condition/add');
               }}
               activeOpacity={0.7}
             >
@@ -413,7 +431,7 @@ export function HomeView() {
                 size={18}
                 style={{ marginRight: 10 }}
               />
-              <Text style={styles.menuItemText}>Add Health Case</Text>
+              <Text style={styles.menuItemText}>Add Condition</Text>
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
@@ -569,7 +587,7 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 6,
   },
-  caseStatusBadge: {
+  conditionStatusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.light.pillBackground,
@@ -585,16 +603,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginRight: 6,
   },
-  caseStatusText: {
+  conditionStatusText: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.light.foreground,
   },
-  caseTitleContainer: {
+  conditionTitleContainer: {
     marginTop: 4,
     marginBottom: 8,
   },
-  caseTitleText: {
+  conditionTitleText: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.light.foreground,

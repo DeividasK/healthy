@@ -1,4 +1,4 @@
-import type { EpisodeOfCare } from 'fhir/r5';
+import type { Condition } from 'fhir/r5';
 
 /**
  * Escapes plain text for inclusion in a FHIR Narrative XHTML div.
@@ -38,38 +38,26 @@ export function parseNarrativeDiv(div?: string | null): string | null {
 }
 
 /**
- * Safely extracts the description from an EpisodeOfCare resource.
- * Supports standard FHIR text.div narratives as well as legacy note/description fields.
+ * Safely extracts the display title from a Condition resource.
  */
-export function getEpisodeDescription(episode: EpisodeOfCare): string | null {
-  // Legacy note array check
-  const legacyNote = (episode as any).note;
-  if (Array.isArray(legacyNote) && legacyNote.length > 0) {
-    const text = legacyNote
-      .map((n: any) => n?.text)
+export function getConditionTitle(condition: Condition): string {
+  return condition.code?.text || 'Condition';
+}
+
+/**
+ * Safely extracts notes / description from a Condition resource.
+ */
+export function getConditionNotes(condition: Condition): string | null {
+  if (Array.isArray(condition.note) && condition.note.length > 0) {
+    const text = condition.note
+      .map((n) => n?.text)
       .filter(Boolean)
       .join('\n');
     if (text) return text;
   }
 
-  // FHIR Narrative check
-  const narrativeText = parseNarrativeDiv(episode.text?.div);
+  const narrativeText = parseNarrativeDiv(condition.text?.div);
   if (narrativeText) return narrativeText;
 
-  // Legacy description property fallback
-  return (episode as any).description || null;
-}
-
-/**
- * Safely extracts the display title from an EpisodeOfCare resource.
- */
-export function getEpisodeTitle(episode: EpisodeOfCare): string {
-  return (
-    episode.type?.[0]?.text ||
-    episode.diagnosis?.[0]?.condition?.[0]?.concept?.text ||
-    episode.diagnosis?.[0]?.condition?.[0]?.reference?.display ||
-    (episode.diagnosis?.[0] as any)?.condition?.display ||
-    (episode as any).description ||
-    'Health Case'
-  );
+  return null;
 }

@@ -1,18 +1,17 @@
-import type { DiagnosticReport, Observation, EpisodeOfCare } from 'fhir/r5';
+import type { DiagnosticReport, Observation, Condition } from 'fhir/r5';
 import {
   DiagnosticReportRecord,
   StoredDiagnosticReportRow,
   StoredObservationRow,
-  StoredEpisodeOfCareRow,
+  StoredConditionRow,
 } from './types';
-import { getEpisodeTitle, getEpisodeDescription } from '../utils/fhirUtils';
+import { getConditionTitle, getConditionNotes } from '../utils/fhirUtils';
 
 export const INDEXED_DB_NAME = 'healthy_db';
-export const INDEXED_DB_VERSION = 2;
+export const INDEXED_DB_VERSION = 3;
 
 const LEGACY_STORAGE_REPORTS_KEY = '@healthy_diagnostic_reports_v1';
 const LEGACY_STORAGE_OBSERVATIONS_KEY = '@healthy_observations_v1';
-const LEGACY_STORAGE_EPISODES_KEY = '@healthy_episodes_of_care_v1';
 
 let dbInstance: IDBDatabase | null = null;
 let dbInitPromise: Promise<IDBDatabase> | null = null;
@@ -55,13 +54,20 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
         }
       }
 
-      // Version 2 stores: episodes_of_care
-      if (oldVersion < 2) {
-        if (!db.objectStoreNames.contains('episodes_of_care')) {
-          const episodeStore = db.createObjectStore('episodes_of_care', {
+      // Version 3 stores: conditions (destructive migration from episodes_of_care)
+      if (oldVersion < 3) {
+        if (db.objectStoreNames.contains('episodes_of_care')) {
+          db.deleteObjectStore('episodes_of_care');
+        }
+
+        if (!db.objectStoreNames.contains('conditions')) {
+          const condStore = db.createObjectStore('conditions', {
             keyPath: 'id',
           });
-          episodeStore.createIndex('start_date', 'start_date', {
+          condStore.createIndex('onset_date', 'onset_date', {
+            unique: false,
+          });
+          condStore.createIndex('clinical_status', 'clinical_status', {
             unique: false,
           });
         }
@@ -115,9 +121,8 @@ async function migrateLegacyLocalStorage(db: IDBDatabase): Promise<void> {
 
   const rawReports = window.localStorage.getItem(LEGACY_STORAGE_REPORTS_KEY);
   const rawObs = window.localStorage.getItem(LEGACY_STORAGE_OBSERVATIONS_KEY);
-  const rawEpisodes = window.localStorage.getItem(LEGACY_STORAGE_EPISODES_KEY);
 
-  if (!rawReports && !rawObs && !rawEpisodes) return;
+  if (!rawReports && !rawObs) return;
 
   const parsedReports: Record<string, StoredDiagnosticReportRow> = rawReports
     ? JSON.parse(rawReports)
@@ -125,19 +130,15 @@ async function migrateLegacyLocalStorage(db: IDBDatabase): Promise<void> {
   const parsedObs: Record<string, StoredObservationRow[]> = rawObs
     ? JSON.parse(rawObs)
     : {};
-  const parsedEpisodes: Record<string, StoredEpisodeOfCareRow> = rawEpisodes
-    ? JSON.parse(rawEpisodes)
-    : {};
 
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(
-      ['diagnostic_reports', 'observations', 'episodes_of_care'],
+      ['diagnostic_reports', 'observations'],
       'readwrite'
     );
 
     const reportStore = tx.objectStore('diagnostic_reports');
     const obsStore = tx.objectStore('observations');
-    const episodeStore = tx.objectStore('episodes_of_care');
 
     for (const report of Object.values(parsedReports)) {
       reportStore.put(report);
@@ -149,14 +150,9 @@ async function migrateLegacyLocalStorage(db: IDBDatabase): Promise<void> {
       }
     }
 
-    for (const episode of Object.values(parsedEpisodes)) {
-      episodeStore.put(episode);
-    }
-
     tx.oncomplete = () => {
       window.localStorage.removeItem(LEGACY_STORAGE_REPORTS_KEY);
       window.localStorage.removeItem(LEGACY_STORAGE_OBSERVATIONS_KEY);
-      window.localStorage.removeItem(LEGACY_STORAGE_EPISODES_KEY);
       resolve();
     };
 
@@ -257,7 +253,7 @@ export async function insertDiagnosticReportWeb(
 }
 
 /**
- * Fetches all Diagnostic Reports and nested Observations from IndexedDB.
+ * Fetches all DiagnosticReports and their child Observations from IndexedDB.
  */
 export async function fetchAllDiagnosticReportsWeb(): Promise<
   DiagnosticReportRecord[]
@@ -272,24 +268,24 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
     const reportStore = tx.objectStore('diagnostic_reports');
     const obsStore = tx.objectStore('observations');
 
-    const reportReq = reportStore.getAll();
+    const reportsReq = reportStore.getAll();
     const obsReq = obsStore.getAll();
 
     tx.oncomplete = () => {
       const reportRows =
-        (reportReq.result as StoredDiagnosticReportRow[]) || [];
+        (reportsReq.result as StoredDiagnosticReportRow[]) || [];
       const obsRows = (obsReq.result as StoredObservationRow[]) || [];
 
       // Group observations by report_id
       const obsByReport: Record<string, Observation[]> = {};
-      for (const o of obsRows) {
-        if (!obsByReport[o.report_id]) {
-          obsByReport[o.report_id] = [];
+      for (const row of obsRows) {
+        if (!obsByReport[row.report_id]) {
+          obsByReport[row.report_id] = [];
         }
-        obsByReport[o.report_id].push(JSON.parse(o.fhir_json));
+        obsByReport[row.report_id].push(JSON.parse(row.fhir_json));
       }
 
-      // Sort reports by effective_date DESC, created_at DESC, id DESC
+      // Sort reports descending by effective_date then created_at
       reportRows.sort((a, b) => {
         const dateCmp = b.effective_date.localeCompare(a.effective_date);
         if (dateCmp !== 0) return dateCmp;
@@ -341,7 +337,7 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
 }
 
 /**
- * Deletes a DiagnosticReport and all associated Observations from IndexedDB.
+ * Deletes a DiagnosticReport and cascades deletion of its Observations from IndexedDB.
  */
 export async function deleteDiagnosticReportWeb(
   reportId: string
@@ -360,6 +356,7 @@ export async function deleteDiagnosticReportWeb(
 
     reportStore.delete(reportId);
 
+    // Delete all child observations matching report_id
     const obsIndex = obsStore.index('report_id');
     const req = obsIndex.openKeyCursor(IDBKeyRange.only(reportId));
 
@@ -379,39 +376,48 @@ export async function deleteDiagnosticReportWeb(
 }
 
 /**
- * Persists an EpisodeOfCare record in IndexedDB.
+ * Persists a Condition record in IndexedDB.
  */
-export async function insertEpisodeOfCareWeb(
-  episode: EpisodeOfCare
-): Promise<void> {
-  if (!episode.id) {
-    throw new Error('EpisodeOfCare requires an id to be persisted');
+export async function insertConditionWeb(condition: Condition): Promise<void> {
+  if (!condition.id) {
+    throw new Error('Condition requires an id to be persisted');
   }
 
   const db = await getWebDatabase();
   const now = new Date().toISOString();
-  const startDate = episode.period?.start || now.split('T')[0];
-  const title = getEpisodeTitle(episode);
-  const descriptionText = getEpisodeDescription(episode);
+  const onsetDate = condition.onsetDateTime || now.split('T')[0];
+  const title = getConditionTitle(condition);
+  const notesText = getConditionNotes(condition);
+  const clinicalStatus =
+    condition.clinicalStatus?.coding?.[0]?.code || 'active';
+  const verificationStatus =
+    condition.verificationStatus?.coding?.[0]?.code || 'unconfirmed';
+  const severity = condition.severity?.coding?.[0]?.code || null;
+  const bodySite = condition.bodySite?.[0]?.text || null;
+  const abatementDate = condition.abatementDateTime || null;
 
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('episodes_of_care', 'readwrite');
-    const store = tx.objectStore('episodes_of_care');
+    const tx = db.transaction('conditions', 'readwrite');
+    const store = tx.objectStore('conditions');
 
-    const getReq = store.get(episode.id!);
+    const getReq = store.get(condition.id!);
     getReq.onsuccess = () => {
-      const existing = getReq.result as StoredEpisodeOfCareRow | undefined;
-      const episodeRow: StoredEpisodeOfCareRow = {
-        id: episode.id!,
-        status: episode.status,
-        start_date: startDate,
+      const existing = getReq.result as StoredConditionRow | undefined;
+      const conditionRow: StoredConditionRow = {
+        id: condition.id!,
+        clinical_status: clinicalStatus,
+        verification_status: verificationStatus,
+        onset_date: onsetDate,
         title,
-        description: descriptionText,
-        fhir_json: JSON.stringify(episode),
+        severity,
+        body_site: bodySite,
+        abatement_date: abatementDate,
+        description: notesText,
+        fhir_json: JSON.stringify(condition),
         created_at: existing?.created_at || now,
         updated_at: now,
       };
-      store.put(episodeRow);
+      store.put(conditionRow);
     };
 
     getReq.onerror = () => reject(getReq.error);
@@ -422,20 +428,20 @@ export async function insertEpisodeOfCareWeb(
 }
 
 /**
- * Fetches all EpisodeOfCare records from IndexedDB.
+ * Fetches all Condition records from IndexedDB.
  */
-export async function fetchAllEpisodesOfCareWeb(): Promise<EpisodeOfCare[]> {
+export async function fetchAllConditionsWeb(): Promise<Condition[]> {
   const db = await getWebDatabase();
 
-  return new Promise<EpisodeOfCare[]>((resolve, reject) => {
-    const tx = db.transaction('episodes_of_care', 'readonly');
-    const store = tx.objectStore('episodes_of_care');
+  return new Promise<Condition[]>((resolve, reject) => {
+    const tx = db.transaction('conditions', 'readonly');
+    const store = tx.objectStore('conditions');
     const req = store.getAll();
 
     tx.oncomplete = () => {
-      const rows = (req.result as StoredEpisodeOfCareRow[]) || [];
+      const rows = (req.result as StoredConditionRow[]) || [];
       rows.sort((a, b) => {
-        const dateCmp = b.start_date.localeCompare(a.start_date);
+        const dateCmp = b.onset_date.localeCompare(a.onset_date);
         if (dateCmp !== 0) return dateCmp;
         const createdCmp = b.created_at.localeCompare(a.created_at);
         if (createdCmp !== 0) return createdCmp;
@@ -449,22 +455,22 @@ export async function fetchAllEpisodesOfCareWeb(): Promise<EpisodeOfCare[]> {
 }
 
 /**
- * Fetches an EpisodeOfCare record by its ID from IndexedDB.
+ * Fetches a Condition record by its ID from IndexedDB.
  */
-export async function fetchEpisodeOfCareByIdWeb(
+export async function fetchConditionByIdWeb(
   id: string
-): Promise<EpisodeOfCare | null> {
+): Promise<Condition | null> {
   if (!id) return null;
 
   const db = await getWebDatabase();
 
-  return new Promise<EpisodeOfCare | null>((resolve, reject) => {
-    const tx = db.transaction('episodes_of_care', 'readonly');
-    const store = tx.objectStore('episodes_of_care');
+  return new Promise<Condition | null>((resolve, reject) => {
+    const tx = db.transaction('conditions', 'readonly');
+    const store = tx.objectStore('conditions');
     const req = store.get(id);
 
     req.onsuccess = () => {
-      const row = req.result as StoredEpisodeOfCareRow | undefined;
+      const row = req.result as StoredConditionRow | undefined;
       if (!row) {
         resolve(null);
         return;
@@ -477,16 +483,16 @@ export async function fetchEpisodeOfCareByIdWeb(
 }
 
 /**
- * Deletes an EpisodeOfCare record by its ID from IndexedDB.
+ * Deletes a Condition record by its ID from IndexedDB.
  */
-export async function deleteEpisodeOfCareWeb(id: string): Promise<void> {
+export async function deleteConditionWeb(id: string): Promise<void> {
   if (!id) return;
 
   const db = await getWebDatabase();
 
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('episodes_of_care', 'readwrite');
-    const store = tx.objectStore('episodes_of_care');
+    const tx = db.transaction('conditions', 'readwrite');
+    const store = tx.objectStore('conditions');
     store.delete(id);
 
     tx.oncomplete = () => resolve();

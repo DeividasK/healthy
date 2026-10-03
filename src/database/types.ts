@@ -1,4 +1,4 @@
-import type { DiagnosticReport, Observation, EpisodeOfCare } from 'fhir/r5';
+import type { DiagnosticReport, Observation, Condition } from 'fhir/r5';
 
 export interface StoredDiagnosticReportRow {
   id: string;
@@ -26,17 +26,21 @@ export interface DiagnosticReportRecord {
   observations: Observation[];
 }
 
-export interface StoredEpisodeOfCareRow {
+export interface StoredConditionRow {
   id: string;
-  status: string;
-  start_date: string;
+  clinical_status: string;
+  verification_status: string;
+  onset_date: string;
   title: string;
+  severity: string | null;
+  body_site: string | null;
+  abatement_date: string | null;
   description: string | null;
   fhir_json: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface HealthCaseRecord {
-  episodeOfCare: EpisodeOfCare;
+export interface ConditionRecord {
+  condition: Condition;
 }

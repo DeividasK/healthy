@@ -29,7 +29,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await floatingBtn.click();
     const menu = page.getByTestId('floating-add-menu');
     await expect(menu).toBeVisible();
-    await expect(page.getByTestId('menu-add-health-case')).toBeVisible();
+    await expect(page.getByTestId('menu-add-condition')).toBeVisible();
     await expect(page.getByTestId('menu-add-lab-results')).toBeVisible();
 
     // Tap floating button again -> menu closes
@@ -73,7 +73,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       ];
 
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open('healthy_db', 2);
+        const req = indexedDB.open('healthy_db', 3);
         req.onupgradeneeded = () => {
           const d = req.result;
           if (!d.objectStoreNames.contains('diagnostic_reports')) {
@@ -88,11 +88,17 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
             const s = d.createObjectStore('observations', { keyPath: 'id' });
             s.createIndex('report_id', 'report_id', { unique: false });
           }
-          if (!d.objectStoreNames.contains('episodes_of_care')) {
-            const s = d.createObjectStore('episodes_of_care', {
+          if (d.objectStoreNames.contains('episodes_of_care')) {
+            d.deleteObjectStore('episodes_of_care');
+          }
+          if (!d.objectStoreNames.contains('conditions')) {
+            const s = d.createObjectStore('conditions', {
               keyPath: 'id',
             });
-            s.createIndex('start_date', 'start_date', { unique: false });
+            s.createIndex('onset_date', 'onset_date', { unique: false });
+            s.createIndex('clinical_status', 'clinical_status', {
+              unique: false,
+            });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -187,7 +193,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     // 2. Put a report into IndexedDB directly
     await page.evaluate(async () => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open('healthy_db', 2);
+        const req = indexedDB.open('healthy_db', 3);
         req.onupgradeneeded = () => {
           const d = req.result;
           if (!d.objectStoreNames.contains('diagnostic_reports')) {
@@ -202,11 +208,17 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
             const s = d.createObjectStore('observations', { keyPath: 'id' });
             s.createIndex('report_id', 'report_id', { unique: false });
           }
-          if (!d.objectStoreNames.contains('episodes_of_care')) {
-            const s = d.createObjectStore('episodes_of_care', {
+          if (d.objectStoreNames.contains('episodes_of_care')) {
+            d.deleteObjectStore('episodes_of_care');
+          }
+          if (!d.objectStoreNames.contains('conditions')) {
+            const s = d.createObjectStore('conditions', {
               keyPath: 'id',
             });
-            s.createIndex('start_date', 'start_date', { unique: false });
+            s.createIndex('onset_date', 'onset_date', { unique: false });
+            s.createIndex('clinical_status', 'clinical_status', {
+              unique: false,
+            });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -283,7 +295,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     // 4. Verify directly in IndexedDB that object stores exist and contain the stored rows
     const inspected = await page.evaluate(async () => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open('healthy_db', 2);
+        const req = indexedDB.open('healthy_db', 3);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
