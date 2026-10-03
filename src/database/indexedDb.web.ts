@@ -27,7 +27,7 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
   if (dbInstance) return dbInstance;
   if (dbInitPromise) return dbInitPromise;
 
-  dbInitPromise = new Promise<IDBDatabase>((resolve, reject) => {
+  const promise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
       reject(new Error('IndexedDB is not supported in this environment.'));
       return;
@@ -100,6 +100,11 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
     request.onblocked = () => {
       console.warn('IndexedDB database upgrade blocked. Close other tabs.');
     };
+  });
+
+  dbInitPromise = promise.catch((err) => {
+    dbInitPromise = null;
+    throw err;
   });
 
   return dbInitPromise;
@@ -278,11 +283,13 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
         obsByReport[o.report_id].push(JSON.parse(o.fhir_json));
       }
 
-      // Sort reports by effective_date DESC, created_at DESC
+      // Sort reports by effective_date DESC, created_at DESC, id DESC
       reportRows.sort((a, b) => {
         const dateCmp = b.effective_date.localeCompare(a.effective_date);
         if (dateCmp !== 0) return dateCmp;
-        return b.created_at.localeCompare(a.created_at);
+        const createdCmp = b.created_at.localeCompare(a.created_at);
+        if (createdCmp !== 0) return createdCmp;
+        return b.id.localeCompare(a.id);
       });
 
       const records: DiagnosticReportRecord[] = reportRows.map((r) => {
@@ -291,21 +298,29 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
 
         if (parsedReport.result && parsedReport.result.length > 0) {
           const idOrder = new Map(
-            parsedReport.result.map((ref, idx) => [
-              ref.reference?.replace('Observation/', ''),
-              idx,
-            ])
+            parsedReport.result.map((ref, idx) => {
+              const cleanRef =
+                ref.reference?.replace(/^Observation\//, '') || '';
+              return [cleanRef, idx];
+            })
           );
           observations.sort((a, b) => {
-            const idxA = idOrder.get(a.id) ?? 9999;
-            const idxB = idOrder.get(b.id) ?? 9999;
-            return idxA - idxB;
+            const cleanA = a.id?.replace(/^Observation\//, '') || '';
+            const cleanB = b.id?.replace(/^Observation\//, '') || '';
+            const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id) ?? 9999;
+            const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id) ?? 9999;
+            if (idxA !== idxB) {
+              return idxA - idxB;
+            }
+            return (a.id || '').localeCompare(b.id || '');
           });
         } else {
           observations.sort((a, b) => {
             const nameA = a.code.coding?.[0]?.display || a.code.text || '';
             const nameB = b.code.coding?.[0]?.display || b.code.text || '';
-            return nameA.localeCompare(nameB);
+            const nameCmp = nameA.localeCompare(nameB);
+            if (nameCmp !== 0) return nameCmp;
+            return (a.id || '').localeCompare(b.id || '');
           });
         }
 
@@ -419,7 +434,9 @@ export async function fetchAllEpisodesOfCareWeb(): Promise<
       rows.sort((a, b) => {
         const dateCmp = b.start_date.localeCompare(a.start_date);
         if (dateCmp !== 0) return dateCmp;
-        return b.created_at.localeCompare(a.created_at);
+        const createdCmp = b.created_at.localeCompare(a.created_at);
+        if (createdCmp !== 0) return createdCmp;
+        return b.id.localeCompare(a.id);
       });
       resolve(rows.map((r) => JSON.parse(r.fhir_json)));
     };

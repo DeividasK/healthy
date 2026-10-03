@@ -82,14 +82,14 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
   const nativeDb = getNativeDb();
   if (nativeDb) {
     const reportRows = await nativeDb.getAllAsync(
-      `SELECT * FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC;`
+      `SELECT * FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
     );
 
     const records: DiagnosticReportRecord[] = [];
     for (const r of reportRows) {
       const parsedReport: FHIRDiagnosticReport = JSON.parse(r.fhir_json);
       const obsRows = await nativeDb.getAllAsync(
-        `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC;`,
+        `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC, id ASC;`,
         [r.id]
       );
       const observations: FHIRObservation[] = obsRows.map((o: any) =>
@@ -98,15 +98,20 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
 
       if (parsedReport.result && parsedReport.result.length > 0) {
         const idOrder = new Map(
-          parsedReport.result.map((ref, idx) => [
-            ref.reference?.replace('Observation/', ''),
-            idx,
-          ])
+          parsedReport.result.map((ref, idx) => {
+            const cleanRef = ref.reference?.replace(/^Observation\//, '') || '';
+            return [cleanRef, idx];
+          })
         );
         observations.sort((a, b) => {
-          const idxA = idOrder.get(a.id) ?? 9999;
-          const idxB = idOrder.get(b.id) ?? 9999;
-          return idxA - idxB;
+          const cleanA = a.id?.replace(/^Observation\//, '') || '';
+          const cleanB = b.id?.replace(/^Observation\//, '') || '';
+          const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id) ?? 9999;
+          const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id) ?? 9999;
+          if (idxA !== idxB) {
+            return idxA - idxB;
+          }
+          return (a.id || '').localeCompare(b.id || '');
         });
       }
 
