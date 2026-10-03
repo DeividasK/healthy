@@ -6,6 +6,7 @@ import {
   getHealthCaseById,
   createOrUpdateHealthCase,
 } from './healthCaseService';
+import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
 import { COLORS } from '../../theme/colors';
 
 export function EditHealthCaseView() {
@@ -35,16 +36,8 @@ export function EditHealthCaseView() {
           dateObj = new Date(y, m - 1, d);
         }
 
-        const title =
-          episode.type?.[0]?.text ||
-          episode.diagnosis?.[0]?.condition?.display ||
-          episode.description ||
-          '';
-
-        const descText =
-          episode.note && episode.note.length > 0
-            ? episode.note.map((n) => n.text).join('\n')
-            : undefined;
+        const title = getEpisodeTitle(episode);
+        const descText = getEpisodeDescription(episode) || undefined;
 
         setInitialValues({
           id: episode.id,

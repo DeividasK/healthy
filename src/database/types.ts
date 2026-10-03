@@ -1,8 +1,4 @@
-import {
-  FHIRDiagnosticReport,
-  FHIRObservation,
-  FHIREpisodeOfCare,
-} from '../types/fhir';
+import type { DiagnosticReport, Observation, EpisodeOfCare } from 'fhir/r5';
 
 export interface StoredDiagnosticReportRow {
   id: string;
@@ -26,8 +22,8 @@ export interface StoredObservationRow {
 }
 
 export interface DiagnosticReportRecord {
-  report: FHIRDiagnosticReport;
-  observations: FHIRObservation[];
+  report: DiagnosticReport;
+  observations: Observation[];
 }
 
 export interface StoredEpisodeOfCareRow {
@@ -42,5 +38,5 @@ export interface StoredEpisodeOfCareRow {
 }
 
 export interface HealthCaseRecord {
-  episodeOfCare: FHIREpisodeOfCare;
+  episodeOfCare: EpisodeOfCare;
 }

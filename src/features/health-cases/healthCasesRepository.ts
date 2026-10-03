@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { FHIREpisodeOfCare } from '../../types/fhir';
+import type { EpisodeOfCare } from 'fhir/r5';
 import { initializeDatabase, getNativeDb } from '../../database/db';
 import {
   insertEpisodeOfCareWeb,
@@ -7,13 +7,18 @@ import {
   fetchEpisodeOfCareByIdWeb,
   deleteEpisodeOfCareWeb,
 } from '../../database/indexedDb';
+import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
 
 /**
  * Persists an EpisodeOfCare (Health Case) record.
  */
 export async function insertEpisodeOfCareRecord(
-  episode: FHIREpisodeOfCare
+  episode: EpisodeOfCare
 ): Promise<void> {
+  if (!episode.id) {
+    throw new Error('EpisodeOfCare requires an id to be persisted');
+  }
+
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -25,15 +30,8 @@ export async function insertEpisodeOfCareRecord(
   if (nativeDb) {
     const now = new Date().toISOString();
     const startDate = episode.period?.start || now.split('T')[0];
-    const title =
-      episode.type?.[0]?.text ||
-      episode.diagnosis?.[0]?.condition?.display ||
-      episode.description ||
-      'Health Case';
-    const descriptionText =
-      episode.note && episode.note.length > 0
-        ? episode.note.map((n) => n.text).join('\n')
-        : episode.description || null;
+    const title = getEpisodeTitle(episode);
+    const descriptionText = getEpisodeDescription(episode);
 
     await nativeDb.runAsync(
       `INSERT INTO episodes_of_care (id, status, start_date, title, description, fhir_json, created_at, updated_at)
@@ -47,6 +45,7 @@ export async function insertEpisodeOfCareRecord(
          updated_at = excluded.updated_at;`,
       [
         episode.id,
+
         episode.status,
         startDate,
         title,
@@ -62,9 +61,7 @@ export async function insertEpisodeOfCareRecord(
 /**
  * Retrieves all stored EpisodeOfCare records.
  */
-export async function fetchAllEpisodeOfCareRecords(): Promise<
-  FHIREpisodeOfCare[]
-> {
+export async function fetchAllEpisodeOfCareRecords(): Promise<EpisodeOfCare[]> {
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -87,7 +84,8 @@ export async function fetchAllEpisodeOfCareRecords(): Promise<
  */
 export async function fetchEpisodeOfCareById(
   id: string
-): Promise<FHIREpisodeOfCare | null> {
+): Promise<EpisodeOfCare | null> {
+  if (!id) return null;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -102,6 +100,7 @@ export async function fetchEpisodeOfCareById(
  * Deletes an EpisodeOfCare record by its ID.
  */
 export async function deleteEpisodeOfCareRecord(id: string): Promise<void> {
+  if (!id) return;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {

@@ -1,9 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import {
-  FHIRDiagnosticReport,
-  FHIRObservation,
-  DiagnosticReportBundle,
-} from '../../types/fhir';
+import type { DiagnosticReport, Observation } from 'fhir/r5';
 import {
   GENERAL_LAB_REPORT_LOINC,
   CBC_PANEL_LOINC,
@@ -15,6 +11,11 @@ import {
   deleteDiagnosticReportRecord,
 } from './labResultsRepository';
 import { DiagnosticReportRecord } from '../../database/types';
+
+export interface DiagnosticReportBundle {
+  report: DiagnosticReport;
+  observations: Observation[];
+}
 
 export interface BiomarkerInputItem {
   id: string; // marker canonical id or loinc
@@ -41,11 +42,12 @@ export interface CreateReportOptions {
 export function buildFHIRObservation(
   item: BiomarkerInputItem,
   effectiveDateTime: string
-): FHIRObservation {
+): Observation {
   const observationId = `obs-${Crypto.randomUUID()}`;
 
   // Calculate optional interpretation if reference range is available
-  let interpretation: FHIRObservation['interpretation'] = undefined;
+  let interpretation: Observation['interpretation'] = undefined;
+
   if (item.referenceLow !== undefined || item.referenceHigh !== undefined) {
     let code = 'N';
     let display = 'Normal';
@@ -73,7 +75,7 @@ export function buildFHIRObservation(
     ];
   }
 
-  const observation: FHIRObservation = {
+  const observation: Observation = {
     resourceType: 'Observation',
     id: observationId,
     status: 'final',
@@ -156,7 +158,7 @@ export async function createAndSaveDiagnosticReport(
   }
 
   // Build observations
-  const observations: FHIRObservation[] = options.items.map((item) =>
+  const observations: Observation[] = options.items.map((item) =>
     buildFHIRObservation(item, effectiveDateTime)
   );
 
@@ -170,7 +172,7 @@ export async function createAndSaveDiagnosticReport(
     ? 'Complete blood count (hemogram) panel - Blood by Automated count'
     : 'Laboratory report';
 
-  const report: FHIRDiagnosticReport = {
+  const report: DiagnosticReport = {
     resourceType: 'DiagnosticReport',
     id: reportId,
     status: 'final',

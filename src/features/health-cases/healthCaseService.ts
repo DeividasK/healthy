@@ -1,16 +1,17 @@
 import * as Crypto from 'expo-crypto';
-import { FHIREpisodeOfCare, FHIREpisodeOfCareStatus } from '../../types/fhir';
+import type { EpisodeOfCare } from 'fhir/r5';
 import {
   insertEpisodeOfCareRecord,
   fetchAllEpisodeOfCareRecords,
   fetchEpisodeOfCareById,
   deleteEpisodeOfCareRecord,
 } from './healthCasesRepository';
+import { createNarrativeDiv } from '../../utils/fhirUtils';
 
 export interface HealthCaseInput {
   id?: string;
   title: string;
-  status: FHIREpisodeOfCareStatus;
+  status: EpisodeOfCare['status'];
   startDate: string; // YYYY-MM-DD
   description?: string;
 }
@@ -20,15 +21,17 @@ export interface HealthCaseInput {
  */
 export async function createOrUpdateHealthCase(
   input: HealthCaseInput
-): Promise<FHIREpisodeOfCare> {
+): Promise<EpisodeOfCare> {
   const caseId = input.id || `eoc-${Crypto.randomUUID()}`;
-  const now = new Date().toISOString();
   const trimmedTitle = input.title.trim();
 
-  const episode: FHIREpisodeOfCare = {
+  const episode: EpisodeOfCare = {
     resourceType: 'EpisodeOfCare',
     id: caseId,
     status: input.status,
+    patient: {
+      display: 'Self',
+    },
     period: {
       start: input.startDate,
     },
@@ -39,20 +42,21 @@ export async function createOrUpdateHealthCase(
     ],
     diagnosis: [
       {
-        condition: {
-          display: trimmedTitle,
-        },
+        condition: [
+          {
+            concept: {
+              text: trimmedTitle,
+            },
+          },
+        ],
       },
     ],
-    description: trimmedTitle,
-    note:
+    text:
       input.description && input.description.trim()
-        ? [
-            {
-              text: input.description.trim(),
-              time: now,
-            },
-          ]
+        ? {
+            status: 'generated',
+            div: createNarrativeDiv(input.description.trim()),
+          }
         : undefined,
   };
 
@@ -63,7 +67,7 @@ export async function createOrUpdateHealthCase(
 /**
  * Fetches all Health Cases.
  */
-export async function getAllHealthCases(): Promise<FHIREpisodeOfCare[]> {
+export async function getAllHealthCases(): Promise<EpisodeOfCare[]> {
   return await fetchAllEpisodeOfCareRecords();
 }
 
@@ -72,7 +76,7 @@ export async function getAllHealthCases(): Promise<FHIREpisodeOfCare[]> {
  */
 export async function getHealthCaseById(
   id: string
-): Promise<FHIREpisodeOfCare | null> {
+): Promise<EpisodeOfCare | null> {
   return await fetchEpisodeOfCareById(id);
 }
 

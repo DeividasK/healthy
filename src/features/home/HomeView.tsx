@@ -27,8 +27,10 @@ import {
   getAllHealthCases,
   deleteHealthCase,
 } from '../health-cases/healthCaseService';
-import { FHIRObservation, FHIREpisodeOfCare } from '../../types/fhir';
+
+import type { Observation, EpisodeOfCare } from 'fhir/r5';
 import { formatDisplayDate } from '../../utils/dateUtils';
+import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
 import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
@@ -36,7 +38,7 @@ import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModa
 export function HomeView() {
   const router = useRouter();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
-  const [healthCases, setHealthCases] = useState<FHIREpisodeOfCare[]>([]);
+  const [healthCases, setHealthCases] = useState<EpisodeOfCare[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Floating + menu state
@@ -134,8 +136,9 @@ export function HomeView() {
     }
   };
 
-  const getStatusBadge = (obs: FHIRObservation) => {
+  const getStatusBadge = (obs: Observation) => {
     const interpretationCode = obs.interpretation?.[0]?.coding?.[0]?.code;
+
     if (!interpretationCode) return null;
 
     let badgeText = 'Normal';
@@ -207,21 +210,15 @@ export function HomeView() {
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionTitle}>Health Cases</Text>
                 {healthCases.map((caseItem) => {
-                  const title =
-                    caseItem.type?.[0]?.text ||
-                    caseItem.diagnosis?.[0]?.condition?.display ||
-                    caseItem.description ||
-                    'Health Case';
-                  const noteText =
-                    caseItem.note && caseItem.note.length > 0
-                      ? caseItem.note.map((n) => n.text).join('\n')
-                      : null;
+                  const title = getEpisodeTitle(caseItem);
+                  const noteText = getEpisodeDescription(caseItem);
+                  const caseId = caseItem.id || '';
 
                   return (
                     <View
-                      key={caseItem.id}
+                      key={caseId || 'case'}
                       style={styles.reportCard}
-                      testID={`case-card-${caseItem.id}`}
+                      testID={`case-card-${caseId}`}
                     >
                       {/* Case Header: Status, Date & Action Icons */}
                       <View style={styles.cardHeader}>
@@ -238,7 +235,7 @@ export function HomeView() {
                         </View>
                         <View style={styles.cardHeaderActions}>
                           <TouchableOpacity
-                            testID={`edit-case-button-${caseItem.id}`}
+                            testID={`edit-case-button-${caseId}`}
                             style={styles.editReportButton}
                             onPress={() => {
                               if (
@@ -249,16 +246,16 @@ export function HomeView() {
                                   document.activeElement as HTMLElement
                                 )?.blur?.();
                               }
-                              router.push(`/health-case/${caseItem.id}/edit`);
+                              router.push(`/health-case/${caseId}/edit`);
                             }}
                             activeOpacity={0.7}
                           >
                             <Pencil color={COLORS.light.iconMuted} size={18} />
                           </TouchableOpacity>
                           <TouchableOpacity
-                            testID={`delete-case-button-${caseItem.id}`}
+                            testID={`delete-case-button-${caseId}`}
                             style={styles.deleteReportButton}
-                            onPress={() => handleDeleteCaseClick(caseItem.id)}
+                            onPress={() => handleDeleteCaseClick(caseId)}
                             activeOpacity={0.7}
                           >
                             <Trash2 color={COLORS.light.iconMuted} size={18} />
@@ -297,11 +294,13 @@ export function HomeView() {
                       ? record.report.note.map((n) => n.text).join('\n')
                       : null;
 
+                  const reportId = record.report.id || '';
+
                   return (
                     <View
-                      key={record.report.id}
+                      key={reportId || 'report'}
                       style={styles.reportCard}
-                      testID={`report-card-${record.report.id}`}
+                      testID={`report-card-${reportId}`}
                     >
                       {/* Card Header: Date & Action Icons */}
                       <View style={styles.cardHeader}>
@@ -317,21 +316,17 @@ export function HomeView() {
                         </View>
                         <View style={styles.cardHeaderActions}>
                           <TouchableOpacity
-                            testID={`edit-report-button-${record.report.id}`}
+                            testID={`edit-report-button-${reportId}`}
                             style={styles.editReportButton}
-                            onPress={() =>
-                              navigateToAddReport(record.report.id)
-                            }
+                            onPress={() => navigateToAddReport(reportId)}
                             activeOpacity={0.7}
                           >
                             <Pencil color={COLORS.light.iconMuted} size={18} />
                           </TouchableOpacity>
                           <TouchableOpacity
-                            testID={`delete-report-button-${record.report.id}`}
+                            testID={`delete-report-button-${reportId}`}
                             style={styles.deleteReportButton}
-                            onPress={() =>
-                              handleDeleteReportClick(record.report.id)
-                            }
+                            onPress={() => handleDeleteReportClick(reportId)}
                             activeOpacity={0.7}
                           >
                             <Trash2 color={COLORS.light.iconMuted} size={18} />

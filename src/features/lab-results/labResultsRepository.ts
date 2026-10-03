@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { FHIRDiagnosticReport, FHIRObservation } from '../../types/fhir';
+import type { DiagnosticReport, Observation } from 'fhir/r5';
 import { DiagnosticReportRecord } from '../../database/types';
 import { initializeDatabase, getNativeDb } from '../../database/db';
 import {
@@ -12,9 +12,18 @@ import {
  * Persists a FHIR DiagnosticReport and its Observations.
  */
 export async function insertDiagnosticReportRecord(
-  report: FHIRDiagnosticReport,
-  observations: FHIRObservation[]
+  report: DiagnosticReport,
+  observations: Observation[]
 ): Promise<void> {
+  if (!report.id) {
+    throw new Error('DiagnosticReport requires an id to be persisted');
+  }
+  for (const obs of observations) {
+    if (!obs.id) {
+      throw new Error('Observation requires an id to be persisted');
+    }
+  }
+
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -87,12 +96,12 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
 
     const records: DiagnosticReportRecord[] = [];
     for (const r of reportRows) {
-      const parsedReport: FHIRDiagnosticReport = JSON.parse(r.fhir_json);
+      const parsedReport: DiagnosticReport = JSON.parse(r.fhir_json);
       const obsRows = await nativeDb.getAllAsync(
         `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC, id ASC;`,
         [r.id]
       );
-      const observations: FHIRObservation[] = obsRows.map((o: any) =>
+      const observations: Observation[] = obsRows.map((o: any) =>
         JSON.parse(o.fhir_json)
       );
 
@@ -106,8 +115,8 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
         observations.sort((a, b) => {
           const cleanA = a.id?.replace(/^Observation\//, '') || '';
           const cleanB = b.id?.replace(/^Observation\//, '') || '';
-          const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id) ?? 9999;
-          const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id) ?? 9999;
+          const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id || '') ?? 9999;
+          const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id || '') ?? 9999;
           if (idxA !== idxB) {
             return idxA - idxB;
           }
@@ -129,6 +138,7 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
 export async function deleteDiagnosticReportRecord(
   reportId: string
 ): Promise<void> {
+  if (!reportId) return;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
