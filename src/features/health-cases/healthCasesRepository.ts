@@ -74,7 +74,7 @@ export async function fetchAllEpisodeOfCareRecords(): Promise<
   const nativeDb = getNativeDb();
   if (nativeDb) {
     const rows = await nativeDb.getAllAsync(
-      `SELECT * FROM episodes_of_care ORDER BY start_date DESC, created_at DESC;`
+      `SELECT * FROM episodes_of_care ORDER BY start_date DESC, created_at DESC, id DESC;`
     );
     return rows.map((r: any) => JSON.parse(r.fhir_json));
   }

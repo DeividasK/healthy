@@ -57,6 +57,7 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
         for (const r of reportsList) {
           reportStore.put({
             id: r.id,
+            case_id: r.caseId || null,
             effective_date: r.effectiveDate,
             status: 'final',
             notes: r.notes || null,
@@ -75,6 +76,11 @@ export async function seedReports(page: Page, reports: any[]): Promise<void> {
                 text: 'Complete Blood Count',
               },
               effectiveDateTime: r.effectiveDateTime || r.effectiveDate,
+              result: r.observations.map((obs: any, idx: number) => ({
+                reference: `Observation/obs-${r.id}-${idx}`,
+                type: 'Observation',
+                display: obs.name,
+              })),
               note: r.notes ? [{ text: r.notes }] : undefined,
             }),
             created_at: '2026-10-02T10:00:00.000Z',
