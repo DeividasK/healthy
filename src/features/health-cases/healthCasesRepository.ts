@@ -7,6 +7,7 @@ import {
   fetchEpisodeOfCareByIdWeb,
   deleteEpisodeOfCareWeb,
 } from '../../database/indexedDb';
+import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
 
 /**
  * Persists an EpisodeOfCare (Health Case) record.
@@ -14,6 +15,10 @@ import {
 export async function insertEpisodeOfCareRecord(
   episode: EpisodeOfCare
 ): Promise<void> {
+  if (!episode.id) {
+    throw new Error('EpisodeOfCare requires an id to be persisted');
+  }
+
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -25,24 +30,8 @@ export async function insertEpisodeOfCareRecord(
   if (nativeDb) {
     const now = new Date().toISOString();
     const startDate = episode.period?.start || now.split('T')[0];
-    const title =
-      episode.type?.[0]?.text ||
-      episode.diagnosis?.[0]?.condition?.[0]?.concept?.text ||
-      episode.diagnosis?.[0]?.condition?.[0]?.reference?.display ||
-      (episode.diagnosis?.[0] as any)?.condition?.display ||
-      (episode as any).description ||
-      'Health Case';
-    const descriptionText =
-      ((episode as any).note && (episode as any).note.length > 0
-        ? (episode as any).note.map((n: any) => n.text).join('\n')
-        : null) ||
-      (episode.text?.div
-        ? episode.text.div.replace(/^<div[^>]*>|<\/div>$/gi, '')
-        : null) ||
-      (episode as any).description ||
-      null;
-
-    const episodeId = episode.id || '';
+    const title = getEpisodeTitle(episode);
+    const descriptionText = getEpisodeDescription(episode);
 
     await nativeDb.runAsync(
       `INSERT INTO episodes_of_care (id, status, start_date, title, description, fhir_json, created_at, updated_at)
@@ -55,7 +44,8 @@ export async function insertEpisodeOfCareRecord(
          fhir_json = excluded.fhir_json,
          updated_at = excluded.updated_at;`,
       [
-        episodeId,
+        episode.id,
+
         episode.status,
         startDate,
         title,
@@ -95,6 +85,7 @@ export async function fetchAllEpisodeOfCareRecords(): Promise<EpisodeOfCare[]> {
 export async function fetchEpisodeOfCareById(
   id: string
 ): Promise<EpisodeOfCare | null> {
+  if (!id) return null;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -109,6 +100,7 @@ export async function fetchEpisodeOfCareById(
  * Deletes an EpisodeOfCare record by its ID.
  */
 export async function deleteEpisodeOfCareRecord(id: string): Promise<void> {
+  if (!id) return;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {

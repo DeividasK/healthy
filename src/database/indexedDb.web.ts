@@ -5,6 +5,7 @@ import {
   StoredObservationRow,
   StoredEpisodeOfCareRow,
 } from './types';
+import { getEpisodeTitle, getEpisodeDescription } from '../utils/fhirUtils';
 
 export const INDEXED_DB_NAME = 'healthy_db';
 export const INDEXED_DB_VERSION = 2;
@@ -171,6 +172,15 @@ export async function insertDiagnosticReportWeb(
   report: DiagnosticReport,
   observations: Observation[]
 ): Promise<void> {
+  if (!report.id) {
+    throw new Error('DiagnosticReport requires an id to be persisted');
+  }
+  for (const obs of observations) {
+    if (!obs.id) {
+      throw new Error('Observation requires an id to be persisted');
+    }
+  }
+
   const db = await getWebDatabase();
   const now = new Date().toISOString();
   const effectiveDate = report.effectiveDateTime || now.split('T')[0];
@@ -179,8 +189,6 @@ export async function insertDiagnosticReportWeb(
       ? report.note.map((n) => n.text).join('\n')
       : null;
 
-  const reportId = report.id || '';
-
   const obsRows: StoredObservationRow[] = observations.map((obs) => {
     const loinc = obs.code.coding?.[0]?.code || '';
     const name = obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
@@ -188,8 +196,8 @@ export async function insertDiagnosticReportWeb(
     const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
 
     return {
-      id: obs.id || '',
-      report_id: reportId,
+      id: obs.id!,
+      report_id: report.id!,
       loinc_code: loinc,
       name,
       value: val,
@@ -207,11 +215,11 @@ export async function insertDiagnosticReportWeb(
     const reportStore = tx.objectStore('diagnostic_reports');
     const obsStore = tx.objectStore('observations');
 
-    const getReq = reportStore.get(reportId);
+    const getReq = reportStore.get(report.id!);
     getReq.onsuccess = () => {
       const existing = getReq.result as StoredDiagnosticReportRow | undefined;
       const reportRow: StoredDiagnosticReportRow = {
-        id: reportId,
+        id: report.id!,
         effective_date: effectiveDate,
         status: report.status,
         notes: notesText,
@@ -223,7 +231,7 @@ export async function insertDiagnosticReportWeb(
 
       // Delete existing observations for this report
       const obsIndex = obsStore.index('report_id');
-      const req = obsIndex.openKeyCursor(IDBKeyRange.only(reportId));
+      const req = obsIndex.openKeyCursor(IDBKeyRange.only(report.id!));
 
       req.onsuccess = () => {
         const cursor = req.result;
@@ -338,6 +346,8 @@ export async function fetchAllDiagnosticReportsWeb(): Promise<
 export async function deleteDiagnosticReportWeb(
   reportId: string
 ): Promise<void> {
+  if (!reportId) return;
+
   const db = await getWebDatabase();
 
   return new Promise<void>((resolve, reject) => {
@@ -374,37 +384,25 @@ export async function deleteDiagnosticReportWeb(
 export async function insertEpisodeOfCareWeb(
   episode: EpisodeOfCare
 ): Promise<void> {
+  if (!episode.id) {
+    throw new Error('EpisodeOfCare requires an id to be persisted');
+  }
+
   const db = await getWebDatabase();
   const now = new Date().toISOString();
   const startDate = episode.period?.start || now.split('T')[0];
-  const title =
-    episode.type?.[0]?.text ||
-    episode.diagnosis?.[0]?.condition?.[0]?.concept?.text ||
-    episode.diagnosis?.[0]?.condition?.[0]?.reference?.display ||
-    (episode.diagnosis?.[0] as any)?.condition?.display ||
-    (episode as any).description ||
-    'Health Case';
-  const descriptionText =
-    ((episode as any).note && (episode as any).note.length > 0
-      ? (episode as any).note.map((n: any) => n.text).join('\n')
-      : null) ||
-    (episode.text?.div
-      ? episode.text.div.replace(/^<div[^>]*>|<\/div>$/gi, '')
-      : null) ||
-    (episode as any).description ||
-    null;
-
-  const episodeId = episode.id || '';
+  const title = getEpisodeTitle(episode);
+  const descriptionText = getEpisodeDescription(episode);
 
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction('episodes_of_care', 'readwrite');
     const store = tx.objectStore('episodes_of_care');
 
-    const getReq = store.get(episodeId);
+    const getReq = store.get(episode.id!);
     getReq.onsuccess = () => {
       const existing = getReq.result as StoredEpisodeOfCareRow | undefined;
       const episodeRow: StoredEpisodeOfCareRow = {
-        id: episodeId,
+        id: episode.id!,
         status: episode.status,
         start_date: startDate,
         title,
@@ -456,6 +454,8 @@ export async function fetchAllEpisodesOfCareWeb(): Promise<EpisodeOfCare[]> {
 export async function fetchEpisodeOfCareByIdWeb(
   id: string
 ): Promise<EpisodeOfCare | null> {
+  if (!id) return null;
+
   const db = await getWebDatabase();
 
   return new Promise<EpisodeOfCare | null>((resolve, reject) => {
@@ -480,6 +480,8 @@ export async function fetchEpisodeOfCareByIdWeb(
  * Deletes an EpisodeOfCare record by its ID from IndexedDB.
  */
 export async function deleteEpisodeOfCareWeb(id: string): Promise<void> {
+  if (!id) return;
+
   const db = await getWebDatabase();
 
   return new Promise<void>((resolve, reject) => {

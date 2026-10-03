@@ -6,6 +6,7 @@ import {
   fetchEpisodeOfCareById,
   deleteEpisodeOfCareRecord,
 } from './healthCasesRepository';
+import { createNarrativeDiv } from '../../utils/fhirUtils';
 
 export interface HealthCaseInput {
   id?: string;
@@ -54,7 +55,7 @@ export async function createOrUpdateHealthCase(
       input.description && input.description.trim()
         ? {
             status: 'generated',
-            div: `<div xmlns="http://www.w3.org/1999/xhtml">${input.description.trim()}</div>`,
+            div: createNarrativeDiv(input.description.trim()),
           }
         : undefined,
   };

@@ -15,6 +15,15 @@ export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
   observations: Observation[]
 ): Promise<void> {
+  if (!report.id) {
+    throw new Error('DiagnosticReport requires an id to be persisted');
+  }
+  for (const obs of observations) {
+    if (!obs.id) {
+      throw new Error('Observation requires an id to be persisted');
+    }
+  }
+
   await initializeDatabase();
 
   if (Platform.OS === 'web') {
@@ -31,14 +40,12 @@ export async function insertDiagnosticReportRecord(
         ? report.note.map((n) => n.text).join('\n')
         : null;
 
-    const reportId = report.id || '';
-
     await nativeDb.withTransactionAsync(async () => {
       await nativeDb.runAsync(
         `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?);`,
         [
-          reportId,
+          report.id,
           effectiveDate,
           report.status,
           notesText,
@@ -49,7 +56,7 @@ export async function insertDiagnosticReportRecord(
       );
 
       await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
-        reportId,
+        report.id,
       ]);
 
       for (const obs of observations) {
@@ -62,16 +69,7 @@ export async function insertDiagnosticReportRecord(
         await nativeDb.runAsync(
           `INSERT OR REPLACE INTO observations (id, report_id, loinc_code, name, value, unit, fhir_json, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [
-            obs.id || '',
-            reportId,
-            loinc,
-            name,
-            val,
-            unit,
-            JSON.stringify(obs),
-            now,
-          ]
+          [obs.id, report.id, loinc, name, val, unit, JSON.stringify(obs), now]
         );
       }
     });
@@ -140,6 +138,7 @@ export async function fetchAllDiagnosticReportRecords(): Promise<
 export async function deleteDiagnosticReportRecord(
   reportId: string
 ): Promise<void> {
+  if (!reportId) return;
   await initializeDatabase();
 
   if (Platform.OS === 'web') {

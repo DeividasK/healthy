@@ -30,6 +30,7 @@ import {
 
 import type { Observation, EpisodeOfCare } from 'fhir/r5';
 import { formatDisplayDate } from '../../utils/dateUtils';
+import { getEpisodeTitle, getEpisodeDescription } from '../../utils/fhirUtils';
 import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
@@ -209,26 +210,8 @@ export function HomeView() {
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionTitle}>Health Cases</Text>
                 {healthCases.map((caseItem) => {
-                  const title =
-                    caseItem.type?.[0]?.text ||
-                    caseItem.diagnosis?.[0]?.condition?.[0]?.concept?.text ||
-                    caseItem.diagnosis?.[0]?.condition?.[0]?.reference
-                      ?.display ||
-                    (caseItem.diagnosis?.[0] as any)?.condition?.display ||
-                    (caseItem as any).description ||
-                    'Health Case';
-                  const noteText =
-                    ((caseItem as any).note && (caseItem as any).note.length > 0
-                      ? (caseItem as any).note
-                          .map((n: any) => n.text)
-                          .join('\n')
-                      : null) ||
-                    (caseItem.text?.div
-                      ? caseItem.text.div.replace(/^<div[^>]*>|<\/div>$/gi, '')
-                      : null) ||
-                    (caseItem as any).description ||
-                    null;
-
+                  const title = getEpisodeTitle(caseItem);
+                  const noteText = getEpisodeDescription(caseItem);
                   const caseId = caseItem.id || '';
 
                   return (
