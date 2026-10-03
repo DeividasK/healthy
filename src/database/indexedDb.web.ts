@@ -27,9 +27,8 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
   if (dbInstance) return dbInstance;
   if (dbInitPromise) return dbInitPromise;
 
-  dbInitPromise = new Promise<IDBDatabase>((resolve, reject) => {
+  const promise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
-      dbInitPromise = null;
       reject(new Error('IndexedDB is not supported in this environment.'));
       return;
     }
@@ -95,13 +94,17 @@ export async function getWebDatabase(): Promise<IDBDatabase> {
     };
 
     request.onerror = () => {
-      dbInitPromise = null;
       reject(request.error);
     };
 
     request.onblocked = () => {
       console.warn('IndexedDB database upgrade blocked. Close other tabs.');
     };
+  });
+
+  dbInitPromise = promise.catch((err) => {
+    dbInitPromise = null;
+    throw err;
   });
 
   return dbInitPromise;
