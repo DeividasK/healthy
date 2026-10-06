@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.pillBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
+    marginRight: 16,
   },
   initialsText: {
     fontSize: 13,

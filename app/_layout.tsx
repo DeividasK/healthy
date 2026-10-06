@@ -60,7 +60,7 @@ function RootLayoutNav() {
           options={{
             title: '',
             headerLeft: () => (
-              <View style={{ marginLeft: Platform.OS === 'ios' ? 0 : 4 }}>
+              <View style={{ marginLeft: 16 }}>
                 <AppLogo size={30} color={COLORS.light.primaryLogo} />
               </View>
             ),
