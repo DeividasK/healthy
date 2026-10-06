@@ -48,8 +48,10 @@ export async function initializeDatabase(): Promise<SQLiteDatabase> {
       // Sequentially apply missing migrations
       for (const migration of DATABASE_MIGRATIONS) {
         if (currentVersion < migration.version) {
-          await db.execAsync(migration.sql);
-          await db.execAsync(`PRAGMA user_version = ${migration.version};`);
+          await db.withTransactionAsync(async () => {
+            await db.execAsync(migration.sql);
+            await db.execAsync(`PRAGMA user_version = ${migration.version};`);
+          });
           currentVersion = migration.version;
         }
       }
