@@ -1,6 +1,13 @@
+import * as SQLite from 'expo-sqlite';
+
 /**
- * Fallback driver interface.
+ * Native and Web SQLite driver.
+ * Uses expo-sqlite's unified asynchronous API across iOS, Android, and Web.
  */
-export async function openNativeDatabase(_dbName: string): Promise<any | null> {
-  return null;
+export async function openNativeDatabase(
+  dbName: string
+): Promise<SQLite.SQLiteDatabase> {
+  const db = await SQLite.openDatabaseAsync(dbName);
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+  return db;
 }

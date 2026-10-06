@@ -1,100 +1,77 @@
-import { Platform } from 'react-native';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
-import { getWebDatabase } from './indexedDb';
+import { DATABASE_MIGRATIONS } from './migrations';
 
 // Re-export feature repositories for backward compatibility and clean access
 export * from '../features/lab-results/labResultsRepository';
 export * from '../features/conditions/conditionsRepository';
+export * from './migrations';
 
 const DB_NAME = 'healthy.db';
-let nativeDb: any = null;
-let isDbInitialized = false;
+let dbInstance: SQLiteDatabase | null = null;
+let initPromise: Promise<SQLiteDatabase> | null = null;
 
 /**
- * Returns the active native SQLite database instance, if available.
+ * Returns the active SQLite database instance, if available.
  */
-export function getNativeDb(): any {
-  return nativeDb;
+export function getNativeDb(): SQLiteDatabase | null {
+  return dbInstance;
+}
+
+/**
+ * Returns the active SQLite database instance or throws if not initialized.
+ */
+export async function getDb(): Promise<SQLiteDatabase> {
+  if (dbInstance) return dbInstance;
+  return await initializeDatabase();
 }
 
 /**
  * Initializes the database tables with versioned migrations.
+ * Executes the exact same versioned SQL migrations across Web, Android, and iOS.
  */
-export async function initializeDatabase(): Promise<void> {
-  if (isDbInitialized) return;
+export async function initializeDatabase(): Promise<SQLiteDatabase> {
+  if (dbInstance) return dbInstance;
+  if (initPromise) return initPromise;
 
-  if (Platform.OS === 'web') {
+  initPromise = (async () => {
     try {
-      await getWebDatabase();
-    } catch (err) {
-      console.warn('Web IndexedDB init failed:', err);
-    }
-    isDbInitialized = true;
-    return;
-  }
-
-  try {
-    nativeDb = await openNativeDatabase(DB_NAME);
-    if (nativeDb) {
-      await nativeDb.execAsync('PRAGMA foreign_keys = ON;');
+      const db = await openNativeDatabase(DB_NAME);
+      await db.execAsync('PRAGMA foreign_keys = ON;');
 
       // Query current schema version
-      const verRow = (await nativeDb.getFirstAsync('PRAGMA user_version;')) as
-        { user_version?: number } | undefined;
-      const currentVersion = verRow?.user_version ?? 0;
+      const verRow = (await db.getFirstAsync<{ user_version: number }>(
+        'PRAGMA user_version;'
+      )) as { user_version?: number } | null | undefined;
+      let currentVersion = verRow?.user_version ?? 0;
 
-      // Migration v1: diagnostic_reports and observations
-      if (currentVersion < 1) {
-        await nativeDb.execAsync(`
-          CREATE TABLE IF NOT EXISTS diagnostic_reports (
-            id TEXT PRIMARY KEY,
-            effective_date TEXT NOT NULL,
-            status TEXT NOT NULL,
-            notes TEXT,
-            fhir_json TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          );
-          CREATE TABLE IF NOT EXISTS observations (
-            id TEXT PRIMARY KEY,
-            report_id TEXT NOT NULL REFERENCES diagnostic_reports(id) ON DELETE CASCADE,
-            loinc_code TEXT NOT NULL,
-            name TEXT NOT NULL,
-            value REAL NOT NULL,
-            unit TEXT NOT NULL,
-            fhir_json TEXT NOT NULL,
-            created_at TEXT NOT NULL
-          );
-          PRAGMA user_version = 1;
-        `);
+      // Sequentially apply missing migrations
+      for (const migration of DATABASE_MIGRATIONS) {
+        if (currentVersion < migration.version) {
+          await db.withTransactionAsync(async () => {
+            await db.execAsync(migration.sql);
+            await db.execAsync(`PRAGMA user_version = ${migration.version};`);
+          });
+          currentVersion = migration.version;
+        }
       }
 
-      // Migration v3: conditions (destructive migration from episodes_of_care)
-      if (currentVersion < 3) {
-        await nativeDb.execAsync(`
-          DROP TABLE IF EXISTS episodes_of_care;
-          CREATE TABLE IF NOT EXISTS conditions (
-            id TEXT PRIMARY KEY,
-            clinical_status TEXT NOT NULL,
-            verification_status TEXT NOT NULL,
-            onset_date TEXT NOT NULL,
-            title TEXT NOT NULL,
-            severity TEXT,
-            body_site TEXT,
-            abatement_date TEXT,
-            description TEXT,
-            fhir_json TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          );
-          PRAGMA user_version = 3;
-        `);
-      }
+      dbInstance = db;
+      return db;
+    } catch (err) {
+      console.error('Failed to initialize SQLite database:', err);
+      initPromise = null;
+      throw err;
     }
-  } catch (err) {
-    console.warn('Native SQLite init failed:', err);
-    nativeDb = null;
-  }
+  })();
 
-  isDbInitialized = true;
+  return initPromise;
+}
+
+/**
+ * Resets the active database connection (useful for testing).
+ */
+export function resetDatabaseInstance(): void {
+  dbInstance = null;
+  initPromise = null;
 }

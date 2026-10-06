@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { seedCondition } from '../testing/testStorage';
+import { clearAppStorage, createConditionViaUI } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -15,16 +15,19 @@ test.describe('Edit Condition View - Visual Regression', () => {
   });
 
   test('Condition View - Edit Existing Mode', async ({ page }, testInfo) => {
-    await seedCondition(page, {
-      id: 'cond-visual-1',
+    await clearAppStorage(page);
+    await createConditionViaUI(page, {
       title: 'Left Knee Pain',
-      clinicalStatus: 'active',
-      verificationStatus: 'confirmed',
-      onsetDate: '2026-10-02',
+      status: 'active',
       notes: 'Persistent ache after running on tarmac.',
     });
 
-    await page.goto('/condition/cond-visual-1/edit');
+    // Tap edit button on Home card
+    const editBtn = page
+      .locator('[data-testid^="edit-condition-button-"]')
+      .first();
+    await editBtn.click();
+    await expect(page).toHaveURL(/.*condition\/.*\/edit/);
 
     await expect(page.getByText('Edit Condition')).toBeVisible();
     await expect(page.getByTestId('condition-title-input')).toHaveValue(

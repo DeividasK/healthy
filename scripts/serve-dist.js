@@ -17,9 +17,14 @@ const MIME_TYPES = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.wasm': 'application/wasm',
 };
 
 const server = http.createServer((req, res) => {
+  // Cross-Origin Isolation headers required for WebAssembly SharedArrayBuffer / OPFS
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+
   const urlPath = req.url.split('?')[0];
   let filePath = path.join(distDir, urlPath);
 

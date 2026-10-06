@@ -1,293 +1,121 @@
 import type { Page } from '@playwright/test';
 
 /**
- * Resets all browser storage (localStorage, sessionStorage, and IndexedDB) for clean test runs.
+ * Resets all browser storage (localStorage, sessionStorage, and OPFS / IndexedDB files) for clean test runs.
  */
 export async function clearAppStorage(page: Page): Promise<void> {
   await page.goto('/');
   await page.evaluate(async () => {
     localStorage.clear();
     sessionStorage.clear();
-    await new Promise<void>((resolve) => {
-      const req = indexedDB.deleteDatabase('healthy_db');
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-      req.onblocked = () => resolve();
-    });
+
+    // Clear Origin Private File System (where expo-sqlite / wa-sqlite persists databases)
+    if (typeof navigator !== 'undefined' && navigator.storage?.getDirectory) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        for await (const [name, handle] of root.entries()) {
+          try {
+            await root.removeEntry(name, {
+              recursive: handle.kind === 'directory',
+            });
+          } catch {
+            // Ignore individual handle delete error
+          }
+        }
+      } catch {
+        // Ignore OPFS access errors in restricted contexts
+      }
+    }
   });
 }
 
 /**
- * Seeds DiagnosticReport and Observation records directly into IndexedDB.
+ * Seeds a DiagnosticReport through standard UI creation flow without exposing private app internals.
  */
-export async function seedReports(page: Page, reports: any[]): Promise<void> {
-  await clearAppStorage(page);
-  await page.evaluate(async (reportsList: any[]) => {
-    await new Promise<void>((resolve, reject) => {
-      const openReq = indexedDB.open('healthy_db', 3);
-      openReq.onupgradeneeded = () => {
-        const db = openReq.result;
-        if (!db.objectStoreNames.contains('diagnostic_reports')) {
-          const s = db.createObjectStore('diagnostic_reports', {
-            keyPath: 'id',
-          });
-          s.createIndex('effective_date', 'effective_date', { unique: false });
-        }
-        if (!db.objectStoreNames.contains('observations')) {
-          const s = db.createObjectStore('observations', { keyPath: 'id' });
-          s.createIndex('report_id', 'report_id', { unique: false });
-        }
-        if (db.objectStoreNames.contains('episodes_of_care')) {
-          db.deleteObjectStore('episodes_of_care');
-        }
-        if (!db.objectStoreNames.contains('conditions')) {
-          const s = db.createObjectStore('conditions', {
-            keyPath: 'id',
-          });
-          s.createIndex('onset_date', 'onset_date', { unique: false });
-          s.createIndex('clinical_status', 'clinical_status', {
-            unique: false,
-          });
-        }
-      };
+export async function createReportViaUI(
+  page: Page,
+  options: {
+    biomarkers: {
+      name: string;
+      value: string;
+      unit?: string;
+    }[];
+    notes?: string;
+  }
+): Promise<void> {
+  await page.goto('/lab-result/add');
 
-      openReq.onsuccess = () => {
-        const db = openReq.result;
-        const tx = db.transaction(
-          ['diagnostic_reports', 'observations'],
-          'readwrite'
-        );
-        const reportStore = tx.objectStore('diagnostic_reports');
-        const obsStore = tx.objectStore('observations');
+  for (let i = 0; i < options.biomarkers.length; i++) {
+    const b = options.biomarkers[i];
+    const searchInput = page.getByTestId('test-search-input');
+    await searchInput.fill(b.name);
 
-        for (const r of reportsList) {
-          reportStore.put({
-            id: r.id,
-            effective_date: r.effectiveDate,
-            status: 'final',
-            notes: r.notes || null,
-            fhir_json: JSON.stringify({
-              resourceType: 'DiagnosticReport',
-              id: r.id,
-              status: 'final',
-              code: {
-                coding: [
-                  {
-                    system: 'http://loinc.org',
-                    code: '58410-2',
-                    display: 'Complete blood count (CBC) panel',
-                  },
-                ],
-                text: 'Complete Blood Count',
-              },
-              effectiveDateTime: r.effectiveDateTime || r.effectiveDate,
-              result: r.observations.map((obs: any, idx: number) => ({
-                reference: `Observation/obs-${r.id}-${idx}`,
-                type: 'Observation',
-                display: obs.name,
-              })),
-              note: r.notes ? [{ text: r.notes }] : undefined,
-            }),
-            created_at: '2026-10-02T10:00:00.000Z',
-            updated_at: '2026-10-02T10:00:00.000Z',
-          });
+    const option = page.locator('[data-testid^="autocomplete-item-"]').first();
+    await option.click();
 
-          for (const [idx, obs] of r.observations.entries()) {
-            const obsId = `obs-${r.id}-${idx}`;
-            const fhirObs = {
-              resourceType: 'Observation',
-              id: obsId,
-              status: 'final',
-              code: {
-                coding: [
-                  {
-                    system: 'http://loinc.org',
-                    code: obs.loinc,
-                    display: obs.name,
-                  },
-                ],
-                text: obs.name,
-              },
-              valueQuantity: {
-                value: obs.value,
-                unit: obs.unit,
-                system: 'http://unitsofmeasure.org',
-                code: obs.unit,
-              },
-              interpretation: obs.interpretationCode
-                ? [
-                    {
-                      coding: [
-                        {
-                          system:
-                            'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
-                          code: obs.interpretationCode,
-                          display:
-                            obs.interpretationCode === 'N'
-                              ? 'Normal'
-                              : obs.interpretationCode === 'L'
-                                ? 'Low'
-                                : 'High',
-                        },
-                      ],
-                    },
-                  ]
-                : undefined,
-            };
+    const valInput = page.getByTestId(`marker-value-input-${i}`);
+    await valInput.fill(b.value);
 
-            obsStore.put({
-              id: obsId,
-              report_id: r.id,
-              loinc_code: obs.loinc,
-              name: obs.name,
-              value: obs.value,
-              unit: obs.unit,
-              fhir_json: JSON.stringify(fhirObs),
-              created_at: '2026-10-02T10:00:00.000Z',
-            });
-          }
-        }
+    if (b.unit) {
+      const unitPicker = page.getByTestId(`marker-unit-select-${i}`);
+      if (await unitPicker.isVisible()) {
+        await unitPicker.selectOption(b.unit);
+      }
+    }
+  }
 
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => reject(tx.error);
-      };
-      openReq.onerror = () => reject(openReq.error);
-    });
-  }, reports);
+  if (options.notes) {
+    const plusBtn = page.getByTestId('plus-menu-button');
+    if (await plusBtn.isVisible()) {
+      await plusBtn.click();
+      const notesOption = page.getByTestId('menu-add-notes');
+      if (await notesOption.isVisible()) {
+        await notesOption.click();
+      }
+    }
+    const notesInput = page.getByTestId('notes-input');
+    await notesInput.fill(options.notes);
+  }
+
+  await page.getByTestId('save-button').click();
+  await page.waitForURL(/.*(\/|#)$/);
 }
 
 /**
- * Seeds a Condition record directly into IndexedDB.
+ * Seeds a Condition through standard UI creation flow without exposing private app internals.
  */
-export async function seedCondition(
+export async function createConditionViaUI(
   page: Page,
-  c: {
-    id: string;
+  options: {
     title: string;
-    clinicalStatus?: string;
-    verificationStatus?: string;
-    onsetDate?: string;
-    startDate?: string;
-    severity?: string;
-    bodySite?: string;
-    abatementDate?: string;
+    status?: string;
     notes?: string;
-    description?: string;
   }
 ): Promise<void> {
-  await clearAppStorage(page);
-  await page.evaluate(async (conditionItem) => {
-    await new Promise<void>((resolve, reject) => {
-      const openReq = indexedDB.open('healthy_db', 3);
-      openReq.onupgradeneeded = () => {
-        const db = openReq.result;
-        if (!db.objectStoreNames.contains('diagnostic_reports')) {
-          const s = db.createObjectStore('diagnostic_reports', {
-            keyPath: 'id',
-          });
-          s.createIndex('effective_date', 'effective_date', { unique: false });
-        }
-        if (!db.objectStoreNames.contains('observations')) {
-          const s = db.createObjectStore('observations', { keyPath: 'id' });
-          s.createIndex('report_id', 'report_id', { unique: false });
-        }
-        if (db.objectStoreNames.contains('episodes_of_care')) {
-          db.deleteObjectStore('episodes_of_care');
-        }
-        if (!db.objectStoreNames.contains('conditions')) {
-          const s = db.createObjectStore('conditions', {
-            keyPath: 'id',
-          });
-          s.createIndex('onset_date', 'onset_date', { unique: false });
-          s.createIndex('clinical_status', 'clinical_status', {
-            unique: false,
-          });
-        }
-      };
+  await page.goto('/condition/add');
 
-      openReq.onsuccess = () => {
-        const db = openReq.result;
-        const tx = db.transaction('conditions', 'readwrite');
-        const store = tx.objectStore('conditions');
+  if (options.status) {
+    const statusSelect = page.getByTestId('status-picker-select');
+    if (await statusSelect.isVisible()) {
+      await statusSelect.selectOption(options.status);
+    }
+  }
 
-        const clinicalStatus = conditionItem.clinicalStatus || 'active';
-        const verificationStatus =
-          conditionItem.verificationStatus || 'unconfirmed';
-        const onsetDate =
-          conditionItem.onsetDate || conditionItem.startDate || '2026-10-02';
-        const notes = conditionItem.notes || conditionItem.description || null;
+  await page.getByTestId('condition-title-input').fill(options.title);
 
-        const condition = {
-          resourceType: 'Condition',
-          id: conditionItem.id,
-          clinicalStatus: {
-            coding: [
-              {
-                system:
-                  'http://terminology.hl7.org/CodeSystem/condition-clinical',
-                code: clinicalStatus,
-              },
-            ],
-          },
-          verificationStatus: {
-            coding: [
-              {
-                system:
-                  'http://terminology.hl7.org/CodeSystem/condition-ver-status',
-                code: verificationStatus,
-              },
-            ],
-          },
-          code: { text: conditionItem.title },
-          subject: { display: 'Self' },
-          onsetDateTime: onsetDate,
-          severity: conditionItem.severity
-            ? {
-                coding: [
-                  {
-                    system: 'http://hl7.org/fhir/ValueSet/condition-severity',
-                    code: conditionItem.severity,
-                    display:
-                      conditionItem.severity.charAt(0).toUpperCase() +
-                      conditionItem.severity.slice(1),
-                  },
-                ],
-              }
-            : undefined,
-          bodySite: conditionItem.bodySite
-            ? [{ text: conditionItem.bodySite }]
-            : undefined,
-          abatementDateTime: conditionItem.abatementDate || undefined,
-          note: notes
-            ? [{ text: notes, time: '2026-10-02T10:00:00.000Z' }]
-            : undefined,
-        };
+  if (options.notes) {
+    const addOptionBtn = page.getByTestId('add-option-button');
+    if (await addOptionBtn.isVisible()) {
+      await addOptionBtn.click();
+      const addNotesOption = page.getByTestId('menu-add-notes');
+      if (await addNotesOption.isVisible()) {
+        await addNotesOption.click();
+      }
+    }
+    const notesInput = page.getByTestId('condition-notes-input');
+    await notesInput.fill(options.notes);
+  }
 
-        store.put({
-          id: conditionItem.id,
-          clinical_status: clinicalStatus,
-          verification_status: verificationStatus,
-          onset_date: onsetDate,
-          title: conditionItem.title,
-          severity: conditionItem.severity || null,
-          body_site: conditionItem.bodySite || null,
-          abatement_date: conditionItem.abatementDate || null,
-          description: notes,
-          fhir_json: JSON.stringify(condition),
-          created_at: '2026-10-02T10:00:00.000Z',
-          updated_at: '2026-10-02T10:00:00.000Z',
-        });
-
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => reject(tx.error);
-      };
-      openReq.onerror = () => reject(openReq.error);
-    });
-  }, c);
+  await page.getByTestId('save-button').click();
+  await page.waitForURL(/.*(\/|#)$/);
 }
