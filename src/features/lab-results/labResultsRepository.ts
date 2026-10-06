@@ -1,15 +1,10 @@
-import { Platform } from 'react-native';
 import type { DiagnosticReport, Observation } from 'fhir/r5';
 import { DiagnosticReportRecord } from '../../database/types';
-import { initializeDatabase, getNativeDb } from '../../database/db';
-import {
-  insertDiagnosticReportWeb,
-  fetchAllDiagnosticReportsWeb,
-  deleteDiagnosticReportWeb,
-} from '../../database/indexedDb';
+import { getDb } from '../../database/db';
 
 /**
- * Persists a FHIR DiagnosticReport and its Observations.
+ * Persists a FHIR DiagnosticReport and its Observations in SQLite.
+ * Single unified implementation across Web, Android, and iOS.
  */
 export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
@@ -23,136 +18,117 @@ export async function insertDiagnosticReportRecord(
       throw new Error('Observation requires an id to be persisted');
     }
   }
+  const reportId = report.id;
+  const db = await getDb();
+  const now = new Date().toISOString();
+  const effectiveDate = report.effectiveDateTime || now.split('T')[0];
+  const notesText =
+    report.note && report.note.length > 0
+      ? report.note.map((n) => n.text).join('\n')
+      : null;
 
-  await initializeDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      [
+        reportId,
+        effectiveDate,
+        report.status,
+        notesText,
+        JSON.stringify(report),
+        now,
+        now,
+      ]
+    );
 
-  if (Platform.OS === 'web') {
-    await insertDiagnosticReportWeb(report, observations);
-    return;
-  }
+    await db.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
+      reportId,
+    ]);
 
-  const nativeDb = getNativeDb();
-  if (nativeDb) {
-    const now = new Date().toISOString();
-    const effectiveDate = report.effectiveDateTime || now.split('T')[0];
-    const notesText =
-      report.note && report.note.length > 0
-        ? report.note.map((n) => n.text).join('\n')
-        : null;
+    for (const obs of observations) {
+      const loinc = obs.code.coding?.[0]?.code || '';
+      const name = obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
+      const val = obs.valueQuantity?.value ?? 0;
+      const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
+      const obsId = obs.id!;
 
-    await nativeDb.withTransactionAsync(async () => {
-      await nativeDb.runAsync(
-        `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?);`,
-        [
-          report.id,
-          effectiveDate,
-          report.status,
-          notesText,
-          JSON.stringify(report),
-          now,
-          now,
-        ]
+      await db.runAsync(
+        `INSERT OR REPLACE INTO observations (id, report_id, loinc_code, name, value, unit, fhir_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+        [obsId, reportId, loinc, name, val, unit, JSON.stringify(obs), now]
       );
-
-      await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
-        report.id,
-      ]);
-
-      for (const obs of observations) {
-        const loinc = obs.code.coding?.[0]?.code || '';
-        const name =
-          obs.code.coding?.[0]?.display || obs.code.text || 'Unknown';
-        const val = obs.valueQuantity?.value ?? 0;
-        const unit = obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
-
-        await nativeDb.runAsync(
-          `INSERT OR REPLACE INTO observations (id, report_id, loinc_code, name, value, unit, fhir_json, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [obs.id, report.id, loinc, name, val, unit, JSON.stringify(obs), now]
-        );
-      }
-    });
-  }
+    }
+  });
 }
 
 /**
- * Retrieves all stored diagnostic reports with their nested observations.
+ * Retrieves all stored diagnostic reports with their nested observations from SQLite.
+ * Single unified implementation across Web, Android, and iOS.
  */
 export async function fetchAllDiagnosticReportRecords(): Promise<
   DiagnosticReportRecord[]
 > {
-  await initializeDatabase();
+  const db = await getDb();
+  const reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
+    `SELECT id, fhir_json FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
+  );
 
-  if (Platform.OS === 'web') {
-    return await fetchAllDiagnosticReportsWeb();
-  }
-
-  const nativeDb = getNativeDb();
-  if (nativeDb) {
-    const reportRows = await nativeDb.getAllAsync(
-      `SELECT * FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
+  const records: DiagnosticReportRecord[] = [];
+  for (const r of reportRows) {
+    const parsedReport: DiagnosticReport = JSON.parse(r.fhir_json);
+    const obsRows = await db.getAllAsync<{ fhir_json: string }>(
+      `SELECT fhir_json FROM observations WHERE report_id = ? ORDER BY name ASC, id ASC;`,
+      [r.id]
+    );
+    const observations: Observation[] = obsRows.map((o) =>
+      JSON.parse(o.fhir_json)
     );
 
-    const records: DiagnosticReportRecord[] = [];
-    for (const r of reportRows) {
-      const parsedReport: DiagnosticReport = JSON.parse(r.fhir_json);
-      const obsRows = await nativeDb.getAllAsync(
-        `SELECT * FROM observations WHERE report_id = ? ORDER BY name ASC, id ASC;`,
-        [r.id]
+    if (parsedReport.result && parsedReport.result.length > 0) {
+      const idOrder = new Map(
+        parsedReport.result.map((ref, idx) => {
+          const cleanRef = ref.reference?.replace(/^Observation\//, '') || '';
+          return [cleanRef, idx];
+        })
       );
-      const observations: Observation[] = obsRows.map((o: any) =>
-        JSON.parse(o.fhir_json)
-      );
-
-      if (parsedReport.result && parsedReport.result.length > 0) {
-        const idOrder = new Map(
-          parsedReport.result.map((ref, idx) => {
-            const cleanRef = ref.reference?.replace(/^Observation\//, '') || '';
-            return [cleanRef, idx];
-          })
-        );
-        observations.sort((a, b) => {
-          const cleanA = a.id?.replace(/^Observation\//, '') || '';
-          const cleanB = b.id?.replace(/^Observation\//, '') || '';
-          const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id || '') ?? 9999;
-          const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id || '') ?? 9999;
-          if (idxA !== idxB) {
-            return idxA - idxB;
-          }
-          return (a.id || '').localeCompare(b.id || '');
-        });
-      }
-
-      records.push({ report: parsedReport, observations });
+      observations.sort((a, b) => {
+        const cleanA = a.id?.replace(/^Observation\//, '') || '';
+        const cleanB = b.id?.replace(/^Observation\//, '') || '';
+        const idxA = idOrder.get(cleanA) ?? idOrder.get(a.id || '') ?? 9999;
+        const idxB = idOrder.get(cleanB) ?? idOrder.get(b.id || '') ?? 9999;
+        if (idxA !== idxB) {
+          return idxA - idxB;
+        }
+        return (a.id || '').localeCompare(b.id || '');
+      });
+    } else {
+      observations.sort((a, b) => {
+        const nameA = a.code.coding?.[0]?.display || a.code.text || '';
+        const nameB = b.code.coding?.[0]?.display || b.code.text || '';
+        const nameCmp = nameA.localeCompare(nameB);
+        if (nameCmp !== 0) return nameCmp;
+        return (a.id || '').localeCompare(b.id || '');
+      });
     }
-    return records;
+
+    records.push({ report: parsedReport, observations });
   }
 
-  return [];
+  return records;
 }
 
 /**
- * Deletes a diagnostic report and its associated observations.
+ * Deletes a diagnostic report and its associated observations from SQLite.
+ * Single unified implementation across Web, Android, and iOS.
  */
 export async function deleteDiagnosticReportRecord(
   reportId: string
 ): Promise<void> {
   if (!reportId) return;
-  await initializeDatabase();
-
-  if (Platform.OS === 'web') {
-    await deleteDiagnosticReportWeb(reportId);
-    return;
-  }
-
-  const nativeDb = getNativeDb();
-  if (nativeDb) {
-    await nativeDb.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
-      reportId,
-    ]);
-    await nativeDb.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [
-      reportId,
-    ]);
-  }
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
+    reportId,
+  ]);
+  await db.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [reportId]);
 }

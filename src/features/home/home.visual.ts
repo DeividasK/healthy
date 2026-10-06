@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage, seedReports } from '../testing/testStorage';
+import { clearAppStorage, createReportViaUI } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -27,30 +27,14 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Populated with Single Report', async ({
     page,
   }, testInfo) => {
-    await seedReports(page, [
-      {
-        id: 'report-single',
-        effectiveDate: '2026-09-26',
-        effectiveDateTime: '2026-09-26T08:30:00.000Z',
-        notes: 'Routine morning blood test',
-        observations: [
-          {
-            name: 'Hemoglobin (Hgb)',
-            loinc: '718-7',
-            value: 14.5,
-            unit: 'g/dL',
-            interpretationCode: 'N',
-          },
-          {
-            name: 'White Blood Cells (WBC)',
-            loinc: '6690-2',
-            value: 6.8,
-            unit: '10*3/uL',
-            interpretationCode: 'N',
-          },
-        ],
-      },
-    ]);
+    await clearAppStorage(page);
+    await createReportViaUI(page, {
+      biomarkers: [
+        { name: 'Hemoglobin', value: '14.5' },
+        { name: 'White Blood Cells', value: '6.8' },
+      ],
+      notes: 'Routine morning blood test',
+    });
 
     await page.goto('/');
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
@@ -62,58 +46,22 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Multi-Report with All Status Badges', async ({
     page,
   }, testInfo) => {
-    await seedReports(page, [
-      {
-        id: 'report-1',
-        effectiveDate: '2026-09-26',
-        effectiveDateTime: '2026-09-26T09:15:00.000Z',
-        notes: 'Follow-up consultation notes',
-        observations: [
-          {
-            name: 'Hemoglobin (Hgb)',
-            loinc: '718-7',
-            value: 15.2,
-            unit: 'g/dL',
-            interpretationCode: 'N',
-          },
-          {
-            name: 'White Blood Cells (WBC)',
-            loinc: '6690-2',
-            value: 3.1,
-            unit: '10*3/uL',
-            interpretationCode: 'L',
-          },
-          {
-            name: 'Platelets (PLT)',
-            loinc: '777-3',
-            value: 480,
-            unit: '10*3/uL',
-            interpretationCode: 'H',
-          },
-        ],
-      },
-      {
-        id: 'report-2',
-        effectiveDate: '2026-08-10',
-        effectiveDateTime: '2026-08-10',
-        observations: [
-          {
-            name: 'Red Blood Cells (RBC)',
-            loinc: '789-8',
-            value: 4.7,
-            unit: '10*6/uL',
-            interpretationCode: 'N',
-          },
-          {
-            name: 'Hematocrit (Hct)',
-            loinc: '4544-3',
-            value: 41.5,
-            unit: '%',
-            interpretationCode: 'N',
-          },
-        ],
-      },
-    ]);
+    await clearAppStorage(page);
+    await createReportViaUI(page, {
+      biomarkers: [
+        { name: 'Hemoglobin', value: '15.2' },
+        { name: 'White Blood Cells', value: '3.1' },
+        { name: 'Platelets', value: '480' },
+      ],
+      notes: 'Follow-up consultation notes',
+    });
+
+    await createReportViaUI(page, {
+      biomarkers: [
+        { name: 'Red Blood Cells', value: '4.7' },
+        { name: 'Hematocrit', value: '41.5' },
+      ],
+    });
 
     await page.goto('/');
     await expect(

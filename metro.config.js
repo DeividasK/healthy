@@ -14,6 +14,9 @@ config.resolver.blockList = [
   /.*\.visual\.[jt]sx?$/,
 ];
 
+// Enable WebAssembly asset bundling for expo-sqlite web support
+config.resolver.assetExts = [...(config.resolver.assetExts || []), 'wasm'];
+
 module.exports = withNativeWind(config, {
   input: './global.css',
   inlineRem: 16,
