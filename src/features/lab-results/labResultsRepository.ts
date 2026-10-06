@@ -1,6 +1,7 @@
 import type { DiagnosticReport, Observation } from 'fhir/r5';
 import { DiagnosticReportRecord } from '../../database/types';
 import { getDb } from '../../database/db';
+import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
@@ -8,7 +9,8 @@ import { getDb } from '../../database/db';
  */
 export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
-  observations: Observation[]
+  observations: Observation[],
+  patientId: string = DEFAULT_PATIENT_ID
 ): Promise<void> {
   if (!report.id) {
     throw new Error('DiagnosticReport requires an id to be persisted');
@@ -29,10 +31,11 @@ export async function insertDiagnosticReportRecord(
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT OR REPLACE INTO diagnostic_reports (id, effective_date, status, notes, fhir_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT OR REPLACE INTO diagnostic_reports (id, patient_id, effective_date, status, notes, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         reportId,
+        patientId,
         effectiveDate,
         report.status,
         notesText,
@@ -64,15 +67,24 @@ export async function insertDiagnosticReportRecord(
 
 /**
  * Retrieves all stored diagnostic reports with their nested observations from SQLite.
- * Single unified implementation across Web, Android, and iOS.
+ * Filters by patientId if provided.
  */
-export async function fetchAllDiagnosticReportRecords(): Promise<
-  DiagnosticReportRecord[]
-> {
+export async function fetchAllDiagnosticReportRecords(
+  patientId?: string
+): Promise<DiagnosticReportRecord[]> {
   const db = await getDb();
-  const reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
-    `SELECT id, fhir_json FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
-  );
+  let reportRows: { id: string; fhir_json: string }[] = [];
+
+  if (patientId) {
+    reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
+      `SELECT id, fhir_json FROM diagnostic_reports WHERE patient_id = ? ORDER BY effective_date DESC, created_at DESC, id DESC;`,
+      [patientId]
+    );
+  } else {
+    reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
+      `SELECT id, fhir_json FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
+    );
+  }
 
   const records: DiagnosticReportRecord[] = [];
   for (const r of reportRows) {

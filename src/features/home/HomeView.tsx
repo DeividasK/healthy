@@ -34,9 +34,11 @@ import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
+import { useActivePatient } from '../profile/ActivePatientContext';
 
 export function HomeView() {
   const router = useRouter();
+  const { activePatientId } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,8 +67,8 @@ export function HomeView() {
     try {
       setIsLoading(true);
       const [reportsData, conditionsData] = await Promise.all([
-        getAllReports(),
-        getAllConditions(),
+        getAllReports(activePatientId),
+        getAllConditions(activePatientId),
       ]);
       setRecords(reportsData);
       setConditions(conditionsData);
@@ -75,7 +77,7 @@ export function HomeView() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activePatientId]);
 
   useFocusEffect(
     useCallback(() => {

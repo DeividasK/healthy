@@ -18,6 +18,7 @@ export const CONDITION_SEVERITY_SYSTEM =
 
 export interface ConditionInput {
   id?: string;
+  patientId?: string;
   title: string;
   clinicalStatus: string;
   verificationStatus: string;
@@ -36,6 +37,7 @@ export async function createOrUpdateCondition(
 ): Promise<Condition> {
   const condId = input.id || `cond-${Crypto.randomUUID()}`;
   const trimmedTitle = input.title.trim();
+  const patientId = input.patientId || 'patient-default';
 
   const condition: Condition = {
     resourceType: 'Condition',
@@ -70,6 +72,7 @@ export async function createOrUpdateCondition(
       text: trimmedTitle,
     },
     subject: {
+      reference: `Patient/${patientId}`,
       display: 'Self',
     },
     onsetDateTime: input.onsetDate,
@@ -105,15 +108,17 @@ export async function createOrUpdateCondition(
         : undefined,
   };
 
-  await insertConditionRecord(condition);
+  await insertConditionRecord(condition, patientId);
   return condition;
 }
 
 /**
- * Fetches all Conditions.
+ * Fetches all Conditions, optionally filtered by patientId.
  */
-export async function getAllConditions(): Promise<Condition[]> {
-  return await fetchAllConditionRecords();
+export async function getAllConditions(
+  patientId?: string
+): Promise<Condition[]> {
+  return await fetchAllConditionRecords(patientId);
 }
 
 /**

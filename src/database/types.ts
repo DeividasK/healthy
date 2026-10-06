@@ -1,7 +1,24 @@
-import type { DiagnosticReport, Observation, Condition } from 'fhir/r5';
+import type {
+  DiagnosticReport,
+  Observation,
+  Condition,
+  Patient,
+} from 'fhir/r5';
+
+export interface StoredPatientRow {
+  id: string;
+  given_name: string;
+  family_name: string | null;
+  gender: string | null;
+  birth_date: string | null;
+  fhir_json: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface StoredDiagnosticReportRow {
   id: string;
+  patient_id: string;
   effective_date: string;
   status: string;
   notes: string | null;
@@ -28,6 +45,7 @@ export interface DiagnosticReportRecord {
 
 export interface StoredConditionRow {
   id: string;
+  patient_id: string;
   clinical_status: string;
   verification_status: string;
   onset_date: string;
@@ -43,4 +61,8 @@ export interface StoredConditionRow {
 
 export interface ConditionRecord {
   condition: Condition;
+}
+
+export interface PatientRecord {
+  patient: Patient;
 }
