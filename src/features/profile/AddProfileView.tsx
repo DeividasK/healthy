@@ -148,7 +148,6 @@ export function AddProfileView({
         await setActivePatientId(selectedPatientIds[0]);
       }
       setShowPickerModal(false);
-      triggerSync().catch(() => {});
       router.replace('/');
     } catch (err) {
       console.error('Failed to restore selected patient(s):', err);

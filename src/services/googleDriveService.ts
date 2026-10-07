@@ -2,6 +2,7 @@ export interface GoogleDriveFile {
   id: string;
   name: string;
   modifiedTime?: string;
+  appProperties?: Record<string, string>;
 }
 
 const GDRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
@@ -55,7 +56,7 @@ export async function listAppDataFiles(
   do {
     const params = new URLSearchParams({
       spaces: 'appDataFolder',
-      fields: 'nextPageToken,files(id,name,modifiedTime)',
+      fields: 'nextPageToken,files(id,name,modifiedTime,appProperties)',
       pageSize: '1000',
     });
     if (pageToken) {
@@ -99,12 +100,14 @@ export async function listAppDataFiles(
 export async function uploadAppDataFile(
   accessToken: string,
   name: string,
-  fileBytes: Uint8Array
+  fileBytes: Uint8Array,
+  appProperties?: Record<string, string>
 ): Promise<GoogleDriveFile> {
   const boundary = `healthy_boundary_${Date.now()}`;
-  const metadata = {
+  const metadata: Record<string, unknown> = {
     name,
     parents: ['appDataFolder'],
+    ...(appProperties ? { appProperties } : {}),
   };
   const bodyBytes = buildMultipartBody(metadata, fileBytes, boundary);
 
@@ -137,8 +140,39 @@ export async function uploadAppDataFile(
 export async function updateAppDataFile(
   accessToken: string,
   fileId: string,
-  fileBytes: Uint8Array
+  fileBytes: Uint8Array,
+  appProperties?: Record<string, string>
 ): Promise<void> {
+  if (appProperties) {
+    const boundary = `healthy_boundary_${Date.now()}`;
+    const metadata = { appProperties };
+    const bodyBytes = buildMultipartBody(metadata, fileBytes, boundary);
+
+    const res = await fetch(
+      `${GDRIVE_UPLOAD_URL}/${fileId}?uploadType=multipart`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+          Accept: 'application/json',
+        },
+        body: bodyBytes as unknown as BodyInit,
+      }
+    );
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new GoogleAuthExpiredError();
+      }
+      const errorText = await res.text();
+      throw new Error(
+        `Failed to update file in Google Drive (HTTP ${res.status}): ${errorText}`
+      );
+    }
+    return;
+  }
+
   const res = await fetch(`${GDRIVE_UPLOAD_URL}/${fileId}?uploadType=media`, {
     method: 'PATCH',
     headers: {

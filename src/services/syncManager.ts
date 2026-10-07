@@ -16,6 +16,7 @@ import {
   updateAppDataFile,
   downloadAppDataFile,
   deleteAppDataFile,
+  type GoogleDriveFile,
 } from './googleDriveService';
 import {
   fetchAllStoredPatients,
@@ -31,6 +32,7 @@ import {
   insertConditionRecord,
 } from '../features/conditions/conditionsRepository';
 import { notifyDatabaseChanged } from '../database/dbEvents';
+import { isExistingNewerOrEqual } from '../utils/dateUtils';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
 
@@ -122,8 +124,8 @@ export async function backupToGoogleDrive(
 ): Promise<{ patients: number; reports: number; conditions: number }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
-  const remoteFileMap = new Map<string, { id: string; modifiedTime?: string }>(
-    remoteFiles.map((f) => [f.name, { id: f.id, modifiedTime: f.modifiedTime }])
+  const remoteFileMap = new Map<string, GoogleDriveFile>(
+    remoteFiles.map((f) => [f.name, f])
   );
 
   const [allStoredPatients, allReportsWithObs, allConditions] =
@@ -159,17 +161,33 @@ export async function backupToGoogleDrive(
     const fileName = `patient_${pat.id || 'default'}.json.enc`;
     const encBytes = await encryptText(JSON.stringify(pat), key);
     const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = pat.meta?.lastUpdated;
+    const appProperties = localLastUpdated
+      ? { lastUpdated: localLastUpdated }
+      : undefined;
+
     if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
       if (
-        existing.modifiedTime &&
-        pat.meta?.lastUpdated &&
-        existing.modifiedTime >= pat.meta.lastUpdated
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
       ) {
         continue;
       }
-      await updateAppDataFile(config.accessToken, existing.id, encBytes);
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
     } else {
-      await uploadAppDataFile(config.accessToken, fileName, encBytes);
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
     }
   }
 
@@ -182,17 +200,33 @@ export async function backupToGoogleDrive(
     };
     const encBytes = await encryptText(JSON.stringify(bundle), key);
     const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = report.meta?.lastUpdated;
+    const appProperties = localLastUpdated
+      ? { lastUpdated: localLastUpdated }
+      : undefined;
+
     if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
       if (
-        existing.modifiedTime &&
-        report.meta?.lastUpdated &&
-        existing.modifiedTime >= report.meta.lastUpdated
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
       ) {
         continue;
       }
-      await updateAppDataFile(config.accessToken, existing.id, encBytes);
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
     } else {
-      await uploadAppDataFile(config.accessToken, fileName, encBytes);
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
     }
   }
 
@@ -201,17 +235,33 @@ export async function backupToGoogleDrive(
     const fileName = `condition_${cond.id}.json.enc`;
     const encBytes = await encryptText(JSON.stringify(cond), key);
     const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = cond.meta?.lastUpdated;
+    const appProperties = localLastUpdated
+      ? { lastUpdated: localLastUpdated }
+      : undefined;
+
     if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
       if (
-        existing.modifiedTime &&
-        cond.meta?.lastUpdated &&
-        existing.modifiedTime >= cond.meta.lastUpdated
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
       ) {
         continue;
       }
-      await updateAppDataFile(config.accessToken, existing.id, encBytes);
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
     } else {
-      await uploadAppDataFile(config.accessToken, fileName, encBytes);
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
     }
   }
 
@@ -293,7 +343,10 @@ export async function restoreFromGoogleDrive(
         if (!pat.meta?.lastUpdated) {
           pat.meta = {
             ...pat.meta,
-            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
           };
         }
         if (
@@ -308,7 +361,10 @@ export async function restoreFromGoogleDrive(
         if (!report.meta?.lastUpdated) {
           report.meta = {
             ...report.meta,
-            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
           };
         }
         const observations = (report.contained || []) as Observation[];
@@ -329,7 +385,10 @@ export async function restoreFromGoogleDrive(
         if (!cond.meta?.lastUpdated) {
           cond.meta = {
             ...cond.meta,
-            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
           };
         }
         const patientId =

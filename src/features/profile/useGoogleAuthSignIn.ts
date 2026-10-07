@@ -87,13 +87,21 @@ export function useGoogleAuthSignIn(
                 headers: { Authorization: `Bearer ${accessToken}` },
               }
             );
+            if (!res.ok) {
+              throw new Error(`Failed to fetch user info: HTTP ${res.status}`);
+            }
             const userInfo = await res.json();
+            if (!userInfo.sub) {
+              throw new Error(
+                'Google user info response did not contain a user ID (sub).'
+              );
+            }
             if (!isMounted) return;
             await onSuccessRef.current({
               accessToken,
               refreshToken,
               tokenExpiresAt,
-              userSub: userInfo.sub || 'user-default-sub',
+              userSub: userInfo.sub,
               userEmail: userInfo.email,
               userName: userInfo.name,
             });

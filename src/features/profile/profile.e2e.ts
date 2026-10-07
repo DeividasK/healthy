@@ -537,7 +537,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       // Verify user can switch to other options (e.g., Create profile or Restore from file)
       const createOption = page.getByTestId('option-create-profile');
       await createOption.click();
-      await expect(page.getByTestId('given-name-input')).toBeVisible();
+      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
     }
   });
 

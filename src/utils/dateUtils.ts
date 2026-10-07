@@ -42,3 +42,20 @@ export function formatDisplayDate(dateStr: string): string {
     return dateStr;
   }
 }
+
+/**
+ * Compares two ISO timestamp strings numerically using millisecond timestamps.
+ * Returns true if existingTimestamp is newer than or equal to incomingTimestamp.
+ */
+export function isExistingNewerOrEqual(
+  existingTimestamp?: string | null,
+  incomingTimestamp?: string | null
+): boolean {
+  if (!existingTimestamp || !incomingTimestamp) return false;
+  const existingTime = new Date(existingTimestamp).getTime();
+  const incomingTime = new Date(incomingTimestamp).getTime();
+  if (isNaN(existingTime) || isNaN(incomingTime)) {
+    return existingTimestamp >= incomingTimestamp;
+  }
+  return existingTime >= incomingTime;
+}

@@ -1,25 +1,13 @@
 import type { Patient } from 'fhir/r5';
 import { getDb } from '../../database/db';
 import { notifyDatabaseChanged } from '../../database/dbEvents';
+import { isExistingNewerOrEqual } from '../../utils/dateUtils';
 
 export const DEFAULT_PATIENT_ID = 'patient-default';
 
 export interface StoredPatient {
   patient: Patient;
   syncAccount?: string | null;
-}
-
-function isExistingNewerOrEqual(
-  existingTimestamp?: string | null,
-  incomingTimestamp?: string | null
-): boolean {
-  if (!existingTimestamp || !incomingTimestamp) return false;
-  const existingTime = new Date(existingTimestamp).getTime();
-  const incomingTime = new Date(incomingTimestamp).getTime();
-  if (isNaN(existingTime) || isNaN(incomingTime)) {
-    return existingTimestamp >= incomingTimestamp;
-  }
-  return existingTime >= incomingTime;
 }
 
 /**
@@ -225,10 +213,10 @@ export async function updatePatientSyncAccount(
   syncAccount: string | null
 ): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE patients SET sync_account = ?, updated_at = ? WHERE id = ?;`,
-    [syncAccount, new Date().toISOString(), id]
-  );
+  await db.runAsync(`UPDATE patients SET sync_account = ? WHERE id = ?;`, [
+    syncAccount,
+    id,
+  ]);
   notifyDatabaseChanged(['patients']);
 }
 

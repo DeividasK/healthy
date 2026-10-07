@@ -3,19 +3,7 @@ import { getDb } from '../../database/db';
 import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
 import { notifyDatabaseChanged } from '../../database/dbEvents';
-
-function isExistingNewerOrEqual(
-  existingTimestamp?: string | null,
-  incomingTimestamp?: string | null
-): boolean {
-  if (!existingTimestamp || !incomingTimestamp) return false;
-  const existingTime = new Date(existingTimestamp).getTime();
-  const incomingTime = new Date(incomingTimestamp).getTime();
-  if (isNaN(existingTime) || isNaN(incomingTime)) {
-    return existingTimestamp >= incomingTimestamp;
-  }
-  return existingTime >= incomingTime;
-}
+import { isExistingNewerOrEqual } from '../../utils/dateUtils';
 
 /**
  * Persists a Condition record using SQLite.

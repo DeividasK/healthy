@@ -54,6 +54,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightSyncRef = useRef<Promise<void> | null>(null);
   const lastFocusSyncRef = useRef<number>(0);
+  const configRef = useRef<GoogleDriveConfig | null>(config);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   const refreshConfig = useCallback(async () => {
     try {
@@ -216,15 +221,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [config, refreshConfig]);
 
   // 15s poll for changes to cloud data when a profile is connected to Google Drive
+  const userSub = config?.userSub;
   useEffect(() => {
-    if (!config || isAuthExpired) return;
+    if (!userSub || isAuthExpired) return;
 
     const interval = setInterval(async () => {
       try {
         if (inFlightSyncRef.current) return;
+        const currentConfig = configRef.current;
+        if (!currentConfig) return;
         const stored = await fetchAllStoredPatients();
         const hasConnectedProfile = stored.some(
-          (sp) => sp.syncAccount && sp.syncAccount === config.userSub
+          (sp) => sp.syncAccount && sp.syncAccount === currentConfig.userSub
         );
         if (hasConnectedProfile) {
           await syncNow();
@@ -237,11 +245,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => {
       clearInterval(interval);
     };
-  }, [config, isAuthExpired, syncNow]);
+  }, [userSub, isAuthExpired, syncNow]);
 
   // Sync when webpage gets focus or application wakes up (browser tab switch, window focus, app resume)
   useEffect(() => {
-    if (!config || isAuthExpired) return;
+    if (!userSub || isAuthExpired) return;
 
     const handleWakeup = async () => {
       const now = Date.now();
@@ -249,9 +257,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (inFlightSyncRef.current) return;
 
       try {
+        const currentConfig = configRef.current;
+        if (!currentConfig) return;
         const stored = await fetchAllStoredPatients();
         const hasConnectedProfile = stored.some(
-          (sp) => sp.syncAccount && sp.syncAccount === config.userSub
+          (sp) => sp.syncAccount && sp.syncAccount === currentConfig.userSub
         );
         if (hasConnectedProfile) {
           lastFocusSyncRef.current = now;
@@ -296,7 +306,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       appStateSub.remove();
     };
-  }, [config, isAuthExpired, syncNow]);
+  }, [userSub, isAuthExpired, syncNow]);
 
   const connectWithGoogle = useCallback(
     async (authData: {
