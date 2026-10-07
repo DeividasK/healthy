@@ -27,6 +27,7 @@ import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { AddOptionsModal } from '../../components/AddOptionsModal';
 import { formatLocalDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
+import { useSync } from '../../context/SyncContext';
 
 export interface ConditionStatusOption {
   id: string;
@@ -136,6 +137,7 @@ export function ConditionForm({
   onSave,
 }: ConditionFormProps) {
   const router = useRouter();
+  const { triggerSync } = useSync();
 
   const [title, setTitle] = useState(initialValues?.title || '');
 
@@ -245,6 +247,11 @@ export function ConditionForm({
         abatementDate: formattedAbatementDate,
         notes: showNotes && notes.trim() ? notes.trim() : undefined,
       });
+
+      // Trigger automatic background sync
+      triggerSync().catch((err) =>
+        console.warn('Background sync failed on condition change:', err)
+      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();

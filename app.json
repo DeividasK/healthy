@@ -11,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.deividas.healthy",
       "adaptiveIcon": {
         "backgroundColor": "#7BA386",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -35,9 +35,11 @@ import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import { useActivePatient } from '../profile/ActivePatientContext';
+import { useSync } from '../../context/SyncContext';
 
 export function HomeView() {
   const router = useRouter();
+  const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
@@ -174,6 +176,9 @@ export function HomeView() {
       }
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
+      triggerSync().catch((err) =>
+        console.warn('Background sync failed on delete:', err)
+      );
     } catch (err) {
       console.error('Failed to delete item:', err);
     }

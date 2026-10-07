@@ -19,6 +19,7 @@ import { AddOptionsModal } from '../../components/AddOptionsModal';
 import { formatLocalDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
 import { PatientInput } from './patientService';
+import { useSync } from '../../context/SyncContext';
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
@@ -50,6 +51,7 @@ export function ProfileForm({
   onSave,
 }: ProfileFormProps) {
   const router = useRouter();
+  const { triggerSync } = useSync();
   const [givenName, setGivenName] = useState(initialValues?.givenName || '');
   const [familyName, setFamilyName] = useState(initialValues?.familyName || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | 'unknown'>(
@@ -108,6 +110,10 @@ export function ProfileForm({
         gender,
         birthDate: formattedBirthDate,
       });
+
+      triggerSync().catch((err) =>
+        console.warn('Background sync failed on profile save:', err)
+      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();

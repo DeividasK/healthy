@@ -11,6 +11,8 @@ import { COLORS } from '../src/theme/colors';
 import { NAV_THEME } from '../src/theme';
 import { ActivePatientProvider } from '../src/features/profile/ActivePatientContext';
 import { ProfileHeaderButton } from '../src/features/profile/ProfileHeaderButton';
+import { SyncProvider } from '../src/context/SyncContext';
+import { SyncHeaderIndicator } from '../src/components/SyncHeaderIndicator';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -45,9 +47,11 @@ export default function RootLayout() {
   }
 
   return (
-    <ActivePatientProvider>
-      <RootLayoutNav />
-    </ActivePatientProvider>
+    <SyncProvider>
+      <ActivePatientProvider>
+        <RootLayoutNav />
+      </ActivePatientProvider>
+    </SyncProvider>
   );
 }
 
@@ -64,7 +68,12 @@ function RootLayoutNav() {
                 <AppLogo size={30} color={COLORS.light.primaryLogo} />
               </View>
             ),
-            headerRight: () => <ProfileHeaderButton />,
+            headerRight: () => (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <SyncHeaderIndicator />
+                <ProfileHeaderButton />
+              </View>
+            ),
           }}
         />
         <Stack.Screen

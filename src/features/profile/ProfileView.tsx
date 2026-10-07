@@ -14,6 +14,7 @@ import { useActivePatient } from './ActivePatientContext';
 import { getPatientDisplayName, getPatientInitials } from './patientService';
 import { formatDisplayDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
+import { GoogleSyncCard } from './GoogleSyncCard';
 
 export function ProfileView() {
   const router = useRouter();
@@ -164,6 +165,9 @@ export function ProfileView() {
               </TouchableOpacity>
             );
           })}
+
+          {/* Cloud Sync & Backup Section */}
+          <GoogleSyncCard />
         </ScrollView>
       </View>
     </SafeAreaView>

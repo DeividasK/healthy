@@ -33,4 +33,32 @@ test.describe('Profile Views - Visual Regression', () => {
 
     await takeSnapshot(page, 'Profile View - Create Form', testInfo);
   });
+
+  test('Profile View - Connected Google Sync State', async ({
+    page,
+  }, testInfo) => {
+    await clearAppStorage(page);
+    await page.evaluate(() => {
+      localStorage.setItem(
+        '@healthy_device_google_sync_config',
+        JSON.stringify({
+          accessToken: 'mock-token',
+          userEmail: 'alice@gmail.com',
+          userName: 'Alice Health',
+          userSub: 'sub-123',
+          lastSyncTimestamp: '2026-10-02T10:00:00Z',
+        })
+      );
+    });
+
+    await page.goto('/profile');
+    await expect(page.getByTestId('google-sync-card')).toBeVisible();
+    await expect(page.getByTestId('connected-user-email')).toBeVisible();
+
+    await takeSnapshot(
+      page,
+      'Profile View - Connected Google Sync State',
+      testInfo
+    );
+  });
 });
