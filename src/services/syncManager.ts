@@ -300,7 +300,7 @@ export async function restoreFromGoogleDrive(
           !allowedPatientIdSet ||
           (pat.id && allowedPatientIdSet.has(pat.id))
         ) {
-          await insertPatientRecord(pat, config.userSub);
+          await insertPatientRecord(pat, config.userSub, true);
           restoredPatients++;
         }
       } else if (resource.resourceType === 'DiagnosticReport') {
@@ -316,7 +316,12 @@ export async function restoreFromGoogleDrive(
           report.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
-          await insertDiagnosticReportRecord(report, observations, patientId);
+          await insertDiagnosticReportRecord(
+            report,
+            observations,
+            patientId,
+            true
+          );
           restoredReports++;
         }
       } else if (resource.resourceType === 'Condition') {
@@ -331,7 +336,7 @@ export async function restoreFromGoogleDrive(
           cond.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
-          await insertConditionRecord(cond, patientId);
+          await insertConditionRecord(cond, patientId, true);
           restoredConditions++;
         }
       }

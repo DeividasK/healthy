@@ -4,13 +4,27 @@ import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
 import { notifyDatabaseChanged } from '../../database/dbEvents';
 
+function isExistingNewerOrEqual(
+  existingTimestamp?: string | null,
+  incomingTimestamp?: string | null
+): boolean {
+  if (!existingTimestamp || !incomingTimestamp) return false;
+  const existingTime = new Date(existingTimestamp).getTime();
+  const incomingTime = new Date(incomingTimestamp).getTime();
+  if (isNaN(existingTime) || isNaN(incomingTime)) {
+    return existingTimestamp >= incomingTimestamp;
+  }
+  return existingTime >= incomingTime;
+}
+
 /**
  * Persists a Condition record using SQLite.
  * Single unified implementation across Web, Android, and iOS.
  */
 export async function insertConditionRecord(
   condition: Condition,
-  patientId: string = DEFAULT_PATIENT_ID
+  patientId: string = DEFAULT_PATIENT_ID,
+  isRemoteSync: boolean = false
 ): Promise<void> {
   if (!condition.id) {
     throw new Error('Condition requires an id to be persisted');
@@ -50,11 +64,13 @@ export async function insertConditionRecord(
       );
     }
 
-    // Last-write-wins: if existing record is newer than or same as incoming change, keep existing
-    if (existing?.updated_at && incomingTimestamp) {
-      if (existing.updated_at >= incomingTimestamp) {
-        return;
-      }
+    // Last-write-wins: during remote sync, if existing record is newer than or same as incoming change, keep existing
+    if (
+      isRemoteSync &&
+      existing?.updated_at &&
+      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
+    ) {
+      return;
     }
 
     await db.runAsync(

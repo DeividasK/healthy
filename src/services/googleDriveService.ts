@@ -49,27 +49,48 @@ export class GoogleAuthExpiredError extends Error {
 export async function listAppDataFiles(
   accessToken: string
 ): Promise<GoogleDriveFile[]> {
-  const url = `${GDRIVE_FILES_URL}?spaces=appDataFolder&fields=files(id,name,modifiedTime)&pageSize=1000`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-    },
-  });
+  const allFiles: GoogleDriveFile[] = [];
+  let pageToken: string | undefined = undefined;
 
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new GoogleAuthExpiredError();
+  do {
+    const params = new URLSearchParams({
+      spaces: 'appDataFolder',
+      fields: 'nextPageToken,files(id,name,modifiedTime)',
+      pageSize: '1000',
+    });
+    if (pageToken) {
+      params.set('pageToken', pageToken);
     }
-    const errorText = await res.text();
-    throw new Error(
-      `Failed to list Google Drive AppData files (HTTP ${res.status}): ${errorText}`
-    );
-  }
+    const url = `${GDRIVE_FILES_URL}?${params.toString()}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
 
-  const data = await res.json();
-  return (data.files || []) as GoogleDriveFile[];
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new GoogleAuthExpiredError();
+      }
+      const errorText = await res.text();
+      throw new Error(
+        `Failed to list Google Drive AppData files (HTTP ${res.status}): ${errorText}`
+      );
+    }
+
+    const data = (await res.json()) as {
+      files?: GoogleDriveFile[];
+      nextPageToken?: string;
+    };
+    if (data.files && Array.isArray(data.files)) {
+      allFiles.push(...data.files);
+    }
+    pageToken = data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return allFiles;
 }
 
 /**

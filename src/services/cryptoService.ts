@@ -10,7 +10,12 @@ export const GDRIVE_SYNC_SALT = 'HEALTHY_GOOGLE_DRIVE_APP_DATA_SALT_V1';
 
 /**
  * Derives a deterministic 256-bit AESEncryptionKey from a Google account's Subject ID (`sub`)
- * and the app salt. This allows 1-click zero-friction sync across all devices signed into the same Google account.
+ * and the app salt.
+ *
+ * This provides client-side encryption-at-rest for records stored in the hidden Google Drive
+ * AppData folder, scoped to the authenticated user's account without requiring a separate
+ * password prompt. All payload files are encrypted locally before upload and decrypted locally
+ * after download.
  */
 export async function deriveKeyFromGoogleUser(
   googleSub: string

@@ -134,9 +134,17 @@ export function GoogleSyncCard() {
                 headers: { Authorization: `Bearer ${accessToken}` },
               }
             );
+            if (!res.ok) {
+              throw new Error(`Failed to fetch user info: HTTP ${res.status}`);
+            }
             const userInfo = await res.json();
+            if (!userInfo.sub) {
+              throw new Error(
+                'Google user info response did not contain a user ID (sub).'
+              );
+            }
             if (!isMounted) return;
-            const userSub = userInfo.sub || 'user-default-sub';
+            const userSub = userInfo.sub;
 
             const currActive = await getActivePatient();
             if (currActive?.id) {

@@ -9,12 +9,26 @@ export interface StoredPatient {
   syncAccount?: string | null;
 }
 
+function isExistingNewerOrEqual(
+  existingTimestamp?: string | null,
+  incomingTimestamp?: string | null
+): boolean {
+  if (!existingTimestamp || !incomingTimestamp) return false;
+  const existingTime = new Date(existingTimestamp).getTime();
+  const incomingTime = new Date(incomingTimestamp).getTime();
+  if (isNaN(existingTime) || isNaN(incomingTime)) {
+    return existingTimestamp >= incomingTimestamp;
+  }
+  return existingTime >= incomingTime;
+}
+
 /**
  * Persists a Patient record using SQLite.
  */
 export async function insertPatientRecord(
   patient: Patient,
-  syncAccount?: string | null
+  syncAccount?: string | null,
+  isRemoteSync: boolean = false
 ): Promise<void> {
   if (!patient.id) {
     throw new Error('Patient requires an id to be persisted');
@@ -41,10 +55,12 @@ export async function insertPatientRecord(
     `SELECT updated_at FROM patients WHERE id = ?;`,
     [patientId]
   );
-  if (existing?.updated_at && incomingTimestamp) {
-    if (existing.updated_at >= incomingTimestamp) {
-      return;
-    }
+  if (
+    isRemoteSync &&
+    existing?.updated_at &&
+    isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
+  ) {
+    return;
   }
 
   await db.runAsync(

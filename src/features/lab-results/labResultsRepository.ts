@@ -4,6 +4,19 @@ import { getDb } from '../../database/db';
 import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
 import { notifyDatabaseChanged } from '../../database/dbEvents';
 
+function isExistingNewerOrEqual(
+  existingTimestamp?: string | null,
+  incomingTimestamp?: string | null
+): boolean {
+  if (!existingTimestamp || !incomingTimestamp) return false;
+  const existingTime = new Date(existingTimestamp).getTime();
+  const incomingTime = new Date(incomingTimestamp).getTime();
+  if (isNaN(existingTime) || isNaN(incomingTime)) {
+    return existingTimestamp >= incomingTimestamp;
+  }
+  return existingTime >= incomingTime;
+}
+
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
  * Single unified implementation across Web, Android, and iOS.
@@ -11,7 +24,8 @@ import { notifyDatabaseChanged } from '../../database/dbEvents';
 export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
   observations: Observation[],
-  patientId: string = DEFAULT_PATIENT_ID
+  patientId: string = DEFAULT_PATIENT_ID,
+  isRemoteSync: boolean = false
 ): Promise<void> {
   if (!report.id) {
     throw new Error('DiagnosticReport requires an id to be persisted');
@@ -53,10 +67,12 @@ export async function insertDiagnosticReportRecord(
       );
     }
 
-    if (existing?.updated_at && incomingTimestamp) {
-      if (existing.updated_at >= incomingTimestamp) {
-        return;
-      }
+    if (
+      isRemoteSync &&
+      existing?.updated_at &&
+      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
+    ) {
+      return;
     }
 
     await db.runAsync(

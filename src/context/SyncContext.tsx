@@ -52,7 +52,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isAuthExpired, setIsAuthExpired] = useState<boolean>(false);
 
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isSyncingRef = useRef<boolean>(false);
+  const inFlightSyncRef = useRef<Promise<void> | null>(null);
   const lastFocusSyncRef = useRef<number>(0);
 
   const refreshConfig = useCallback(async () => {
@@ -94,9 +94,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const syncNow = useCallback(async () => {
-    if (!config || isSyncingRef.current) return;
-    isSyncingRef.current = true;
+  const syncNow = useCallback(async (): Promise<void> => {
+    if (!config) return;
+    if (inFlightSyncRef.current) {
+      return inFlightSyncRef.current;
+    }
 
     if (resetTimerRef.current) {
       clearTimeout(resetTimerRef.current);
@@ -107,105 +109,110 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setSyncError(null);
     setIsAuthExpired(false);
 
-    try {
-      let activeConfig = config;
-
-      // 1. If refresh token is available and token has expired or is nearing expiry, refresh preemptively
-      const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-      if (
-        activeConfig.refreshToken &&
-        activeConfig.tokenExpiresAt &&
-        Date.now() >= activeConfig.tokenExpiresAt - 60000 &&
-        clientId
-      ) {
-        try {
-          const refreshRes = await refreshGoogleAccessToken(
-            activeConfig.refreshToken,
-            clientId
-          );
-          activeConfig = {
-            ...activeConfig,
-            accessToken: refreshRes.accessToken,
-            tokenExpiresAt: refreshRes.expiresIn
-              ? Date.now() + refreshRes.expiresIn * 1000
-              : undefined,
-          };
-          await saveGoogleDriveConfig(activeConfig);
-          setConfig(activeConfig);
-        } catch (refreshErr) {
-          console.warn('Preemptive token refresh failed:', refreshErr);
-        }
-      }
-
+    const performSync = async () => {
       try {
-        await syncWithGoogleDrive(activeConfig);
-      } catch (firstErr: unknown) {
+        let activeConfig = config;
+
+        // 1. If refresh token is available and token has expired or is nearing expiry, refresh preemptively
+        const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+        if (
+          activeConfig.refreshToken &&
+          activeConfig.tokenExpiresAt &&
+          Date.now() >= activeConfig.tokenExpiresAt - 60000 &&
+          clientId
+        ) {
+          try {
+            const refreshRes = await refreshGoogleAccessToken(
+              activeConfig.refreshToken,
+              clientId
+            );
+            activeConfig = {
+              ...activeConfig,
+              accessToken: refreshRes.accessToken,
+              tokenExpiresAt: refreshRes.expiresIn
+                ? Date.now() + refreshRes.expiresIn * 1000
+                : undefined,
+            };
+            await saveGoogleDriveConfig(activeConfig);
+            setConfig(activeConfig);
+          } catch (refreshErr) {
+            console.warn('Preemptive token refresh failed:', refreshErr);
+          }
+        }
+
+        try {
+          await syncWithGoogleDrive(activeConfig);
+        } catch (firstErr: unknown) {
+          const isAuthError =
+            (firstErr instanceof Error &&
+              (firstErr.name === 'GoogleAuthExpiredError' ||
+                firstErr.message.includes('HTTP 401') ||
+                firstErr.message.includes('Invalid Credentials') ||
+                firstErr.message.includes('UNAUTHENTICATED'))) ||
+            false;
+
+          // If auth error and we have a refreshToken, attempt one refresh & retry
+          if (isAuthError && activeConfig.refreshToken && clientId) {
+            const refreshRes = await refreshGoogleAccessToken(
+              activeConfig.refreshToken,
+              clientId
+            );
+            activeConfig = {
+              ...activeConfig,
+              accessToken: refreshRes.accessToken,
+              tokenExpiresAt: refreshRes.expiresIn
+                ? Date.now() + refreshRes.expiresIn * 1000
+                : undefined,
+            };
+            await saveGoogleDriveConfig(activeConfig);
+            setConfig(activeConfig);
+            // Retry sync with new token
+            await syncWithGoogleDrive(activeConfig);
+          } else {
+            throw firstErr;
+          }
+        }
+
+        const now = new Date();
+        setLastSyncedAt(now);
+        setIsUpToDate(true);
+        setSyncState('just_synced');
+        setIsAuthExpired(false);
+
+        // Revert from 'just_synced' checkmark to 'idle' after 1 second
+        resetTimerRef.current = setTimeout(() => {
+          setSyncState('idle');
+        }, 1000);
+
+        // Refresh config to pick up new timestamp
+        await refreshConfig();
+      } catch (err: unknown) {
         const isAuthError =
-          (firstErr instanceof Error &&
-            (firstErr.name === 'GoogleAuthExpiredError' ||
-              firstErr.message.includes('HTTP 401') ||
-              firstErr.message.includes('Invalid Credentials') ||
-              firstErr.message.includes('UNAUTHENTICATED'))) ||
+          (err instanceof Error &&
+            (err.name === 'GoogleAuthExpiredError' ||
+              err.message.includes('HTTP 401') ||
+              err.message.includes('Invalid Credentials') ||
+              err.message.includes('UNAUTHENTICATED'))) ||
           false;
 
-        // If auth error and we have a refreshToken, attempt one refresh & retry
-        if (isAuthError && activeConfig.refreshToken && clientId) {
-          const refreshRes = await refreshGoogleAccessToken(
-            activeConfig.refreshToken,
-            clientId
-          );
-          activeConfig = {
-            ...activeConfig,
-            accessToken: refreshRes.accessToken,
-            tokenExpiresAt: refreshRes.expiresIn
-              ? Date.now() + refreshRes.expiresIn * 1000
-              : undefined,
-          };
-          await saveGoogleDriveConfig(activeConfig);
-          setConfig(activeConfig);
-          // Retry sync with new token
-          await syncWithGoogleDrive(activeConfig);
-        } else {
-          throw firstErr;
-        }
+        const message = isAuthError
+          ? 'Your Google Drive session has expired. Please reconnect to resume cloud backup.'
+          : err instanceof Error
+            ? err.message
+            : 'Failed to sync with Google Drive.';
+
+        console.error('Sync failed:', err);
+        setSyncError(message);
+        setIsAuthExpired(isAuthError);
+        setIsUpToDate(false);
+        setSyncState('error');
+      } finally {
+        inFlightSyncRef.current = null;
       }
+    };
 
-      const now = new Date();
-      setLastSyncedAt(now);
-      setIsUpToDate(true);
-      setSyncState('just_synced');
-      setIsAuthExpired(false);
-
-      // Revert from 'just_synced' checkmark to 'idle' after 1 second
-      resetTimerRef.current = setTimeout(() => {
-        setSyncState('idle');
-      }, 1000);
-
-      // Refresh config to pick up new timestamp
-      await refreshConfig();
-    } catch (err: unknown) {
-      const isAuthError =
-        (err instanceof Error &&
-          (err.name === 'GoogleAuthExpiredError' ||
-            err.message.includes('HTTP 401') ||
-            err.message.includes('Invalid Credentials') ||
-            err.message.includes('UNAUTHENTICATED'))) ||
-        false;
-
-      const message = isAuthError
-        ? 'Your Google Drive session has expired. Please reconnect to resume cloud backup.'
-        : err instanceof Error
-          ? err.message
-          : 'Failed to sync with Google Drive.';
-
-      console.error('Sync failed:', err);
-      setSyncError(message);
-      setIsAuthExpired(isAuthError);
-      setIsUpToDate(false);
-      setSyncState('error');
-    } finally {
-      isSyncingRef.current = false;
-    }
+    inFlightSyncRef.current = performSync();
+    return inFlightSyncRef.current;
   }, [config, refreshConfig]);
 
   // 15s poll for changes to cloud data when a profile is connected to Google Drive
@@ -214,7 +221,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(async () => {
       try {
-        if (isSyncingRef.current) return;
+        if (inFlightSyncRef.current) return;
         const stored = await fetchAllStoredPatients();
         const hasConnectedProfile = stored.some(
           (sp) => sp.syncAccount && sp.syncAccount === config.userSub
@@ -239,7 +246,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const handleWakeup = async () => {
       const now = Date.now();
       if (now - lastFocusSyncRef.current < 2000) return; // 2s debounce
-      if (isSyncingRef.current) return;
+      if (inFlightSyncRef.current) return;
 
       try {
         const stored = await fetchAllStoredPatients();

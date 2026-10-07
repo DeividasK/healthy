@@ -1,6 +1,7 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import type {
   Patient,
   DiagnosticReport,
@@ -94,6 +95,13 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     const file = new File(Paths.cache, fileName);
     file.create({ overwrite: true });
     file.write(zippedBytes);
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'application/zip',
+        dialogTitle: 'Export Health Records',
+        UTI: 'public.zip-archive',
+      });
+    }
   }
 
   return {
