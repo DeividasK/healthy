@@ -29,6 +29,16 @@ export async function insertConditionRecord(
   const abatementDate = condition.abatementDateTime || null;
   const condId = condition.id;
 
+  const existing = await db.getFirstAsync<{ patient_id: string }>(
+    `SELECT patient_id FROM conditions WHERE id = ?;`,
+    [condId]
+  );
+  if (existing?.patient_id && existing.patient_id !== patientId) {
+    throw new Error(
+      `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
+    );
+  }
+
   await db.runAsync(
     `INSERT INTO conditions (id, patient_id, clinical_status, verification_status, onset_date, title, severity, body_site, abatement_date, description, fhir_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -39,7 +39,16 @@ export function ProfileView() {
             testID="back-button"
             accessibilityLabel="Back"
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                (document.activeElement as HTMLElement)?.blur?.();
+              }
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
           >
             <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
           </TouchableOpacity>

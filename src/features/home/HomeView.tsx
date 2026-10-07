@@ -63,30 +63,58 @@ export function HomeView() {
     requireCountdown: true,
   });
 
+  const [loadedPatientId, setLoadedPatientId] = useState(activePatientId);
   const activePatientIdRef = useRef(activePatientId);
+  const loadGenerationRef = useRef(0);
+
+  // If activePatientId changed, immediately reset displayed records and loading state
+  // during render (recommended React pattern instead of setState inside useEffect)
+  if (loadedPatientId !== activePatientId) {
+    setLoadedPatientId(activePatientId);
+    setRecords([]);
+    setConditions([]);
+    setIsLoading(true);
+  }
+
   useEffect(() => {
     activePatientIdRef.current = activePatientId;
   }, [activePatientId]);
 
   const loadData = useCallback(async () => {
     const requestedPatientId = activePatientId;
+    const currentGeneration = ++loadGenerationRef.current;
+
     try {
       setIsLoading(true);
       const [reportsData, conditionsData] = await Promise.all([
         getAllReports(requestedPatientId),
         getAllConditions(requestedPatientId),
       ]);
-      if (activePatientIdRef.current !== requestedPatientId) {
+
+      // Only apply results if this request is still the latest generation and for current patient
+      if (
+        activePatientIdRef.current !== requestedPatientId ||
+        loadGenerationRef.current !== currentGeneration
+      ) {
         return;
       }
       setRecords(reportsData);
       setConditions(conditionsData);
     } catch (err) {
-      if (activePatientIdRef.current === requestedPatientId) {
+      if (
+        activePatientIdRef.current === requestedPatientId &&
+        loadGenerationRef.current === currentGeneration
+      ) {
         console.error('Failed to load dashboard data:', err);
+        // Keep records cleared on error so previous/stale records are not exposed
+        setRecords([]);
+        setConditions([]);
       }
     } finally {
-      if (activePatientIdRef.current === requestedPatientId) {
+      if (
+        activePatientIdRef.current === requestedPatientId &&
+        loadGenerationRef.current === currentGeneration
+      ) {
         setIsLoading(false);
       }
     }
@@ -471,7 +499,12 @@ export function HomeView() {
         )}
 
         {/* Floating Add Button at bottom middle */}
-        <View style={styles.floatingButtonContainer} pointerEvents="box-none">
+        <View
+          style={[
+            styles.floatingButtonContainer,
+            { pointerEvents: 'box-none' },
+          ]}
+        >
           <PlusCircleButton
             testID="floating-add-button"
             variant="primary"
@@ -726,11 +759,18 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   floatingButton: {
-    shadowColor: COLORS.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 14px rgba(61, 100, 80, 0.35)',
+      },
+      default: {
+        shadowColor: COLORS.light.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
+        elevation: 8,
+      },
+    }),
   },
   floatingMenuBackdrop: {
     position: 'absolute',

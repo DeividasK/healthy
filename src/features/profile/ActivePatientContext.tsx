@@ -77,20 +77,31 @@ export function ActivePatientProvider({
     };
   }, []);
 
-  const handleSetActivePatientId = async (patientId: string) => {
-    try {
-      await switchActivePatient(patientId);
-      const updated = await getPatient(patientId);
-      if (updated) {
-        setActivePatient(updated);
-      } else {
-        await loadPatients();
-      }
-    } catch (err) {
-      console.error('Failed to switch active patient:', err);
-      throw err;
-    }
-  };
+  const switchQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+
+  const handleSetActivePatientId = useCallback(
+    (patientId: string) => {
+      const runSwitch = async () => {
+        try {
+          await switchActivePatient(patientId);
+          const updated = await getPatient(patientId);
+          if (updated) {
+            setActivePatient(updated);
+          } else {
+            await loadPatients();
+          }
+        } catch (err) {
+          console.error('Failed to switch active patient:', err);
+          throw err;
+        }
+      };
+
+      const nextPromise = switchQueueRef.current.then(runSwitch, runSwitch);
+      switchQueueRef.current = nextPromise.catch(() => {});
+      return nextPromise;
+    },
+    [loadPatients]
+  );
 
   const activePatientId = activePatient?.id || 'patient-default';
   const activePatientName = getPatientDisplayName(activePatient);

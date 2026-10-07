@@ -100,10 +100,29 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     await page.getByTestId('patient-given-name-input').fill('John');
     await page.getByTestId('patient-family-name-input').fill('Smith');
+
+    // Test setting date of birth
+    const dobInput = page.locator('input[name="patientBirthDate"]');
+    await dobInput.fill('1990-05-15');
+
     await page.getByTestId('save-profile-button').click();
 
     await expect(page.getByTestId('profile-display-name')).toHaveText(
       'John Smith'
+    );
+    await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
+      'May 15, 1990'
+    );
+
+    // Re-open and clear date of birth
+    await page.getByTestId('edit-profile-button').click();
+    await expect(page).toHaveURL(/.*profile\/.*\/edit/);
+    const dobInputEdit = page.locator('input[name="patientBirthDate"]');
+    await dobInputEdit.fill('');
+    await page.getByTestId('save-profile-button').click();
+
+    await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
+      'Not specified'
     );
   });
 });

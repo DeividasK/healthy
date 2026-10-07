@@ -34,17 +34,11 @@ export async function insertDiagnosticReportRecord(
       `SELECT patient_id FROM diagnostic_reports WHERE id = ?;`,
       [reportId]
     );
-    const persistedPatientId = existing?.patient_id ?? patientId;
 
-    let persistedReport = report;
     if (existing?.patient_id && existing.patient_id !== patientId) {
-      persistedReport = {
-        ...report,
-        subject: {
-          reference: `Patient/${existing.patient_id}`,
-          display: 'Self',
-        },
-      };
+      throw new Error(
+        `Cannot update diagnostic report ${reportId}: belongs to patient ${existing.patient_id}, not ${patientId}`
+      );
     }
 
     await db.runAsync(
@@ -58,11 +52,11 @@ export async function insertDiagnosticReportRecord(
          updated_at = excluded.updated_at;`,
       [
         reportId,
-        persistedPatientId,
+        patientId,
         effectiveDate,
-        persistedReport.status,
+        report.status,
         notesText,
-        JSON.stringify(persistedReport),
+        JSON.stringify(report),
         now,
         now,
       ]

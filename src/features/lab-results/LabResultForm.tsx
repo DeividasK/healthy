@@ -385,7 +385,9 @@ export function LabResultForm({
             {/* Native Date Picker */}
             <NativeDatePicker
               value={selectedDate}
-              onChange={handleDateChange}
+              onChange={(date) => {
+                if (date) handleDateChange(date);
+              }}
               testID="date-picker-button"
             />
 

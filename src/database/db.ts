@@ -2,9 +2,6 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
 
-// Re-export feature repositories for backward compatibility and clean access
-export * from '../features/lab-results/labResultsRepository';
-export * from '../features/conditions/conditionsRepository';
 export * from './migrations';
 
 const DB_NAME = 'healthy.db';

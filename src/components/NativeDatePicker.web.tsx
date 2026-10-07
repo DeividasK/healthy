@@ -6,9 +6,12 @@ import { COLORS } from '../theme/colors';
 
 export interface NativeDatePickerProps {
   value: Date | null;
-  onChange: (date: Date) => void;
+  onChange: (date: Date | null) => void;
   placeholder?: string;
   testID?: string;
+  variant?: 'pill' | 'input';
+  id?: string;
+  name?: string;
 }
 
 export function NativeDatePicker({
@@ -16,6 +19,9 @@ export function NativeDatePicker({
   onChange,
   placeholder = 'Not specified',
   testID = 'date-picker-button',
+  variant = 'pill',
+  id,
+  name,
 }: NativeDatePickerProps) {
   const inputRef = useRef<any>(null);
 
@@ -33,24 +39,26 @@ export function NativeDatePicker({
 
   const handleNativeChange = (e: any) => {
     const val = e.target?.value;
-    if (val) {
-      const [year, month, day] = val.split('-').map(Number);
-      const newDate = new Date(year, month - 1, day);
-      const now = new Date();
-      const todayEnd = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        23,
-        59,
-        59,
-        999
-      );
-      if (newDate.getTime() > todayEnd.getTime()) {
-        return;
-      }
-      onChange(newDate);
+    if (!val) {
+      onChange(null);
+      return;
     }
+    const [year, month, day] = val.split('-').map(Number);
+    const newDate = new Date(year, month - 1, day);
+    const now = new Date();
+    const todayEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+    if (newDate.getTime() > todayEnd.getTime()) {
+      return;
+    }
+    onChange(newDate);
   };
 
   const handleClick = (e: any) => {
@@ -61,19 +69,31 @@ export function NativeDatePicker({
     } catch {}
   };
 
+  const isInput = variant === 'input';
+
   return (
-    <View style={styles.datePill} testID={testID}>
+    <View
+      style={isInput ? styles.dateInputContainer : styles.datePill}
+      testID={testID}
+    >
       <Calendar
         color={COLORS.light.iconMuted}
         size={18}
         style={styles.pillIcon}
       />
-      <Text style={styles.datePillText}>{formattedDate}</Text>
+      <Text
+        style={[
+          isInput ? styles.dateInputText : styles.datePillText,
+          !value && isInput && styles.placeholderText,
+        ]}
+      >
+        {formattedDate}
+      </Text>
       {React.createElement('input', {
         ref: inputRef,
         type: 'date',
-        id: `${testID}-native-input`,
-        name: `${testID}-date`,
+        id: id || `${testID}-native-input`,
+        name: name || `${testID}-date`,
         max: todayStr,
         value: dateValueStr,
         onChange: handleNativeChange,
@@ -107,12 +127,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  dateInputContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    width: '100%',
+  },
   pillIcon: {
-    marginRight: 6,
+    marginRight: 8,
   },
   datePillText: {
     color: COLORS.light.foreground,
     fontSize: 14,
     fontWeight: '600',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: COLORS.light.foreground,
+  },
+  placeholderText: {
+    color: COLORS.light.placeholder,
   },
 });

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronDown, User } from 'lucide-react-native';
 import { NativeDatePicker } from '../../components/NativeDatePicker';
+import { AddOptionsModal } from '../../components/AddOptionsModal';
 import { formatLocalDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
 import { PatientInput } from './patientService';
@@ -64,6 +65,7 @@ export function ProfileForm({
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
 
   const handleGenderPress = () => {
     if (Platform.OS === 'ios') {
@@ -81,6 +83,8 @@ export function ProfileForm({
           }
         }
       );
+    } else if (Platform.OS === 'android') {
+      setShowGenderModal(true);
     }
   };
 
@@ -247,13 +251,14 @@ export function ProfileForm({
           {/* Date of Birth Field */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Date of Birth</Text>
-            <View style={styles.datePickerContainer}>
-              <NativeDatePicker
-                testID="patient-birth-date-picker"
-                value={birthDate}
-                onChange={(date) => setBirthDate(date)}
-              />
-            </View>
+            <NativeDatePicker
+              testID="patient-birth-date-picker"
+              id="patient-birth-date-picker"
+              name="patientBirthDate"
+              variant="input"
+              value={birthDate}
+              onChange={(date) => setBirthDate(date)}
+            />
           </View>
         </ScrollView>
 
@@ -271,6 +276,24 @@ export function ProfileForm({
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Gender Selection Modal for Android */}
+        <AddOptionsModal
+          visible={showGenderModal}
+          onClose={() => setShowGenderModal(false)}
+          overlayTestID="gender-menu-overlay"
+          cardTestID="gender-menu-card"
+          options={GENDER_OPTIONS.map((opt) => ({
+            id: opt.id,
+            label: opt.label,
+            icon: null,
+            testID: `gender-option-${opt.id}`,
+            onPress: () => {
+              setGender(opt.id);
+              setShowGenderModal(false);
+            },
+          }))}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -358,10 +381,6 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: 16,
     color: COLORS.light.foreground,
-  },
-  datePickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   bottomBar: {
     padding: 16,
