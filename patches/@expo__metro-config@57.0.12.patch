@@ -6,7 +6,7 @@ index 10c8ce32a04cc7f05f28d95347fa7127dd6600f8..9581fe61215a0d2a244e52fcef67c236
              else if (asyncType &&
                  // Workers require standalone bundles even when ordinary chunk splitting is disabled.
                  (isWorker || splitChunks)) {
-+                if (isWorker && options.includeAsyncPaths) {
++                if (isWorker && options.includeAsyncPaths && options.sourceUrl) {
 +                    continue;
 +                }
                  const asyncChunks = gatherChunks(runtimePremodules, chunks, { test: pathToRegex(dependency.absolutePath) }, isWorker ? runtimePremodules : [], graph, options, true, isWorker);

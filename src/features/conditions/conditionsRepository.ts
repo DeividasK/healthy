@@ -29,46 +29,48 @@ export async function insertConditionRecord(
   const abatementDate = condition.abatementDateTime || null;
   const condId = condition.id;
 
-  const existing = await db.getFirstAsync<{ patient_id: string }>(
-    `SELECT patient_id FROM conditions WHERE id = ?;`,
-    [condId]
-  );
-  if (existing?.patient_id && existing.patient_id !== patientId) {
-    throw new Error(
-      `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
+  await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<{ patient_id: string }>(
+      `SELECT patient_id FROM conditions WHERE id = ?;`,
+      [condId]
     );
-  }
+    if (existing?.patient_id && existing.patient_id !== patientId) {
+      throw new Error(
+        `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
+      );
+    }
 
-  await db.runAsync(
-    `INSERT INTO conditions (id, patient_id, clinical_status, verification_status, onset_date, title, severity, body_site, abatement_date, description, fhir_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       clinical_status = excluded.clinical_status,
-       verification_status = excluded.verification_status,
-       onset_date = excluded.onset_date,
-       title = excluded.title,
-       severity = excluded.severity,
-       body_site = excluded.body_site,
-       abatement_date = excluded.abatement_date,
-       description = excluded.description,
-       fhir_json = excluded.fhir_json,
-       updated_at = excluded.updated_at;`,
-    [
-      condId,
-      patientId,
-      clinicalStatus,
-      verificationStatus,
-      onsetDate,
-      title,
-      severity,
-      bodySite,
-      abatementDate,
-      notesText,
-      JSON.stringify(condition),
-      now,
-      now,
-    ]
-  );
+    await db.runAsync(
+      `INSERT INTO conditions (id, patient_id, clinical_status, verification_status, onset_date, title, severity, body_site, abatement_date, description, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         clinical_status = excluded.clinical_status,
+         verification_status = excluded.verification_status,
+         onset_date = excluded.onset_date,
+         title = excluded.title,
+         severity = excluded.severity,
+         body_site = excluded.body_site,
+         abatement_date = excluded.abatement_date,
+         description = excluded.description,
+         fhir_json = excluded.fhir_json,
+         updated_at = excluded.updated_at;`,
+      [
+        condId,
+        patientId,
+        clinicalStatus,
+        verificationStatus,
+        onsetDate,
+        title,
+        severity,
+        bodySite,
+        abatementDate,
+        notesText,
+        JSON.stringify(condition),
+        now,
+        now,
+      ]
+    );
+  });
 }
 
 /**

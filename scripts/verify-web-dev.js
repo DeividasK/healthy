@@ -1,18 +1,22 @@
 const { spawn } = require('child_process');
 const http = require('http');
 
-const PORT = 8081;
+const PORT = 8099;
 const URL = `http://localhost:${PORT}`;
 const TIMEOUT_MS = 60000;
 const POLL_INTERVAL_MS = 1000;
 
 console.log('Starting Expo web development server for verification...');
 
-const devServer = spawn('pnpm', ['expo', 'start', '--port', String(PORT)], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  detached: true,
-  env: { ...process.env, CI: '1' },
-});
+const devServer = spawn(
+  'pnpm',
+  ['expo', 'start', '--web', '--port', String(PORT)],
+  {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+    env: { ...process.env, CI: '1' },
+  }
+);
 
 let serverLogs = '';
 
@@ -79,6 +83,55 @@ async function verify() {
           console.error(response.body.slice(0, 500));
           cleanup();
           process.exit(1);
+        }
+
+        // Metro bundles on demand when scripts are requested.
+        // Extract script bundle URLs from HTML and request them eagerly.
+        const scriptMatches = [
+          ...response.body.matchAll(/<script[^>]+src=["']([^"']+)["']/gi),
+        ];
+        const scriptUrls = scriptMatches
+          .map((m) => m[1])
+          .filter(
+            (src) =>
+              src &&
+              !src.startsWith('data:') &&
+              (src.includes('.bundle') ||
+                src.endsWith('.js') ||
+                src.includes('/_expo/'))
+          );
+
+        if (scriptUrls.length === 0) {
+          console.error(
+            '❌ Could not find any bundle <script src> in HTML response.'
+          );
+          cleanup();
+          process.exit(1);
+        }
+
+        for (const scriptUrl of scriptUrls) {
+          const fullBundleUrl = scriptUrl.startsWith('http')
+            ? scriptUrl
+            : `${URL}${scriptUrl.startsWith('/') ? '' : '/'}${scriptUrl}`;
+          const bundleRes = await fetchUrl(fullBundleUrl);
+          if (bundleRes.statusCode !== 200) {
+            console.error(
+              `❌ Failed to load bundle ${fullBundleUrl}: status code ${bundleRes.statusCode}`
+            );
+            cleanup();
+            process.exit(1);
+          }
+          if (
+            bundleRes.body.includes('_expo-static-error') ||
+            bundleRes.body.includes('Worker chunk not found')
+          ) {
+            console.error(
+              '❌ Static error overlay detected in bundle response:'
+            );
+            console.error(bundleRes.body.slice(0, 500));
+            cleanup();
+            process.exit(1);
+          }
         }
 
         // Allow 2 seconds for any async bundling warnings/errors to log

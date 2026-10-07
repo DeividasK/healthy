@@ -92,7 +92,16 @@ export async function createConditionViaUI(
     notes?: string;
   }
 ): Promise<void> {
-  await page.goto('/condition/add');
+  const fab = page.getByTestId('floating-add-button');
+  if (await fab.isVisible()) {
+    await fab.click();
+    await page.getByTestId('menu-add-condition').click();
+  } else {
+    await page.goto('/condition/add');
+  }
+
+  await page.waitForURL(/.*condition\/add/);
+  await page.getByTestId('condition-title-input').waitFor({ state: 'visible' });
 
   if (options.status) {
     const statusSelect = page.getByTestId('status-picker-select');
