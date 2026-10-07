@@ -5,26 +5,30 @@ import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { COLORS } from '../theme/colors';
 
 export interface NativeDatePickerProps {
-  value: Date;
+  value: Date | null;
   onChange: (date: Date) => void;
+  placeholder?: string;
   testID?: string;
 }
 
 export function NativeDatePicker({
   value,
   onChange,
+  placeholder = 'Not specified',
   testID = 'date-picker-button',
 }: NativeDatePickerProps) {
-  const formattedDate = value.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedDate = value
+    ? value.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : placeholder;
 
   const handlePress = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-        value,
+        value: value || new Date(),
         onChange: (_event, selectedDate) => {
           if (selectedDate) {
             onChange(selectedDate);

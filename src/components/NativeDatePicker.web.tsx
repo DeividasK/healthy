@@ -5,25 +5,29 @@ import { formatLocalDate } from '../utils/dateUtils';
 import { COLORS } from '../theme/colors';
 
 export interface NativeDatePickerProps {
-  value: Date;
+  value: Date | null;
   onChange: (date: Date) => void;
+  placeholder?: string;
   testID?: string;
 }
 
 export function NativeDatePicker({
   value,
   onChange,
+  placeholder = 'Not specified',
   testID = 'date-picker-button',
 }: NativeDatePickerProps) {
   const inputRef = useRef<any>(null);
 
-  const formattedDate = value.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedDate = value
+    ? value.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : placeholder;
 
-  const dateValueStr = formatLocalDate(value);
+  const dateValueStr = value ? formatLocalDate(value) : '';
 
   const todayStr = formatLocalDate(new Date());
 

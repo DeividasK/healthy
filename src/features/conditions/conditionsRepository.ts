@@ -33,7 +33,6 @@ export async function insertConditionRecord(
     `INSERT INTO conditions (id, patient_id, clinical_status, verification_status, onset_date, title, severity, body_site, abatement_date, description, fhir_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
-       patient_id = excluded.patient_id,
        clinical_status = excluded.clinical_status,
        verification_status = excluded.verification_status,
        onset_date = excluded.onset_date,

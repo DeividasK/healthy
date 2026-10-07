@@ -30,16 +30,39 @@ export async function insertDiagnosticReportRecord(
       : null;
 
   await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<{ patient_id: string }>(
+      `SELECT patient_id FROM diagnostic_reports WHERE id = ?;`,
+      [reportId]
+    );
+    const persistedPatientId = existing?.patient_id ?? patientId;
+
+    let persistedReport = report;
+    if (existing?.patient_id && existing.patient_id !== patientId) {
+      persistedReport = {
+        ...report,
+        subject: {
+          reference: `Patient/${existing.patient_id}`,
+          display: 'Self',
+        },
+      };
+    }
+
     await db.runAsync(
-      `INSERT OR REPLACE INTO diagnostic_reports (id, patient_id, effective_date, status, notes, fhir_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO diagnostic_reports (id, patient_id, effective_date, status, notes, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         effective_date = excluded.effective_date,
+         status = excluded.status,
+         notes = excluded.notes,
+         fhir_json = excluded.fhir_json,
+         updated_at = excluded.updated_at;`,
       [
         reportId,
-        patientId,
+        persistedPatientId,
         effectiveDate,
-        report.status,
+        persistedReport.status,
         notesText,
-        JSON.stringify(report),
+        JSON.stringify(persistedReport),
         now,
         now,
       ]

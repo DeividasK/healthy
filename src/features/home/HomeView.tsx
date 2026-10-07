@@ -6,7 +6,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -63,19 +63,32 @@ export function HomeView() {
     requireCountdown: true,
   });
 
+  const activePatientIdRef = useRef(activePatientId);
+  useEffect(() => {
+    activePatientIdRef.current = activePatientId;
+  }, [activePatientId]);
+
   const loadData = useCallback(async () => {
+    const requestedPatientId = activePatientId;
     try {
       setIsLoading(true);
       const [reportsData, conditionsData] = await Promise.all([
-        getAllReports(activePatientId),
-        getAllConditions(activePatientId),
+        getAllReports(requestedPatientId),
+        getAllConditions(requestedPatientId),
       ]);
+      if (activePatientIdRef.current !== requestedPatientId) {
+        return;
+      }
       setRecords(reportsData);
       setConditions(conditionsData);
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
+      if (activePatientIdRef.current === requestedPatientId) {
+        console.error('Failed to load dashboard data:', err);
+      }
     } finally {
-      setIsLoading(false);
+      if (activePatientIdRef.current === requestedPatientId) {
+        setIsLoading(false);
+      }
     }
   }, [activePatientId]);
 

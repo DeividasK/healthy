@@ -250,7 +250,7 @@ export function ProfileForm({
             <View style={styles.datePickerContainer}>
               <NativeDatePicker
                 testID="patient-birth-date-picker"
-                value={birthDate || new Date()}
+                value={birthDate}
                 onChange={(date) => setBirthDate(date)}
               />
             </View>

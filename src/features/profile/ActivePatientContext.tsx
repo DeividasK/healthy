@@ -9,6 +9,7 @@ import type { Patient } from 'fhir/r5';
 import {
   getActivePatient,
   getAllPatients,
+  getPatient,
   switchActivePatient,
   getPatientDisplayName,
 } from './patientService';
@@ -79,7 +80,7 @@ export function ActivePatientProvider({
   const handleSetActivePatientId = async (patientId: string) => {
     try {
       await switchActivePatient(patientId);
-      const updated = patients.find((p) => p.id === patientId);
+      const updated = await getPatient(patientId);
       if (updated) {
         setActivePatient(updated);
       } else {
@@ -87,6 +88,7 @@ export function ActivePatientProvider({
       }
     } catch (err) {
       console.error('Failed to switch active patient:', err);
+      throw err;
     }
   };
 
