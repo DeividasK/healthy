@@ -426,7 +426,9 @@ export function ConditionForm({
             {/* Onset Date Pill */}
             <NativeDatePicker
               value={onsetDate}
-              onChange={setOnsetDate}
+              onChange={(date) => {
+                if (date) setOnsetDate(date);
+              }}
               testID="date-picker-button"
             />
 
@@ -555,7 +557,7 @@ export function ConditionForm({
               <View style={styles.datePickerContainer}>
                 <NativeDatePicker
                   value={abatementDate || new Date()}
-                  onChange={setAbatementDate}
+                  onChange={(date) => setAbatementDate(date || undefined)}
                   testID="abatement-date-picker-button"
                 />
               </View>

@@ -30,6 +30,7 @@ export interface BiomarkerInputItem {
 
 export interface CreateReportOptions {
   reportId?: string;
+  patientId?: string;
   date: string; // YYYY-MM-DD
   time?: string; // e.g. "09:30"
   notes?: string;
@@ -41,7 +42,8 @@ export interface CreateReportOptions {
  */
 export function buildFHIRObservation(
   item: BiomarkerInputItem,
-  effectiveDateTime: string
+  effectiveDateTime: string,
+  patientId: string = 'patient-default'
 ): Observation {
   const observationId = `obs-${Crypto.randomUUID()}`;
 
@@ -101,6 +103,10 @@ export function buildFHIRObservation(
       ],
       text: item.name,
     },
+    subject: {
+      reference: `Patient/${patientId}`,
+      display: 'Self',
+    },
     effectiveDateTime,
     valueQuantity: {
       value: item.value,
@@ -149,6 +155,7 @@ export async function createAndSaveDiagnosticReport(
   options: CreateReportOptions
 ): Promise<DiagnosticReportBundle> {
   const reportId = options.reportId || `rep-${Crypto.randomUUID()}`;
+  const patientId = options.patientId || 'patient-default';
   const now = new Date().toISOString();
 
   // Determine effective date/time
@@ -159,7 +166,7 @@ export async function createAndSaveDiagnosticReport(
 
   // Build observations
   const observations: Observation[] = options.items.map((item) =>
-    buildFHIRObservation(item, effectiveDateTime)
+    buildFHIRObservation(item, effectiveDateTime, patientId)
   );
 
   // Check if all markers are CBC markers to provide specialized panel LOINC if applicable,
@@ -197,6 +204,10 @@ export async function createAndSaveDiagnosticReport(
       ],
       text: panelDisplay,
     },
+    subject: {
+      reference: `Patient/${patientId}`,
+      display: 'Self',
+    },
     effectiveDateTime,
     issued: now,
     result: observations.map((obs) => ({
@@ -215,16 +226,18 @@ export async function createAndSaveDiagnosticReport(
     ];
   }
 
-  await insertDiagnosticReportRecord(report, observations);
+  await insertDiagnosticReportRecord(report, observations, patientId);
 
   return { report, observations };
 }
 
 /**
- * Gets all diagnostic reports.
+ * Gets all diagnostic reports, optionally filtered by patientId.
  */
-export async function getAllReports(): Promise<DiagnosticReportRecord[]> {
-  return await fetchAllDiagnosticReportRecords();
+export async function getAllReports(
+  patientId?: string
+): Promise<DiagnosticReportRecord[]> {
+  return await fetchAllDiagnosticReportRecords(patientId);
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   BiomarkerInputItem,
   getReportById,
 } from './diagnosticReportService';
+import { useActivePatient } from '../profile/ActivePatientContext';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -80,6 +81,7 @@ export function LabResultForm({
   isEdit = false,
 }: LabResultFormProps) {
   const router = useRouter();
+  const { activePatientId } = useActivePatient();
   const reportId = initialReportId;
 
   // Test Date (defaults to today)
@@ -280,6 +282,7 @@ export function LabResultForm({
 
       await createAndSaveDiagnosticReport({
         reportId: isEdit ? initialReportId : undefined,
+        patientId: activePatientId,
         date: effectiveDateStr,
         time: testTime || undefined,
         notes: testNotes ? testNotes.trim() : undefined,
@@ -382,7 +385,9 @@ export function LabResultForm({
             {/* Native Date Picker */}
             <NativeDatePicker
               value={selectedDate}
-              onChange={handleDateChange}
+              onChange={(date) => {
+                if (date) handleDateChange(date);
+              }}
               testID="date-picker-button"
             />
 

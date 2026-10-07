@@ -13,6 +13,10 @@ export function EditConditionView() {
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
 
+  const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
+    undefined
+  );
+
   useEffect(() => {
     if (!id) return;
 
@@ -25,6 +29,12 @@ export function EditConditionView() {
           setNotFound(true);
           return;
         }
+
+        const patientRef = condition.subject?.reference;
+        const parsedPatientId = patientRef?.startsWith('Patient/')
+          ? patientRef.replace('Patient/', '')
+          : patientRef;
+        setInitialPatientId(parsedPatientId);
 
         const dateStr = condition.onsetDateTime;
         let dateObj = new Date();
@@ -102,6 +112,7 @@ export function EditConditionView() {
     await createOrUpdateCondition({
       ...values,
       id,
+      patientId: initialPatientId,
     });
   };
 

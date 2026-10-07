@@ -9,6 +9,8 @@ import '../global.css';
 import { AppLogo } from '../src/components/AppLogo';
 import { COLORS } from '../src/theme/colors';
 import { NAV_THEME } from '../src/theme';
+import { ActivePatientProvider } from '../src/features/profile/ActivePatientContext';
+import { ProfileHeaderButton } from '../src/features/profile/ProfileHeaderButton';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -42,7 +44,11 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <ActivePatientProvider>
+      <RootLayoutNav />
+    </ActivePatientProvider>
+  );
 }
 
 function RootLayoutNav() {
@@ -54,10 +60,32 @@ function RootLayoutNav() {
           options={{
             title: '',
             headerLeft: () => (
-              <View style={{ marginLeft: Platform.OS === 'ios' ? 0 : 4 }}>
+              <View style={{ marginLeft: 16 }}>
                 <AppLogo size={30} color={COLORS.light.primaryLogo} />
               </View>
             ),
+            headerRight: () => <ProfileHeaderButton />,
+          }}
+        />
+        <Stack.Screen
+          name="profile/index"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="profile/new"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="profile/[id]/edit"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
           }}
         />
         <Stack.Screen
