@@ -50,8 +50,7 @@ export function HomeView() {
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // If no patients exist in the app (e.g. all profiles were deleted), redirect immediately to /profile/new.
-  // Note: Migration v4 automatically seeds the initial 'patient-default', so a fresh install or storage clear has 1 patient.
+  // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
   useEffect(() => {
     if (!isPatientLoading && patients.length === 0) {
       router.replace('/profile/new');

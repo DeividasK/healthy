@@ -189,7 +189,7 @@ export async function getActivePatientId(): Promise<string> {
   const row = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM app_settings WHERE key = 'active_patient_id';`
   );
-  return row?.value || DEFAULT_PATIENT_ID;
+  return row?.value || '';
 }
 
 /**

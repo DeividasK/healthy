@@ -27,10 +27,6 @@ export function SyncErrorModal({
 }: SyncErrorModalProps) {
   if (!visible) return null;
 
-  const isExpired =
-    Boolean(errorMessage?.toLowerCase().includes('expired')) ||
-    Boolean(errorMessage?.toLowerCase().includes('reconnect'));
-
   return (
     <Modal
       visible={visible}
@@ -45,9 +41,7 @@ export function SyncErrorModal({
               <View style={styles.iconCircle}>
                 <AlertTriangle size={20} color="#D97706" />
               </View>
-              <Text style={styles.title}>
-                {isExpired ? 'Session Expired' : 'Cloud Sync Issue'}
-              </Text>
+              <Text style={styles.title}>Cloud Sync Issue</Text>
             </View>
             <TouchableOpacity
               testID="close-sync-error-modal"
@@ -64,9 +58,8 @@ export function SyncErrorModal({
                 'An error occurred while syncing with Google Drive.'}
             </Text>
             <Text style={styles.subtext}>
-              {isExpired
-                ? 'Your authorization token has expired. Reconnecting will restore seamless background backup.'
-                : 'Please check your internet connection and ensure your Google account permissions are active.'}
+              Please check your internet connection and ensure your Google
+              account permissions are active.
             </Text>
           </View>
 
@@ -80,33 +73,18 @@ export function SyncErrorModal({
               <Text style={styles.secondaryBtnText}>Dismiss</Text>
             </TouchableOpacity>
 
-            {isExpired && onReconnect ? (
-              <TouchableOpacity
-                testID="reconnect-sync-btn"
-                style={styles.primaryBtn}
-                onPress={() => {
-                  onDismiss();
-                  onReconnect();
-                }}
-                activeOpacity={0.7}
-              >
-                <RefreshCw size={16} color={COLORS.light.primaryForeground} />
-                <Text style={styles.primaryBtnText}>Reconnect Google</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                testID="retry-sync-btn"
-                style={styles.primaryBtn}
-                onPress={() => {
-                  onDismiss();
-                  onRetry();
-                }}
-                activeOpacity={0.7}
-              >
-                <RefreshCw size={16} color={COLORS.light.primaryForeground} />
-                <Text style={styles.primaryBtnText}>Retry Sync</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              testID="retry-sync-btn"
+              style={styles.primaryBtn}
+              onPress={() => {
+                onDismiss();
+                onRetry();
+              }}
+              activeOpacity={0.7}
+            >
+              <RefreshCw size={16} color={COLORS.light.primaryForeground} />
+              <Text style={styles.primaryBtnText}>Retry Sync</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>

@@ -1,9 +1,25 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createReportViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createReportViaUI,
+} from '../testing/testStorage';
+
+test.describe('Fresh Install Onboarding Redirect', () => {
+  test('should redirect to /profile/new on fresh install when no patients exist', async ({
+    page,
+  }) => {
+    await clearAppStorage(page);
+    await page.goto('/');
+    await expect(page).toHaveURL(/.*profile\/new/);
+    await expect(page.getByText('Add Profile')).toBeVisible();
+  });
+});
 
 test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.reload();
   });
 

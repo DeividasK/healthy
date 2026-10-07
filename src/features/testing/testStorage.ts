@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Resets all browser storage (localStorage, sessionStorage, and OPFS / IndexedDB files) for clean test runs.
@@ -9,24 +9,53 @@ export async function clearAppStorage(page: Page): Promise<void> {
     localStorage.clear();
     sessionStorage.clear();
 
-    // Clear Origin Private File System (where expo-sqlite / wa-sqlite persists databases)
-    if (typeof navigator !== 'undefined' && navigator.storage?.getDirectory) {
+    if (
+      typeof (
+        window as unknown as { __clearAllDatabaseTables?: () => Promise<void> }
+      ).__clearAllDatabaseTables === 'function'
+    ) {
       try {
-        const root = await navigator.storage.getDirectory();
-        for await (const [name, handle] of root.entries()) {
-          try {
-            await root.removeEntry(name, {
-              recursive: handle.kind === 'directory',
-            });
-          } catch {
-            // Ignore individual handle delete error
+        await (
+          window as unknown as {
+            __clearAllDatabaseTables?: () => Promise<void>;
           }
-        }
+        ).__clearAllDatabaseTables!();
       } catch {
-        // Ignore OPFS access errors in restricted contexts
+        // Ignore table wipe error if database not initialized yet
       }
     }
   });
+}
+
+/**
+ * Creates a Patient profile through standard UI flow.
+ */
+export async function createPatientViaUI(
+  page: Page,
+  options: {
+    givenName?: string;
+    familyName?: string;
+  } = {}
+): Promise<void> {
+  await page.goto('/profile/new');
+  await expect(page.getByTestId('add-profile-header-title')).toBeVisible();
+  const givenNameInput = page.getByTestId('patient-given-name-input');
+  await expect(givenNameInput).toBeVisible();
+  const nameToFill = options.givenName || 'Self';
+  await givenNameInput.click();
+  await givenNameInput.fill(nameToFill);
+  await expect(givenNameInput).toHaveValue(nameToFill);
+
+  if (options.familyName) {
+    const familyNameInput = page.getByTestId('patient-family-name-input');
+    await familyNameInput.click();
+    await familyNameInput.fill(options.familyName);
+    await expect(familyNameInput).toHaveValue(options.familyName);
+  }
+  const saveBtn = page.getByTestId('save-profile-button');
+  await expect(saveBtn).toBeVisible();
+  await saveBtn.click();
+  await expect(page).not.toHaveURL(/.*profile\/new/);
 }
 
 /**

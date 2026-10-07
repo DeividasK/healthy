@@ -54,8 +54,6 @@ export function isExistingNewerOrEqual(
   if (!existingTimestamp || !incomingTimestamp) return false;
   const existingTime = new Date(existingTimestamp).getTime();
   const incomingTime = new Date(incomingTimestamp).getTime();
-  if (isNaN(existingTime) || isNaN(incomingTime)) {
-    return existingTimestamp >= incomingTimestamp;
-  }
+  if (isNaN(existingTime) || isNaN(incomingTime)) return false;
   return existingTime >= incomingTime;
 }

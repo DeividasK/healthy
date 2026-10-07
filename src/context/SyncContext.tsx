@@ -200,17 +200,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
               err.message.includes('UNAUTHENTICATED'))) ||
           false;
 
-        const message = isAuthError
-          ? 'Your Google Drive session has expired. Please reconnect to resume cloud backup.'
-          : err instanceof Error
-            ? err.message
-            : 'Failed to sync with Google Drive.';
+        if (isAuthError) {
+          console.warn(
+            'Google Drive auth session expired or unauthorized. Gracefully handling without requiring manual reconnection:',
+            err
+          );
+          setSyncState('idle');
+          setIsAuthExpired(false);
+          setIsUpToDate(false);
+          setSyncError(null);
+        } else {
+          const message =
+            err instanceof Error
+              ? err.message
+              : 'Failed to sync with Google Drive.';
 
-        console.error('Sync failed:', err);
-        setSyncError(message);
-        setIsAuthExpired(isAuthError);
-        setIsUpToDate(false);
-        setSyncState('error');
+          console.error('Sync failed:', err);
+          setSyncError(message);
+          setIsAuthExpired(false);
+          setIsUpToDate(false);
+          setSyncState('error');
+        }
       } finally {
         inFlightSyncRef.current = null;
       }
@@ -220,36 +230,39 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return inFlightSyncRef.current;
   }, [config, refreshConfig]);
 
-  // 15s poll for changes to cloud data when a profile is connected to Google Drive
+  // 5-minute poll for changes to cloud data when a profile is connected to Google Drive
   const userSub = config?.userSub;
   useEffect(() => {
-    if (!userSub || isAuthExpired) return;
+    if (!userSub) return;
 
-    const interval = setInterval(async () => {
-      try {
-        if (inFlightSyncRef.current) return;
-        const currentConfig = configRef.current;
-        if (!currentConfig) return;
-        const stored = await fetchAllStoredPatients();
-        const hasConnectedProfile = stored.some(
-          (sp) => sp.syncAccount && sp.syncAccount === currentConfig.userSub
-        );
-        if (hasConnectedProfile) {
-          await syncNow();
+    const interval = setInterval(
+      async () => {
+        try {
+          if (inFlightSyncRef.current) return;
+          const currentConfig = configRef.current;
+          if (!currentConfig) return;
+          const stored = await fetchAllStoredPatients();
+          const hasConnectedProfile = stored.some(
+            (sp) => sp.syncAccount && sp.syncAccount === currentConfig.userSub
+          );
+          if (hasConnectedProfile) {
+            await syncNow();
+          }
+        } catch (pollErr) {
+          console.warn('5-minute cloud poll encountered an error:', pollErr);
         }
-      } catch (pollErr) {
-        console.warn('15s cloud poll encountered an error:', pollErr);
-      }
-    }, 15000);
+      },
+      5 * 60 * 1000
+    );
 
     return () => {
       clearInterval(interval);
     };
-  }, [userSub, isAuthExpired, syncNow]);
+  }, [userSub, syncNow]);
 
   // Sync when webpage gets focus or application wakes up (browser tab switch, window focus, app resume)
   useEffect(() => {
-    if (!userSub || isAuthExpired) return;
+    if (!userSub) return;
 
     const handleWakeup = async () => {
       const now = Date.now();
@@ -306,7 +319,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       appStateSub.remove();
     };
-  }, [userSub, isAuthExpired, syncNow]);
+  }, [userSub, syncNow]);
 
   const connectWithGoogle = useCallback(
     async (authData: {

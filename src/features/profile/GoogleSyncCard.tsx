@@ -47,7 +47,6 @@ export function GoogleSyncCard() {
     isSyncing,
     lastSyncedAt,
     isUpToDate,
-    isAuthExpired,
     syncNow,
     connectWithGoogle,
     disconnect,
@@ -192,7 +191,7 @@ export function GoogleSyncCard() {
   );
 
   const handleConnectGoogleDrive = async () => {
-    if (config && !isAuthExpired) {
+    if (config) {
       if (activePatient?.id) {
         setActionLoading('connecting');
         try {
@@ -360,25 +359,8 @@ export function GoogleSyncCard() {
             </Text>
           </View>
 
-          {/* Sync Now / Up to date / Reconnect Action Button */}
-          {isAuthExpired ? (
-            <TouchableOpacity
-              testID="reconnect-google-button"
-              style={[styles.syncButton, styles.syncButtonExpired]}
-              disabled={!request || actionLoading === 'connecting'}
-              onPress={() => promptAsync()}
-              activeOpacity={0.8}
-            >
-              {actionLoading === 'connecting' ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <RefreshCw size={16} color="#fff" />
-                  <Text style={styles.syncButtonText}>Reconnect Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : isCurrentSyncing ? (
+          {/* Sync Now / Up to date Action Button */}
+          {isCurrentSyncing ? (
             <TouchableOpacity
               testID="sync-now-button"
               style={[styles.syncButton, styles.syncButtonSyncing]}
@@ -564,9 +546,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCFCE7',
     borderWidth: 1,
     borderColor: '#86EFAC',
-  },
-  syncButtonExpired: {
-    backgroundColor: '#D97706',
   },
   syncButtonText: {
     fontSize: 14,

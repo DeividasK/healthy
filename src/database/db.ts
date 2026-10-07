@@ -72,3 +72,25 @@ export function resetDatabaseInstance(): void {
   dbInstance = null;
   initPromise = null;
 }
+
+/**
+ * Deletes all records from all application tables and notifies subscribers (useful for tests/resets).
+ */
+export async function clearAllDatabaseTables(): Promise<void> {
+  const db = await getDb();
+  await db.execAsync(`
+    DELETE FROM observations;
+    DELETE FROM diagnostic_reports;
+    DELETE FROM conditions;
+    DELETE FROM app_settings;
+    DELETE FROM patients;
+  `);
+}
+
+if (typeof window !== 'undefined') {
+  (
+    window as unknown as {
+      __clearAllDatabaseTables?: typeof clearAllDatabaseTables;
+    }
+  ).__clearAllDatabaseTables = clearAllDatabaseTables;
+}

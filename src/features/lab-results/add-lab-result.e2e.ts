@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { formatLocalDate } from '../../utils/dateUtils';
-import { clearAppStorage } from '../testing/testStorage';
+import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.reload();
   });
 

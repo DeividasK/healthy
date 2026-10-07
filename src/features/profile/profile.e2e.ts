@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createConditionViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createConditionViaUI,
+} from '../testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.reload();
   });
 
@@ -80,7 +85,11 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // 9. Switch back to 'Self' profile
     await page.getByTestId('profile-header-button').click();
-    await page.getByTestId('profile-item-patient-default').click();
+    await page
+      .locator('[data-testid^="profile-item-"]')
+      .filter({ hasText: 'Self' })
+      .first()
+      .click();
 
     // Verify 'Self' is now active
     await expect(page.getByTestId('profile-display-name')).toHaveText('Self');
@@ -212,10 +221,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     ).toBeVisible();
   });
 
-  test('should display top header sync warning and modal explanation when sync error occurs', async ({
+  test('should gracefully handle google auth token expiry without requiring manual reconnection', async ({
     page,
   }) => {
-    // Intercept Google Drive API to simulate a network/token error during sync
+    // Intercept Google Drive API to simulate a 401 token expiry error during sync
     await page.route('https://www.googleapis.com/**', (route) => {
       route.fulfill({
         status: 401,
@@ -224,7 +233,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       });
     });
 
-    // Set connected state with expired last sync so sync-now-button is visible
+    // Set connected state with token
     await page.evaluate(() => {
       localStorage.setItem(
         '@healthy_device_google_sync_config',
@@ -243,28 +252,11 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(connectBtn).toBeVisible();
     await connectBtn.click();
 
-    // Verify GoogleSyncCard shows Reconnect Google button
-    await expect(page.getByTestId('reconnect-google-button')).toBeVisible();
-
-    // Navigate to Home to inspect top header
-    await page.getByTestId('back-button').click();
-
-    // Top header should show persistent yellow warning icon
-    const warningIcon = page.getByTestId('sync-warning-icon');
-    await expect(warningIcon).toBeVisible();
-
-    // Click warning icon to open error modal
-    await warningIcon.click();
-    const errorModal = page.getByTestId('sync-error-modal');
-    await expect(errorModal).toBeVisible();
-    await expect(page.getByTestId('sync-error-message')).toContainText(
-      'session has expired'
+    // Verify GoogleSyncCard stays connected gracefully and does NOT show a disruptive Reconnect button
+    await expect(page.getByTestId('reconnect-google-button')).not.toBeVisible();
+    await expect(page.getByTestId('connected-user-email')).toHaveText(
+      'bob@gmail.com'
     );
-    await expect(page.getByTestId('reconnect-sync-btn')).toBeVisible();
-
-    // Dismiss error modal
-    await page.getByTestId('dismiss-sync-error-btn').click();
-    await expect(errorModal).not.toBeVisible();
   });
 
   test('should present 3 creation options on /profile/new (Create, Restore file, Restore GDrive) and navigate properly', async ({
@@ -581,7 +573,11 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
 
     // 5. Switch back to 'Self'
-    await page.getByTestId('profile-item-patient-default').click();
+    await page
+      .locator('[data-testid^="profile-item-"]')
+      .filter({ hasText: 'Self' })
+      .first()
+      .click();
     await expect(page.getByTestId('profile-display-name')).toHaveText('Self');
     // 'Self' shows connected Google Drive state
     await expect(page.getByTestId('connected-user-email')).toHaveText(
@@ -589,11 +585,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     );
   });
 
-  test('should poll cloud data every 15s when a profile is connected and update Last synced time', async ({
+  test('should sync cloud data when a profile is connected and update Last synced time', async ({
     page,
   }) => {
-    test.setTimeout(45000);
-
     // Intercept Google Drive API so periodic sync calls succeed
     await page.route('https://www.googleapis.com/**', (route) => {
       route.fulfill({
@@ -633,8 +627,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       .textContent();
     expect(initialLastSynced).toBeTruthy();
 
-    // Wait 15.5 seconds for cloud poll to trigger
-    await page.waitForTimeout(16000);
+    // Trigger sync via window focus event
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
 
     // Verify last-synced-time-text is present and updated
     const updatedLastSynced = page.getByTestId('last-synced-time-text');

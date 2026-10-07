@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage } from '../testing/testStorage';
+import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.reload();
   });
 
