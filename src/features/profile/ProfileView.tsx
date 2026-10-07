@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,8 +19,19 @@ import { GoogleSyncCard } from './GoogleSyncCard';
 
 export function ProfileView() {
   const router = useRouter();
-  const { activePatient, activePatientId, patients, setActivePatientId } =
-    useActivePatient();
+  const {
+    activePatient,
+    activePatientId,
+    patients,
+    isLoading,
+    setActivePatientId,
+  } = useActivePatient();
+
+  React.useEffect(() => {
+    if (!isLoading && patients.length === 0) {
+      router.replace('/profile/new');
+    }
+  }, [isLoading, patients.length, router]);
 
   const activeName = getPatientDisplayName(activePatient);
   const activeInitials = getPatientInitials(activePatient);
@@ -30,6 +42,43 @@ export function ProfileView() {
   const birthDateFormatted = activePatient?.birthDate
     ? formatDisplayDate(activePatient.birthDate)
     : 'Not specified';
+  const targetId =
+    activePatient?.id ||
+    activePatientId ||
+    (patients.length > 0 ? patients[0].id : null);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              testID="back-button"
+              accessibilityLabel="Back"
+              style={styles.backButton}
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                  (document.activeElement as HTMLElement)?.blur?.();
+                }
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/');
+                }
+              }}
+            >
+              <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.light.primary} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -57,12 +106,15 @@ export function ProfileView() {
           <TouchableOpacity
             testID="edit-profile-button"
             accessibilityLabel="Edit Profile"
-            style={styles.editHeaderButton}
+            disabled={isLoading || !targetId}
+            style={[
+              styles.editHeaderButton,
+              (isLoading || !targetId) && { opacity: 0.6 },
+            ]}
             onPress={() => {
               if (Platform.OS === 'web' && typeof document !== 'undefined') {
                 (document.activeElement as HTMLElement)?.blur?.();
               }
-              const targetId = activePatient?.id || activePatientId;
               if (targetId) {
                 router.push(`/profile/${targetId}/edit`);
               }
@@ -182,6 +234,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',

@@ -42,6 +42,9 @@ export async function createOrUpdateCondition(
   const condition: Condition = {
     resourceType: 'Condition',
     id: condId,
+    meta: {
+      lastUpdated: new Date().toISOString(),
+    },
     clinicalStatus: {
       coding: [
         {

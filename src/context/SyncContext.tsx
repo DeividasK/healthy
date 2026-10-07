@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
   GoogleDriveConfig,
   loadGoogleDriveConfig,
@@ -13,6 +14,7 @@ import {
   syncWithGoogleDrive,
   refreshGoogleAccessToken,
 } from '../services/syncManager';
+import { fetchAllStoredPatients } from '../features/profile/patientRepository';
 
 export type SyncState = 'idle' | 'syncing' | 'just_synced' | 'error';
 
@@ -50,6 +52,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isAuthExpired, setIsAuthExpired] = useState<boolean>(false);
 
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSyncingRef = useRef<boolean>(false);
+  const lastFocusSyncRef = useRef<number>(0);
 
   const refreshConfig = useCallback(async () => {
     try {
@@ -91,7 +95,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const syncNow = useCallback(async () => {
-    if (!config) return;
+    if (!config || isSyncingRef.current) return;
+    isSyncingRef.current = true;
 
     if (resetTimerRef.current) {
       clearTimeout(resetTimerRef.current);
@@ -198,8 +203,93 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setIsAuthExpired(isAuthError);
       setIsUpToDate(false);
       setSyncState('error');
+    } finally {
+      isSyncingRef.current = false;
     }
   }, [config, refreshConfig]);
+
+  // 15s poll for changes to cloud data when a profile is connected to Google Drive
+  useEffect(() => {
+    if (!config || isAuthExpired) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (isSyncingRef.current) return;
+        const stored = await fetchAllStoredPatients();
+        const hasConnectedProfile = stored.some(
+          (sp) => sp.syncAccount && sp.syncAccount === config.userSub
+        );
+        if (hasConnectedProfile) {
+          await syncNow();
+        }
+      } catch (pollErr) {
+        console.warn('15s cloud poll encountered an error:', pollErr);
+      }
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [config, isAuthExpired, syncNow]);
+
+  // Sync when webpage gets focus or application wakes up (browser tab switch, window focus, app resume)
+  useEffect(() => {
+    if (!config || isAuthExpired) return;
+
+    const handleWakeup = async () => {
+      const now = Date.now();
+      if (now - lastFocusSyncRef.current < 2000) return; // 2s debounce
+      if (isSyncingRef.current) return;
+
+      try {
+        const stored = await fetchAllStoredPatients();
+        const hasConnectedProfile = stored.some(
+          (sp) => sp.syncAccount && sp.syncAccount === config.userSub
+        );
+        if (hasConnectedProfile) {
+          lastFocusSyncRef.current = now;
+          await syncNow();
+        }
+      } catch (err) {
+        console.warn('Wakeup sync check encountered an error:', err);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      ) {
+        handleWakeup();
+      }
+    };
+
+    const onWindowFocus = () => {
+      handleWakeup();
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('focus', onWindowFocus);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    const appStateSub = AppState.addEventListener(
+      'change',
+      (state: AppStateStatus) => {
+        if (state === 'active') {
+          handleWakeup();
+        }
+      }
+    );
+
+    return () => {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('focus', onWindowFocus);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      appStateSub.remove();
+    };
+  }, [config, isAuthExpired, syncNow]);
 
   const connectWithGoogle = useCallback(
     async (authData: {
@@ -223,6 +313,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setConfig(newConfig);
       setSyncError(null);
       setIsAuthExpired(false);
+      setSyncState('syncing');
       // Trigger immediate initial sync
       setTimeout(() => {
         syncWithGoogleDrive(newConfig)

@@ -111,4 +111,31 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
     await expect(page.getByText('15.5')).toBeVisible();
   });
+
+  test('should automatically re-render and display new condition in real time when added from another tab without page reload', async ({
+    page,
+    context,
+  }) => {
+    // 1. Tab 1 is on Home, initially showing "Nothing to show yet"
+    await page.goto('/');
+    await expect(page.getByText('Nothing to show yet')).toBeVisible();
+
+    // 2. Open Tab 2 in the same browser context and add a condition
+    const page2 = await context.newPage();
+    await page2.goto('/condition/add');
+
+    await page2.getByTestId('condition-title-input').fill('Asthma');
+    const activeChip = page2.getByTestId('status-chip-active');
+    if (await activeChip.isVisible()) {
+      await activeChip.click();
+    }
+    await page2.getByTestId('save-condition-button').click();
+    await page2.waitForURL('/');
+
+    // 3. Check Tab 1: Asthma should appear automatically in real time without reloading Tab 1!
+    await expect(page.getByText('Asthma')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Nothing to show yet')).not.toBeVisible();
+
+    await page2.close();
+  });
 });

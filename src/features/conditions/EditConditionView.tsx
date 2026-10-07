@@ -4,10 +4,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { ConditionForm, ConditionFormValues } from './ConditionForm';
 import { getConditionById, createOrUpdateCondition } from './conditionService';
 import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
+import { useSync } from '../../context/SyncContext';
 import { COLORS } from '../../theme/colors';
 
 export function EditConditionView() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConditionFormValues | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(id));
@@ -114,6 +116,9 @@ export function EditConditionView() {
       id,
       patientId: initialPatientId,
     });
+    triggerSync().catch((err) =>
+      console.warn('Background sync failed on edit condition:', err)
+    );
   };
 
   return (

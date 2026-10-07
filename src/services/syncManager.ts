@@ -15,9 +15,10 @@ import {
   uploadAppDataFile,
   updateAppDataFile,
   downloadAppDataFile,
+  deleteAppDataFile,
 } from './googleDriveService';
 import {
-  fetchAllPatients,
+  fetchAllStoredPatients,
   insertPatientRecord,
   DEFAULT_PATIENT_ID,
 } from '../features/profile/patientRepository';
@@ -29,6 +30,7 @@ import {
   fetchAllConditionRecords,
   insertConditionRecord,
 } from '../features/conditions/conditionsRepository';
+import { notifyDatabaseChanged } from '../database/dbEvents';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
 
@@ -112,58 +114,102 @@ export async function saveGoogleDriveConfig(
 }
 
 /**
- * Backs up all local records to Google Drive appDataFolder.
+ * Backs up local records to Google Drive appDataFolder.
+ * Only uploads records for patients connected to this Google account (or all if not tagged).
  */
 export async function backupToGoogleDrive(
   config: GoogleDriveConfig
 ): Promise<{ patients: number; reports: number; conditions: number }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
-  const remoteFileMap = new Map<string, string>(
-    remoteFiles.map((f) => [f.name, f.id])
+  const remoteFileMap = new Map<string, { id: string; modifiedTime?: string }>(
+    remoteFiles.map((f) => [f.name, { id: f.id, modifiedTime: f.modifiedTime }])
   );
 
-  const [patients, reportsWithObs, conditions] = await Promise.all([
-    fetchAllPatients(),
-    fetchAllDiagnosticReportRecords(),
-    fetchAllConditionRecords(),
-  ]);
+  const [allStoredPatients, allReportsWithObs, allConditions] =
+    await Promise.all([
+      fetchAllStoredPatients(),
+      fetchAllDiagnosticReportRecords(),
+      fetchAllConditionRecords(),
+    ]);
 
-  // Upload/Update Patients
-  for (const pat of patients) {
+  // Filter to patients explicitly connected to this Google account
+  const eligiblePatients = allStoredPatients.filter(
+    (sp) => sp.syncAccount === config.userSub
+  );
+  const eligiblePatientIds = new Set(
+    eligiblePatients.map((sp) => sp.patient.id || 'default')
+  );
+
+  const eligibleReports = allReportsWithObs.filter((r) => {
+    const patientId =
+      r.report.subject?.reference?.replace(/^Patient\//, '') ||
+      DEFAULT_PATIENT_ID;
+    return eligiblePatientIds.has(patientId);
+  });
+
+  const eligibleConditions = allConditions.filter((c) => {
+    const patientId =
+      c.subject?.reference?.replace(/^Patient\//, '') || DEFAULT_PATIENT_ID;
+    return eligiblePatientIds.has(patientId);
+  });
+
+  // Upload/Update Eligible Patients
+  for (const { patient: pat } of eligiblePatients) {
     const fileName = `patient_${pat.id || 'default'}.json.enc`;
     const encBytes = await encryptText(JSON.stringify(pat), key);
-    const existingId = remoteFileMap.get(fileName);
-    if (existingId) {
-      await updateAppDataFile(config.accessToken, existingId, encBytes);
+    const existing = remoteFileMap.get(fileName);
+    if (existing) {
+      if (
+        existing.modifiedTime &&
+        pat.meta?.lastUpdated &&
+        existing.modifiedTime >= pat.meta.lastUpdated
+      ) {
+        continue;
+      }
+      await updateAppDataFile(config.accessToken, existing.id, encBytes);
     } else {
       await uploadAppDataFile(config.accessToken, fileName, encBytes);
     }
   }
 
   // Upload/Update Diagnostic Reports
-  for (const { report, observations } of reportsWithObs) {
+  for (const { report, observations } of eligibleReports) {
     const fileName = `report_${report.id}.json.enc`;
     const bundle = {
       ...report,
       contained: observations,
     };
     const encBytes = await encryptText(JSON.stringify(bundle), key);
-    const existingId = remoteFileMap.get(fileName);
-    if (existingId) {
-      await updateAppDataFile(config.accessToken, existingId, encBytes);
+    const existing = remoteFileMap.get(fileName);
+    if (existing) {
+      if (
+        existing.modifiedTime &&
+        report.meta?.lastUpdated &&
+        existing.modifiedTime >= report.meta.lastUpdated
+      ) {
+        continue;
+      }
+      await updateAppDataFile(config.accessToken, existing.id, encBytes);
     } else {
       await uploadAppDataFile(config.accessToken, fileName, encBytes);
     }
   }
 
   // Upload/Update Conditions
-  for (const cond of conditions) {
+  for (const cond of eligibleConditions) {
     const fileName = `condition_${cond.id}.json.enc`;
     const encBytes = await encryptText(JSON.stringify(cond), key);
-    const existingId = remoteFileMap.get(fileName);
-    if (existingId) {
-      await updateAppDataFile(config.accessToken, existingId, encBytes);
+    const existing = remoteFileMap.get(fileName);
+    if (existing) {
+      if (
+        existing.modifiedTime &&
+        cond.meta?.lastUpdated &&
+        existing.modifiedTime >= cond.meta.lastUpdated
+      ) {
+        continue;
+      }
+      await updateAppDataFile(config.accessToken, existing.id, encBytes);
     } else {
       await uploadAppDataFile(config.accessToken, fileName, encBytes);
     }
@@ -177,20 +223,56 @@ export async function backupToGoogleDrive(
   await saveGoogleDriveConfig(updatedConfig);
 
   return {
-    patients: patients.length,
-    reports: reportsWithObs.length,
-    conditions: conditions.length,
+    patients: eligiblePatients.length,
+    reports: eligibleReports.length,
+    conditions: eligibleConditions.length,
   };
 }
 
 /**
+ * Inspects remote Google Drive appDataFolder and returns list of remote patients without importing all records.
+ */
+export async function listRemoteGooglePatients(
+  config: GoogleDriveConfig
+): Promise<Patient[]> {
+  const key = await deriveKeyFromGoogleUser(config.userSub);
+  const remoteFiles = await listAppDataFiles(config.accessToken);
+  const remotePatients: Patient[] = [];
+
+  for (const file of remoteFiles) {
+    if (file.name.startsWith('patient_') && file.name.endsWith('.json.enc')) {
+      try {
+        const encryptedBytes = await downloadAppDataFile(
+          config.accessToken,
+          file.id
+        );
+        const decryptedText = await decryptText(encryptedBytes, key);
+        const resource = JSON.parse(decryptedText);
+        if (resource.resourceType === 'Patient') {
+          remotePatients.push(resource as Patient);
+        }
+      } catch (err) {
+        console.warn('Failed to parse remote patient:', file.name, err);
+      }
+    }
+  }
+
+  return remotePatients;
+}
+
+/**
  * Restores records from Google Drive appDataFolder into the local database.
+ * If targetPatientIds is provided, only restores those patients and their records.
  */
 export async function restoreFromGoogleDrive(
-  config: GoogleDriveConfig
+  config: GoogleDriveConfig,
+  targetPatientIds?: string[]
 ): Promise<{ patients: number; reports: number; conditions: number }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
+  const allowedPatientIdSet = targetPatientIds
+    ? new Set(targetPatientIds)
+    : null;
 
   let restoredPatients = 0;
   let restoredReports = 0;
@@ -207,27 +289,59 @@ export async function restoreFromGoogleDrive(
       const resource = JSON.parse(decryptedText);
 
       if (resource.resourceType === 'Patient') {
-        await insertPatientRecord(resource as Patient);
-        restoredPatients++;
+        const pat = resource as Patient;
+        if (!pat.meta?.lastUpdated) {
+          pat.meta = {
+            ...pat.meta,
+            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+          };
+        }
+        if (
+          !allowedPatientIdSet ||
+          (pat.id && allowedPatientIdSet.has(pat.id))
+        ) {
+          await insertPatientRecord(pat, config.userSub);
+          restoredPatients++;
+        }
       } else if (resource.resourceType === 'DiagnosticReport') {
         const report = resource as DiagnosticReport;
+        if (!report.meta?.lastUpdated) {
+          report.meta = {
+            ...report.meta,
+            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+          };
+        }
         const observations = (report.contained || []) as Observation[];
         const patientId =
           report.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
-        await insertDiagnosticReportRecord(report, observations, patientId);
-        restoredReports++;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          await insertDiagnosticReportRecord(report, observations, patientId);
+          restoredReports++;
+        }
       } else if (resource.resourceType === 'Condition') {
         const cond = resource as Condition;
+        if (!cond.meta?.lastUpdated) {
+          cond.meta = {
+            ...cond.meta,
+            lastUpdated: file.modifiedTime || '1970-01-01T00:00:00.000Z',
+          };
+        }
         const patientId =
           cond.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
-        await insertConditionRecord(cond, patientId);
-        restoredConditions++;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          await insertConditionRecord(cond, patientId);
+          restoredConditions++;
+        }
       }
     } catch (err) {
       console.warn('Failed to restore file from Google Drive:', file.name, err);
     }
+  }
+
+  if (restoredPatients > 0 || restoredReports > 0 || restoredConditions > 0) {
+    notifyDatabaseChanged(['patients', 'conditions', 'diagnostic_reports']);
   }
 
   const updatedConfig: GoogleDriveConfig = {
@@ -245,13 +359,115 @@ export async function restoreFromGoogleDrive(
 
 /**
  * Performs full two-way incremental sync between local database and Google Drive.
+ * ONLY syncs profiles that are currently active/stored locally and marked for sync with this Google account.
  */
 export async function syncWithGoogleDrive(
   config: GoogleDriveConfig
 ): Promise<{ patients: number; reports: number; conditions: number }> {
-  // 1. Pull down remote records first
-  const restored = await restoreFromGoogleDrive(config);
-  // 2. Push any local records up
+  const allStoredPatients = await fetchAllStoredPatients();
+  const eligiblePatients = allStoredPatients.filter(
+    (sp) => sp.syncAccount === config.userSub
+  );
+  const eligiblePatientIds = eligiblePatients
+    .map((sp) => sp.patient.id)
+    .filter((id): id is string => Boolean(id));
+
+  // 1. Pull down remote records only for local eligible patients (or none if empty array)
+  const restored = await restoreFromGoogleDrive(config, eligiblePatientIds);
+  // 2. Push any local records up for eligible patients
   await backupToGoogleDrive(config);
   return restored;
+}
+
+/**
+ * Deletes a patient and all their associated reports and conditions from Google Drive appDataFolder.
+ */
+export async function deletePatientFromGoogleDrive(
+  config: GoogleDriveConfig,
+  patientId: string
+): Promise<{ deletedFiles: number }> {
+  const key = await deriveKeyFromGoogleUser(config.userSub);
+  const remoteFiles = await listAppDataFiles(config.accessToken);
+  let deletedCount = 0;
+
+  for (const file of remoteFiles) {
+    if (!file.name.endsWith('.json.enc')) continue;
+
+    // Check direct patient file
+    if (file.name === `patient_${patientId}.json.enc`) {
+      try {
+        await deleteAppDataFile(config.accessToken, file.id);
+        deletedCount++;
+      } catch (err) {
+        console.warn(
+          'Failed to delete patient file from Google Drive:',
+          file.name,
+          err
+        );
+      }
+      continue;
+    }
+
+    // Check report or condition files belonging to this patient
+    if (file.name.startsWith('report_') || file.name.startsWith('condition_')) {
+      try {
+        const encryptedBytes = await downloadAppDataFile(
+          config.accessToken,
+          file.id
+        );
+        const decryptedText = await decryptText(encryptedBytes, key);
+        const resource = JSON.parse(decryptedText);
+
+        const resourcePatientId =
+          resource.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+
+        if (resourcePatientId === patientId) {
+          await deleteAppDataFile(config.accessToken, file.id);
+          deletedCount++;
+        }
+      } catch (err) {
+        console.warn(
+          'Failed to inspect/delete remote file for patient:',
+          file.name,
+          err
+        );
+      }
+    }
+  }
+
+  const updatedConfig: GoogleDriveConfig = {
+    ...config,
+    lastSyncTimestamp: new Date().toISOString(),
+  };
+  await saveGoogleDriveConfig(updatedConfig);
+
+  return { deletedFiles: deletedCount };
+}
+
+/**
+ * Deletes all encrypted app data files from Google Drive appDataFolder.
+ */
+export async function deleteAllAppDataFromGoogleDrive(
+  config: GoogleDriveConfig
+): Promise<{ deletedFiles: number }> {
+  const remoteFiles = await listAppDataFiles(config.accessToken);
+  let deletedCount = 0;
+
+  for (const file of remoteFiles) {
+    if (file.name.endsWith('.json.enc')) {
+      try {
+        await deleteAppDataFile(config.accessToken, file.id);
+        deletedCount++;
+      } catch (err) {
+        console.warn(
+          'Failed to delete app data file from Google Drive:',
+          file.name,
+          err
+        );
+      }
+    }
+  }
+
+  return { deletedFiles: deletedCount };
 }

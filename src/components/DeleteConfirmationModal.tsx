@@ -8,15 +8,19 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { Check } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 
 export interface DeleteConfirmationModalProps {
   visible: boolean;
   title: string;
   message: string;
+  confirmLabel?: string;
   requireCountdown?: boolean;
   countdownDuration?: number;
-  onConfirm: () => void;
+  showCloudDeleteOption?: boolean;
+  cloudDeleteLabel?: string;
+  onConfirm: (options?: { deleteFromCloud?: boolean }) => void | Promise<void>;
   onCancel: () => void;
   testID?: string;
 }
@@ -24,9 +28,12 @@ export interface DeleteConfirmationModalProps {
 interface DeleteConfirmationModalContentProps {
   title: string;
   message: string;
+  confirmLabel?: string;
   requireCountdown: boolean;
   countdownDuration: number;
-  onConfirm: () => void;
+  showCloudDeleteOption?: boolean;
+  cloudDeleteLabel?: string;
+  onConfirm: (options?: { deleteFromCloud?: boolean }) => void | Promise<void>;
   onCancel: () => void;
   testID: string;
 }
@@ -34,8 +41,11 @@ interface DeleteConfirmationModalContentProps {
 function DeleteConfirmationModalContent({
   title,
   message,
+  confirmLabel = 'Delete',
   requireCountdown,
   countdownDuration,
+  showCloudDeleteOption = false,
+  cloudDeleteLabel = 'Delete from Google Drive',
   onConfirm,
   onCancel,
   testID,
@@ -43,6 +53,7 @@ function DeleteConfirmationModalContent({
   const [countdown, setCountdown] = useState(
     requireCountdown ? countdownDuration : 0
   );
+  const [deleteFromCloud, setDeleteFromCloud] = useState(false);
 
   useEffect(() => {
     if (!requireCountdown) return;
@@ -70,6 +81,29 @@ function DeleteConfirmationModalContent({
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.message}>{message}</Text>
 
+            {showCloudDeleteOption && (
+              <TouchableOpacity
+                testID="delete-from-cloud-checkbox"
+                style={styles.checkboxRow}
+                onPress={() => setDeleteFromCloud((prev) => !prev)}
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: deleteFromCloud }}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    deleteFromCloud && styles.checkboxChecked,
+                  ]}
+                >
+                  {deleteFromCloud && (
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  )}
+                </View>
+                <Text style={styles.checkboxLabel}>{cloudDeleteLabel}</Text>
+              </TouchableOpacity>
+            )}
+
             <View style={styles.actionsRow}>
               <TouchableOpacity
                 testID="delete-modal-cancel-button"
@@ -87,11 +121,13 @@ function DeleteConfirmationModalContent({
                   isDeleteDisabled && styles.deleteButtonDisabled,
                 ]}
                 disabled={isDeleteDisabled}
-                onPress={onConfirm}
+                onPress={() => onConfirm({ deleteFromCloud })}
                 activeOpacity={0.8}
               >
                 <Text style={styles.deleteButtonText}>
-                  {countdown > 0 ? `Delete (${countdown}s)` : 'Delete'}
+                  {countdown > 0
+                    ? `${confirmLabel} (${countdown}s)`
+                    : confirmLabel}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -106,8 +142,11 @@ export function DeleteConfirmationModal({
   visible,
   title,
   message,
+  confirmLabel = 'Delete',
   requireCountdown = true,
   countdownDuration = 5,
+  showCloudDeleteOption = false,
+  cloudDeleteLabel = 'Delete from Google Drive',
   onConfirm,
   onCancel,
   testID = 'delete-confirmation-modal',
@@ -125,8 +164,11 @@ export function DeleteConfirmationModal({
       <DeleteConfirmationModalContent
         title={title}
         message={message}
+        confirmLabel={confirmLabel}
         requireCountdown={requireCountdown}
         countdownDuration={countdownDuration}
+        showCloudDeleteOption={showCloudDeleteOption}
+        cloudDeleteLabel={cloudDeleteLabel}
         onConfirm={onConfirm}
         onCancel={onCancel}
         testID={testID}
@@ -174,7 +216,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.light.textSecondary,
     lineHeight: 20,
+    marginBottom: 20,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 24,
+    gap: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: COLORS.light.border,
+    backgroundColor: COLORS.light.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.light.primary,
+    borderColor: COLORS.light.primary,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: COLORS.light.foreground,
+    fontWeight: '500',
   },
   actionsRow: {
     flexDirection: 'row',

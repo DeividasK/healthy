@@ -2,6 +2,7 @@ import type { Condition } from 'fhir/r5';
 import { getDb } from '../../database/db';
 import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
+import { notifyDatabaseChanged } from '../../database/dbEvents';
 
 /**
  * Persists a Condition record using SQLite.
@@ -17,6 +18,14 @@ export async function insertConditionRecord(
 
   const db = await getDb();
   const now = new Date().toISOString();
+  const incomingTimestamp = condition.meta?.lastUpdated || now;
+  const conditionWithMeta: Condition = {
+    ...condition,
+    meta: {
+      ...condition.meta,
+      lastUpdated: incomingTimestamp,
+    },
+  };
   const onsetDate = condition.onsetDateTime || now.split('T')[0];
   const title = getConditionTitle(condition);
   const notesText = getConditionNotes(condition);
@@ -29,15 +38,23 @@ export async function insertConditionRecord(
   const abatementDate = condition.abatementDateTime || null;
   const condId = condition.id;
 
+  let didUpdate = false;
   await db.withTransactionAsync(async () => {
-    const existing = await db.getFirstAsync<{ patient_id: string }>(
-      `SELECT patient_id FROM conditions WHERE id = ?;`,
-      [condId]
-    );
+    const existing = await db.getFirstAsync<{
+      patient_id: string;
+      updated_at: string;
+    }>(`SELECT patient_id, updated_at FROM conditions WHERE id = ?;`, [condId]);
     if (existing?.patient_id && existing.patient_id !== patientId) {
       throw new Error(
         `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
+    }
+
+    // Last-write-wins: if existing record is newer than or same as incoming change, keep existing
+    if (existing?.updated_at && incomingTimestamp) {
+      if (existing.updated_at >= incomingTimestamp) {
+        return;
+      }
     }
 
     await db.runAsync(
@@ -65,12 +82,17 @@ export async function insertConditionRecord(
         bodySite,
         abatementDate,
         notesText,
-        JSON.stringify(condition),
+        JSON.stringify(conditionWithMeta),
         now,
-        now,
+        incomingTimestamp,
       ]
     );
+    didUpdate = true;
   });
+
+  if (didUpdate) {
+    notifyDatabaseChanged(['conditions']);
+  }
 }
 
 /**
@@ -81,18 +103,24 @@ export async function fetchAllConditionRecords(
   patientId?: string
 ): Promise<Condition[]> {
   const db = await getDb();
-  let rows: { fhir_json: string }[] = [];
+  let rows: { fhir_json: string; updated_at: string }[] = [];
   if (patientId) {
-    rows = await db.getAllAsync<{ fhir_json: string }>(
-      `SELECT fhir_json FROM conditions WHERE patient_id = ? ORDER BY onset_date DESC, created_at DESC, id DESC;`,
+    rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
+      `SELECT fhir_json, updated_at FROM conditions WHERE patient_id = ? ORDER BY onset_date DESC, created_at DESC, id DESC;`,
       [patientId]
     );
   } else {
-    rows = await db.getAllAsync<{ fhir_json: string }>(
-      `SELECT fhir_json FROM conditions ORDER BY onset_date DESC, created_at DESC, id DESC;`
+    rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
+      `SELECT fhir_json, updated_at FROM conditions ORDER BY onset_date DESC, created_at DESC, id DESC;`
     );
   }
-  return rows.map((r) => JSON.parse(r.fhir_json));
+  return rows.map((r) => {
+    const cond: Condition = JSON.parse(r.fhir_json);
+    if (!cond.meta?.lastUpdated && r.updated_at) {
+      cond.meta = { ...cond.meta, lastUpdated: r.updated_at };
+    }
+    return cond;
+  });
 }
 
 /**
@@ -103,11 +131,16 @@ export async function fetchConditionById(
   id: string
 ): Promise<Condition | null> {
   const db = await getDb();
-  const row = await db.getFirstAsync<{ fhir_json: string }>(
-    `SELECT fhir_json FROM conditions WHERE id = ?;`,
+  const row = await db.getFirstAsync<{ fhir_json: string; updated_at: string }>(
+    `SELECT fhir_json, updated_at FROM conditions WHERE id = ?;`,
     [id]
   );
-  return row ? JSON.parse(row.fhir_json) : null;
+  if (!row) return null;
+  const cond: Condition = JSON.parse(row.fhir_json);
+  if (!cond.meta?.lastUpdated && row.updated_at) {
+    cond.meta = { ...cond.meta, lastUpdated: row.updated_at };
+  }
+  return cond;
 }
 
 /**
@@ -117,4 +150,5 @@ export async function fetchConditionById(
 export async function deleteConditionRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM conditions WHERE id = ?;`, [id]);
+  notifyDatabaseChanged(['conditions']);
 }

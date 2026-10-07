@@ -88,6 +88,23 @@ function RootLayoutNav() {
           options={{
             headerShown: false,
             presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+            animation: Platform.OS === 'web' ? 'none' : 'default',
+          }}
+        />
+        <Stack.Screen
+          name="profile/restore-from-file"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+            animation: Platform.OS === 'web' ? 'none' : 'default',
+          }}
+        />
+        <Stack.Screen
+          name="profile/restore-from-google-drive"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+            animation: Platform.OS === 'web' ? 'none' : 'default',
           }}
         />
         <Stack.Screen

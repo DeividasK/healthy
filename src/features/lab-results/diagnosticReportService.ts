@@ -182,6 +182,9 @@ export async function createAndSaveDiagnosticReport(
   const report: DiagnosticReport = {
     resourceType: 'DiagnosticReport',
     id: reportId,
+    meta: {
+      lastUpdated: now,
+    },
     status: 'final',
     category: [
       {

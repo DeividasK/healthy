@@ -24,7 +24,10 @@ import { useSync } from '../../context/SyncContext';
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
   isEdit?: boolean;
+  showBackButton?: boolean;
+  hideHeader?: boolean;
   onSave: (values: PatientInput) => Promise<void>;
+  onDelete?: () => void;
 }
 
 const GENDER_OPTIONS: {
@@ -48,7 +51,10 @@ function showAlert(title: string, message: string) {
 export function ProfileForm({
   initialValues,
   isEdit = false,
+  showBackButton = true,
+  hideHeader = false,
   onSave,
+  onDelete,
 }: ProfileFormProps) {
   const router = useRouter();
   const { triggerSync } = useSync();
@@ -135,171 +141,198 @@ export function ProfileForm({
   const selectedGenderLabel =
     GENDER_OPTIONS.find((g) => g.id === gender)?.label || 'Unknown';
 
+  const formContent = (
+    <>
+      {!hideHeader && (
+        <View style={styles.header}>
+          {showBackButton ? (
+            <TouchableOpacity
+              testID="back-button"
+              accessibilityLabel="Back"
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 32 }} />
+          )}
+          <Text style={styles.headerTitle}>
+            {isEdit ? 'Edit Profile' : 'New Profile'}
+          </Text>
+          <View style={{ width: 32 }} />
+        </View>
+      )}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          hideHeader && styles.scrollContentEmbedded,
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Avatar Preview */}
+        <View style={styles.avatarPreviewContainer}>
+          <View style={styles.avatarCircle}>
+            <User size={40} color={COLORS.light.primary} />
+          </View>
+        </View>
+
+        {/* Given Name Field */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Given Name *</Text>
+          <TextInput
+            testID="patient-given-name-input"
+            id="patient-given-name-input"
+            nativeID="patient-given-name-input"
+            name="patientGivenName"
+            accessibilityLabel="Given Name"
+            style={styles.input}
+            placeholder="e.g. Jane"
+            placeholderTextColor={COLORS.light.placeholder}
+            value={givenName}
+            onChangeText={setGivenName}
+            autoCapitalize="words"
+          />
+        </View>
+
+        {/* Family Name Field */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Family Name</Text>
+          <TextInput
+            testID="patient-family-name-input"
+            id="patient-family-name-input"
+            nativeID="patient-family-name-input"
+            name="patientFamilyName"
+            accessibilityLabel="Family Name"
+            style={styles.input}
+            placeholder="e.g. Doe"
+            placeholderTextColor={COLORS.light.placeholder}
+            value={familyName}
+            onChangeText={setFamilyName}
+            autoCapitalize="words"
+          />
+        </View>
+
+        {/* Gender Selector */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Gender</Text>
+          {Platform.OS === 'web' ? (
+            <View style={styles.webSelectWrapper}>
+              <select
+                data-testid="patient-gender-select"
+                id="patient-gender-select"
+                name="patientGender"
+                value={gender}
+                onChange={(e) =>
+                  setGender(
+                    e.target.value as 'male' | 'female' | 'other' | 'unknown'
+                  )
+                }
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${COLORS.light.border}`,
+                  backgroundColor: COLORS.light.card,
+                  color: COLORS.light.foreground,
+                  fontSize: 16,
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {GENDER_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </View>
+          ) : (
+            <TouchableOpacity
+              testID="patient-gender-picker"
+              style={styles.pickerButton}
+              onPress={handleGenderPress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.pickerButtonText}>{selectedGenderLabel}</Text>
+              <ChevronDown size={18} color={COLORS.light.iconMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Date of Birth Field */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Date of Birth</Text>
+          <NativeDatePicker
+            testID="patient-birth-date-picker"
+            id="patient-birth-date-picker"
+            name="patientBirthDate"
+            variant="input"
+            value={birthDate}
+            onChange={(date) => setBirthDate(date)}
+          />
+        </View>
+      </ScrollView>
+
+      {/* Bottom Save Bar */}
+      <View style={[styles.bottomBar, hideHeader && styles.bottomBarEmbedded]}>
+        <TouchableOpacity
+          testID="save-profile-button"
+          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSaving}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Saving...' : 'Save Profile'}
+          </Text>
+        </TouchableOpacity>
+
+        {isEdit && onDelete && (
+          <TouchableOpacity
+            testID="delete-profile-button"
+            style={styles.deleteProfileButton}
+            onPress={onDelete}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.deleteProfileButtonText}>Delete Profile</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Gender Selection Modal for Android */}
+      <AddOptionsModal
+        visible={showGenderModal}
+        onClose={() => setShowGenderModal(false)}
+        overlayTestID="gender-menu-overlay"
+        cardTestID="gender-menu-card"
+        options={GENDER_OPTIONS.map((opt) => ({
+          id: opt.id,
+          label: opt.label,
+          icon: null,
+          testID: `gender-option-${opt.id}`,
+          onPress: () => {
+            setGender(opt.id);
+            setShowGenderModal(false);
+          },
+        }))}
+      />
+    </>
+  );
+
+  if (hideHeader) {
+    return formContent;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="back-button"
-            accessibilityLabel="Back"
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEdit ? 'Edit Profile' : 'New Profile'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Avatar Preview */}
-          <View style={styles.avatarPreviewContainer}>
-            <View style={styles.avatarCircle}>
-              <User size={40} color={COLORS.light.primary} />
-            </View>
-          </View>
-
-          {/* Given Name Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Given Name *</Text>
-            <TextInput
-              testID="patient-given-name-input"
-              id="patient-given-name-input"
-              nativeID="patient-given-name-input"
-              name="patientGivenName"
-              accessibilityLabel="Given Name"
-              style={styles.input}
-              placeholder="e.g. Jane"
-              placeholderTextColor={COLORS.light.placeholder}
-              value={givenName}
-              onChangeText={setGivenName}
-              autoCapitalize="words"
-            />
-          </View>
-
-          {/* Family Name Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Family Name</Text>
-            <TextInput
-              testID="patient-family-name-input"
-              id="patient-family-name-input"
-              nativeID="patient-family-name-input"
-              name="patientFamilyName"
-              accessibilityLabel="Family Name"
-              style={styles.input}
-              placeholder="e.g. Doe"
-              placeholderTextColor={COLORS.light.placeholder}
-              value={familyName}
-              onChangeText={setFamilyName}
-              autoCapitalize="words"
-            />
-          </View>
-
-          {/* Gender Selector */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Gender</Text>
-            {Platform.OS === 'web' ? (
-              <View style={styles.webSelectWrapper}>
-                <select
-                  data-testid="patient-gender-select"
-                  id="patient-gender-select"
-                  name="patientGender"
-                  value={gender}
-                  onChange={(e) =>
-                    setGender(
-                      e.target.value as 'male' | 'female' | 'other' | 'unknown'
-                    )
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    border: `1px solid ${COLORS.light.border}`,
-                    backgroundColor: COLORS.light.card,
-                    color: COLORS.light.foreground,
-                    fontSize: 16,
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {GENDER_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </View>
-            ) : (
-              <TouchableOpacity
-                testID="patient-gender-picker"
-                style={styles.pickerButton}
-                onPress={handleGenderPress}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.pickerButtonText}>
-                  {selectedGenderLabel}
-                </Text>
-                <ChevronDown size={18} color={COLORS.light.iconMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Date of Birth Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Date of Birth</Text>
-            <NativeDatePicker
-              testID="patient-birth-date-picker"
-              id="patient-birth-date-picker"
-              name="patientBirthDate"
-              variant="input"
-              value={birthDate}
-              onChange={(date) => setBirthDate(date)}
-            />
-          </View>
-        </ScrollView>
-
-        {/* Bottom Save Bar */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            testID="save-profile-button"
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={isSaving}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save Profile'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Gender Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showGenderModal}
-          onClose={() => setShowGenderModal(false)}
-          overlayTestID="gender-menu-overlay"
-          cardTestID="gender-menu-card"
-          options={GENDER_OPTIONS.map((opt) => ({
-            id: opt.id,
-            label: opt.label,
-            icon: null,
-            testID: `gender-option-${opt.id}`,
-            onPress: () => {
-              setGender(opt.id);
-              setShowGenderModal(false);
-            },
-          }))}
-        />
+        {formContent}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -336,6 +369,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
+  },
+  scrollContentEmbedded: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 16,
   },
   avatarPreviewContainer: {
     alignItems: 'center',
@@ -394,6 +432,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.light.border,
   },
+  bottomBarEmbedded: {
+    paddingHorizontal: 0,
+    paddingTop: 8,
+    paddingBottom: 24,
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+  },
   saveButton: {
     backgroundColor: COLORS.light.primary,
     borderRadius: 12,
@@ -406,6 +451,21 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: COLORS.light.primaryForeground,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  deleteProfileButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteProfileButtonText: {
+    color: COLORS.light.destructive,
     fontSize: 16,
     fontWeight: '700',
   },

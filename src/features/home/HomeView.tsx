@@ -36,14 +36,26 @@ import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import { useActivePatient } from '../profile/ActivePatientContext';
 import { useSync } from '../../context/SyncContext';
+import { useDatabaseSubscription } from '../../database/dbEvents';
 
 export function HomeView() {
   const router = useRouter();
   const { triggerSync } = useSync();
-  const { activePatientId } = useActivePatient();
+  const {
+    activePatientId,
+    patients,
+    isLoading: isPatientLoading,
+  } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // If no patients exist in the app, redirect immediately to /profile/new
+  useEffect(() => {
+    if (!isPatientLoading && patients.length === 0) {
+      router.replace('/profile/new');
+    }
+  }, [isPatientLoading, patients.length, router]);
 
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -126,6 +138,13 @@ export function HomeView() {
     useCallback(() => {
       loadData();
     }, [loadData])
+  );
+
+  useDatabaseSubscription(
+    ['conditions', 'diagnostic_reports', 'observations'],
+    () => {
+      loadData();
+    }
   );
 
   const formatDate = (dateStr: string) => {
