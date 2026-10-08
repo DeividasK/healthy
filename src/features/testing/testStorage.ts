@@ -70,7 +70,8 @@ export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
 export async function createPatientViaUI(
   page: Page,
 ): Promise<void> {
-  await page.goto('/profile/new');
+  // This redirects to new profile creation page
+  await page.goto('/');
   await page.getByTestId('patient-given-name-input').fill(DEFAULT_PROFILE_FIRST_NAME);
   await page.getByTestId('patient-family-name-input').fill(DEFAULT_PROFILE_LAST_NAME);
   await page.getByTestId('save-profile-button').click();

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { Suspense } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
+import { COLORS } from '../theme/colors';
 
 export * from './migrations';
 
@@ -53,9 +55,28 @@ export interface DatabaseProviderProps {
  */
 export function DatabaseProvider({ children }: DatabaseProviderProps) {
   return (
-    <SQLiteProvider databaseName={DB_NAME} onInit={migrateDatabase}>
-      {children}
-    </SQLiteProvider>
+    <Suspense
+      fallback={
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: COLORS.light.background,
+          }}
+        >
+          <ActivityIndicator size="large" color={COLORS.light.primary} />
+        </View>
+      }
+    >
+      <SQLiteProvider
+        databaseName={DB_NAME}
+        onInit={migrateDatabase}
+        useSuspense
+      >
+        {children}
+      </SQLiteProvider>
+    </Suspense>
   );
 }
 
