@@ -22,6 +22,7 @@ Follow these rules when designing, updating, and executing test suites:
 - **Succinct & Maintainable**: Tests **MUST** be updated if possible to keep testing succinct (avoid duplicate test cases when existing tests can be updated or expanded).
 - **Plan Disclosure**: The implementation plan **MUST** describe new E2E tests that will be written.
 - **When to Run**: Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
+- **Targeted Test Execution (`--only-changed`)**: When re-running tests during development or iterating on fixes, utilize `pnpm exec playwright test --only-changed` (or `pnpm exec playwright test --only-changed=main`) to selectively execute only the tests affected by the changed files instead of the entire test suite. Specific test file paths can also be supplied directly (e.g. `pnpm playwright test src/features/<feature>/<name>.e2e.ts`).
 
 ## Visual Tests (`pnpm test:visual`)
 

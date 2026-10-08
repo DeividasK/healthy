@@ -35,6 +35,7 @@ import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import { useActivePatient } from '../profile/ActivePatientContext';
+import { getAllPatients } from '../profile/patientService';
 import { useSync } from '../../context/SyncContext';
 import { useDatabaseSubscription } from '../../database/dbEvents';
 
@@ -45,6 +46,7 @@ export function HomeView() {
     activePatientId,
     patients,
     isLoading: isPatientLoading,
+    refreshPatients,
   } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
@@ -53,9 +55,20 @@ export function HomeView() {
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
   useEffect(() => {
     if (!isPatientLoading && patients.length === 0) {
-      router.replace('/profile/new');
+      let isMounted = true;
+      getAllPatients().then((actualPatients) => {
+        if (!isMounted) return;
+        if (actualPatients.length === 0) {
+          router.replace('/profile/new');
+        } else {
+          refreshPatients();
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [isPatientLoading, patients.length, router]);
+  }, [isPatientLoading, patients.length, refreshPatients, router]);
 
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);

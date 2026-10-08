@@ -320,9 +320,8 @@ export function GoogleSyncCard() {
           testID="google-sync-disconnected"
         >
           <Text style={styles.description}>
-            Sync your encrypted records across devices using your private Google
-            Drive AppData folder. Records are encrypted client-side with AES-256
-            before syncing.
+            Sync your records safely across devices using your private Google
+            Drive AppData folder, isolated from all other applications.
           </Text>
 
           <TouchableOpacity

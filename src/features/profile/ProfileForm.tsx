@@ -26,6 +26,7 @@ export interface ProfileFormProps {
   isEdit?: boolean;
   showBackButton?: boolean;
   hideHeader?: boolean;
+  navigateOnSave?: boolean;
   onSave: (values: PatientInput) => Promise<void>;
   onDelete?: () => void;
 }
@@ -53,6 +54,7 @@ export function ProfileForm({
   isEdit = false,
   showBackButton = true,
   hideHeader = false,
+  navigateOnSave = true,
   onSave,
   onDelete,
 }: ProfileFormProps) {
@@ -125,10 +127,12 @@ export function ProfileForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/profile');
+      if (navigateOnSave) {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/profile');
+        }
       }
     } catch (err) {
       console.error('Failed to save profile:', err);

@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import 'react-native-reanimated';
 import '../global.css';
 
@@ -39,11 +39,25 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-app-ready', 'true');
+      }
     }
   }, [loaded]);
 
   if (!loaded) {
-    return null;
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: COLORS.light.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={COLORS.light.primary} />
+      </View>
+    );
   }
 
   return (

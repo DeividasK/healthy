@@ -1,30 +1,36 @@
 import { expect, type Page } from '@playwright/test';
 
 /**
- * Resets all browser storage (localStorage, sessionStorage, and OPFS / IndexedDB files) for clean test runs.
+ * Resets browser storage (localStorage and sessionStorage) for clean test runs.
  */
 export async function clearAppStorage(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.evaluate(async () => {
+  await page.goto('/profile/new');
+  await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
+  await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
-
-    if (
-      typeof (
-        window as unknown as { __clearAllDatabaseTables?: () => Promise<void> }
-      ).__clearAllDatabaseTables === 'function'
-    ) {
-      try {
-        await (
-          window as unknown as {
-            __clearAllDatabaseTables?: () => Promise<void>;
-          }
-        ).__clearAllDatabaseTables!();
-      } catch {
-        // Ignore table wipe error if database not initialized yet
-      }
-    }
   });
+}
+
+/**
+ * Deletes the active profile through the standard UI flow.
+ */
+export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
+  await page.goto('/profile');
+  const editBtn = page.getByTestId('edit-profile-button').first();
+  await expect(editBtn).toBeVisible();
+  await editBtn.click();
+
+  const deleteBtn = page.getByTestId('delete-profile-button');
+  await expect(deleteBtn).toBeVisible();
+  await deleteBtn.click();
+
+  const modal = page.getByTestId('delete-profile-modal');
+  await expect(modal).toBeVisible();
+
+  const confirmBtn = page.getByTestId('delete-modal-confirm-button');
+  await expect(confirmBtn).toBeEnabled({ timeout: 10000 });
+  await confirmBtn.click();
 }
 
 /**
@@ -37,13 +43,20 @@ export async function createPatientViaUI(
     familyName?: string;
   } = {}
 ): Promise<void> {
-  await page.goto('/profile/new');
+  if (!page.url().includes('/profile/new')) {
+    await page.goto('/profile/new');
+  }
+  await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
   await expect(page.getByTestId('add-profile-header-title')).toBeVisible();
   const givenNameInput = page.getByTestId('patient-given-name-input');
   await expect(givenNameInput).toBeVisible();
   const nameToFill = options.givenName || 'Self';
   await givenNameInput.click();
   await givenNameInput.fill(nameToFill);
+  if ((await givenNameInput.inputValue()) !== nameToFill) {
+    await givenNameInput.click();
+    await givenNameInput.pressSequentially(nameToFill, { delay: 30 });
+  }
   await expect(givenNameInput).toHaveValue(nameToFill);
 
   if (options.familyName) {
@@ -121,10 +134,10 @@ export async function createConditionViaUI(
     notes?: string;
   }
 ): Promise<void> {
-  const fab = page.getByTestId('floating-add-button');
+  const fab = page.getByTestId('floating-add-button').first();
   if (await fab.isVisible()) {
     await fab.click();
-    await page.getByTestId('menu-add-condition').click();
+    await page.getByTestId('menu-add-condition').first().click();
   } else {
     await page.goto('/condition/add');
   }

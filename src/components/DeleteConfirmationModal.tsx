@@ -89,6 +89,7 @@ function DeleteConfirmationModalContent({
                 activeOpacity={0.7}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: deleteFromCloud }}
+                aria-checked={deleteFromCloud}
               >
                 <View
                   style={[

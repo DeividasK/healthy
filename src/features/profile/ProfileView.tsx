@@ -12,7 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Pencil, Plus, User, Check } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
-import { getPatientDisplayName, getPatientInitials } from './patientService';
+import {
+  getPatientDisplayName,
+  getPatientInitials,
+  getAllPatients,
+} from './patientService';
 import { formatDisplayDate } from '../../utils/dateUtils';
 import { COLORS } from '../../theme/colors';
 import { GoogleSyncCard } from './GoogleSyncCard';
@@ -25,13 +29,25 @@ export function ProfileView() {
     patients,
     isLoading,
     setActivePatientId,
+    refreshPatients,
   } = useActivePatient();
 
   React.useEffect(() => {
     if (!isLoading && patients.length === 0) {
-      router.replace('/profile/new');
+      let isMounted = true;
+      getAllPatients().then((actualPatients) => {
+        if (!isMounted) return;
+        if (actualPatients.length === 0) {
+          router.replace('/profile/new');
+        } else {
+          refreshPatients();
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [isLoading, patients.length, router]);
+  }, [isLoading, patients.length, refreshPatients, router]);
 
   const activeName = getPatientDisplayName(activePatient);
   const activeInitials = getPatientInitials(activePatient);

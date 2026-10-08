@@ -63,7 +63,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await page.getByTestId('save-profile-button').click();
 
     // 5. Verify back on profile screen and "Jane Doe" is active
-    await expect(page.getByTestId('profile-display-name')).toHaveText(
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
       'Jane Doe'
     );
 
@@ -359,6 +359,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await page.getByTestId('patient-given-name-input').fill('Synced');
     await page.getByTestId('patient-family-name-input').fill('Jane');
     await page.getByTestId('save-profile-button').click();
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+      'Synced Jane'
+    );
 
     // Connect "Synced Jane" to Google Drive
     const connectBtn = page.getByTestId('google-signin-button');
@@ -367,7 +370,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     }
 
     // Let's edit the profile
-    await page.getByTestId('edit-profile-button').click();
+    await page.getByTestId('edit-profile-button').first().click();
     await expect(page).toHaveURL(/.*profile\/.*\/edit/);
 
     const deleteBtn = page.getByTestId('delete-profile-button');
@@ -418,7 +421,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     );
 
     // 3. Delete Bob Smith locally (with cloud delete unchecked)
-    await page.getByTestId('edit-profile-button').click();
+    await page.getByTestId('edit-profile-button').first().click();
     await page.getByTestId('delete-profile-button').click();
 
     const modal = page.getByTestId('delete-profile-modal');
@@ -569,7 +572,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await page.getByTestId('save-profile-button').click();
 
     // 4. Verify 'Bob' is now active, but NOT connected to Google Drive!
-    await expect(page.getByTestId('profile-display-name')).toHaveText('Bob');
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+      'Bob'
+    );
     await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
 
     // 5. Switch back to 'Self'
@@ -578,7 +583,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       .filter({ hasText: 'Self' })
       .first()
       .click();
-    await expect(page.getByTestId('profile-display-name')).toHaveText('Self');
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+      'Self'
+    );
     // 'Self' shows connected Google Drive state
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'alice@gmail.com'

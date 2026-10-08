@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage } from '../testing/testStorage';
+import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -10,17 +10,15 @@ test.use({
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Profile Views - Visual Regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
-  });
-
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.goto('/profile');
 
     await expect(page.getByText('Profile', { exact: true })).toBeVisible();
     await expect(page.getByTestId('active-profile-card')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Profile View - Details and Switcher', testInfo);
   });
 
@@ -31,6 +29,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await expect(page.getByText('Add Profile')).toBeVisible();
     await expect(page.getByTestId('option-create-profile')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Profile View - Add Profile Options', testInfo);
   });
 
@@ -38,6 +37,7 @@ test.describe('Profile Views - Visual Regression', () => {
     page,
   }, testInfo) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await page.evaluate(() => {
       localStorage.setItem(
         '@healthy_device_google_sync_config',
@@ -66,6 +66,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await expect(page.getByTestId('google-sync-card')).toBeVisible();
     await expect(page.getByTestId('connected-user-email')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Profile View - Connected Google Sync State',
@@ -83,6 +84,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await expect(page.getByTestId('option-restore-file')).toBeVisible();
     await expect(page.getByTestId('select-profile-file-button')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Profile View - Restore From File Option',
@@ -100,6 +102,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
     await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Profile View - Restore From Google Drive Option',

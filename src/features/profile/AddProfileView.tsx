@@ -23,6 +23,7 @@ import type { Patient } from 'fhir/r5';
 import { ProfileForm } from './ProfileForm';
 import {
   createOrUpdatePatient,
+  getAllPatients,
   getPatientDisplayName,
   getPatientInitials,
 } from './patientService';
@@ -214,7 +215,16 @@ export function AddProfileView({
       await setActivePatientId(created.id);
     }
     triggerSync().catch(() => {});
-    router.replace('/');
+    const all = await getAllPatients();
+    if (all.length > 1) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/profile');
+      }
+    } else {
+      router.replace('/');
+    }
   };
 
   return (
@@ -374,6 +384,7 @@ export function AddProfileView({
               isEdit={false}
               showBackButton={false}
               hideHeader={true}
+              navigateOnSave={false}
               onSave={handleManualSave}
             />
           </View>

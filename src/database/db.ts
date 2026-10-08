@@ -86,11 +86,3 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM patients;
   `);
 }
-
-if (typeof window !== 'undefined') {
-  (
-    window as unknown as {
-      __clearAllDatabaseTables?: typeof clearAllDatabaseTables;
-    }
-  ).__clearAllDatabaseTables = clearAllDatabaseTables;
-}

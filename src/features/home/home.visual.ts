@@ -1,5 +1,9 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage, createReportViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createReportViaUI,
+} from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -11,23 +15,23 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
+    await clearAppStorage(page);
+    await createPatientViaUI(page);
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
     await page.goto('/');
 
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
     await expect(page.getByTestId('floating-add-button')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Home View - Empty State', testInfo);
   });
 
   test('Home View - Populated with Single Report', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
     await createReportViaUI(page, {
       biomarkers: [
         { name: 'Hemoglobin', value: '14.5' },
@@ -40,13 +44,13 @@ test.describe('Home View - Visual Regression', () => {
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
     await expect(page.getByText('"Routine morning blood test"')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
   });
 
   test('Home View - Multi-Report with All Status Badges', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
     await createReportViaUI(page, {
       biomarkers: [
         { name: 'Hemoglobin', value: '15.2' },
@@ -70,6 +74,7 @@ test.describe('Home View - Visual Regression', () => {
     await expect(page.getByText('Low', { exact: true })).toBeVisible();
     await expect(page.getByText('High', { exact: true })).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Home View - Multi-Report with Status Badges',
