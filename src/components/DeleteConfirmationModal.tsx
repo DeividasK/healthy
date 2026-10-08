@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
-  TouchableWithoutFeedback,
+  Pressable,
 } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
@@ -74,68 +74,66 @@ function DeleteConfirmationModalContent({
   const isDeleteDisabled = countdown > 0;
 
   return (
-    <TouchableWithoutFeedback onPress={onCancel}>
-      <View style={styles.backdrop}>
-        <TouchableWithoutFeedback>
-          <View style={styles.card} testID={`${testID}-card`}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
+    <Pressable style={styles.backdrop} onPress={onCancel}>
+      <Pressable
+        style={styles.card}
+        testID={`${testID}-card`}
+        onPress={(e) => e.stopPropagation?.()}
+      >
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.message}>{message}</Text>
 
-            {showCloudDeleteOption && (
-              <TouchableOpacity
-                testID="delete-from-cloud-checkbox"
-                style={styles.checkboxRow}
-                onPress={() => setDeleteFromCloud((prev) => !prev)}
-                activeOpacity={0.7}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: deleteFromCloud }}
-                aria-checked={deleteFromCloud}
-              >
-                <View
-                  style={[
-                    styles.checkbox,
-                    deleteFromCloud && styles.checkboxChecked,
-                  ]}
-                >
-                  {deleteFromCloud && (
-                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
-                  )}
-                </View>
-                <Text style={styles.checkboxLabel}>{cloudDeleteLabel}</Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                testID="delete-modal-cancel-button"
-                style={styles.cancelButton}
-                onPress={onCancel}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                testID="delete-modal-confirm-button"
-                style={[
-                  styles.deleteButton,
-                  isDeleteDisabled && styles.deleteButtonDisabled,
-                ]}
-                disabled={isDeleteDisabled}
-                onPress={() => onConfirm({ deleteFromCloud })}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.deleteButtonText}>
-                  {countdown > 0
-                    ? `${confirmLabel} (${countdown}s)`
-                    : confirmLabel}
-                </Text>
-              </TouchableOpacity>
+        {showCloudDeleteOption && (
+          <TouchableOpacity
+            testID="delete-from-cloud-checkbox"
+            style={styles.checkboxRow}
+            onPress={() => setDeleteFromCloud((prev) => !prev)}
+            activeOpacity={0.7}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: deleteFromCloud }}
+            aria-checked={deleteFromCloud}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                deleteFromCloud && styles.checkboxChecked,
+              ]}
+            >
+              {deleteFromCloud && (
+                <Check size={14} color="#FFFFFF" strokeWidth={3} />
+              )}
             </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </View>
-    </TouchableWithoutFeedback>
+            <Text style={styles.checkboxLabel}>{cloudDeleteLabel}</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            testID="delete-modal-cancel-button"
+            style={styles.cancelButton}
+            onPress={onCancel}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            testID="delete-modal-confirm-button"
+            style={[
+              styles.deleteButton,
+              isDeleteDisabled && styles.deleteButtonDisabled,
+            ]}
+            disabled={isDeleteDisabled}
+            onPress={() => onConfirm({ deleteFromCloud })}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.deleteButtonText}>
+              {countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

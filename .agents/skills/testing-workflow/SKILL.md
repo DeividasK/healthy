@@ -12,7 +12,7 @@ Follow these rules when designing, updating, and executing test suites:
 
 - **Typecheck**: `pnpm tsc --noEmit`
 - **Lint**: `pnpm expo lint`
-- **Web Dev Server Smoke Check**: `pnpm test:web-dev` (ensures `expo start --web` responds with 200 OK and no static errors/worker failures before completion)
+- **E2E & Console Health**: `pnpm test:e2e` (runs Playwright suite against the Expo web dev server with automatic console error and warning assertions)
 - **Formatting**: `pnpm format:check` (or `pnpm format`)
 
 ## End-to-End Tests (`pnpm test:e2e`)

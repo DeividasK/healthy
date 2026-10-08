@@ -1,4 +1,28 @@
-import { expect, type Page } from '@playwright/test';
+import { test as baseTest, expect, type Page } from '@playwright/test';
+
+export { expect };
+
+export interface ConsoleMonitor {
+  /**
+   * Temporarily ignores specific error or warning message substrings or RegExp patterns
+   * for the duration of the current test.
+   */
+  ignore: (...patterns: (string | RegExp)[]) => void;
+  assertNoErrors: () => void;
+  getErrors: () => string[];
+  getWarnings: () => string[];
+}
+
+export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
+  consoleMonitor: [
+    async ({ page }, use) => {
+      const monitor = setupConsoleMonitor(page);
+      await use(monitor);
+      monitor.assertNoErrors();
+    },
+    { auto: true },
+  ],
+});
 
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
 export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
@@ -164,3 +188,63 @@ export async function createTestConditionViaUI(
 
 export const createConditionViaUI = createTestConditionViaUI;
 export const addConditionViaUI = createTestConditionViaUI;
+
+/**
+ * Attaches a console and pageerror monitor to the page that tracks console errors and warnings.
+ * Provides assertNoErrors to verify no unhandled errors or unexpected warnings occurred.
+ */
+export function setupConsoleMonitor(page: Page): ConsoleMonitor {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const testIgnoredPatterns: (string | RegExp)[] = [];
+
+  /**
+   * List of known, benign third-party library warning substrings to filter globally.
+   * Every entry MUST document why it is ignored and when/if it can be removed.
+   */
+  const globalIgnoredPatterns = [
+    // 1. 'props.pointerEvents is deprecated. Use style.pointerEvents'
+    // - Why: react-native-web (0.21.0+) deprecated the JSX `pointerEvents` prop on <View> in favor of `style.pointerEvents`.
+    //   Upstream navigation containers (@react-navigation, expo-router, react-native-screens) still pass `pointerEvents="box-none"`
+    //   or `pointerEvents="auto"` to internal screen and header wrapper views during development (__DEV__ = true).
+    //   Application code does not pass pointerEvents as a prop anywhere.
+    // - When/if it can be removed: Can be removed once upstream Expo Router and React Navigation release updates
+    //   that migrate all internal screen wrappers to `style.pointerEvents` (expected in Expo SDK 58+).
+    'props.pointerEvents is deprecated. Use style.pointerEvents',
+  ];
+
+  page.on('console', (msg) => {
+    const text = msg.text();
+    const type = msg.type();
+    if (type === 'error') {
+      errors.push(text);
+    } else if (type === 'warning') {
+      if (!globalIgnoredPatterns.some((pattern) => text.includes(pattern))) {
+        warnings.push(text);
+      }
+    }
+  });
+
+  page.on('pageerror', (err) => {
+    errors.push(err.message);
+  });
+
+  const isIgnored = (msg: string) =>
+    testIgnoredPatterns.some((pattern) =>
+      typeof pattern === 'string' ? msg.includes(pattern) : pattern.test(msg)
+    );
+
+  return {
+    ignore: (...patterns: (string | RegExp)[]) => {
+      testIgnoredPatterns.push(...patterns);
+    },
+    assertNoErrors: () => {
+      const unignoredErrors = errors.filter((err) => !isIgnored(err));
+      const unignoredWarnings = warnings.filter((warn) => !isIgnored(warn));
+      expect(unignoredErrors).toEqual([]);
+      expect(unignoredWarnings).toEqual([]);
+    },
+    getErrors: () => errors.filter((err) => !isIgnored(err)),
+    getWarnings: () => warnings.filter((warn) => !isIgnored(warn)),
+  };
+}

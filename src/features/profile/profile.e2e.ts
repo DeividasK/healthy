@@ -1,5 +1,6 @@
-import { test, expect } from '@playwright/test';
 import {
+  test,
+  expect,
   clearAppStorage,
   createPatientViaUI,
   createConditionViaUI,
@@ -224,7 +225,13 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
   test('should gracefully handle google auth token expiry without requiring manual reconnection', async ({
     page,
+    consoleMonitor,
   }) => {
+    // Chromium logs 401 HTTP response to console during token expiry simulation; ignore for this negative test.
+    consoleMonitor.ignore(
+      'Failed to load resource: the server responded with a status of 401'
+    );
+
     // Intercept Google Drive API to simulate a 401 token expiry error during sync
     await page.route('https://www.googleapis.com/**', (route) => {
       route.fulfill({
@@ -264,7 +271,13 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
   test('should silently refresh expired google auth token via GIS and continue sync without interruption', async ({
     page,
+    consoleMonitor,
   }) => {
+    // Chromium logs 401 HTTP response to console during token expiry simulation; ignore for this negative test.
+    consoleMonitor.ignore(
+      'Failed to load resource: the server responded with a status of 401'
+    );
+
     // 1. Route Google Drive APIs
     let driveCallsWithNewToken = 0;
     await page.route('https://www.googleapis.com/**', (route) => {
@@ -620,6 +633,15 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test('should individually connect profiles to Google Drive and show accurate status badges', async ({
     page,
   }) => {
+    // Intercept Google Drive API so sync calls succeed
+    await page.route('https://www.googleapis.com/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ files: [], id: 'file-mock-123' }),
+      });
+    });
+
     // 1. Navigate to Profile
     await page.getByTestId('profile-header-button').click();
 

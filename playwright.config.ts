@@ -29,9 +29,9 @@ export default defineConfig<ChromaticConfig>({
     },
   ],
   webServer: {
-    command: 'node scripts/serve-dist.js 8089',
+    command: 'pnpm expo start --web --port 8089',
     url: 'http://localhost:8089',
     reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    timeout: 60000,
   },
 });

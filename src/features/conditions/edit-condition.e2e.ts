@@ -1,5 +1,7 @@
-import { test, expect } from '@playwright/test';
 import {
+  test,
+  expect,
+  clearAppStorage,
   createPatientViaUI,
   createTestConditionViaUI,
   DEFAULT_CONDITION_TITLE,
@@ -7,6 +9,7 @@ import {
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
     await createPatientViaUI(page);
   });
 
