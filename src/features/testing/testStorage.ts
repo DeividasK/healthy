@@ -1,4 +1,17 @@
-import { expect, type Page } from '@playwright/test';
+import { test as baseTest, expect, type Page } from '@playwright/test';
+
+export { expect };
+
+export const test = baseTest.extend<{ consoleGuard: void }>({
+  consoleGuard: [
+    async ({ page }, use) => {
+      const { assertNoErrors } = setupConsoleMonitor(page);
+      await use();
+      assertNoErrors();
+    },
+    { auto: true },
+  ],
+});
 
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
 export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
@@ -164,3 +177,52 @@ export async function createTestConditionViaUI(
 
 export const createConditionViaUI = createTestConditionViaUI;
 export const addConditionViaUI = createTestConditionViaUI;
+
+/**
+ * Attaches a console and pageerror monitor to the page that tracks console errors and warnings.
+ * Provides assertNoErrors to verify no unhandled errors or unexpected warnings occurred.
+ */
+export function setupConsoleMonitor(page: Page) {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  /**
+   * List of known, benign third-party library warning substrings to filter.
+   * Every entry MUST document why it is ignored and when/if it can be removed.
+   */
+  const ignoredPatterns = [
+    // 1. 'props.pointerEvents is deprecated. Use style.pointerEvents'
+    // - Why: react-native-web (0.21.0+) deprecated the JSX `pointerEvents` prop on <View> in favor of `style.pointerEvents`.
+    //   Upstream navigation containers (@react-navigation, expo-router, react-native-screens) still pass `pointerEvents="box-none"`
+    //   or `pointerEvents="auto"` to internal screen and header wrapper views during development (__DEV__ = true).
+    //   Application code does not pass pointerEvents as a prop anywhere.
+    // - When/if it can be removed: Can be removed once upstream Expo Router and React Navigation release updates
+    //   that migrate all internal screen wrappers to `style.pointerEvents` (expected in Expo SDK 58+).
+    'props.pointerEvents is deprecated. Use style.pointerEvents',
+  ];
+
+  page.on('console', (msg) => {
+    const text = msg.text();
+    const type = msg.type();
+    if (type === 'error') {
+      errors.push(text);
+    } else if (type === 'warning') {
+      if (!ignoredPatterns.some((pattern) => text.includes(pattern))) {
+        warnings.push(text);
+      }
+    }
+  });
+
+  page.on('pageerror', (err) => {
+    errors.push(err.message);
+  });
+
+  return {
+    assertNoErrors: () => {
+      expect(errors).toEqual([]);
+      expect(warnings).toEqual([]);
+    },
+    getErrors: () => errors,
+    getWarnings: () => warnings,
+  };
+}

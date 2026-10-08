@@ -10,11 +10,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -492,9 +492,10 @@ export function HomeView() {
 
         {/* Floating Add Menu & Backdrop */}
         {showAddMenu && (
-          <TouchableWithoutFeedback onPress={() => setShowAddMenu(false)}>
-            <View style={styles.floatingMenuBackdrop} />
-          </TouchableWithoutFeedback>
+          <Pressable
+            style={styles.floatingMenuBackdrop}
+            onPress={() => setShowAddMenu(false)}
+          />
         )}
 
         {showAddMenu && (
@@ -538,12 +539,7 @@ export function HomeView() {
         )}
 
         {/* Floating Add Button at bottom middle */}
-        <View
-          style={[
-            styles.floatingButtonContainer,
-            { pointerEvents: 'box-none' },
-          ]}
-        >
+        <View style={styles.floatingButtonContainer}>
           <PlusCircleButton
             testID="floating-add-button"
             variant="primary"
@@ -796,6 +792,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 100,
+    pointerEvents: 'box-none',
   },
   floatingButton: {
     ...Platform.select({

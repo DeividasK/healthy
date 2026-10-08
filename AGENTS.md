@@ -30,7 +30,7 @@ pnpm expo install --fix      # fix incompatible package versions
 
 ### Verification Guidelines
 
-- **Always run**: `pnpm tsc --noEmit`, `pnpm expo lint`, and `pnpm test:web-dev` before declaring any task done. Never declare completion when `pnpm web` or dev server is broken.
+- **Always run**: `pnpm tsc --noEmit`, `pnpm expo lint`, and `pnpm test:e2e` before declaring any task done. Never declare completion when `pnpm web` or dev server is broken.
 - **Visual Tests (`pnpm test:visual`)**:
   - You **MUST** write visual tests for new views.
   - Visual tests for that view **MUST** be collocated next to the view inside `src/features/<feature>/` and named accordingly (e.g. `src/features/<feature>/<view-name>.visual.ts`).
