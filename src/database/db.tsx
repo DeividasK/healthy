@@ -1,10 +1,11 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
+import React from 'react';
+import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
 
 export * from './migrations';
 
-const DB_NAME = 'healthy.db';
+export const DB_NAME = 'healthy.db';
 let dbInstance: SQLiteDatabase | null = null;
 let initPromise: Promise<SQLiteDatabase> | null = null;
 
@@ -13,6 +14,49 @@ let initPromise: Promise<SQLiteDatabase> | null = null;
  */
 export function getNativeDb(): SQLiteDatabase | null {
   return dbInstance;
+}
+
+/**
+ * Applies PRAGMAs and migrations to a database instance.
+ * Used by expo-sqlite's SQLiteProvider onInit callback.
+ */
+export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+
+  // Query current schema version
+  const verRow = (await db.getFirstAsync<{ user_version: number }>(
+    'PRAGMA user_version;'
+  )) as { user_version?: number } | null | undefined;
+  let currentVersion = verRow?.user_version ?? 0;
+
+  // Sequentially apply missing migrations
+  for (const migration of DATABASE_MIGRATIONS) {
+    if (currentVersion < migration.version) {
+      await db.withTransactionAsync(async () => {
+        await db.execAsync(migration.sql);
+        await db.execAsync(`PRAGMA user_version = ${migration.version};`);
+      });
+      currentVersion = migration.version;
+    }
+  }
+
+  dbInstance = db;
+}
+
+export interface DatabaseProviderProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Configured SQLiteProvider for the Healthy application.
+ * Manages the SQLite database connection, PRAGMA setup, and schema migrations.
+ */
+export function DatabaseProvider({ children }: DatabaseProviderProps) {
+  return (
+    <SQLiteProvider databaseName={DB_NAME} onInit={migrateDatabase}>
+      {children}
+    </SQLiteProvider>
+  );
 }
 
 /**
@@ -34,26 +78,7 @@ export async function initializeDatabase(): Promise<SQLiteDatabase> {
   initPromise = (async () => {
     try {
       const db = await openNativeDatabase(DB_NAME);
-      await db.execAsync('PRAGMA foreign_keys = ON;');
-
-      // Query current schema version
-      const verRow = (await db.getFirstAsync<{ user_version: number }>(
-        'PRAGMA user_version;'
-      )) as { user_version?: number } | null | undefined;
-      let currentVersion = verRow?.user_version ?? 0;
-
-      // Sequentially apply missing migrations
-      for (const migration of DATABASE_MIGRATIONS) {
-        if (currentVersion < migration.version) {
-          await db.withTransactionAsync(async () => {
-            await db.execAsync(migration.sql);
-            await db.execAsync(`PRAGMA user_version = ${migration.version};`);
-          });
-          currentVersion = migration.version;
-        }
-      }
-
-      dbInstance = db;
+      await migrateDatabase(db);
       return db;
     } catch (err) {
       console.error('Failed to initialize SQLite database:', err);

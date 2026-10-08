@@ -1,7 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import 'react-native-reanimated';
 import '../global.css';
@@ -13,7 +13,7 @@ import { ActivePatientProvider } from '../src/features/profile/ActivePatientCont
 import { ProfileHeaderButton } from '../src/features/profile/ProfileHeaderButton';
 import { SyncProvider } from '../src/context/SyncContext';
 import { SyncHeaderIndicator } from '../src/components/SyncHeaderIndicator';
-import { initializeDatabase } from '../src/database/db';
+import { DatabaseProvider } from '../src/database/db';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -27,43 +27,25 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+function AppReadyHandler() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  return null;
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  const [dbReady, setDbReady] = useState(false);
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    let isMounted = true;
-    initializeDatabase()
-      .then(() => {
-        if (isMounted) setDbReady(true);
-      })
-      .catch((err) => {
-        console.error('Failed to initialize database in RootLayout:', err);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const isReady = loaded && dbReady;
-
-  useEffect(() => {
-    if (isReady) {
-      SplashScreen.hideAsync();
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        document.documentElement.setAttribute('data-app-ready', 'true');
-      }
-    }
-  }, [isReady]);
-
-  if (!isReady) {
+  if (!loaded) {
     return (
       <View
         style={{
@@ -79,11 +61,14 @@ export default function RootLayout() {
   }
 
   return (
-    <SyncProvider>
-      <ActivePatientProvider>
-        <RootLayoutNav />
-      </ActivePatientProvider>
-    </SyncProvider>
+    <DatabaseProvider>
+      <AppReadyHandler />
+      <SyncProvider>
+        <ActivePatientProvider>
+          <RootLayoutNav />
+        </ActivePatientProvider>
+      </SyncProvider>
+    </DatabaseProvider>
   );
 }
 

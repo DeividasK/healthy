@@ -8,7 +8,6 @@ export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
  */
 export async function clearAppStorage(page: Page): Promise<void> {
   await page.goto('/');
-  await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
   await page.evaluate(async () => {
     localStorage.clear();
     sessionStorage.clear();
@@ -72,7 +71,6 @@ export async function createPatientViaUI(
   page: Page,
 ): Promise<void> {
   await page.goto('/profile/new');
-  await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
   await page.getByTestId('patient-given-name-input').fill(DEFAULT_PROFILE_FIRST_NAME);
   await page.getByTestId('patient-family-name-input').fill(DEFAULT_PROFILE_LAST_NAME);
   await page.getByTestId('save-profile-button').click();
