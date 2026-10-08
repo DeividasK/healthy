@@ -2,12 +2,23 @@ import { test as baseTest, expect, type Page } from '@playwright/test';
 
 export { expect };
 
-export const test = baseTest.extend<{ consoleGuard: void }>({
-  consoleGuard: [
+export interface ConsoleMonitor {
+  /**
+   * Temporarily ignores specific error or warning message substrings or RegExp patterns
+   * for the duration of the current test.
+   */
+  ignore: (...patterns: (string | RegExp)[]) => void;
+  assertNoErrors: () => void;
+  getErrors: () => string[];
+  getWarnings: () => string[];
+}
+
+export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
+  consoleMonitor: [
     async ({ page }, use) => {
-      const { assertNoErrors } = setupConsoleMonitor(page);
-      await use();
-      assertNoErrors();
+      const monitor = setupConsoleMonitor(page);
+      await use(monitor);
+      monitor.assertNoErrors();
     },
     { auto: true },
   ],
@@ -182,15 +193,16 @@ export const addConditionViaUI = createTestConditionViaUI;
  * Attaches a console and pageerror monitor to the page that tracks console errors and warnings.
  * Provides assertNoErrors to verify no unhandled errors or unexpected warnings occurred.
  */
-export function setupConsoleMonitor(page: Page) {
+export function setupConsoleMonitor(page: Page): ConsoleMonitor {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const testIgnoredPatterns: (string | RegExp)[] = [];
 
   /**
-   * List of known, benign third-party library warning substrings to filter.
+   * List of known, benign third-party library warning substrings to filter globally.
    * Every entry MUST document why it is ignored and when/if it can be removed.
    */
-  const ignoredPatterns = [
+  const globalIgnoredPatterns = [
     // 1. 'props.pointerEvents is deprecated. Use style.pointerEvents'
     // - Why: react-native-web (0.21.0+) deprecated the JSX `pointerEvents` prop on <View> in favor of `style.pointerEvents`.
     //   Upstream navigation containers (@react-navigation, expo-router, react-native-screens) still pass `pointerEvents="box-none"`
@@ -207,7 +219,7 @@ export function setupConsoleMonitor(page: Page) {
     if (type === 'error') {
       errors.push(text);
     } else if (type === 'warning') {
-      if (!ignoredPatterns.some((pattern) => text.includes(pattern))) {
+      if (!globalIgnoredPatterns.some((pattern) => text.includes(pattern))) {
         warnings.push(text);
       }
     }
@@ -217,12 +229,22 @@ export function setupConsoleMonitor(page: Page) {
     errors.push(err.message);
   });
 
+  const isIgnored = (msg: string) =>
+    testIgnoredPatterns.some((pattern) =>
+      typeof pattern === 'string' ? msg.includes(pattern) : pattern.test(msg)
+    );
+
   return {
-    assertNoErrors: () => {
-      expect(errors).toEqual([]);
-      expect(warnings).toEqual([]);
+    ignore: (...patterns: (string | RegExp)[]) => {
+      testIgnoredPatterns.push(...patterns);
     },
-    getErrors: () => errors,
-    getWarnings: () => warnings,
+    assertNoErrors: () => {
+      const unignoredErrors = errors.filter((err) => !isIgnored(err));
+      const unignoredWarnings = warnings.filter((warn) => !isIgnored(warn));
+      expect(unignoredErrors).toEqual([]);
+      expect(unignoredWarnings).toEqual([]);
+    },
+    getErrors: () => errors.filter((err) => !isIgnored(err)),
+    getWarnings: () => warnings.filter((warn) => !isIgnored(warn)),
   };
 }
