@@ -7,8 +7,6 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import {
   Cloud,
   CheckCircle2,
@@ -25,20 +23,12 @@ import {
   updatePatientSyncAccount,
   StoredPatient,
 } from './patientService';
+import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import { deletePatientFromGoogleDrive } from '../../services/syncManager';
 import { exportZipArchive } from '../../services/zipArchiveService';
 import { COLORS } from '../../theme/colors';
 import { useDatabaseSubscription } from '../../database/dbEvents';
-
-WebBrowser.maybeCompleteAuthSession();
-
-const googleDiscovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-  userInfoEndpoint: 'https://www.googleapis.com/oauth2/v3/userinfo',
-};
 
 export function GoogleSyncCard() {
   const {
@@ -83,106 +73,36 @@ export function GoogleSyncCard() {
     }
   });
 
-  // Google OAuth setup
-  const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'healthy',
-    preferLocalhost: true,
-  });
+  // Google OAuth Hook
+  const { signIn: promptGoogleSignIn, isReady: isGoogleReady } =
+    useGoogleAuthSignIn(async (authData: GoogleAuthPayload) => {
+      setActionLoading('connecting');
+      try {
+        const userSub = authData.userSub;
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId,
-      scopes: [
-        'openid',
-        'profile',
-        'email',
-        'https://www.googleapis.com/auth/drive.appdata',
-      ],
-      responseType: AuthSession.ResponseType.Token,
-      usePKCE: false,
-      redirectUri,
-    },
-    googleDiscovery
-  );
+        const currActive = await getActivePatient();
+        if (currActive?.id) {
+          await updatePatientSyncAccount(currActive.id, userSub);
+          await refreshPatients();
+          const updated = await getStoredPatient(currActive.id);
+          setActiveStoredPatient(updated);
+        }
 
-  useEffect(() => {
-    let isMounted = true;
-    if (response?.type === 'success') {
-      const accessToken =
-        response.authentication?.accessToken ||
-        response.params.access_token ||
-        '';
-
-      const expiresInSeconds = response.authentication?.expiresIn
-        ? Number(response.authentication.expiresIn)
-        : response.params.expires_in
-          ? Number(response.params.expires_in)
-          : 3600;
-
-      const tokenExpiresAt = Date.now() + expiresInSeconds * 1000;
-
-      if (accessToken) {
-        (async () => {
-          if (!isMounted) return;
-          setActionLoading('connecting');
-          try {
-            const res = await fetch(
-              'https://www.googleapis.com/oauth2/v3/userinfo',
-              {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              }
-            );
-            if (!res.ok) {
-              throw new Error(`Failed to fetch user info: HTTP ${res.status}`);
-            }
-            const userInfo = await res.json();
-            if (!userInfo.sub) {
-              throw new Error(
-                'Google user info response did not contain a user ID (sub).'
-              );
-            }
-            if (!isMounted) return;
-            const userSub = userInfo.sub;
-
-            const currActive = await getActivePatient();
-            if (currActive?.id) {
-              await updatePatientSyncAccount(currActive.id, userSub);
-              await refreshPatients();
-              const updated = await getStoredPatient(currActive.id);
-              if (isMounted) {
-                setActiveStoredPatient(updated);
-              }
-            }
-
-            await connectWithGoogle({
-              accessToken,
-              tokenExpiresAt,
-              userSub,
-              userEmail: userInfo.email,
-              userName: userInfo.name,
-            });
-            if (isMounted) {
-              setFeedbackMessage(
-                'Google Drive connected and initial sync started!'
-              );
-            }
-          } catch (err) {
-            console.error('Google profile fetch failed:', err);
-            Alert.alert('Error', 'Failed to retrieve Google profile.');
-          } finally {
-            if (isMounted) {
-              setActionLoading(null);
-            }
-          }
-        })();
+        await connectWithGoogle({
+          accessToken: authData.accessToken,
+          tokenExpiresAt: authData.tokenExpiresAt,
+          userSub,
+          userEmail: authData.userEmail,
+          userName: authData.userName,
+        });
+        setFeedbackMessage('Google Drive connected and initial sync started!');
+      } catch (err) {
+        console.error('Google profile connect failed:', err);
+        Alert.alert('Error', 'Failed to connect Google profile.');
+      } finally {
+        setActionLoading(null);
       }
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [response, connectWithGoogle, refreshPatients]);
+    });
 
   const isProfileSynced = Boolean(
     config &&
@@ -216,7 +136,7 @@ export function GoogleSyncCard() {
         }
       }
     } else {
-      promptAsync();
+      promptGoogleSignIn();
     }
   };
 
@@ -327,7 +247,9 @@ export function GoogleSyncCard() {
           <TouchableOpacity
             testID="google-signin-button"
             style={styles.googleBtn}
-            disabled={(!request && !config) || actionLoading === 'connecting'}
+            disabled={
+              (!isGoogleReady && !config) || actionLoading === 'connecting'
+            }
             onPress={handleConnectGoogleDrive}
             activeOpacity={0.8}
           >

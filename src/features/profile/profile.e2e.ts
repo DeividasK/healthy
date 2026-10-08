@@ -262,6 +262,92 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     );
   });
 
+  test('should silently refresh expired google auth token via GIS and continue sync without interruption', async ({
+    page,
+  }) => {
+    // 1. Route Google Drive APIs
+    let driveCallsWithNewToken = 0;
+    await page.route('https://www.googleapis.com/**', (route) => {
+      const authHeader = route.request().headers()['authorization'] || '';
+      if (authHeader.includes('fresh-gis-token')) {
+        driveCallsWithNewToken++;
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ files: [], id: 'file-refreshed-123' }),
+        });
+      } else {
+        route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { message: 'Invalid Credentials' } }),
+        });
+      }
+    });
+
+    // 2. Mock GIS on window before navigation
+    await page.addInitScript(() => {
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: (config: any) => ({
+              requestAccessToken: (_options: any) => {
+                setTimeout(() => {
+                  config.callback({
+                    access_token: 'fresh-gis-token',
+                    expires_in: 3600,
+                  });
+                }, 10);
+              },
+            }),
+          },
+        },
+      };
+    });
+
+    await page.getByTestId('profile-header-button').click();
+
+    // 3. Set expired token in config
+    await page.evaluate(() => {
+      localStorage.setItem(
+        '@healthy_device_google_sync_config',
+        JSON.stringify({
+          accessToken: 'stale-token',
+          tokenExpiresAt: Date.now() - 100000,
+          userEmail: 'bob@gmail.com',
+          userName: 'Bob Test',
+          userSub: 'bob-sub-67890',
+        })
+      );
+    });
+
+    await page.reload();
+
+    const connectBtn = page.getByTestId('google-signin-button');
+    await expect(connectBtn).toBeVisible();
+    await connectBtn.click();
+
+    // 4. Verify connected state
+    await expect(page.getByTestId('connected-user-email')).toHaveText(
+      'bob@gmail.com'
+    );
+
+    // 5. Verify up to date button appears and fresh token was used in Drive API
+    await expect(page.getByTestId('up-to-date-button')).toBeVisible({
+      timeout: 10000,
+    });
+    expect(driveCallsWithNewToken).toBeGreaterThan(0);
+
+    // 6. Verify updated token is stored in localStorage
+    const savedConfig = await page.evaluate(() => {
+      return JSON.parse(
+        localStorage.getItem('@healthy_device_google_sync_config') || '{}'
+      );
+    });
+    expect(savedConfig.accessToken).toBe('fresh-gis-token');
+    expect(savedConfig.tokenExpiresAt).toBeGreaterThan(Date.now());
+  });
+
   test('should present 3 creation options on /profile/new (Create, Restore file, Restore GDrive) and navigate properly', async ({
     page,
   }) => {

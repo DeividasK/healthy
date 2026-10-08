@@ -14,6 +14,10 @@ import {
   syncWithGoogleDrive,
   refreshGoogleAccessToken,
 } from '../services/syncManager';
+import {
+  loadGisScript,
+  silentRefreshWebAccessToken,
+} from '../services/googleAuthWebService';
 import { fetchAllStoredPatients } from '../features/profile/patientRepository';
 
 export type SyncState = 'idle' | 'syncing' | 'just_synced' | 'error';
@@ -77,6 +81,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
     (async () => {
       try {
+        if (Platform.OS === 'web') {
+          loadGisScript().catch((err) => {
+            console.warn('Failed to preload GIS script:', err);
+          });
+        }
         const loaded = await loadGoogleDriveConfig();
         if (!isMounted) return;
         setConfig(loaded);
@@ -118,30 +127,46 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       try {
         let activeConfig = config;
 
-        // 1. If refresh token is available and token has expired or is nearing expiry, refresh preemptively
+        // 1. Proactive token refresh if near expiry or expired
         const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
-        if (
-          activeConfig.refreshToken &&
-          activeConfig.tokenExpiresAt &&
-          Date.now() >= activeConfig.tokenExpiresAt - 60000 &&
-          clientId
-        ) {
-          try {
-            const refreshRes = await refreshGoogleAccessToken(
-              activeConfig.refreshToken,
-              clientId
-            );
-            activeConfig = {
-              ...activeConfig,
-              accessToken: refreshRes.accessToken,
-              tokenExpiresAt: refreshRes.expiresIn
-                ? Date.now() + refreshRes.expiresIn * 1000
-                : undefined,
-            };
-            await saveGoogleDriveConfig(activeConfig);
-            setConfig(activeConfig);
-          } catch (refreshErr) {
-            console.warn('Preemptive token refresh failed:', refreshErr);
+        const isNearExpiry =
+          Boolean(activeConfig.tokenExpiresAt) &&
+          Date.now() >= (activeConfig.tokenExpiresAt ?? 0) - 60000;
+
+        if (isNearExpiry) {
+          if (activeConfig.refreshToken && clientId) {
+            try {
+              const refreshRes = await refreshGoogleAccessToken(
+                activeConfig.refreshToken,
+                clientId
+              );
+              activeConfig = {
+                ...activeConfig,
+                accessToken: refreshRes.accessToken,
+                tokenExpiresAt: refreshRes.expiresIn
+                  ? Date.now() + refreshRes.expiresIn * 1000
+                  : undefined,
+              };
+              await saveGoogleDriveConfig(activeConfig);
+              setConfig(activeConfig);
+            } catch (refreshErr) {
+              console.warn('Preemptive token refresh failed:', refreshErr);
+            }
+          } else if (Platform.OS === 'web') {
+            try {
+              const refreshRes = await silentRefreshWebAccessToken(
+                activeConfig.userEmail
+              );
+              activeConfig = {
+                ...activeConfig,
+                accessToken: refreshRes.accessToken,
+                tokenExpiresAt: Date.now() + refreshRes.expiresIn * 1000,
+              };
+              await saveGoogleDriveConfig(activeConfig);
+              setConfig(activeConfig);
+            } catch (gisErr) {
+              console.warn('Preemptive web silent refresh failed:', gisErr);
+            }
           }
         }
 
@@ -156,23 +181,52 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 firstErr.message.includes('UNAUTHENTICATED'))) ||
             false;
 
-          // If auth error and we have a refreshToken, attempt one refresh & retry
-          if (isAuthError && activeConfig.refreshToken && clientId) {
-            const refreshRes = await refreshGoogleAccessToken(
-              activeConfig.refreshToken,
-              clientId
-            );
-            activeConfig = {
-              ...activeConfig,
-              accessToken: refreshRes.accessToken,
-              tokenExpiresAt: refreshRes.expiresIn
-                ? Date.now() + refreshRes.expiresIn * 1000
-                : undefined,
-            };
-            await saveGoogleDriveConfig(activeConfig);
-            setConfig(activeConfig);
-            // Retry sync with new token
-            await syncWithGoogleDrive(activeConfig);
+          // If auth error, attempt one refresh & retry
+          if (isAuthError) {
+            let refreshed = false;
+            if (activeConfig.refreshToken && clientId) {
+              try {
+                const refreshRes = await refreshGoogleAccessToken(
+                  activeConfig.refreshToken,
+                  clientId
+                );
+                activeConfig = {
+                  ...activeConfig,
+                  accessToken: refreshRes.accessToken,
+                  tokenExpiresAt: refreshRes.expiresIn
+                    ? Date.now() + refreshRes.expiresIn * 1000
+                    : undefined,
+                };
+                await saveGoogleDriveConfig(activeConfig);
+                setConfig(activeConfig);
+                refreshed = true;
+              } catch (refreshErr) {
+                console.warn('Token refresh retry failed:', refreshErr);
+              }
+            } else if (Platform.OS === 'web') {
+              try {
+                const refreshRes = await silentRefreshWebAccessToken(
+                  activeConfig.userEmail
+                );
+                activeConfig = {
+                  ...activeConfig,
+                  accessToken: refreshRes.accessToken,
+                  tokenExpiresAt: Date.now() + refreshRes.expiresIn * 1000,
+                };
+                await saveGoogleDriveConfig(activeConfig);
+                setConfig(activeConfig);
+                refreshed = true;
+              } catch (gisErr) {
+                console.warn('Web silent refresh retry failed:', gisErr);
+              }
+            }
+
+            if (refreshed) {
+              // Retry sync with new token
+              await syncWithGoogleDrive(activeConfig);
+            } else {
+              throw firstErr;
+            }
           } else {
             throw firstErr;
           }
