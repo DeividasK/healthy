@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
   FileText,
@@ -41,6 +41,7 @@ import { useDatabaseSubscription } from '../../database/dbEvents';
 
 export function HomeView() {
   const router = useRouter();
+  const pathname = usePathname();
   const { triggerSync } = useSync();
   const {
     activePatientId,
@@ -54,6 +55,7 @@ export function HomeView() {
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
   useEffect(() => {
+    if (pathname !== '/') return;
     if (!isPatientLoading && patients.length === 0) {
       let isMounted = true;
       getAllPatients().then((actualPatients) => {
@@ -68,7 +70,7 @@ export function HomeView() {
         isMounted = false;
       };
     }
-  }, [isPatientLoading, patients.length, refreshPatients, router]);
+  }, [pathname, isPatientLoading, patients.length, refreshPatients, router]);
 
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);
