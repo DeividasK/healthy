@@ -1,3 +1,3 @@
-import { AddLabResultView } from '../../src/features/lab-results/AddLabResultView';
+import { AddLabResultView } from '@/src/features/lab-results/AddLabResultView';
 
 export default AddLabResultView;

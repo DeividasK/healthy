@@ -14,7 +14,7 @@ import {
   LogOut,
   Archive,
 } from 'lucide-react-native';
-import { useSync } from '../../context/SyncContext';
+import { useSync } from '@/src/context/SyncContext';
 import { useActivePatient } from './ActivePatientContext';
 import {
   getActivePatient,
@@ -24,11 +24,11 @@ import {
   StoredPatient,
 } from './patientService';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
-import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
-import { deletePatientFromGoogleDrive } from '../../services/syncManager';
-import { exportZipArchive } from '../../services/zipArchiveService';
-import { COLORS } from '../../theme/colors';
-import { useDatabaseSubscription } from '../../database/dbEvents';
+import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
+import { deletePatientFromGoogleDrive } from '@/src/services/syncManager';
+import { exportZipArchive } from '@/src/services/zipArchiveService';
+import { COLORS } from '@/src/theme/colors';
+import { useDatabaseSubscription } from '@/src/database/dbEvents';
 
 export function GoogleSyncCard() {
   const {

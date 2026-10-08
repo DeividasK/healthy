@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ChevronDown } from 'lucide-react-native';
-import { UnitOption } from '../data/cbcMarkers';
-import { COLORS } from '../theme/colors';
+import { UnitOption } from '@/src/data/cbcMarkers';
+import { COLORS } from '@/src/theme/colors';
 
 export interface NativeUnitPickerProps {
   selectedUnit: string;

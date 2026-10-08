@@ -29,14 +29,14 @@ import {
 } from './patientService';
 import { useActivePatient } from './ActivePatientContext';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
-import { useSync } from '../../context/SyncContext';
+import { useSync } from '@/src/context/SyncContext';
 import {
   listRemoteGooglePatients,
   restoreFromGoogleDrive,
   GoogleDriveConfig,
-} from '../../services/syncManager';
-import { restoreFromZipBytes } from '../../services/zipArchiveService';
-import { COLORS } from '../../theme/colors';
+} from '@/src/services/syncManager';
+import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
+import { COLORS } from '@/src/theme/colors';
 
 export interface AddProfileViewProps {
   initialTab?: 'create' | 'file' | 'gdrive';

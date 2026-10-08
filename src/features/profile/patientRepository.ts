@@ -1,7 +1,7 @@
 import type { Patient } from 'fhir/r5';
-import { getDb } from '../../database/db';
-import { notifyDatabaseChanged } from '../../database/dbEvents';
-import { isExistingNewerOrEqual } from '../../utils/dateUtils';
+import { getDb } from '@/src/database/db';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 export const DEFAULT_PATIENT_ID = 'patient-default';
 

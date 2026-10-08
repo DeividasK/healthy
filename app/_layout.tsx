@@ -6,14 +6,14 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 import 'react-native-reanimated';
 import '../global.css';
 
-import { AppLogo } from '../src/components/AppLogo';
-import { COLORS } from '../src/theme/colors';
-import { NAV_THEME } from '../src/theme';
-import { ActivePatientProvider } from '../src/features/profile/ActivePatientContext';
-import { ProfileHeaderButton } from '../src/features/profile/ProfileHeaderButton';
-import { SyncProvider } from '../src/context/SyncContext';
-import { SyncHeaderIndicator } from '../src/components/SyncHeaderIndicator';
-import { DatabaseProvider } from '../src/database/db';
+import { AppLogo } from '@/src/components/AppLogo';
+import { COLORS } from '@/src/theme/colors';
+import { NAV_THEME } from '@/src/theme';
+import { ActivePatientProvider } from '@/src/features/profile/ActivePatientContext';
+import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton';
+import { SyncProvider } from '@/src/context/SyncContext';
+import { SyncHeaderIndicator } from '@/src/components/SyncHeaderIndicator';
+import { DatabaseProvider } from '@/src/database/db';
 
 export {
   // Catch any errors thrown by the Layout component.

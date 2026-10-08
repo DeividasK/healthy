@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { createPatientViaUI } from '../testing/testStorage';
+import { createPatientViaUI } from '@/src/features/testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },

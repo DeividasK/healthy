@@ -13,15 +13,15 @@ import {
   fetchAllPatients,
   insertPatientRecord,
   DEFAULT_PATIENT_ID,
-} from '../features/profile/patientRepository';
+} from '@/src/features/profile/patientRepository';
 import {
   fetchAllDiagnosticReportRecords,
   insertDiagnosticReportRecord,
-} from '../features/lab-results/labResultsRepository';
+} from '@/src/features/lab-results/labResultsRepository';
 import {
   fetchAllConditionRecords,
   insertConditionRecord,
-} from '../features/conditions/conditionsRepository';
+} from '@/src/features/conditions/conditionsRepository';
 
 export interface ZipExportSummary {
   patientCount: number;

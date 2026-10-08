@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { AlertTriangle, X, RefreshCw } from 'lucide-react-native';
-import { COLORS } from '../../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 interface SyncErrorModalProps {
   visible: boolean;

@@ -10,13 +10,13 @@ import {
   getPatientDisplayName,
 } from './patientService';
 import { useActivePatient } from './ActivePatientContext';
-import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
-import { useSync } from '../../context/SyncContext';
+import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
+import { useSync } from '@/src/context/SyncContext';
 import {
   loadGoogleDriveConfig,
   deletePatientFromGoogleDrive,
-} from '../../services/syncManager';
-import { COLORS } from '../../theme/colors';
+} from '@/src/services/syncManager';
+import { COLORS } from '@/src/theme/colors';
 
 export function EditProfileView() {
   const router = useRouter();

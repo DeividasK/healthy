@@ -13,12 +13,12 @@ import {
   saveGoogleDriveConfig,
   syncWithGoogleDrive,
   refreshGoogleAccessToken,
-} from '../services/syncManager';
+} from '@/src/services/syncManager';
 import {
   loadGisScript,
   silentRefreshWebAccessToken,
-} from '../services/googleAuthWebService';
-import { fetchAllStoredPatients } from '../features/profile/patientRepository';
+} from '@/src/services/googleAuthWebService';
+import { fetchAllStoredPatients } from '@/src/features/profile/patientRepository';
 
 export type SyncState = 'idle' | 'syncing' | 'just_synced' | 'error';
 

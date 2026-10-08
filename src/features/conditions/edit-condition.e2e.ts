@@ -3,7 +3,7 @@ import {
   createPatientViaUI,
   createTestConditionViaUI,
   DEFAULT_CONDITION_TITLE,
-} from '../testing/testStorage';
+} from '@/src/features/testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {

@@ -22,17 +22,17 @@ import {
   fetchAllStoredPatients,
   insertPatientRecord,
   DEFAULT_PATIENT_ID,
-} from '../features/profile/patientRepository';
+} from '@/src/features/profile/patientRepository';
 import {
   fetchAllDiagnosticReportRecords,
   insertDiagnosticReportRecord,
-} from '../features/lab-results/labResultsRepository';
+} from '@/src/features/lab-results/labResultsRepository';
 import {
   fetchAllConditionRecords,
   insertConditionRecord,
-} from '../features/conditions/conditionsRepository';
-import { notifyDatabaseChanged } from '../database/dbEvents';
-import { isExistingNewerOrEqual } from '../utils/dateUtils';
+} from '@/src/features/conditions/conditionsRepository';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
 

@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { formatLocalDate } from '../../utils/dateUtils';
-import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+} from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {

@@ -4,13 +4,13 @@ import {
   GENERAL_LAB_REPORT_LOINC,
   CBC_PANEL_LOINC,
   CBC_MARKERS,
-} from '../../data/cbcMarkers';
+} from '@/src/data/cbcMarkers';
 import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,
   deleteDiagnosticReportRecord,
 } from './labResultsRepository';
-import { DiagnosticReportRecord } from '../../database/types';
+import { DiagnosticReportRecord } from '@/src/database/types';
 
 export interface DiagnosticReportBundle {
   report: DiagnosticReport;

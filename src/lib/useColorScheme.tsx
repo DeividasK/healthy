@@ -1,4 +1,4 @@
-import { COLORS } from '../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export function useColorScheme() {
   return {

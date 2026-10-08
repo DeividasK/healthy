@@ -17,8 +17,8 @@ import {
   getPatientInitials,
   getAllPatients,
 } from './patientService';
-import { formatDisplayDate } from '../../utils/dateUtils';
-import { COLORS } from '../../theme/colors';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { COLORS } from '@/src/theme/colors';
 import { GoogleSyncCard } from './GoogleSyncCard';
 
 export function ProfileView() {
