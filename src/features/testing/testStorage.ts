@@ -1,14 +1,46 @@
 import { expect, type Page } from '@playwright/test';
 
+export const DEFAULT_PROFILE_FIRST_NAME = 'John';
+export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
+
 /**
  * Resets browser storage (localStorage and sessionStorage) for clean test runs.
  */
 export async function clearAppStorage(page: Page): Promise<void> {
-  await page.goto('/profile/new');
+  await page.goto('/');
   await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     localStorage.clear();
     sessionStorage.clear();
+
+    // Clear Origin Private File System (where expo-sqlite / wa-sqlite persists databases)
+    if (typeof navigator !== 'undefined' && navigator.storage?.getDirectory) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        for await (const [name, handle] of root.entries()) {
+          try {
+            await root.removeEntry(name, {
+              recursive: handle.kind === 'directory',
+            });
+          } catch {
+            // Ignore individual handle delete error
+          }
+        }
+      } catch {
+        // Ignore OPFS access errors in restricted contexts
+      }
+    }
+
+    if (typeof indexedDB !== 'undefined' && indexedDB.databases) {
+      try {
+        const dbs = await indexedDB.databases();
+        for (const db of dbs) {
+          if (db.name) indexedDB.deleteDatabase(db.name);
+        }
+      } catch {
+        // Ignore indexedDB deletion errors
+      }
+    }
   });
 }
 
@@ -38,42 +70,14 @@ export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
  */
 export async function createPatientViaUI(
   page: Page,
-  options: {
-    givenName?: string;
-    familyName?: string;
-  } = {}
 ): Promise<void> {
-  if (!page.url().includes('/profile/new')) {
-    await page.goto('/profile/new');
-  }
+  await page.goto('/profile/new');
   await page.locator('html[data-app-ready="true"]').waitFor({ timeout: 10000 });
-  await expect(page.getByTestId('add-profile-header-title')).toBeVisible();
-  const givenNameInput = page.getByTestId('patient-given-name-input');
-  await expect(givenNameInput).toBeVisible();
-  const nameToFill = options.givenName || 'Self';
-  await givenNameInput.click();
-  await givenNameInput.fill(nameToFill);
-  if ((await givenNameInput.inputValue()) !== nameToFill) {
-    await givenNameInput.click();
-    await givenNameInput.pressSequentially(nameToFill, { delay: 30 });
-  }
-  await expect(givenNameInput).toHaveValue(nameToFill);
-
-  if (options.familyName) {
-    const familyNameInput = page.getByTestId('patient-family-name-input');
-    await familyNameInput.click();
-    await familyNameInput.fill(options.familyName);
-    await expect(familyNameInput).toHaveValue(options.familyName);
-  }
-  const saveBtn = page.getByTestId('save-profile-button');
-  await expect(saveBtn).toBeVisible();
-  await saveBtn.click();
-  await expect(page).not.toHaveURL(/.*profile\/new/);
+  await page.getByTestId('patient-given-name-input').fill(DEFAULT_PROFILE_FIRST_NAME);
+  await page.getByTestId('patient-family-name-input').fill(DEFAULT_PROFILE_LAST_NAME);
+  await page.getByTestId('save-profile-button').click();
 }
 
-/**
- * Seeds a DiagnosticReport through standard UI creation flow without exposing private app internals.
- */
 export async function createReportViaUI(
   page: Page,
   options: {

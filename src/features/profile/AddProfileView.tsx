@@ -47,7 +47,7 @@ export function AddProfileView({
 }: AddProfileViewProps = {}) {
   const router = useRouter();
   const { patients, setActivePatientId, refreshPatients } = useActivePatient();
-  const { connectWithGoogle, triggerSync, disconnect } = useSync();
+  const { connectWithGoogle, triggerSync } = useSync();
 
   const [activeTab, setActiveTab] = useState<'create' | 'file' | 'gdrive'>(
     initialTab
@@ -83,7 +83,6 @@ export function AddProfileView({
         const remotes = await listRemoteGooglePatients(config);
 
         if (remotes.length === 0) {
-          await disconnect();
           setPendingGoogleConfig(null);
           setNoProfilesEmail(authData.userEmail || '');
           setShowNoProfilesModal(true);
@@ -135,7 +134,26 @@ export function AddProfileView({
     if (!pendingGoogleConfig || selectedPatientIds.length === 0) return;
     setActionLoading('restoring-selected');
     try {
-      await restoreFromGoogleDrive(pendingGoogleConfig, selectedPatientIds);
+      const res = await restoreFromGoogleDrive(
+        pendingGoogleConfig,
+        selectedPatientIds
+      );
+      if (!res || res.patients === 0) {
+        Alert.alert('Restore Failed', 'No profiles were restored.');
+        return;
+      }
+      await refreshPatients();
+      const updatedPatients = await getAllPatients();
+      const targetId = selectedPatientIds.find((id) =>
+        updatedPatients.some((p) => p.id === id)
+      );
+      if (!targetId) {
+        Alert.alert(
+          'Restore Failed',
+          'Selected profile could not be found after restore.'
+        );
+        return;
+      }
       await connectWithGoogle({
         accessToken: pendingGoogleConfig.accessToken,
         refreshToken: pendingGoogleConfig.refreshToken,
@@ -144,10 +162,7 @@ export function AddProfileView({
         userEmail: pendingGoogleConfig.userEmail,
         userName: pendingGoogleConfig.userName,
       });
-      await refreshPatients();
-      if (selectedPatientIds[0]) {
-        await setActivePatientId(selectedPatientIds[0]);
-      }
+      await setActivePatientId(targetId);
       setShowPickerModal(false);
       router.replace('/');
     } catch (err) {

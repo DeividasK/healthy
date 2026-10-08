@@ -3,9 +3,9 @@ import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
+    page.on('console', msg => console.log(`[Browser ${msg.type()}]:`, msg.text()));
     await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should allow creating a Condition with status, title, and optional fields via plus modal', async ({

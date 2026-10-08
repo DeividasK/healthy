@@ -68,7 +68,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     );
 
     // 6. Navigate to Home
-    await page.getByTestId('back-button').click();
+    await page.locator('[data-testid="back-button"]:visible').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
 
     // 7. Verify record isolation: 'Back Pain' belonged to 'Self', so Jane Doe has empty list!
@@ -92,10 +92,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       .click();
 
     // Verify 'Self' is now active
-    await expect(page.getByTestId('profile-display-name')).toHaveText('Self');
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText('Self');
 
     // 10. Return to Home -> 'Back Pain' should be visible, 'Asthma' should not
-    await page.getByTestId('back-button').click();
+    await page.locator('[data-testid="back-button"]:visible').click();
     await expect(page.getByText('Back Pain')).toBeVisible();
     await expect(page.getByText('Asthma')).not.toBeVisible();
   });
@@ -575,7 +575,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
       'Bob'
     );
-    await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
+    await expect(
+      page.getByTestId('google-sync-disconnected').first()
+    ).toBeVisible();
 
     // 5. Switch back to 'Self'
     await page

@@ -79,6 +79,12 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   }, testInfo) => {
     await page.goto('/lab-result/add');
 
+    // Set a previous date so time selection is unrestricted
+    const dateInput = page
+      .getByTestId('date-picker-button')
+      .locator('input[type="date"]');
+    await dateInput.fill('2026-10-01');
+
     // Add a marker
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.fill('WBC');
