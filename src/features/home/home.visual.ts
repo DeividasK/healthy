@@ -1,9 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import {
-  clearAppStorage,
-  createPatientViaUI,
-  createReportViaUI,
-} from '../testing/testStorage';
+import { createPatientViaUI, createReportViaUI } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -15,13 +11,10 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await createPatientViaUI(page);
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
-    await page.goto('/');
-
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
     await expect(page.getByTestId('floating-add-button')).toBeVisible();
 
@@ -40,7 +33,6 @@ test.describe('Home View - Visual Regression', () => {
       notes: 'Routine morning blood test',
     });
 
-    await page.goto('/');
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
     await expect(page.getByText('"Routine morning blood test"')).toBeVisible();
 
@@ -67,7 +59,6 @@ test.describe('Home View - Visual Regression', () => {
       ],
     });
 
-    await page.goto('/');
     await expect(
       page.getByText('Normal', { exact: true }).first()
     ).toBeVisible();

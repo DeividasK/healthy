@@ -91,7 +91,8 @@ export async function createReportViaUI(
     notes?: string;
   }
 ): Promise<void> {
-  await page.goto('/lab-result/add');
+  await page.getByTestId('floating-add-button').click();
+  await page.getByTestId('menu-add-lab-results').click();
 
   for (let i = 0; i < options.biomarkers.length; i++) {
     const b = options.biomarkers[i];

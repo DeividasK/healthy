@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
+import { createPatientViaUI } from '../testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
   test.beforeEach(async ({ page }) => {

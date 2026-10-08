@@ -5,7 +5,6 @@ test.describe('Edit Lab Results Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should replace "CBC Panel" badge with "Edit" icon and allow editing existing report results', async ({
@@ -19,7 +18,8 @@ test.describe('Edit Lab Results Flow', () => {
     });
 
     // 1. Create an initial report
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.fill('Hemoglobin');
     await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
@@ -113,7 +113,8 @@ test.describe('Edit Lab Results Flow', () => {
   test('should preserve exact selected date without shifting back by a day across multiple edits/saves', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // 1. Select specific date: 2026-09-26
     const datePicker = page.getByTestId('date-picker-button');

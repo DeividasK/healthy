@@ -20,13 +20,11 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should display "Nothing to show yet" on empty home and render floating plus button', async ({
     page,
   }) => {
-    await page.goto('/');
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
 
     const floatingBtn = page.getByTestId('floating-add-button');
@@ -132,7 +130,6 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     page,
   }) => {
     // 1. Visit Home, initially showing "Nothing to show yet"
-    await page.goto('/');
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
 
     // 2. Add a condition via UI

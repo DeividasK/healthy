@@ -6,15 +6,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should allow user to add CBC lab results, view them on home, and persist across reload', async ({
     page,
   }) => {
-    // 1. Visit homepage
-    await page.goto('/');
-
     // 2. Click floating "+" button -> "Add Lab Results"
     await page.getByTestId('floating-add-button').click();
     const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
@@ -94,7 +90,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should allow removing a test from the active list before saving', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // Add Platelets
     const searchInput = page.getByTestId('test-search-input');
@@ -115,7 +112,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should open and update date and time via native dropdown inputs', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // Verify date picker button has native date input and updates with valid past date
     const dateInput = page
@@ -144,7 +142,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should hide plus menu options and plus button when time and notes are added, and reappear when removed', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     const plusBtn = page.getByTestId('plus-menu-button');
     await expect(plusBtn).toBeVisible();
@@ -193,7 +192,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // Label should read "Select Test"
     await expect(page.getByText('Select Test', { exact: true })).toBeVisible();
@@ -248,7 +248,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   }) => {
     // Set small mobile viewport
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // Add RDW-CV
     const searchInput = page.getByTestId('test-search-input');
@@ -278,7 +279,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should change biomarker unit using native dropdown', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // Add WBC (units: '10*3/uL', '10*9/L', '/uL')
     const searchInput = page.getByTestId('test-search-input');
@@ -300,7 +302,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should validate that date and time cannot be set to the future', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // 1. Verify native date input has max attribute set to today
     const dateInput = page
@@ -332,7 +335,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should reset future time to current time without throwing an alert when reverting to today from a past date', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
 
     // 1. Select a past date (2026-09-20)
     const dateInput = page

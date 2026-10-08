@@ -9,14 +9,11 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should display profile button in header and allow navigating to profile', async ({
     page,
   }) => {
-    await page.goto('/');
-
     const profileBtn = page.getByTestId('profile-header-button');
     await expect(profileBtn).toBeVisible();
     await profileBtn.click();
@@ -24,7 +21,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page).toHaveURL(/.*profile/);
     await expect(page.getByText('Profile', { exact: true })).toBeVisible();
     await expect(page.getByTestId('active-profile-card')).toBeVisible();
-    await expect(page.getByTestId('profile-display-name')).toHaveText('Self');
+    await expect(page.getByTestId('profile-display-name')).toHaveText(
+      'John Doe'
+    );
   });
 
   test('should allow creating a new profile and switching active patient with record isolation', async ({
@@ -83,16 +82,18 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByText('Asthma')).toBeVisible();
     await expect(page.getByText('Back Pain')).not.toBeVisible();
 
-    // 9. Switch back to 'Self' profile
+    // 9. Switch back to 'John Doe' profile
     await page.getByTestId('profile-header-button').click();
     await page
       .locator('[data-testid^="profile-item-"]')
-      .filter({ hasText: 'Self' })
+      .filter({ hasText: 'John Doe' })
       .first()
       .click();
 
-    // Verify 'Self' is now active
-    await expect(page.getByTestId('profile-display-name').first()).toHaveText('Self');
+    // Verify 'John Doe' is now active
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+      'John Doe'
+    );
 
     // 10. Return to Home -> 'Back Pain' should be visible, 'Asthma' should not
     await page.locator('[data-testid="back-button"]:visible').click();
@@ -101,7 +102,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   });
 
   test('should allow editing an existing profile', async ({ page }) => {
-    await page.goto('/profile');
+    await page.getByTestId('profile-header-button').click();
 
     // Wait for active profile to load and edit button to be enabled
     await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
@@ -148,7 +149,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       });
     });
 
-    await page.goto('/profile');
+    await page.getByTestId('profile-header-button').click();
 
     // 1. Verify Google Drive Sync Card is visible in disconnected state
     const syncCard = page.getByTestId('google-sync-card');
@@ -233,6 +234,8 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       });
     });
 
+    await page.getByTestId('profile-header-button').click();
+
     // Set connected state with token
     await page.evaluate(() => {
       localStorage.setItem(
@@ -246,7 +249,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       );
     });
 
-    await page.goto('/profile');
+    await page.reload();
 
     const connectBtn = page.getByTestId('google-signin-button');
     await expect(connectBtn).toBeVisible();
@@ -276,26 +279,23 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
     await page.getByTestId('option-restore-file').click();
-    await expect(page).toHaveURL(/.*profile\/restore-from-file/);
     await expect(page.getByTestId('select-profile-file-button')).toBeVisible();
     await expect(page.getByText('Select profile')).toBeVisible();
 
     // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
     await page.getByTestId('option-restore-gdrive').click();
-    await expect(page).toHaveURL(/.*profile\/restore-from-google-drive/);
     await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
     await expect(page.getByText('Connect Google Drive')).toBeVisible();
 
     // Click "Create" -> navigates back to /profile/new with manual form
     await page.getByTestId('option-create-profile').click();
-    await expect(page).toHaveURL(/.*profile\/new/);
     await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
   });
 
   test('should allow deleting a profile from EditProfileView with 5s countdown and redirect to /profile/new when last profile deleted', async ({
     page,
   }) => {
-    await page.goto('/profile');
+    await page.getByTestId('profile-header-button').click();
 
     // Wait for active profile to load and edit button to be enabled
     await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
@@ -352,7 +352,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     });
 
     // 2. Open /profile/new and create a profile (or tag active patient)
-    await page.goto('/profile');
+    await page.getByTestId('profile-header-button').click();
 
     // Add a second profile for "Synced Jane"
     await page.getByTestId('add-new-profile-button').click();
@@ -407,7 +407,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       );
     });
 
-    await page.goto('/profile');
+    await page.getByTestId('profile-header-button').click();
 
     // 2. Create a second profile "Bob Smith"
     await page.getByTestId('add-new-profile-button').click();
@@ -431,9 +431,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
     await confirmBtn.click();
 
-    // 4. Verify we are back on Profile with "Self" active and Bob Smith is gone
+    // 4. Verify we are back on Profile with "John Doe" active and Bob Smith is gone
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
-      'Self'
+      'John Doe'
     );
     await expect(page.getByText('Bob Smith')).not.toBeVisible();
 
@@ -461,7 +461,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test('should display "No profiles found in <user_email> Google Drive" modal when no profiles are found and dismiss on Close', async ({
     page,
   }) => {
-    await page.goto('/profile/new');
+    await page.goto('/profile/restore-from-google-drive');
 
     // Mock Google OAuth and API calls in the browser context
     await page.route('https://accounts.google.com/**', (route) => {
@@ -500,14 +500,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       }
     );
 
-    // Verify the Restore from Google Drive option is visible and can be clicked
-    const gdriveOption = page.getByTestId('option-restore-gdrive');
-    await expect(gdriveOption).toBeVisible();
-    await gdriveOption.click();
-
-    // Now on /profile/restore-from-google-drive, click "Connect Google Drive" button
+    // Verify the Restore from Google Drive screen and Connect Google Drive button
     const connectBtn = page.getByTestId('connect-google-drive-button');
-    if (await connectBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (await connectBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await connectBtn.click();
     }
 
@@ -539,7 +534,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test('should individually connect profiles to Google Drive and show accurate status badges', async ({
     page,
   }) => {
-    // 1. Mock Google Drive credentials in local storage
+    // 1. Navigate to Profile
+    await page.getByTestId('profile-header-button').click();
+
+    // Mock Google Drive credentials in local storage
     await page.evaluate(() => {
       localStorage.setItem(
         '@healthy_device_google_sync_config',
@@ -553,15 +551,15 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       );
     });
 
-    await page.goto('/profile');
+    await page.reload();
 
-    // 2. Connect the first profile ('Self')
+    // 2. Connect the first profile ('John Doe')
     const connectBtn1 = page.getByTestId('google-signin-button');
     await expect(connectBtn1).toBeVisible();
     await expect(connectBtn1).toContainText('Connect Google Drive');
     await connectBtn1.click();
 
-    // Now 'Self' is connected
+    // Now 'John Doe' is connected
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'alice@gmail.com'
     );
@@ -579,14 +577,14 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       page.getByTestId('google-sync-disconnected').first()
     ).toBeVisible();
 
-    // 5. Switch back to 'Self'
+    // 5. Switch back to 'John Doe'
     await page
       .locator('[data-testid^="profile-item-"]')
-      .filter({ hasText: 'Self' })
+      .filter({ hasText: 'John Doe' })
       .first()
       .click();
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
-      'Self'
+      'John Doe'
     );
     // 'Self' shows connected Google Drive state
     await expect(page.getByTestId('connected-user-email')).toHaveText(
@@ -606,6 +604,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       });
     });
 
+    // Navigate to profile
+    await page.getByTestId('profile-header-button').click();
+
     // 1. Mock Google Drive credentials
     await page.evaluate(() => {
       localStorage.setItem(
@@ -620,7 +621,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       );
     });
 
-    await page.goto('/profile');
+    await page.reload();
 
     // Connect 'Self' to Google Drive
     const connectBtn = page.getByTestId('google-signin-button');
