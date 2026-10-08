@@ -1,9 +1,9 @@
 import type { Condition } from 'fhir/r5';
-import { getDb } from '../../database/db';
-import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
-import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
-import { notifyDatabaseChanged } from '../../database/dbEvents';
-import { isExistingNewerOrEqual } from '../../utils/dateUtils';
+import { getDb } from '@/src/database/db';
+import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
+import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 /**
  * Persists a Condition record using SQLite.

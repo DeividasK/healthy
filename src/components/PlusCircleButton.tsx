@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Plus } from 'lucide-react-native';
-import { COLORS } from '../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export interface PlusCircleButtonProps extends TouchableOpacityProps {
   size?: number;

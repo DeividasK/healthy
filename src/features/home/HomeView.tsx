@@ -18,26 +18,26 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DiagnosticReportRecord } from '../../database/types';
+import { DiagnosticReportRecord } from '@/src/database/types';
 import {
   getAllReports,
   deleteReport,
-} from '../lab-results/diagnosticReportService';
+} from '@/src/features/lab-results/diagnosticReportService';
 import {
   getAllConditions,
   deleteCondition,
-} from '../conditions/conditionService';
+} from '@/src/features/conditions/conditionService';
 
 import type { Observation, Condition } from 'fhir/r5';
-import { formatDisplayDate } from '../../utils/dateUtils';
-import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
-import { COLORS } from '../../theme/colors';
-import { PlusCircleButton } from '../../components/PlusCircleButton';
-import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
-import { useActivePatient } from '../profile/ActivePatientContext';
-import { getAllPatients } from '../profile/patientService';
-import { useSync } from '../../context/SyncContext';
-import { useDatabaseSubscription } from '../../database/dbEvents';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
+import { COLORS } from '@/src/theme/colors';
+import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { getAllPatients } from '@/src/features/profile/patientService';
+import { useSync } from '@/src/context/SyncContext';
+import { useDatabaseSubscription } from '@/src/database/dbEvents';
 
 export function HomeView() {
   const router = useRouter();

@@ -22,12 +22,12 @@ import {
   MapPin,
   X,
 } from 'lucide-react-native';
-import { NativeDatePicker } from '../../components/NativeDatePicker';
-import { PlusCircleButton } from '../../components/PlusCircleButton';
-import { AddOptionsModal } from '../../components/AddOptionsModal';
-import { formatLocalDate } from '../../utils/dateUtils';
-import { COLORS } from '../../theme/colors';
-import { useSync } from '../../context/SyncContext';
+import { NativeDatePicker } from '@/src/components/NativeDatePicker';
+import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { AddOptionsModal } from '@/src/components/AddOptionsModal';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import { COLORS } from '@/src/theme/colors';
+import { useSync } from '@/src/context/SyncContext';
 
 export interface ConditionStatusOption {
   id: string;

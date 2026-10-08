@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Calendar } from 'lucide-react-native';
-import { formatLocalDate } from '../utils/dateUtils';
-import { COLORS } from '../theme/colors';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import { COLORS } from '@/src/theme/colors';
 
 export interface NativeDatePickerProps {
   value: Date | null;

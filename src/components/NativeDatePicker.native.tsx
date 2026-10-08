@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Calendar } from 'lucide-react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { COLORS } from '../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export interface NativeDatePickerProps {
   value: Date | null;

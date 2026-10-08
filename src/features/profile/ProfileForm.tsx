@@ -14,12 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ChevronDown, User } from 'lucide-react-native';
-import { NativeDatePicker } from '../../components/NativeDatePicker';
-import { AddOptionsModal } from '../../components/AddOptionsModal';
-import { formatLocalDate } from '../../utils/dateUtils';
-import { COLORS } from '../../theme/colors';
+import { NativeDatePicker } from '@/src/components/NativeDatePicker';
+import { AddOptionsModal } from '@/src/components/AddOptionsModal';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import { COLORS } from '@/src/theme/colors';
 import { PatientInput } from './patientService';
-import { useSync } from '../../context/SyncContext';
+import { useSync } from '@/src/context/SyncContext';
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;

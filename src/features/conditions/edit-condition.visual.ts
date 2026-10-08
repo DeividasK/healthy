@@ -3,7 +3,7 @@ import {
   clearAppStorage,
   createPatientViaUI,
   createConditionViaUI,
-} from '../testing/testStorage';
+} from '@/src/features/testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },

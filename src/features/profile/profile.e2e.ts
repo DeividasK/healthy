@@ -3,7 +3,7 @@ import {
   clearAppStorage,
   createPatientViaUI,
   createConditionViaUI,
-} from '../testing/testStorage';
+} from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test.beforeEach(async ({ page }) => {

@@ -35,5 +35,5 @@ runs:
         pnpm build:web
         if [ -n "${{ inputs.base-url }}" ]; then
           touch dist/.nojekyll
-          cp dist/+not-found.html dist/404.html
+          cp dist/index.html dist/404.html
         fi

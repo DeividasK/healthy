@@ -13,25 +13,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, X, Clock, FileText } from 'lucide-react-native';
-import { NativeDatePicker } from '../../components/NativeDatePicker';
-import { NativeTimePicker } from '../../components/NativeTimePicker';
-import { NativeUnitPicker } from '../../components/NativeUnitPicker';
-import { PlusCircleButton } from '../../components/PlusCircleButton';
-import { AddOptionsModal } from '../../components/AddOptionsModal';
+import { NativeDatePicker } from '@/src/components/NativeDatePicker';
+import { NativeTimePicker } from '@/src/components/NativeTimePicker';
+import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
+import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { AddOptionsModal } from '@/src/components/AddOptionsModal';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
   searchCBCMarkers,
-} from '../../data/cbcMarkers';
-import { formatLocalDate } from '../../utils/dateUtils';
-import { COLORS } from '../../theme/colors';
+} from '@/src/data/cbcMarkers';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import { COLORS } from '@/src/theme/colors';
 import {
   createAndSaveDiagnosticReport,
   BiomarkerInputItem,
   getReportById,
 } from './diagnosticReportService';
-import { useActivePatient } from '../profile/ActivePatientContext';
-import { useSync } from '../../context/SyncContext';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { useSync } from '@/src/context/SyncContext';
 
 export interface ActiveMarkerItem {
   id: string;

@@ -1,9 +1,9 @@
 import type { DiagnosticReport, Observation } from 'fhir/r5';
-import { DiagnosticReportRecord } from '../../database/types';
-import { getDb } from '../../database/db';
-import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
-import { notifyDatabaseChanged } from '../../database/dbEvents';
-import { isExistingNewerOrEqual } from '../../utils/dateUtils';
+import { DiagnosticReportRecord } from '@/src/database/types';
+import { getDb } from '@/src/database/db';
+import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.

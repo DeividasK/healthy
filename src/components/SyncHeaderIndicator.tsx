@@ -6,10 +6,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Check, AlertTriangle } from 'lucide-react-native';
-import { useSync } from '../context/SyncContext';
+import { useSync } from '@/src/context/SyncContext';
 import { useRouter } from 'expo-router';
-import { SyncErrorModal } from '../features/profile/SyncErrorModal';
-import { COLORS } from '../theme/colors';
+import { SyncErrorModal } from '@/src/features/profile/SyncErrorModal';
+import { COLORS } from '@/src/theme/colors';
 
 export function SyncHeaderIndicator() {
   const router = useRouter();

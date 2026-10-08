@@ -3,9 +3,9 @@ import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ConditionForm, ConditionFormValues } from './ConditionForm';
 import { getConditionById, createOrUpdateCondition } from './conditionService';
-import { getConditionTitle, getConditionNotes } from '../../utils/fhirUtils';
-import { useSync } from '../../context/SyncContext';
-import { COLORS } from '../../theme/colors';
+import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
+import { useSync } from '@/src/context/SyncContext';
+import { COLORS } from '@/src/theme/colors';
 
 export function EditConditionView() {
   const { id } = useLocalSearchParams<{ id: string }>();

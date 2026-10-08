@@ -2,9 +2,9 @@ import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { ConditionForm } from './ConditionForm';
 import { createOrUpdateCondition } from './conditionService';
-import { useActivePatient } from '../profile/ActivePatientContext';
-import { useSync } from '../../context/SyncContext';
-import { COLORS } from '../../theme/colors';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { useSync } from '@/src/context/SyncContext';
+import { COLORS } from '@/src/theme/colors';
 
 export function AddConditionView() {
   const { activePatientId, isLoading } = useActivePatient();

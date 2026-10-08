@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage } from '../testing/testStorage';
+import { clearAppStorage } from '@/src/features/testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },

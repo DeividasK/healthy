@@ -3,7 +3,7 @@ import {
   clearAppStorage,
   createPatientViaUI,
   createReportViaUI,
-} from '../testing/testStorage';
+} from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
   test('should redirect to /profile/new on fresh install when no patients exist', async ({

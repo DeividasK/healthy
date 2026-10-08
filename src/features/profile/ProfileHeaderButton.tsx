@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import { getPatientInitials } from './patientService';
-import { COLORS } from '../../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export function ProfileHeaderButton() {
   const router = useRouter();

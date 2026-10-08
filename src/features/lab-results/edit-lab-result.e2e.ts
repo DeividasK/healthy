@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+} from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
   test.beforeEach(async ({ page }) => {

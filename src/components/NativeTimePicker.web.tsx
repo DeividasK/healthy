@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Clock, X } from 'lucide-react-native';
-import { COLORS } from '../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export interface NativeTimePickerProps {
   value: string; // "HH:mm"

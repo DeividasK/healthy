@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Clock, X } from 'lucide-react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { COLORS } from '../theme/colors';
+import { COLORS } from '@/src/theme/colors';
 
 export interface NativeTimePickerProps {
   value: string; // "HH:mm"

@@ -13,7 +13,7 @@ import {
   switchActivePatient,
   getPatientDisplayName,
 } from './patientService';
-import { useDatabaseSubscription } from '../../database/dbEvents';
+import { useDatabaseSubscription } from '@/src/database/dbEvents';
 
 interface ActivePatientContextValue {
   activePatient: Patient | null;
