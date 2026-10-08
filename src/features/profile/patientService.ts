@@ -3,10 +3,15 @@ import type { Patient } from 'fhir/r5';
 import {
   insertPatientRecord,
   fetchAllPatients,
+  fetchAllStoredPatients,
   fetchPatientById,
+  fetchStoredPatientById,
+  type StoredPatient,
   deletePatientRecord,
   getActivePatientId,
   setActivePatientId,
+  clearActivePatientId,
+  updatePatientSyncAccount,
   DEFAULT_PATIENT_ID,
 } from './patientRepository';
 
@@ -16,6 +21,7 @@ export interface PatientInput {
   familyName?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   birthDate?: string; // YYYY-MM-DD
+  syncAccount?: string | null;
 }
 
 /**
@@ -64,6 +70,9 @@ export async function createOrUpdatePatient(
   const patient: Patient = {
     resourceType: 'Patient',
     id: patientId,
+    meta: {
+      lastUpdated: new Date().toISOString(),
+    },
     active: true,
     name: [
       {
@@ -77,7 +86,7 @@ export async function createOrUpdatePatient(
     birthDate: input.birthDate || undefined,
   };
 
-  await insertPatientRecord(patient);
+  await insertPatientRecord(patient, input.syncAccount);
   return patient;
 }
 
@@ -96,36 +105,72 @@ export async function getPatient(id: string): Promise<Patient | null> {
 }
 
 /**
- * Deletes a patient by ID.
+ * Retrieves a stored patient with syncAccount by ID.
  */
-export async function deletePatient(id: string): Promise<void> {
-  await deletePatientRecord(id);
+export async function getStoredPatient(
+  id: string
+): Promise<StoredPatient | null> {
+  return await fetchStoredPatientById(id);
 }
 
 /**
- * Gets the current active patient.
+ * Retrieves all stored patients with syncAccount.
  */
-export async function getActivePatient(): Promise<Patient> {
+export async function getAllStoredPatients(): Promise<StoredPatient[]> {
+  return await fetchAllStoredPatients();
+}
+
+export type { StoredPatient };
+
+/**
+ * Deletes a patient by ID and handles switching active patient or clearing if empty.
+ */
+export async function deletePatient(
+  id: string
+): Promise<{ remainingCount: number; newActiveId: string | null }> {
+  await deletePatientRecord(id);
+  const remaining = await fetchAllPatients();
+  const currentActiveId = await getActivePatientId();
+
+  if (remaining.length === 0) {
+    await clearActivePatientId();
+    return { remainingCount: 0, newActiveId: null };
+  }
+
+  if (currentActiveId === id) {
+    const nextActive = remaining[0].id || null;
+    if (nextActive) {
+      await setActivePatientId(nextActive);
+    } else {
+      await clearActivePatientId();
+    }
+    return { remainingCount: remaining.length, newActiveId: nextActive };
+  }
+
+  return { remainingCount: remaining.length, newActiveId: currentActiveId };
+}
+
+/**
+ * Gets the current active patient, or null if no patients exist.
+ */
+export async function getActivePatient(): Promise<Patient | null> {
+  const allPatients = await fetchAllPatients();
+  if (allPatients.length === 0) {
+    return null;
+  }
+
   const activeId = await getActivePatientId();
-  const patient = await fetchPatientById(activeId);
+  const patient = allPatients.find((p) => p.id === activeId);
   if (patient) {
     return patient;
   }
 
-  // Fallback to default patient if found
-  const defaultPatient = await fetchPatientById(DEFAULT_PATIENT_ID);
-  if (defaultPatient) {
-    await setActivePatientId(DEFAULT_PATIENT_ID);
-    return defaultPatient;
+  // If active patient not found among existing patients, pick the first one
+  const firstPatient = allPatients[0];
+  if (firstPatient.id) {
+    await setActivePatientId(firstPatient.id);
   }
-
-  // If no patient exists at all, bootstrap default
-  const fallback = await createOrUpdatePatient({
-    id: DEFAULT_PATIENT_ID,
-    givenName: 'Self',
-  });
-  await setActivePatientId(DEFAULT_PATIENT_ID);
-  return fallback;
+  return firstPatient;
 }
 
 /**
@@ -135,4 +180,4 @@ export async function switchActivePatient(patientId: string): Promise<void> {
   await setActivePatientId(patientId);
 }
 
-export { DEFAULT_PATIENT_ID };
+export { DEFAULT_PATIENT_ID, updatePatientSyncAccount };

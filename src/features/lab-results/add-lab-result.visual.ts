@@ -1,5 +1,5 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage } from '../testing/testStorage';
+import { createPatientViaUI } from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -11,26 +11,23 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
+    await createPatientViaUI(page);
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-lab-results').click();
   });
 
   test('Add Report View - Initial Clean Form', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
-    await page.goto('/lab-result/add');
-
     await expect(page.getByText('Add Lab Results')).toBeVisible();
     await expect(page.getByTestId('date-picker-button')).toBeVisible();
     await expect(page.getByTestId('test-search-input')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Add Report View - Initial Clean Form', testInfo);
   });
 
   test('Add Report View - Autocomplete Dropdown Open', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
-    await page.goto('/lab-result/add');
-
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.click();
 
@@ -40,6 +37,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
       page.getByTestId('autocomplete-item-cbc_hemoglobin')
     ).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Autocomplete Dropdown Open',
@@ -48,24 +46,28 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   });
 
   test('Add Report View - Populated Biomarkers', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
-    await page.goto('/lab-result/add');
-
     const searchInput = page.getByTestId('test-search-input');
 
     // Add Hemoglobin
     await searchInput.fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
+    const hemoglobinOption = page.getByTestId(
+      'autocomplete-item-cbc_hemoglobin'
+    );
+    await expect(hemoglobinOption).toBeVisible();
+    await hemoglobinOption.click();
     await page.getByTestId('marker-value-input-0').fill('14.2');
 
     // Add Platelets
     await searchInput.fill('Platelets');
-    await page.getByTestId('autocomplete-item-cbc_platelets').click();
+    const plateletsOption = page.getByTestId('autocomplete-item-cbc_platelets');
+    await expect(plateletsOption).toBeVisible();
+    await plateletsOption.click();
     await page.getByTestId('marker-value-input-1').fill('260');
 
     await expect(page.getByTestId('marker-card-0')).toBeVisible();
     await expect(page.getByTestId('marker-card-1')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Populated Biomarkers',
@@ -76,13 +78,18 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   test('Add Report View - Expanded Time and Notes', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
-    await page.goto('/lab-result/add');
+    // Set a previous date so time selection is unrestricted
+    const dateInput = page
+      .getByTestId('date-picker-button')
+      .locator('input[type="date"]');
+    await dateInput.fill('2026-10-01');
 
     // Add a marker
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.fill('WBC');
-    await page.getByTestId('autocomplete-item-cbc_wbc').click();
+    const wbcOption = page.getByTestId('autocomplete-item-cbc_wbc');
+    await expect(wbcOption).toBeVisible();
+    await wbcOption.click();
     await page.getByTestId('marker-value-input-0').fill('5.4');
 
     // Open plus menu and add Time
@@ -106,6 +113,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await expect(page.getByTestId('time-picker-button')).toContainText('08:45');
     await expect(page.getByTestId('notes-input')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Expanded Time and Notes',

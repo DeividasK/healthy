@@ -1,7 +1,11 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+
+export const DEFAULT_PROFILE_FIRST_NAME = 'John';
+export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
+export const DEFAULT_CONDITION_TITLE = 'Test Condition';
 
 /**
- * Resets all browser storage (localStorage, sessionStorage, and OPFS / IndexedDB files) for clean test runs.
+ * Resets browser storage (localStorage and sessionStorage) for clean test runs.
  */
 export async function clearAppStorage(page: Page): Promise<void> {
   await page.goto('/');
@@ -26,12 +30,56 @@ export async function clearAppStorage(page: Page): Promise<void> {
         // Ignore OPFS access errors in restricted contexts
       }
     }
+
+    if (typeof indexedDB !== 'undefined' && indexedDB.databases) {
+      try {
+        const dbs = await indexedDB.databases();
+        for (const db of dbs) {
+          if (db.name) indexedDB.deleteDatabase(db.name);
+        }
+      } catch {
+        // Ignore indexedDB deletion errors
+      }
+    }
   });
 }
 
 /**
- * Seeds a DiagnosticReport through standard UI creation flow without exposing private app internals.
+ * Deletes the active profile through the standard UI flow.
  */
+export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
+  await page.goto('/profile');
+  const editBtn = page.getByTestId('edit-profile-button').first();
+  await expect(editBtn).toBeVisible();
+  await editBtn.click();
+
+  const deleteBtn = page.getByTestId('delete-profile-button');
+  await expect(deleteBtn).toBeVisible();
+  await deleteBtn.click();
+
+  const modal = page.getByTestId('delete-profile-modal');
+  await expect(modal).toBeVisible();
+
+  const confirmBtn = page.getByTestId('delete-modal-confirm-button');
+  await expect(confirmBtn).toBeEnabled({ timeout: 10000 });
+  await confirmBtn.click();
+}
+
+/**
+ * Creates a Patient profile through standard UI flow.
+ */
+export async function createPatientViaUI(page: Page): Promise<void> {
+  // This redirects to new profile creation page
+  await page.goto('/');
+  await page
+    .getByTestId('patient-given-name-input')
+    .fill(DEFAULT_PROFILE_FIRST_NAME);
+  await page
+    .getByTestId('patient-family-name-input')
+    .fill(DEFAULT_PROFILE_LAST_NAME);
+  await page.getByTestId('save-profile-button').click();
+}
+
 export async function createReportViaUI(
   page: Page,
   options: {
@@ -43,7 +91,8 @@ export async function createReportViaUI(
     notes?: string;
   }
 ): Promise<void> {
-  await page.goto('/lab-result/add');
+  await page.getByTestId('floating-add-button').click();
+  await page.getByTestId('menu-add-lab-results').click();
 
   for (let i = 0; i < options.biomarkers.length; i++) {
     const b = options.biomarkers[i];
@@ -81,50 +130,37 @@ export async function createReportViaUI(
   await page.waitForURL(/.*(\/|#)$/);
 }
 
+export interface AddConditionOptions {
+  title?: string;
+  status?: string;
+  notes?: string;
+}
+
 /**
- * Seeds a Condition through standard UI creation flow without exposing private app internals.
+ * Creates a Condition through standard UI flow starting from the homepage.
  */
-export async function createConditionViaUI(
+export async function createTestConditionViaUI(
   page: Page,
-  options: {
-    title: string;
-    status?: string;
-    notes?: string;
-  }
+  options?: AddConditionOptions
 ): Promise<void> {
-  const fab = page.getByTestId('floating-add-button');
-  if (await fab.isVisible()) {
-    await fab.click();
-    await page.getByTestId('menu-add-condition').click();
-  } else {
-    await page.goto('/condition/add');
+  await page.getByTestId('floating-add-button').click();
+  await page.getByTestId('menu-add-condition').click();
+  await page
+    .getByTestId('condition-title-input')
+    .fill(options?.title ?? DEFAULT_CONDITION_TITLE);
+
+  if (options?.status) {
+    await page.getByTestId('status-picker-select').selectOption(options.status);
   }
 
-  await page.waitForURL(/.*condition\/add/);
-  await page.getByTestId('condition-title-input').waitFor({ state: 'visible' });
-
-  if (options.status) {
-    const statusSelect = page.getByTestId('status-picker-select');
-    if (await statusSelect.isVisible()) {
-      await statusSelect.selectOption(options.status);
-    }
-  }
-
-  await page.getByTestId('condition-title-input').fill(options.title);
-
-  if (options.notes) {
-    const addOptionBtn = page.getByTestId('add-option-button');
-    if (await addOptionBtn.isVisible()) {
-      await addOptionBtn.click();
-      const addNotesOption = page.getByTestId('menu-add-notes');
-      if (await addNotesOption.isVisible()) {
-        await addNotesOption.click();
-      }
-    }
-    const notesInput = page.getByTestId('condition-notes-input');
-    await notesInput.fill(options.notes);
+  if (options?.notes) {
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-notes').click();
+    await page.getByTestId('condition-notes-input').fill(options.notes);
   }
 
   await page.getByTestId('save-button').click();
-  await page.waitForURL(/.*(\/|#)$/);
 }
+
+export const createConditionViaUI = createTestConditionViaUI;
+export const addConditionViaUI = createTestConditionViaUI;

@@ -1,5 +1,9 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage, createReportViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createReportViaUI,
+} from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -10,12 +14,9 @@ test.use({
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Edit Lab Result View - Visual Regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
-  });
-
   test('Add Report View - Edit Existing Mode', async ({ page }, testInfo) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await createReportViaUI(page, {
       biomarkers: [
         { name: 'Hemoglobin', value: '13.8' },
@@ -40,6 +41,7 @@ test.describe('Edit Lab Result View - Visual Regression', () => {
       'Initial checkup notes for editing'
     );
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Add Report View - Edit Existing Mode', testInfo);
   });
 });

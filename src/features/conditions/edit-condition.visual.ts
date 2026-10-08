@@ -1,5 +1,9 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { clearAppStorage, createConditionViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createConditionViaUI,
+} from '../testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -10,12 +14,9 @@ test.use({
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Edit Condition View - Visual Regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
-  });
-
   test('Condition View - Edit Existing Mode', async ({ page }, testInfo) => {
     await clearAppStorage(page);
+    await createPatientViaUI(page);
     await createConditionViaUI(page, {
       title: 'Left Knee Pain',
       status: 'active',
@@ -37,6 +38,7 @@ test.describe('Edit Condition View - Visual Regression', () => {
       'Persistent ache after running on tarmac.'
     );
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Condition View - Edit Existing Mode', testInfo);
   });
 });

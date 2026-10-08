@@ -11,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.deividas.healthy",
       "adaptiveIcon": {
         "backgroundColor": "#7BA386",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -21,7 +22,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -37,7 +38,8 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-localization",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

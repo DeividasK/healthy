@@ -31,6 +31,7 @@ import {
   getReportById,
 } from './diagnosticReportService';
 import { useActivePatient } from '../profile/ActivePatientContext';
+import { useSync } from '../../context/SyncContext';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -82,6 +83,7 @@ export function LabResultForm({
 }: LabResultFormProps) {
   const router = useRouter();
   const { activePatientId } = useActivePatient();
+  const { triggerSync } = useSync();
   const reportId = initialReportId;
 
   // Test Date (defaults to today)
@@ -288,6 +290,10 @@ export function LabResultForm({
         notes: testNotes ? testNotes.trim() : undefined,
         items: biomarkers,
       });
+
+      triggerSync().catch((err) =>
+        console.warn('Background sync failed on lab result save:', err)
+      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();

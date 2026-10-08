@@ -10,10 +10,6 @@ test.use({
 const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Not Found View - Visual Regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.clock.setFixedTime(FIXED_DATE);
-  });
-
   test('Not Found View - 404 Screen', async ({ page }, testInfo) => {
     await clearAppStorage(page);
     await page.goto('/some-non-existent-page');
@@ -21,6 +17,7 @@ test.describe('Not Found View - Visual Regression', () => {
     await expect(page.getByText("This screen doesn't exist.")).toBeVisible();
     await expect(page.getByText('Go to home screen!')).toBeVisible();
 
+    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Not Found View - 404 Screen', testInfo);
   });
 });

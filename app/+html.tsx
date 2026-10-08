@@ -35,4 +35,24 @@ export default function Root({ children }: { children: ReactNode }) {
 const responsiveBackground = `
 body {
   background-color: ${COLORS.light.background};
+  margin: 0;
+  padding: 0;
+}
+#root:empty::after {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 36px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -18px;
+  margin-left: -18px;
+  border-radius: 50%;
+  border: 3px solid rgba(79, 111, 82, 0.2);
+  border-top-color: ${COLORS.light.primary};
+  animation: root-spinner 0.8s linear infinite;
+}
+@keyframes root-spinner {
+  to { transform: rotate(360deg); }
 }`;

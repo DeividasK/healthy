@@ -13,6 +13,7 @@ import {
   switchActivePatient,
   getPatientDisplayName,
 } from './patientService';
+import { useDatabaseSubscription } from '../../database/dbEvents';
 
 interface ActivePatientContextValue {
   activePatient: Patient | null;
@@ -51,6 +52,10 @@ export function ActivePatientProvider({
       setIsLoading(false);
     }
   }, []);
+
+  useDatabaseSubscription(['patients', 'app_settings'], () => {
+    loadPatients();
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -103,8 +108,10 @@ export function ActivePatientProvider({
     [loadPatients]
   );
 
-  const activePatientId = activePatient?.id || 'patient-default';
-  const activePatientName = getPatientDisplayName(activePatient);
+  const activePatientId = activePatient?.id || '';
+  const activePatientName = activePatient
+    ? getPatientDisplayName(activePatient)
+    : '';
 
   return (
     <ActivePatientContext.Provider

@@ -3,10 +3,12 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { ConditionForm } from './ConditionForm';
 import { createOrUpdateCondition } from './conditionService';
 import { useActivePatient } from '../profile/ActivePatientContext';
+import { useSync } from '../../context/SyncContext';
 import { COLORS } from '../../theme/colors';
 
 export function AddConditionView() {
   const { activePatientId, isLoading } = useActivePatient();
+  const { triggerSync } = useSync();
 
   if (isLoading) {
     return (
@@ -31,6 +33,9 @@ export function AddConditionView() {
       ...values,
       patientId: activePatientId,
     });
+    triggerSync().catch((err) =>
+      console.warn('Background sync failed on add condition:', err)
+    );
   };
 
   return <ConditionForm onSave={handleSave} />;

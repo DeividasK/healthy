@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
   FileText,
@@ -35,13 +35,42 @@ import { COLORS } from '../../theme/colors';
 import { PlusCircleButton } from '../../components/PlusCircleButton';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import { useActivePatient } from '../profile/ActivePatientContext';
+import { getAllPatients } from '../profile/patientService';
+import { useSync } from '../../context/SyncContext';
+import { useDatabaseSubscription } from '../../database/dbEvents';
 
 export function HomeView() {
   const router = useRouter();
-  const { activePatientId } = useActivePatient();
+  const pathname = usePathname();
+  const { triggerSync } = useSync();
+  const {
+    activePatientId,
+    patients,
+    isLoading: isPatientLoading,
+    refreshPatients,
+  } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
+  useEffect(() => {
+    if (pathname !== '/') return;
+    if (!isPatientLoading && patients.length === 0) {
+      let isMounted = true;
+      getAllPatients().then((actualPatients) => {
+        if (!isMounted) return;
+        if (actualPatients.length === 0) {
+          router.replace('/profile/new');
+        } else {
+          refreshPatients();
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [pathname, isPatientLoading, patients.length, refreshPatients, router]);
 
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -126,6 +155,13 @@ export function HomeView() {
     }, [loadData])
   );
 
+  useDatabaseSubscription(
+    ['conditions', 'diagnostic_reports', 'observations'],
+    () => {
+      loadData();
+    }
+  );
+
   const formatDate = (dateStr: string) => {
     return formatDisplayDate(dateStr);
   };
@@ -174,6 +210,9 @@ export function HomeView() {
       }
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
+      triggerSync().catch((err) =>
+        console.warn('Background sync failed on delete:', err)
+      );
     } catch (err) {
       console.error('Failed to delete item:', err);
     }

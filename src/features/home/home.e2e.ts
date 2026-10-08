@@ -1,16 +1,30 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createReportViaUI } from '../testing/testStorage';
+import {
+  clearAppStorage,
+  createPatientViaUI,
+  createReportViaUI,
+} from '../testing/testStorage';
+
+test.describe('Fresh Install Onboarding Redirect', () => {
+  test('should redirect to /profile/new on fresh install when no patients exist', async ({
+    page,
+  }) => {
+    await clearAppStorage(page);
+    await page.goto('/');
+    await expect(page).toHaveURL(/.*profile\/new/);
+    await expect(page.getByText('Add Profile')).toBeVisible();
+  });
+});
 
 test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
-    await page.reload();
+    await createPatientViaUI(page);
   });
 
   test('should display "Nothing to show yet" on empty home and render floating plus button', async ({
     page,
   }) => {
-    await page.goto('/');
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
 
     const floatingBtn = page.getByTestId('floating-add-button');
@@ -110,5 +124,34 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(reportCard).toBeVisible();
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
     await expect(page.getByText('15.5')).toBeVisible();
+  });
+
+  test('should automatically re-render and display new condition and handle focus/wakeup sync gracefully', async ({
+    page,
+  }) => {
+    // 1. Visit Home, initially showing "Nothing to show yet"
+    await expect(page.getByText('Nothing to show yet')).toBeVisible();
+
+    // 2. Add a condition via UI
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-condition').click();
+    await expect(page).toHaveURL(/.*condition\/add/);
+
+    await page.getByTestId('condition-title-input').fill('Asthma');
+    await page.getByTestId('save-button').click();
+    await page.waitForURL(/.*(\/|#)$/);
+
+    // 3. Condition is immediately visible on Home
+    await expect(page.getByText('Asthma')).toBeVisible();
+
+    // 4. Test focus and wakeup sync reactivity: dispatch focus and visibilitychange events
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // 5. Verify home stays intact and continues displaying condition
+    await expect(page.getByText('Asthma')).toBeVisible();
+    await expect(page.getByText('Nothing to show yet')).not.toBeVisible();
   });
 });

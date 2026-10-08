@@ -1,16 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage } from '../testing/testStorage';
+import { createPatientViaUI } from '../testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await page.reload();
+    await createPatientViaUI(page);
   });
 
   test('should allow creating a Condition with status, title, and optional fields via plus modal', async ({
     page,
   }) => {
-    await page.goto('/');
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-condition').click();
 

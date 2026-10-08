@@ -2,6 +2,8 @@ import type { DiagnosticReport, Observation } from 'fhir/r5';
 import { DiagnosticReportRecord } from '../../database/types';
 import { getDb } from '../../database/db';
 import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
+import { notifyDatabaseChanged } from '../../database/dbEvents';
+import { isExistingNewerOrEqual } from '../../utils/dateUtils';
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
@@ -10,7 +12,8 @@ import { DEFAULT_PATIENT_ID } from '../profile/patientRepository';
 export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
   observations: Observation[],
-  patientId: string = DEFAULT_PATIENT_ID
+  patientId: string = DEFAULT_PATIENT_ID,
+  isRemoteSync: boolean = false
 ): Promise<void> {
   if (!report.id) {
     throw new Error('DiagnosticReport requires an id to be persisted');
@@ -23,22 +26,41 @@ export async function insertDiagnosticReportRecord(
   const reportId = report.id;
   const db = await getDb();
   const now = new Date().toISOString();
+  const incomingTimestamp = report.meta?.lastUpdated || now;
+  const reportWithMeta: DiagnosticReport = {
+    ...report,
+    meta: {
+      ...report.meta,
+      lastUpdated: incomingTimestamp,
+    },
+  };
   const effectiveDate = report.effectiveDateTime || now.split('T')[0];
   const notesText =
     report.note && report.note.length > 0
       ? report.note.map((n) => n.text).join('\n')
       : null;
 
+  let didUpdate = false;
   await db.withTransactionAsync(async () => {
-    const existing = await db.getFirstAsync<{ patient_id: string }>(
-      `SELECT patient_id FROM diagnostic_reports WHERE id = ?;`,
-      [reportId]
-    );
+    const existing = await db.getFirstAsync<{
+      patient_id: string;
+      updated_at: string;
+    }>(`SELECT patient_id, updated_at FROM diagnostic_reports WHERE id = ?;`, [
+      reportId,
+    ]);
 
     if (existing?.patient_id && existing.patient_id !== patientId) {
       throw new Error(
         `Cannot update diagnostic report ${reportId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
+    }
+
+    if (
+      isRemoteSync &&
+      existing?.updated_at &&
+      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
+    ) {
+      return;
     }
 
     await db.runAsync(
@@ -56,9 +78,9 @@ export async function insertDiagnosticReportRecord(
         effectiveDate,
         report.status,
         notesText,
-        JSON.stringify(report),
+        JSON.stringify(reportWithMeta),
         now,
-        now,
+        incomingTimestamp,
       ]
     );
 
@@ -79,7 +101,13 @@ export async function insertDiagnosticReportRecord(
         [obsId, reportId, loinc, name, val, unit, JSON.stringify(obs), now]
       );
     }
+
+    didUpdate = true;
   });
+
+  if (didUpdate) {
+    notifyDatabaseChanged(['diagnostic_reports', 'observations']);
+  }
 }
 
 /**
@@ -90,22 +118,33 @@ export async function fetchAllDiagnosticReportRecords(
   patientId?: string
 ): Promise<DiagnosticReportRecord[]> {
   const db = await getDb();
-  let reportRows: { id: string; fhir_json: string }[] = [];
+  let reportRows: { id: string; fhir_json: string; updated_at: string }[] = [];
 
   if (patientId) {
-    reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
-      `SELECT id, fhir_json FROM diagnostic_reports WHERE patient_id = ? ORDER BY effective_date DESC, created_at DESC, id DESC;`,
+    reportRows = await db.getAllAsync<{
+      id: string;
+      fhir_json: string;
+      updated_at: string;
+    }>(
+      `SELECT id, fhir_json, updated_at FROM diagnostic_reports WHERE patient_id = ? ORDER BY effective_date DESC, created_at DESC, id DESC;`,
       [patientId]
     );
   } else {
-    reportRows = await db.getAllAsync<{ id: string; fhir_json: string }>(
-      `SELECT id, fhir_json FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
+    reportRows = await db.getAllAsync<{
+      id: string;
+      fhir_json: string;
+      updated_at: string;
+    }>(
+      `SELECT id, fhir_json, updated_at FROM diagnostic_reports ORDER BY effective_date DESC, created_at DESC, id DESC;`
     );
   }
 
   const records: DiagnosticReportRecord[] = [];
   for (const r of reportRows) {
     const parsedReport: DiagnosticReport = JSON.parse(r.fhir_json);
+    if (!parsedReport.meta?.lastUpdated && r.updated_at) {
+      parsedReport.meta = { ...parsedReport.meta, lastUpdated: r.updated_at };
+    }
     const obsRows = await db.getAllAsync<{ fhir_json: string }>(
       `SELECT fhir_json FROM observations WHERE report_id = ? ORDER BY name ASC, id ASC;`,
       [r.id]
@@ -160,4 +199,5 @@ export async function deleteDiagnosticReportRecord(
     reportId,
   ]);
   await db.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [reportId]);
+  notifyDatabaseChanged(['diagnostic_reports', 'observations']);
 }
