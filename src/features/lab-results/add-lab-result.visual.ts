@@ -1,5 +1,8 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { createPatientViaUI } from '@/src/features/testing/testStorage';
+import {
+  clearAppStorage,
+  seedTestPatient,
+} from '@/src/features/testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -11,9 +14,9 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await createPatientViaUI(page);
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+    await page.goto('/lab-result/add');
   });
 
   test('Add Report View - Initial Clean Form', async ({ page }, testInfo) => {

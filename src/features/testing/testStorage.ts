@@ -248,3 +248,5 @@ export function setupConsoleMonitor(page: Page): ConsoleMonitor {
     getWarnings: () => warnings.filter((warn) => !isIgnored(warn)),
   };
 }
+
+export * from './testSeed';

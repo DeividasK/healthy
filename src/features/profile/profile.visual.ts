@@ -1,5 +1,8 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { createPatientViaUI } from '@/src/features/testing/testStorage';
+import {
+  clearAppStorage,
+  seedTestPatient,
+} from '@/src/features/testing/testStorage';
 
 test.use({
   viewport: { width: 360, height: 740 },
@@ -11,8 +14,9 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
-    await createPatientViaUI(page);
-    await page.getByTestId('profile-header-button').click();
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+    await page.goto('/profile');
 
     await expect(page.getByText('Profile', { exact: true })).toBeVisible();
     await expect(page.getByTestId('active-profile-card')).toBeVisible();
@@ -34,18 +38,7 @@ test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Connected Google Sync State', async ({
     page,
   }, testInfo) => {
-    await createPatientViaUI(page);
-    await page.route('https://www.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ files: [], id: 'file-123' }),
-      });
-    });
-
-    await page.getByTestId('profile-header-button').click();
-    await expect(page.getByTestId('google-sync-card')).toBeVisible();
-
+    await clearAppStorage(page);
     await page.evaluate(() => {
       localStorage.setItem(
         '@healthy_device_google_sync_config',
@@ -58,12 +51,9 @@ test.describe('Profile Views - Visual Regression', () => {
         })
       );
     });
+    await seedTestPatient(page, { syncAccount: 'google-sub-12345' });
+    await page.goto('/profile');
 
-    await page.reload();
-
-    const connectBtn = page.getByTestId('google-signin-button');
-    await expect(connectBtn).toBeVisible();
-    await connectBtn.click();
     await expect(page.getByTestId('google-sync-card')).toBeVisible();
     await expect(page.getByTestId('connected-user-email')).toBeVisible();
 

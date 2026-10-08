@@ -1,8 +1,8 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
 import {
   clearAppStorage,
-  createPatientViaUI,
-  createReportViaUI,
+  seedTestPatient,
+  seedTestReport,
 } from '@/src/features/testing/testStorage';
 
 test.use({
@@ -16,21 +16,18 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 test.describe('Edit Lab Result View - Visual Regression', () => {
   test('Add Report View - Edit Existing Mode', async ({ page }, testInfo) => {
     await clearAppStorage(page);
-    await createPatientViaUI(page);
-    await createReportViaUI(page, {
+    await seedTestPatient(page);
+    const bundle = await seedTestReport(page, {
+      id: 'report-edit-test',
+      date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: '13.8' },
-        { name: 'Platelets', value: '210' },
+        { name: 'Hemoglobin', value: 13.8 },
+        { name: 'Platelets', value: 210 },
       ],
       notes: 'Initial checkup notes for editing',
     });
 
-    // Tap edit button on Home card
-    const editBtn = page
-      .locator('[data-testid^="edit-report-button-"]')
-      .first();
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*lab-result\/.*\/edit/);
+    await page.goto(`/lab-result/${bundle.report.id}/edit`);
 
     await expect(page.getByText('Edit Lab Results')).toBeVisible();
     await expect(page.getByTestId('marker-card-0')).toContainText(

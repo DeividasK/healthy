@@ -1,7 +1,8 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
 import {
-  createPatientViaUI,
-  createReportViaUI,
+  clearAppStorage,
+  seedTestPatient,
+  seedTestReport,
 } from '@/src/features/testing/testStorage';
 
 test.use({
@@ -14,7 +15,8 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await createPatientViaUI(page);
+    await clearAppStorage(page);
+    await seedTestPatient(page);
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
@@ -28,13 +30,17 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Populated with Single Report', async ({
     page,
   }, testInfo) => {
-    await createReportViaUI(page, {
+    await seedTestReport(page, {
+      id: 'report-home-single',
+      date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: '14.5' },
-        { name: 'White Blood Cells', value: '6.8' },
+        { name: 'Hemoglobin', value: 14.5 },
+        { name: 'White Blood Cells', value: 6.8 },
       ],
       notes: 'Routine morning blood test',
     });
+
+    await page.goto('/');
 
     await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
     await expect(page.getByText('"Routine morning blood test"')).toBeVisible();
@@ -46,21 +52,27 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Multi-Report with All Status Badges', async ({
     page,
   }, testInfo) => {
-    await createReportViaUI(page, {
+    await seedTestReport(page, {
+      id: 'report-home-multi-1',
+      date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: '15.2' },
-        { name: 'White Blood Cells', value: '3.1' },
-        { name: 'Platelets', value: '480' },
+        { name: 'Hemoglobin', value: 15.2 },
+        { name: 'White Blood Cells', value: 3.1 },
+        { name: 'Platelets', value: 480 },
       ],
       notes: 'Follow-up consultation notes',
     });
 
-    await createReportViaUI(page, {
+    await seedTestReport(page, {
+      id: 'report-home-multi-2',
+      date: '2026-10-02',
       biomarkers: [
-        { name: 'Red Blood Cells', value: '4.7' },
-        { name: 'Hematocrit', value: '41.5' },
+        { name: 'Red Blood Cells', value: 4.7 },
+        { name: 'Hematocrit', value: 41.5 },
       ],
     });
+
+    await page.goto('/');
 
     await expect(
       page.getByText('Normal', { exact: true }).first()

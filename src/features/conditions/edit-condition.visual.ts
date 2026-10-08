@@ -1,8 +1,8 @@
 import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
 import {
   clearAppStorage,
-  createPatientViaUI,
-  createConditionViaUI,
+  seedTestPatient,
+  seedTestCondition,
 } from '@/src/features/testing/testStorage';
 
 test.use({
@@ -16,19 +16,16 @@ const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
 test.describe('Edit Condition View - Visual Regression', () => {
   test('Condition View - Edit Existing Mode', async ({ page }, testInfo) => {
     await clearAppStorage(page);
-    await createPatientViaUI(page);
-    await createConditionViaUI(page, {
+    await seedTestPatient(page);
+    const cond = await seedTestCondition(page, {
+      id: 'cond-visual-test',
       title: 'Left Knee Pain',
       status: 'active',
       notes: 'Persistent ache after running on tarmac.',
+      onsetDate: '2026-10-02',
     });
 
-    // Tap edit button on Home card
-    const editBtn = page
-      .locator('[data-testid^="edit-condition-button-"]')
-      .first();
-    await editBtn.click();
-    await expect(page).toHaveURL(/.*condition\/.*\/edit/);
+    await page.goto(`/condition/${cond.id}/edit`);
 
     await expect(page.getByText('Edit Condition')).toBeVisible();
     await expect(page.getByTestId('condition-title-input')).toHaveValue(
