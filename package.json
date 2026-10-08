@@ -72,7 +72,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start",
-    "web:dist": "pnpm build:web && pnpm serve dist -l 8081",
+    "web:dist": "pnpm build:web && pnpm serve -s dist -l 8081",
     "build:web": "expo export --platform web",
     "build:pages": "EXPO_BASE_URL=/healthy expo export --platform web && touch dist/.nojekyll && cp dist/index.html dist/404.html",
     "test:e2e": "playwright test --project=chromium",
