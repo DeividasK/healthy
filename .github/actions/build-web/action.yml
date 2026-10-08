@@ -12,13 +12,13 @@ runs:
   steps:
     - name: Cache Web Build Output
       id: web-build-cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: dist
         key: ${{ runner.os }}-web-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
 
     - name: Cache Metro Bundler
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: .expo/cache
         key: ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
