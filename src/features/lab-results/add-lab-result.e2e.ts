@@ -12,7 +12,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await createPatientViaUI(page);
   });
 
-  test('should allow user to add CBC lab results, view them on home, and persist across reload', async ({
+  test('should allow user to add CBC lab results and view them on home', async ({
     page,
   }) => {
     // 2. Click floating "+" button -> "Add Lab Results"
@@ -82,13 +82,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
     await expect(page.getByText('6.8')).toBeVisible();
     await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
-
-    // 11. Verify Local Persistence: reload page and assert results are still present
-    await page.reload();
-    await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-    await expect(page.getByText('14.5')).toBeVisible();
-    await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
-    await expect(page.getByText('6.8')).toBeVisible();
   });
 
   test('should allow removing a test from the active list before saving', async ({

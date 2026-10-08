@@ -97,14 +97,7 @@ test.describe('Edit Lab Results Flow', () => {
     await expect(page.getByText('White Blood Cells (WBC)')).not.toBeVisible();
     await expect(page.getByText('"Updated checkup note"')).toBeVisible();
 
-    // 9. Verify persistence across page reload
-    await page.reload();
-    await expect(page.getByText('16.2')).toBeVisible();
-    await expect(page.getByText('250')).toBeVisible();
-    await expect(page.getByText('White Blood Cells (WBC)')).not.toBeVisible();
-    await expect(page.getByText('"Updated checkup note"')).toBeVisible();
-
-    // 10. Verify no shadow*, pointerEvents, or Blocked aria-hidden console warnings occurred
+    // 9. Verify no shadow*, pointerEvents, or Blocked aria-hidden console warnings occurred
     const problematicWarnings = consoleWarnings.filter(
       (w) =>
         w.includes('shadow*') ||

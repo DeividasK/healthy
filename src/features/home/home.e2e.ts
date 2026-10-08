@@ -4,6 +4,7 @@ import {
   clearAppStorage,
   createPatientViaUI,
   createReportViaUI,
+  createTestConditionViaUI,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -135,14 +136,8 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     // 1. Visit Home, initially showing "Nothing to show yet"
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
 
-    // 2. Add a condition via UI
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-condition').click();
-    await expect(page).toHaveURL(/.*condition\/add/);
-
-    await page.getByTestId('condition-title-input').fill('Asthma');
-    await page.getByTestId('save-button').click();
-    await page.waitForURL(/.*(\/|#)$/);
+    // 2. Add a condition via helper
+    await createTestConditionViaUI(page, { title: 'Asthma' });
 
     // 3. Condition is immediately visible on Home
     await expect(page.getByText('Asthma')).toBeVisible();
