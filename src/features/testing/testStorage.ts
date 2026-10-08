@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
 export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
+export const DEFAULT_CONDITION_TITLE = 'Test Condition';
 
 /**
  * Resets browser storage (localStorage and sessionStorage) for clean test runs.
@@ -67,13 +68,15 @@ export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
 /**
  * Creates a Patient profile through standard UI flow.
  */
-export async function createPatientViaUI(
-  page: Page,
-): Promise<void> {
+export async function createPatientViaUI(page: Page): Promise<void> {
   // This redirects to new profile creation page
   await page.goto('/');
-  await page.getByTestId('patient-given-name-input').fill(DEFAULT_PROFILE_FIRST_NAME);
-  await page.getByTestId('patient-family-name-input').fill(DEFAULT_PROFILE_LAST_NAME);
+  await page
+    .getByTestId('patient-given-name-input')
+    .fill(DEFAULT_PROFILE_FIRST_NAME);
+  await page
+    .getByTestId('patient-family-name-input')
+    .fill(DEFAULT_PROFILE_LAST_NAME);
   await page.getByTestId('save-profile-button').click();
 }
 
@@ -126,50 +129,37 @@ export async function createReportViaUI(
   await page.waitForURL(/.*(\/|#)$/);
 }
 
+export interface AddConditionOptions {
+  title?: string;
+  status?: string;
+  notes?: string;
+}
+
 /**
- * Seeds a Condition through standard UI creation flow without exposing private app internals.
+ * Creates a Condition through standard UI flow starting from the homepage.
  */
-export async function createConditionViaUI(
+export async function createTestConditionViaUI(
   page: Page,
-  options: {
-    title: string;
-    status?: string;
-    notes?: string;
-  }
+  options?: AddConditionOptions
 ): Promise<void> {
-  const fab = page.getByTestId('floating-add-button').first();
-  if (await fab.isVisible()) {
-    await fab.click();
-    await page.getByTestId('menu-add-condition').first().click();
-  } else {
-    await page.goto('/condition/add');
+  await page.getByTestId('floating-add-button').click();
+  await page.getByTestId('menu-add-condition').click();
+  await page
+    .getByTestId('condition-title-input')
+    .fill(options?.title ?? DEFAULT_CONDITION_TITLE);
+
+  if (options?.status) {
+    await page.getByTestId('status-picker-select').selectOption(options.status);
   }
 
-  await page.waitForURL(/.*condition\/add/);
-  await page.getByTestId('condition-title-input').waitFor({ state: 'visible' });
-
-  if (options.status) {
-    const statusSelect = page.getByTestId('status-picker-select');
-    if (await statusSelect.isVisible()) {
-      await statusSelect.selectOption(options.status);
-    }
-  }
-
-  await page.getByTestId('condition-title-input').fill(options.title);
-
-  if (options.notes) {
-    const addOptionBtn = page.getByTestId('add-option-button');
-    if (await addOptionBtn.isVisible()) {
-      await addOptionBtn.click();
-      const addNotesOption = page.getByTestId('menu-add-notes');
-      if (await addNotesOption.isVisible()) {
-        await addNotesOption.click();
-      }
-    }
-    const notesInput = page.getByTestId('condition-notes-input');
-    await notesInput.fill(options.notes);
+  if (options?.notes) {
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-notes').click();
+    await page.getByTestId('condition-notes-input').fill(options.notes);
   }
 
   await page.getByTestId('save-button').click();
-  await page.waitForURL(/.*(\/|#)$/);
 }
+
+export const createConditionViaUI = createTestConditionViaUI;
+export const addConditionViaUI = createTestConditionViaUI;

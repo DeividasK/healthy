@@ -1,22 +1,18 @@
 import { test, expect } from '@playwright/test';
-import { clearAppStorage, createPatientViaUI } from '../testing/testStorage';
+import {
+  createPatientViaUI,
+  createTestConditionViaUI,
+  DEFAULT_CONDITION_TITLE,
+} from '../testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await createPatientViaUI(page);
-    await page.reload();
   });
 
   test('should allow editing an existing Condition', async ({ page }) => {
     // 1. Create a condition
-    await page.goto('/condition/add');
-    await page
-      .getByTestId('condition-title-input')
-      .fill('Right Shoulder Strain');
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Right Shoulder Strain')).toBeVisible();
+    await createTestConditionViaUI(page);
 
     // 2. Click edit button
     const editBtn = page.locator('[data-testid^="edit-condition-button-"]');
@@ -26,28 +22,22 @@ test.describe('Edit Condition Flow', () => {
 
     // 3. Verify populated title
     const titleInput = page.getByTestId('condition-title-input');
-    await expect(titleInput).toHaveValue('Right Shoulder Strain');
+    await expect(titleInput).toHaveValue(DEFAULT_CONDITION_TITLE);
 
     // Update title
-    await titleInput.fill('Right Shoulder Strain - Resolved');
+    await titleInput.fill('Updated Condition');
     await page.getByTestId('save-button').click();
 
     // 4. Verify home view reflects updated title
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(
-      page.getByText('Right Shoulder Strain - Resolved')
-    ).toBeVisible();
+    await expect(page.getByText('Updated Condition')).toBeVisible();
   });
 
   test('should allow deleting a Condition with confirmation modal and cancel option', async ({
     page,
   }) => {
     // 1. Create a condition
-    await page.goto('/condition/add');
-    await page.getByTestId('condition-title-input').fill('Migraine Case');
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Migraine Case')).toBeVisible();
+    await createTestConditionViaUI(page);
 
     // 2. Click delete button
     const deleteBtn = page.locator('[data-testid^="delete-condition-button-"]');
@@ -62,7 +52,7 @@ test.describe('Edit Condition Flow', () => {
     const cancelBtn = page.getByTestId('delete-modal-cancel-button');
     await cancelBtn.click();
     await expect(modal).not.toBeVisible();
-    await expect(page.getByText('Migraine Case')).toBeVisible();
+    await expect(page.getByText(DEFAULT_CONDITION_TITLE)).toBeVisible();
 
     // 4. Click delete again and verify 5-second countdown
     await deleteBtn.click();
@@ -76,7 +66,7 @@ test.describe('Edit Condition Flow', () => {
     await confirmBtn.click();
 
     // 5. Condition is removed, returns to empty state
-    await expect(page.getByText('Migraine Case')).not.toBeVisible();
+    await expect(page.getByText(DEFAULT_CONDITION_TITLE)).not.toBeVisible();
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
   });
 });
