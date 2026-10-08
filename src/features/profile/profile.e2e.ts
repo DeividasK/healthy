@@ -404,6 +404,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     // Delete button should appear in EditProfileView
     const deleteBtn = page.getByTestId('delete-profile-button');
     await expect(deleteBtn).toBeVisible();
+    await page.clock.install();
     await deleteBtn.click();
 
     // Confirmation modal should appear with 5s countdown
@@ -420,8 +421,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
     await expect(confirmBtn).toContainText('Delete (');
 
-    // Wait until countdown expires
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    // Fast-forward countdown by 5 seconds
+    await page.clock.fastForward(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
     await confirmBtn.click();
 
@@ -521,13 +523,15 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // 3. Delete Bob Smith locally (with cloud delete unchecked)
     await page.getByTestId('edit-profile-button').first().click();
+    await page.clock.install();
     await page.getByTestId('delete-profile-button').click();
 
     const modal = page.getByTestId('delete-profile-modal');
     await expect(modal).toBeVisible();
 
     const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    await page.clock.fastForward(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await confirmBtn.click();
 
     // 4. Verify we are back on Profile with "John Doe" active and Bob Smith is gone

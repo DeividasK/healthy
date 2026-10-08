@@ -85,11 +85,13 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(reportCard).toBeVisible();
 
     // 4. Reopen modal and wait for 5-second countdown to finish
+    await page.clock.install();
     await deleteBtn.click();
     await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
 
-    // Wait until countdown reaches 0 and button becomes enabled with text "Delete"
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    // Fast-forward countdown by 5 seconds
+    await page.clock.fastForward(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
 
     // Click enabled Delete button

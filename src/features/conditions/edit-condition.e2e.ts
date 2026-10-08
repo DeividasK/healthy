@@ -58,13 +58,15 @@ test.describe('Edit Condition Flow', () => {
     await expect(page.getByText(DEFAULT_CONDITION_TITLE)).toBeVisible();
 
     // 4. Click delete again and verify 5-second countdown
+    await page.clock.install();
     await deleteBtn.click();
     const confirmBtn = page.getByTestId('delete-modal-confirm-button');
     await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
     await expect(confirmBtn).toContainText('Delete (');
 
-    // Wait until countdown reaches 0 and button becomes enabled with text "Delete"
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    // Fast-forward countdown by 5 seconds
+    await page.clock.fastForward(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
     await confirmBtn.click();
 
