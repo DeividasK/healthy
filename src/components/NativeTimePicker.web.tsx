@@ -47,6 +47,7 @@ export function NativeTimePicker({
         type: 'time',
         id: `${testID}-native-input`,
         name: `${testID}-time`,
+        'aria-label': 'Time',
         max: maxTime,
         value: value,
         onChange: handleNativeChange,

@@ -1,27 +1,20 @@
-import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
-import { createPatientViaUI } from '@/src/features/testing/testStorage';
-
-test.use({
-  viewport: { width: 360, height: 740 },
-  colorScheme: 'light',
-  disableAutoSnapshot: true,
-});
-
-const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
+import {
+  test,
+  takeSnapshot,
+  clearAppStorage,
+  seedTestPatient,
+} from '@/src/features/testing/visualTest';
 
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await createPatientViaUI(page);
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+    await page.goto('/lab-result/add');
   });
 
   test('Add Report View - Initial Clean Form', async ({ page }, testInfo) => {
-    await expect(page.getByText('Add Lab Results')).toBeVisible();
-    await expect(page.getByTestId('date-picker-button')).toBeVisible();
-    await expect(page.getByTestId('test-search-input')).toBeVisible();
+    await page.getByTestId('test-search-input').waitFor();
 
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Add Report View - Initial Clean Form', testInfo);
   });
 
@@ -30,14 +23,8 @@ test.describe('Add Lab Result View - Visual Regression', () => {
   }, testInfo) => {
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.click();
+    await page.getByTestId('autocomplete-item-cbc_hemoglobin').waitFor();
 
-    const autocompleteList = page.getByTestId('autocomplete-list');
-    await expect(autocompleteList).toBeVisible();
-    await expect(
-      page.getByTestId('autocomplete-item-cbc_hemoglobin')
-    ).toBeVisible();
-
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Autocomplete Dropdown Open',
@@ -53,21 +40,16 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     const hemoglobinOption = page.getByTestId(
       'autocomplete-item-cbc_hemoglobin'
     );
-    await expect(hemoglobinOption).toBeVisible();
     await hemoglobinOption.click();
     await page.getByTestId('marker-value-input-0').fill('14.2');
 
     // Add Platelets
     await searchInput.fill('Platelets');
     const plateletsOption = page.getByTestId('autocomplete-item-cbc_platelets');
-    await expect(plateletsOption).toBeVisible();
     await plateletsOption.click();
     await page.getByTestId('marker-value-input-1').fill('260');
+    await page.getByTestId('marker-card-1').waitFor();
 
-    await expect(page.getByTestId('marker-card-0')).toBeVisible();
-    await expect(page.getByTestId('marker-card-1')).toBeVisible();
-
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Populated Biomarkers',
@@ -88,7 +70,6 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.fill('WBC');
     const wbcOption = page.getByTestId('autocomplete-item-cbc_wbc');
-    await expect(wbcOption).toBeVisible();
     await wbcOption.click();
     await page.getByTestId('marker-value-input-0').fill('5.4');
 
@@ -110,10 +91,8 @@ test.describe('Add Lab Result View - Visual Regression', () => {
       .getByTestId('notes-input')
       .fill('Fasting morning blood sample taken at clinic');
 
-    await expect(page.getByTestId('time-picker-button')).toContainText('08:45');
-    await expect(page.getByTestId('notes-input')).toBeVisible();
+    await page.getByTestId('notes-input').waitFor();
 
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Add Report View - Expanded Time and Notes',

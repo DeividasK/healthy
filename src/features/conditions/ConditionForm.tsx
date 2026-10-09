@@ -399,6 +399,7 @@ export function ConditionForm({
                   {
                     id: 'status-picker-select',
                     name: 'status',
+                    'aria-label': 'Condition status',
                     value: selectedStatus.id,
                     onChange: (e: any) => {
                       const found = CONDITION_STATUS_OPTIONS.find(

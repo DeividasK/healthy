@@ -3,8 +3,8 @@ import type { ChromaticConfig } from '@chromatic-com/playwright';
 
 export default defineConfig<ChromaticConfig>({
   testDir: './src/features',
-  fullyParallel: false,
-  workers: 1,
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   timeout: 30000,
@@ -16,6 +16,11 @@ export default defineConfig<ChromaticConfig>({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: /.*\.e2e\.ts/,
+    },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
       testMatch: /.*\.e2e\.ts/,
     },
     {

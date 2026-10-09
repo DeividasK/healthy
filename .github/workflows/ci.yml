@@ -40,9 +40,6 @@ jobs:
         with:
           cache: true
 
-      - name: Build Web Static Export
-        uses: ./.github/actions/build-web
-
       - name: Run E2E Tests
         run: pnpm test:e2e
 

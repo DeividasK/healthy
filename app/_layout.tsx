@@ -14,6 +14,7 @@ import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton'
 import { SyncProvider } from '@/src/context/SyncContext';
 import { SyncHeaderIndicator } from '@/src/components/SyncHeaderIndicator';
 import { DatabaseProvider } from '@/src/database/db';
+import { setupTestBridge } from '@/src/features/testing/testBridge';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -30,6 +31,7 @@ SplashScreen.preventAutoHideAsync();
 function AppReadyHandler() {
   useEffect(() => {
     SplashScreen.hideAsync();
+    setupTestBridge();
   }, []);
 
   return null;

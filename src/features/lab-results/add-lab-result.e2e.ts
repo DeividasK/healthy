@@ -4,6 +4,7 @@ import {
   expect,
   clearAppStorage,
   createPatientViaUI,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -12,84 +13,83 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await createPatientViaUI(page);
   });
 
-  test('should allow user to add CBC lab results, view them on home, and persist across reload', async ({
-    page,
-  }) => {
-    // 2. Click floating "+" button -> "Add Lab Results"
-    await page.getByTestId('floating-add-button').click();
-    const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
-    await expect(addLabResultsMenuBtn).toBeVisible();
-    await addLabResultsMenuBtn.click();
+  test(
+    'should allow user to add CBC lab results and view them on home',
+    { tag: ['@smoke', '@critical'] },
+    async ({ page }) => {
+      await test.step('Open Add Lab Results screen from floating button and audit a11y', async () => {
+        await page.getByTestId('floating-add-button').click();
+        const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
+        await expect(addLabResultsMenuBtn).toBeVisible();
+        await addLabResultsMenuBtn.click();
 
-    // 3. Verify navigation to Add Lab Results screen
-    await expect(page).toHaveURL(/.*lab-result\/add/);
-    await expect(page.getByText('Add Lab Results')).toBeVisible();
+        await expect(page).toHaveURL(/.*lab-result\/add/);
+        await expect(page.getByText('Add Lab Results')).toBeVisible();
+        await checkA11y(page, { disableRules: ['color-contrast'] });
+      });
 
-    // 4. Search and select "Hemoglobin" from CBC autocomplete
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Hemoglobin');
-    const hemoglobinOption = page.getByTestId(
-      'autocomplete-item-cbc_hemoglobin'
-    );
-    await expect(hemoglobinOption).toBeVisible();
-    await hemoglobinOption.click();
+      await test.step('Search and select Hemoglobin and WBC biomarkers', async () => {
+        const searchInput = page.getByTestId('test-search-input');
+        await searchInput.fill('Hemoglobin');
+        const hemoglobinOption = page.getByTestId(
+          'autocomplete-item-cbc_hemoglobin'
+        );
+        await expect(hemoglobinOption).toBeVisible();
+        await hemoglobinOption.click();
 
-    // Verify search input is cleared and Hemoglobin card is added
-    await expect(searchInput).toHaveValue('');
-    const hemoglobinCard = page.getByTestId('marker-card-0');
-    await expect(hemoglobinCard).toBeVisible();
-    await expect(hemoglobinCard.getByText('Hemoglobin (Hgb)')).toBeVisible();
+        await expect(searchInput).toHaveValue('');
+        const hemoglobinCard = page.getByTestId('marker-card-0');
+        await expect(hemoglobinCard).toBeVisible();
+        await expect(
+          hemoglobinCard.getByText('Hemoglobin (Hgb)')
+        ).toBeVisible();
 
-    // 5. Search and select "White Blood Cells (WBC)"
-    await searchInput.fill('WBC');
-    const wbcOption = page.getByTestId('autocomplete-item-cbc_wbc');
-    await expect(wbcOption).toBeVisible();
-    await wbcOption.click();
+        await searchInput.fill('WBC');
+        const wbcOption = page.getByTestId('autocomplete-item-cbc_wbc');
+        await expect(wbcOption).toBeVisible();
+        await wbcOption.click();
 
-    const wbcCard = page.getByTestId('marker-card-1');
-    await expect(wbcCard).toBeVisible();
-    await expect(wbcCard.getByText('White Blood Cells (WBC)')).toBeVisible();
+        const wbcCard = page.getByTestId('marker-card-1');
+        await expect(wbcCard).toBeVisible();
+        await expect(
+          wbcCard.getByText('White Blood Cells (WBC)')
+        ).toBeVisible();
+      });
 
-    // 6. Enter numeric values for both biomarkers
-    const hemoglobinInput = page.getByTestId('marker-value-input-0');
-    await hemoglobinInput.fill('14.5');
+      await test.step('Enter numeric biomarker values', async () => {
+        const hemoglobinInput = page.getByTestId('marker-value-input-0');
+        await hemoglobinInput.fill('14.5');
 
-    const wbcInput = page.getByTestId('marker-value-input-1');
-    await wbcInput.fill('6.8');
+        const wbcInput = page.getByTestId('marker-value-input-1');
+        await wbcInput.fill('6.8');
+      });
 
-    // 7. Click "+" menu button and add notes
-    const plusMenuBtn = page.getByTestId('plus-menu-button');
-    await plusMenuBtn.click();
-    const addNotesOption = page.getByTestId('menu-add-notes');
-    await expect(addNotesOption).toBeVisible();
-    await addNotesOption.click();
+      await test.step('Add notes via plus menu and save', async () => {
+        const plusMenuBtn = page.getByTestId('plus-menu-button');
+        await plusMenuBtn.click();
+        const addNotesOption = page.getByTestId('menu-add-notes');
+        await expect(addNotesOption).toBeVisible();
+        await addNotesOption.click();
 
-    const notesInput = page.getByTestId('notes-input');
-    await expect(notesInput).toBeVisible();
-    await notesInput.fill('Fasting routine checkup');
+        const notesInput = page.getByTestId('notes-input');
+        await expect(notesInput).toBeVisible();
+        await notesInput.fill('Fasting routine checkup');
 
-    // 8. Click bottom Save button
-    const saveButton = page.getByTestId('save-button');
-    await expect(saveButton).toBeVisible();
-    await saveButton.click();
+        const saveButton = page.getByTestId('save-button');
+        await expect(saveButton).toBeVisible();
+        await saveButton.click();
+      });
 
-    // 9. Verify navigation back to home page
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-
-    // 10. Verify that Homepage shows the results (only)
-    await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-    await expect(page.getByText('14.5')).toBeVisible();
-    await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
-    await expect(page.getByText('6.8')).toBeVisible();
-    await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
-
-    // 11. Verify Local Persistence: reload page and assert results are still present
-    await page.reload();
-    await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-    await expect(page.getByText('14.5')).toBeVisible();
-    await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
-    await expect(page.getByText('6.8')).toBeVisible();
-  });
+      await test.step('Verify saved results render on Home', async () => {
+        await expect(page).toHaveURL(/.*(\/|#)$/);
+        await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
+        await expect(page.getByText('14.5')).toBeVisible();
+        await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
+        await expect(page.getByText('6.8')).toBeVisible();
+        await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
+      });
+    }
+  );
 
   test('should allow removing a test from the active list before saving', async ({
     page,

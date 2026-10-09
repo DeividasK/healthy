@@ -37,6 +37,7 @@ pnpm expo install --fix      # fix incompatible package versions
   - You **MUST NOT** write a new test if an existing visual test covers the changes/new additions.
   - You **MUST** call out new visual tests that will be added or ones that you expect to be affected if none will be added.
   - ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+  - Visual tests **MUST NOT** contain assertions (`expect(...)`). They should strictly navigate, prepare UI state, and call `takeSnapshot()`. All functional assertions belong in E2E tests (`*.e2e.ts`).
 - **E2E Tests (`pnpm test:e2e`)**:
   - You **MUST** write E2E tests for new views and user flows.
   - E2E tests for that view **MUST** be collocated next to the view inside `src/features/<feature>/` and named accordingly (e.g. `src/features/<feature>/<view-name>.e2e.ts`).

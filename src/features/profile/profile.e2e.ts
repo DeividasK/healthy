@@ -4,6 +4,10 @@ import {
   clearAppStorage,
   createPatientViaUI,
   createConditionViaUI,
+  mockGoogleDriveRoutes,
+  mockGoogleAuthRoutes,
+  mockGoogleIdentityServices,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
@@ -12,95 +16,102 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await createPatientViaUI(page);
   });
 
-  test('should display profile button in header and allow navigating to profile', async ({
-    page,
-  }) => {
-    const profileBtn = page.getByTestId('profile-header-button');
-    await expect(profileBtn).toBeVisible();
-    await profileBtn.click();
+  test(
+    'should display profile button in header and allow navigating to profile',
+    { tag: ['@smoke'] },
+    async ({ page }) => {
+      await test.step('Click profile button in header', async () => {
+        const profileBtn = page.getByTestId('profile-header-button');
+        await expect(profileBtn).toBeVisible();
+        await profileBtn.click();
+      });
 
-    await expect(page).toHaveURL(/.*profile/);
-    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('active-profile-card')).toBeVisible();
-    await expect(page.getByTestId('profile-display-name')).toHaveText(
-      'John Doe'
-    );
-  });
-
-  test('should allow creating a new profile and switching active patient with record isolation', async ({
-    page,
-  }) => {
-    // 1. Initially on default profile 'Self', create a Condition 'Back Pain'
-    await createConditionViaUI(page, {
-      title: 'Back Pain',
-      status: 'active',
-    });
-
-    // Verify condition exists on Home
-    await expect(page.getByText('Back Pain')).toBeVisible();
-
-    // 2. Open Profile screen
-    await page.getByTestId('profile-header-button').click();
-    await expect(page).toHaveURL(/.*profile/);
-
-    // 3. Click Add Profile
-    const addProfileBtn = page.getByTestId('add-new-profile-button');
-    await expect(addProfileBtn).toBeVisible();
-    await addProfileBtn.click();
-
-    await expect(page).toHaveURL(/.*profile\/new/);
-    await expect(page.getByTestId('add-profile-header-title')).toBeVisible();
-
-    // 4. Fill form for new patient "Jane Doe"
-    await page.getByTestId('patient-given-name-input').fill('Jane');
-    await page.getByTestId('patient-family-name-input').fill('Doe');
-
-    const genderSelect = page.getByTestId('patient-gender-select');
-    if (await genderSelect.isVisible()) {
-      await genderSelect.selectOption('female');
+      await test.step('Verify navigation to profile view, display name, and audit a11y', async () => {
+        await expect(page).toHaveURL(/.*profile/);
+        await expect(page.getByText('Profile', { exact: true })).toBeVisible();
+        await expect(page.getByTestId('active-profile-card')).toBeVisible();
+        await expect(page.getByTestId('profile-display-name')).toHaveText(
+          'John Doe'
+        );
+        await checkA11y(page, { disableRules: ['color-contrast'] });
+      });
     }
+  );
 
-    await page.getByTestId('save-profile-button').click();
+  test(
+    'should allow creating a new profile and switching active patient with record isolation',
+    { tag: ['@critical'] },
+    async ({ page }) => {
+      await test.step('Create condition for initial John Doe profile', async () => {
+        await createConditionViaUI(page, {
+          title: 'Back Pain',
+          status: 'active',
+        });
+        await expect(page.getByText('Back Pain')).toBeVisible();
+      });
 
-    // 5. Verify back on profile screen and "Jane Doe" is active
-    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
-      'Jane Doe'
-    );
+      await test.step('Navigate to Add Profile and create Jane Doe', async () => {
+        await page.getByTestId('profile-header-button').click();
+        await expect(page).toHaveURL(/.*profile/);
 
-    // 6. Navigate to Home
-    await page.locator('[data-testid="back-button"]:visible').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
+        const addProfileBtn = page.getByTestId('add-new-profile-button');
+        await expect(addProfileBtn).toBeVisible();
+        await addProfileBtn.click();
 
-    // 7. Verify record isolation: 'Back Pain' belonged to 'Self', so Jane Doe has empty list!
-    await expect(page.getByText('Nothing to show yet')).toBeVisible();
-    await expect(page.getByText('Back Pain')).not.toBeVisible();
+        await expect(page).toHaveURL(/.*profile\/new/);
+        await expect(
+          page.getByTestId('add-profile-header-title')
+        ).toBeVisible();
 
-    // 8. Add a condition for Jane Doe
-    await createConditionViaUI(page, {
-      title: 'Asthma',
-      status: 'active',
-    });
-    await expect(page.getByText('Asthma')).toBeVisible();
-    await expect(page.getByText('Back Pain')).not.toBeVisible();
+        await page.getByTestId('patient-given-name-input').fill('Jane');
+        await page.getByTestId('patient-family-name-input').fill('Doe');
 
-    // 9. Switch back to 'John Doe' profile
-    await page.getByTestId('profile-header-button').click();
-    await page
-      .locator('[data-testid^="profile-item-"]')
-      .filter({ hasText: 'John Doe' })
-      .first()
-      .click();
+        const genderSelect = page.getByTestId('patient-gender-select');
+        if (await genderSelect.isVisible()) {
+          await genderSelect.selectOption('female');
+        }
 
-    // Verify 'John Doe' is now active
-    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
-      'John Doe'
-    );
+        await page.getByTestId('save-profile-button').click();
+        await expect(
+          page.getByTestId('profile-display-name').first()
+        ).toHaveText('Jane Doe');
+      });
 
-    // 10. Return to Home -> 'Back Pain' should be visible, 'Asthma' should not
-    await page.locator('[data-testid="back-button"]:visible').click();
-    await expect(page.getByText('Back Pain')).toBeVisible();
-    await expect(page.getByText('Asthma')).not.toBeVisible();
-  });
+      await test.step('Navigate to Home and verify record isolation for Jane Doe', async () => {
+        await page.locator('[data-testid="back-button"]:visible').click();
+        await expect(page).toHaveURL(/.*(\/|#)$/);
+
+        await expect(page.getByText('Nothing to show yet')).toBeVisible();
+        await expect(page.getByText('Back Pain')).not.toBeVisible();
+      });
+
+      await test.step('Add condition for Jane Doe and verify on Home', async () => {
+        await createConditionViaUI(page, {
+          title: 'Asthma',
+          status: 'active',
+        });
+        await expect(page.getByText('Asthma')).toBeVisible();
+        await expect(page.getByText('Back Pain')).not.toBeVisible();
+      });
+
+      await test.step('Switch back to John Doe and verify condition isolation restored', async () => {
+        await page.getByTestId('profile-header-button').click();
+        await page
+          .getByTestId(/^profile-item-/)
+          .filter({ hasText: 'John Doe' })
+          .first()
+          .click();
+
+        await expect(
+          page.getByTestId('profile-display-name').first()
+        ).toHaveText('John Doe');
+
+        await page.locator('[data-testid="back-button"]:visible').click();
+        await expect(page.getByText('Back Pain')).toBeVisible();
+        await expect(page.getByText('Asthma')).not.toBeVisible();
+      });
+    }
+  );
 
   test('should allow editing an existing profile', async ({ page }) => {
     await page.getByTestId('profile-header-button').click();
@@ -142,13 +153,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     page,
   }) => {
     // Intercept Google Drive API so mock sync calls succeed
-    await page.route('https://www.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ files: [], id: 'file-123' }),
-      });
-    });
+    await mockGoogleDriveRoutes(page, { files: [], fileId: 'file-123' });
 
     await page.getByTestId('profile-header-button').click();
 
@@ -233,13 +238,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     );
 
     // Intercept Google Drive API to simulate a 401 token expiry error during sync
-    await page.route('https://www.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: { message: 'Invalid Credentials' } }),
-      });
-    });
+    await mockGoogleDriveRoutes(page, { status: 401 });
 
     await page.getByTestId('profile-header-button').click();
 
@@ -280,43 +279,16 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // 1. Route Google Drive APIs
     let driveCallsWithNewToken = 0;
-    await page.route('https://www.googleapis.com/**', (route) => {
-      const authHeader = route.request().headers()['authorization'] || '';
-      if (authHeader.includes('fresh-gis-token')) {
+    await mockGoogleDriveRoutes(page, {
+      expectedToken: 'fresh-gis-token',
+      fileId: 'file-refreshed-123',
+      onCallWithExpectedToken: () => {
         driveCallsWithNewToken++;
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ files: [], id: 'file-refreshed-123' }),
-        });
-      } else {
-        route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: { message: 'Invalid Credentials' } }),
-        });
-      }
+      },
     });
 
     // 2. Mock GIS on window before navigation
-    await page.addInitScript(() => {
-      (window as any).google = {
-        accounts: {
-          oauth2: {
-            initTokenClient: (config: any) => ({
-              requestAccessToken: (_options: any) => {
-                setTimeout(() => {
-                  config.callback({
-                    access_token: 'fresh-gis-token',
-                    expires_in: 3600,
-                  });
-                }, 10);
-              },
-            }),
-          },
-        },
-      };
-    });
+    await mockGoogleIdentityServices(page, { accessToken: 'fresh-gis-token' });
 
     await page.getByTestId('profile-header-button').click();
 
@@ -404,6 +376,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     // Delete button should appear in EditProfileView
     const deleteBtn = page.getByTestId('delete-profile-button');
     await expect(deleteBtn).toBeVisible();
+    await page.clock.install();
     await deleteBtn.click();
 
     // Confirmation modal should appear with 5s countdown
@@ -420,8 +393,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
     await expect(confirmBtn).toContainText('Delete (');
 
-    // Wait until countdown expires
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    // Fast-forward countdown by 5 seconds
+    await page.clock.runFor(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
     await confirmBtn.click();
 
@@ -521,13 +495,15 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // 3. Delete Bob Smith locally (with cloud delete unchecked)
     await page.getByTestId('edit-profile-button').first().click();
+    await page.clock.install();
     await page.getByTestId('delete-profile-button').click();
 
     const modal = page.getByTestId('delete-profile-modal');
     await expect(modal).toBeVisible();
 
     const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmBtn).toHaveText('Delete', { timeout: 7000 });
+    await page.clock.runFor(5000);
+    await expect(confirmBtn).toHaveText('Delete');
     await confirmBtn.click();
 
     // 4. Verify we are back on Profile with "John Doe" active and Bob Smith is gone
@@ -563,41 +539,13 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await page.goto('/profile/restore-from-google-drive');
 
     // Mock Google OAuth and API calls in the browser context
-    await page.route('https://accounts.google.com/**', (route) => {
-      route.fulfill({ status: 200, body: 'OK' });
+    await mockGoogleAuthRoutes(page, {
+      accessToken: 'mock-token',
+      userEmail: 'testuser@gmail.com',
+      userName: 'Test User',
+      userSub: 'google-sub-empty',
     });
-    await page.route('https://oauth2.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ access_token: 'mock-token', expires_in: 3600 }),
-      });
-    });
-    await page.route(
-      'https://www.googleapis.com/oauth2/v3/userinfo',
-      (route) => {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            sub: 'google-sub-empty',
-            email: 'testuser@gmail.com',
-            name: 'Test User',
-          }),
-        });
-      }
-    );
-    await page.route(
-      'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=*',
-      (route) => {
-        // Return empty files list
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ files: [] }),
-        });
-      }
-    );
+    await mockGoogleDriveRoutes(page, { files: [] });
 
     // Verify the Restore from Google Drive screen and Connect Google Drive button
     const connectBtn = page.getByTestId('connect-google-drive-button');
@@ -634,13 +582,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     page,
   }) => {
     // Intercept Google Drive API so sync calls succeed
-    await page.route('https://www.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ files: [], id: 'file-mock-123' }),
-      });
-    });
+    await mockGoogleDriveRoutes(page, { files: [], fileId: 'file-mock-123' });
 
     // 1. Navigate to Profile
     await page.getByTestId('profile-header-button').click();
@@ -687,7 +629,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // 5. Switch back to 'John Doe'
     await page
-      .locator('[data-testid^="profile-item-"]')
+      .getByTestId(/^profile-item-/)
       .filter({ hasText: 'John Doe' })
       .first()
       .click();
@@ -704,13 +646,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     page,
   }) => {
     // Intercept Google Drive API so periodic sync calls succeed
-    await page.route('https://www.googleapis.com/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ files: [], id: 'file-poll-123' }),
-      });
-    });
+    await mockGoogleDriveRoutes(page, { files: [], fileId: 'file-poll-123' });
 
     // Navigate to profile
     await page.getByTestId('profile-header-button').click();

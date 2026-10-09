@@ -70,6 +70,7 @@ export function ProfileView() {
           <View style={styles.header}>
             <TouchableOpacity
               testID="back-button"
+              accessibilityRole="button"
               accessibilityLabel="Back"
               style={styles.backButton}
               onPress={() => {
@@ -103,6 +104,7 @@ export function ProfileView() {
         <View style={styles.header}>
           <TouchableOpacity
             testID="back-button"
+            accessibilityRole="button"
             accessibilityLabel="Back"
             style={styles.backButton}
             onPress={() => {
@@ -121,6 +123,7 @@ export function ProfileView() {
           <Text style={styles.headerTitle}>Profile</Text>
           <TouchableOpacity
             testID="edit-profile-button"
+            accessibilityRole="button"
             accessibilityLabel="Edit Profile"
             disabled={isLoading || !targetId}
             style={[

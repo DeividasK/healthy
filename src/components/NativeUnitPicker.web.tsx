@@ -34,6 +34,7 @@ export function NativeUnitPicker({
         {
           id: `${testID}-native-select`,
           name: `${testID}-unit`,
+          'aria-label': 'Select unit',
           value: selectedUnit,
           onChange: handleChange,
           style: {
