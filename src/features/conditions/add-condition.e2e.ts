@@ -3,6 +3,7 @@ import {
   expect,
   clearAppStorage,
   createPatientViaUI,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
@@ -15,12 +16,13 @@ test.describe('Add Condition Flow', () => {
     'should allow creating a Condition with status, title, and optional fields via plus modal',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
-      await test.step('Navigate to Add Condition screen', async () => {
+      await test.step('Navigate to Add Condition screen and audit a11y', async () => {
         await page.getByTestId('floating-add-button').click();
         await page.getByTestId('menu-add-condition').click();
 
         await expect(page).toHaveURL(/.*condition\/add/);
         await expect(page.getByText('New Condition')).toBeVisible();
+        await checkA11y(page, { disableRules: ['color-contrast'] });
       });
 
       await test.step('Select status and enter condition title', async () => {

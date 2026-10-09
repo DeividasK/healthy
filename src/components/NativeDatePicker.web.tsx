@@ -94,6 +94,7 @@ export function NativeDatePicker({
         type: 'date',
         id: id || `${testID}-native-input`,
         name: name || `${testID}-date`,
+        'aria-label': name || 'Date',
         max: todayStr,
         value: dateValueStr,
         onChange: handleNativeChange,

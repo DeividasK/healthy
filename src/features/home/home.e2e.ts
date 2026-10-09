@@ -5,6 +5,7 @@ import {
   createPatientViaUI,
   createReportViaUI,
   createTestConditionViaUI,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -35,8 +36,9 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     'should display "Nothing to show yet" on empty home and render floating plus button',
     { tag: ['@smoke'] },
     async ({ page }) => {
-      await test.step('Verify empty state on Home', async () => {
+      await test.step('Verify empty state on Home and audit accessibility', async () => {
         await expect(page.getByText('Nothing to show yet')).toBeVisible();
+        await checkA11y(page);
       });
 
       await test.step('Open floating menu', async () => {

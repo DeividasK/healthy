@@ -19,6 +19,11 @@ export default defineConfig<ChromaticConfig>({
       testMatch: /.*\.e2e\.ts/,
     },
     {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /.*\.e2e\.ts/,
+    },
+    {
       name: 'visual',
       use: {
         viewport: { width: 360, height: 740 },

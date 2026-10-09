@@ -2,7 +2,7 @@ import {
   test,
   expect,
   clearAppStorage,
-  createPatientViaUI,
+  seedTestPatient,
   createTestConditionViaUI,
   DEFAULT_CONDITION_TITLE,
 } from '@/src/features/testing/testStorage';
@@ -10,7 +10,7 @@ import {
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(

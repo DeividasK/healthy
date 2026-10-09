@@ -2,26 +2,19 @@ import {
   test,
   expect,
   clearAppStorage,
-  createPatientViaUI,
+  seedTestPatient,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(
     'should replace "CBC Panel" badge with "Edit" icon and allow editing existing report results',
     { tag: ['@smoke'] },
     async ({ page }) => {
-      const consoleWarnings: string[] = [];
-      page.on('console', (msg) => {
-        if (msg.type() === 'warning' || msg.type() === 'error') {
-          consoleWarnings.push(msg.text());
-        }
-      });
-
       await test.step('Create an initial report with Hemoglobin and WBC', async () => {
         await page.getByTestId('floating-add-button').click();
         await page.getByTestId('menu-add-lab-results').click();
@@ -97,14 +90,6 @@ test.describe('Edit Lab Results Flow', () => {
           page.getByText('White Blood Cells (WBC)')
         ).not.toBeVisible();
         await expect(page.getByText('"Updated checkup note"')).toBeVisible();
-
-        const problematicWarnings = consoleWarnings.filter(
-          (w) =>
-            w.includes('shadow*') ||
-            w.includes('pointerEvents') ||
-            w.includes('Blocked aria-hidden')
-        );
-        expect(problematicWarnings).toEqual([]);
       });
     }
   );

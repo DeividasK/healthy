@@ -4,6 +4,7 @@ import {
   expect,
   clearAppStorage,
   createPatientViaUI,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -16,7 +17,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     'should allow user to add CBC lab results and view them on home',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
-      await test.step('Open Add Lab Results screen from floating button', async () => {
+      await test.step('Open Add Lab Results screen from floating button and audit a11y', async () => {
         await page.getByTestId('floating-add-button').click();
         const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
         await expect(addLabResultsMenuBtn).toBeVisible();
@@ -24,6 +25,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
         await expect(page).toHaveURL(/.*lab-result\/add/);
         await expect(page.getByText('Add Lab Results')).toBeVisible();
+        await checkA11y(page, { disableRules: ['color-contrast'] });
       });
 
       await test.step('Search and select Hemoglobin and WBC biomarkers', async () => {

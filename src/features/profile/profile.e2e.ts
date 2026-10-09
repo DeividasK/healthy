@@ -7,6 +7,7 @@ import {
   mockGoogleDriveRoutes,
   mockGoogleAuthRoutes,
   mockGoogleIdentityServices,
+  checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
@@ -25,13 +26,14 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         await profileBtn.click();
       });
 
-      await test.step('Verify navigation to profile view and display name', async () => {
+      await test.step('Verify navigation to profile view, display name, and audit a11y', async () => {
         await expect(page).toHaveURL(/.*profile/);
         await expect(page.getByText('Profile', { exact: true })).toBeVisible();
         await expect(page.getByTestId('active-profile-card')).toBeVisible();
         await expect(page.getByTestId('profile-display-name')).toHaveText(
           'John Doe'
         );
+        await checkA11y(page, { disableRules: ['color-contrast'] });
       });
     }
   );
