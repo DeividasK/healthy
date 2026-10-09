@@ -3,6 +3,7 @@ import type {
   Observation,
   Condition,
   Patient,
+  Encounter,
 } from 'fhir/r5';
 
 export interface StoredPatientRow {
@@ -61,6 +62,25 @@ export interface StoredConditionRow {
 
 export interface ConditionRecord {
   condition: Condition;
+}
+
+export interface StoredConsultationRow {
+  id: string;
+  patient_id: string;
+  condition_id: string | null;
+  date: string;
+  doctor_name: string | null;
+  service_type: string | null;
+  title: string;
+  notes: string | null;
+  status: string;
+  fhir_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultationRecord {
+  consultation: Encounter;
 }
 
 export interface PatientRecord {

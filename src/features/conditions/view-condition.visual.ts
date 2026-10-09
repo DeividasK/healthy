@@ -7,19 +7,21 @@ import {
   seedTestConsultation,
 } from '@/src/features/testing/visualTest';
 
-test.describe('Edit Condition View - Visual Regression', () => {
-  test('Condition View - Edit Existing Mode', async ({ page }, testInfo) => {
+test.describe('View Condition View - Visual Regression', () => {
+  test('Condition View - Details with Consultations', async ({
+    page,
+  }, testInfo) => {
     await clearAppStorage(page);
     await seedTestPatient(page);
     const cond = await seedTestCondition(page, {
-      id: 'cond-visual-test',
+      id: 'cond-view-visual-test',
       title: 'Left Knee Pain',
       status: 'active',
       notes: 'Persistent ache after running on tarmac.',
       onsetDate: '2026-10-02',
     });
     await seedTestConsultation(page, {
-      id: 'cons-cond-visual-test',
+      id: 'cons-cond-view-visual-test',
       conditionId: cond.id,
       title: 'Orthopedic Evaluation',
       doctorName: 'Dr. Sarah Connor',
@@ -28,9 +30,13 @@ test.describe('Edit Condition View - Visual Regression', () => {
       status: 'completed',
     });
 
-    await page.goto(`/condition/${cond.id}/edit`);
-    await page.getByTestId('condition-title-input').waitFor();
+    await page.goto(`/condition/${cond.id}`);
+    await page.getByTestId('condition-title').waitFor();
 
-    await takeSnapshot(page, 'Condition View - Edit Existing Mode', testInfo);
+    await takeSnapshot(
+      page,
+      'Condition View - Details with Consultations',
+      testInfo
+    );
   });
 });

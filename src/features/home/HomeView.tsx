@@ -4,7 +4,9 @@ import {
   FileText,
   FolderPlus,
   Pencil,
+  Stethoscope,
   Trash2,
+  User,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -27,10 +29,23 @@ import {
   getAllConditions,
   deleteCondition,
 } from '@/src/features/conditions/conditionService';
+import {
+  getAllConsultations,
+  deleteConsultation,
+} from '@/src/features/consultations/consultationService';
 
-import type { Observation, Condition } from 'fhir/r5';
-import { formatDisplayDate } from '@/src/utils/dateUtils';
-import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
+import type { Observation, Condition, Encounter } from 'fhir/r5';
+import { formatDisplayDateTime } from '@/src/utils/dateUtils';
+import {
+  getConditionTitle,
+  getConditionNotes,
+  getConsultationTitle,
+  getConsultationDoctor,
+  getConsultationServiceType,
+  getConsultationNotes,
+  getConsultationConditionId,
+} from '@/src/utils/fhirUtils';
+
 import { COLORS } from '@/src/theme/colors';
 import { PlusCircleButton } from '@/src/components/PlusCircleButton';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
@@ -51,6 +66,7 @@ export function HomeView() {
   } = useActivePatient();
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
+  const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -78,7 +94,7 @@ export function HomeView() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     visible: boolean;
-    type: 'report' | 'condition';
+    type: 'report' | 'condition' | 'consultation';
     id: string;
     title: string;
     message: string;
@@ -102,6 +118,7 @@ export function HomeView() {
     setLoadedPatientId(activePatientId);
     setRecords([]);
     setConditions([]);
+    setConsultations([]);
     setIsLoading(true);
   }
 
@@ -115,10 +132,12 @@ export function HomeView() {
 
     try {
       setIsLoading(true);
-      const [reportsData, conditionsData] = await Promise.all([
-        getAllReports(requestedPatientId),
-        getAllConditions(requestedPatientId),
-      ]);
+      const [reportsData, conditionsData, consultationsData] =
+        await Promise.all([
+          getAllReports(requestedPatientId),
+          getAllConditions(requestedPatientId),
+          getAllConsultations(requestedPatientId),
+        ]);
 
       // Only apply results if this request is still the latest generation and for current patient
       if (
@@ -129,6 +148,7 @@ export function HomeView() {
       }
       setRecords(reportsData);
       setConditions(conditionsData);
+      setConsultations(consultationsData);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -138,6 +158,7 @@ export function HomeView() {
         // Keep records cleared on error so previous/stale records are not exposed
         setRecords([]);
         setConditions([]);
+        setConsultations([]);
       }
     } finally {
       if (
@@ -156,14 +177,14 @@ export function HomeView() {
   );
 
   useDatabaseSubscription(
-    ['conditions', 'diagnostic_reports', 'observations'],
+    ['conditions', 'diagnostic_reports', 'observations', 'consultations'],
     () => {
       loadData();
     }
   );
 
   const formatDate = (dateStr: string) => {
-    return formatDisplayDate(dateStr);
+    return formatDisplayDateTime(dateStr);
   };
 
   const navigateToAddReport = (id?: string) => {
@@ -201,12 +222,26 @@ export function HomeView() {
     });
   };
 
+  const handleDeleteConsultationClick = (id: string) => {
+    setDeleteModal({
+      visible: true,
+      type: 'consultation',
+      id,
+      title: 'Delete Consultation',
+      message:
+        'Are you sure you want to delete this consultation? This action cannot be undone.',
+      requireCountdown: true,
+    });
+  };
+
   const handleConfirmDelete = async () => {
     try {
       if (deleteModal.type === 'report') {
         await deleteReport(deleteModal.id);
-      } else {
+      } else if (deleteModal.type === 'condition') {
         await deleteCondition(deleteModal.id);
+      } else {
+        await deleteConsultation(deleteModal.id);
       }
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
@@ -278,7 +313,14 @@ export function HomeView() {
     );
   };
 
-  const hasAnyData = records.length > 0 || conditions.length > 0;
+  const standaloneConsultations = consultations.filter(
+    (c) => !getConsultationConditionId(c)
+  );
+
+  const hasAnyData =
+    records.length > 0 ||
+    conditions.length > 0 ||
+    standaloneConsultations.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -315,10 +357,20 @@ export function HomeView() {
                   const condId = conditionItem.id || '';
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={condId || 'condition'}
                       style={styles.reportCard}
                       testID={`condition-card-${condId}`}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        if (
+                          Platform.OS === 'web' &&
+                          typeof document !== 'undefined'
+                        ) {
+                          (document.activeElement as HTMLElement)?.blur?.();
+                        }
+                        router.push(`/condition/${condId}`);
+                      }}
                     >
                       {/* Card Header: Status, Date & Action Icons */}
                       <View style={styles.cardHeader}>
@@ -337,7 +389,8 @@ export function HomeView() {
                           <TouchableOpacity
                             testID={`edit-condition-button-${condId}`}
                             style={styles.editReportButton}
-                            onPress={() => {
+                            onPress={(e) => {
+                              e?.stopPropagation?.();
                               if (
                                 Platform.OS === 'web' &&
                                 typeof document !== 'undefined'
@@ -355,7 +408,10 @@ export function HomeView() {
                           <TouchableOpacity
                             testID={`delete-condition-button-${condId}`}
                             style={styles.deleteReportButton}
-                            onPress={() => handleDeleteConditionClick(condId)}
+                            onPress={(e) => {
+                              e?.stopPropagation?.();
+                              handleDeleteConditionClick(condId);
+                            }}
                             activeOpacity={0.7}
                           >
                             <Trash2 color={COLORS.light.iconMuted} size={18} />
@@ -376,7 +432,7 @@ export function HomeView() {
                           </Text>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -487,6 +543,96 @@ export function HomeView() {
                 })}
               </View>
             )}
+
+            {/* Standalone Consultations Section */}
+            {standaloneConsultations.length > 0 && (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Consultations</Text>
+                {standaloneConsultations.map((cons) => {
+                  const consId = cons.id || '';
+                  const consTitle = getConsultationTitle(cons);
+                  const consDoctor = getConsultationDoctor(cons);
+                  const consServiceType = getConsultationServiceType(cons);
+                  const consNotes = getConsultationNotes(cons);
+                  const consDate =
+                    cons.actualPeriod?.start || cons.plannedStartDate || '';
+
+                  return (
+                    <View
+                      key={consId || 'consultation'}
+                      style={styles.reportCard}
+                      testID={`consultation-card-${consId}`}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={styles.cardHeaderLeft}>
+                          <Calendar
+                            color={COLORS.light.iconMuted}
+                            size={16}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.cardDate}>
+                            {formatDate(consDate)}
+                          </Text>
+                        </View>
+                        <View style={styles.cardHeaderActions}>
+                          <TouchableOpacity
+                            testID={`edit-consultation-button-${consId}`}
+                            style={styles.editReportButton}
+                            onPress={() =>
+                              router.push(`/consultation/${consId}/edit`)
+                            }
+                            activeOpacity={0.7}
+                          >
+                            <Pencil color={COLORS.light.iconMuted} size={18} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            testID={`delete-consultation-button-${consId}`}
+                            style={styles.deleteReportButton}
+                            onPress={() =>
+                              handleDeleteConsultationClick(consId)
+                            }
+                            activeOpacity={0.7}
+                          >
+                            <Trash2 color={COLORS.light.iconMuted} size={18} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <Text style={styles.consultationTitleText}>
+                        {consTitle}
+                      </Text>
+
+                      {consServiceType && (
+                        <View style={styles.serviceTypeBadge}>
+                          <Text style={styles.serviceTypeText}>
+                            {consServiceType}
+                          </Text>
+                        </View>
+                      )}
+
+                      {consDoctor && (
+                        <View style={styles.doctorRow}>
+                          <User
+                            color={COLORS.light.iconMuted}
+                            size={13}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text style={styles.doctorText}>{consDoctor}</Text>
+                        </View>
+                      )}
+
+                      {consNotes && (
+                        <View style={styles.cardNoteContainer}>
+                          <Text style={styles.cardNoteText}>
+                            &quot;{consNotes}&quot;
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </ScrollView>
         )}
 
@@ -515,6 +661,25 @@ export function HomeView() {
                 style={{ marginRight: 10 }}
               />
               <Text style={styles.menuItemText}>Add Condition</Text>
+            </TouchableOpacity>
+
+            <View style={styles.menuDivider} />
+
+            <TouchableOpacity
+              testID="menu-add-consultation"
+              style={styles.menuItem}
+              onPress={() => {
+                setShowAddMenu(false);
+                router.push('/consultation/add');
+              }}
+              activeOpacity={0.7}
+            >
+              <Stethoscope
+                color={COLORS.light.primary}
+                size={18}
+                style={{ marginRight: 10 }}
+              />
+              <Text style={styles.menuItemText}>Add Consultation</Text>
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
@@ -699,6 +864,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.light.foreground,
+  },
+  consultationTitleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.light.foreground,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  serviceTypeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.light.pillBackground,
+    borderWidth: 1,
+    borderColor: COLORS.light.pillBorder,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+  },
+  serviceTypeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.light.primary,
+  },
+  doctorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  doctorText: {
+    fontSize: 13,
+    color: COLORS.light.muted,
   },
   cardNoteContainer: {
     backgroundColor: COLORS.light.pillBackground,

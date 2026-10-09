@@ -7,6 +7,7 @@ import type {
   DiagnosticReport,
   Observation,
   Condition,
+  Encounter,
 } from 'fhir/r5';
 import { deriveKeyFromPassphrase, decryptText } from './cryptoService';
 import {
@@ -22,11 +23,16 @@ import {
   fetchAllConditionRecords,
   insertConditionRecord,
 } from '@/src/features/conditions/conditionsRepository';
+import {
+  fetchAllConsultationRecords,
+  insertConsultationRecord,
+} from '@/src/features/consultations/consultationsRepository';
 
 export interface ZipExportSummary {
   patientCount: number;
   reportCount: number;
   conditionCount: number;
+  consultationCount: number;
   fileName: string;
 }
 
@@ -34,11 +40,13 @@ export interface ZipExportSummary {
  * Exports all local health records across all profiles into a standard Zip archive (unencrypted).
  */
 export async function exportZipArchive(): Promise<ZipExportSummary> {
-  const [patients, reportsWithObs, conditions] = await Promise.all([
-    fetchAllPatients(),
-    fetchAllDiagnosticReportRecords(),
-    fetchAllConditionRecords(),
-  ]);
+  const [patients, reportsWithObs, conditions, consultations] =
+    await Promise.all([
+      fetchAllPatients(),
+      fetchAllDiagnosticReportRecords(),
+      fetchAllConditionRecords(),
+      fetchAllConsultationRecords(),
+    ]);
 
   const zipFiles: Record<string, Uint8Array> = {};
 
@@ -64,6 +72,12 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     zipFiles[`records/condition_${cond.id}.json`] = strToU8(jsonStr);
   }
 
+  // Export Consultations as plain JSON
+  for (const cons of consultations) {
+    const jsonStr = JSON.stringify(cons, null, 2);
+    zipFiles[`records/consultation_${cons.id}.json`] = strToU8(jsonStr);
+  }
+
   // Manifest as plain JSON
   const manifest = {
     version: 1,
@@ -71,6 +85,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     patientCount: patients.length,
     reportCount: reportsWithObs.length,
     conditionCount: conditions.length,
+    consultationCount: consultations.length,
   };
   zipFiles['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2));
 
@@ -108,6 +123,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     patientCount: patients.length,
     reportCount: reportsWithObs.length,
     conditionCount: conditions.length,
+    consultationCount: consultations.length,
     fileName,
   };
 }
@@ -118,12 +134,18 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
 export async function restoreFromZipBytes(
   zipBytes: Uint8Array,
   legacyPassphrase: string = 'healthy-backup'
-): Promise<{ patients: number; reports: number; conditions: number }> {
+): Promise<{
+  patients: number;
+  reports: number;
+  conditions: number;
+  consultations: number;
+}> {
   const unzipped = unzipSync(zipBytes);
 
   let restoredPatients = 0;
   let restoredReports = 0;
   let restoredConditions = 0;
+  let restoredConsultations = 0;
   let legacyKey: import('expo-crypto').AESEncryptionKey | null = null;
 
   for (const [path, fileBytes] of Object.entries(unzipped)) {
@@ -169,6 +191,13 @@ export async function restoreFromZipBytes(
           DEFAULT_PATIENT_ID;
         await insertConditionRecord(cond, patientId);
         restoredConditions++;
+      } else if (resource.resourceType === 'Encounter') {
+        const cons = resource as Encounter;
+        const patientId =
+          cons.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        await insertConsultationRecord(cons, patientId);
+        restoredConsultations++;
       }
     } catch (err) {
       console.warn('Failed to parse record from zip:', path, err);
@@ -179,5 +208,6 @@ export async function restoreFromZipBytes(
     patients: restoredPatients,
     reports: restoredReports,
     conditions: restoredConditions,
+    consultations: restoredConsultations,
   };
 }

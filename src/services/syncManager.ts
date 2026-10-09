@@ -4,6 +4,7 @@ import type {
   DiagnosticReport,
   Observation,
   Condition,
+  Encounter,
 } from 'fhir/r5';
 import {
   deriveKeyFromGoogleUser,
@@ -31,6 +32,10 @@ import {
   fetchAllConditionRecords,
   insertConditionRecord,
 } from '@/src/features/conditions/conditionsRepository';
+import {
+  fetchAllConsultationRecords,
+  insertConsultationRecord,
+} from '@/src/features/consultations/consultationsRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
@@ -119,21 +124,29 @@ export async function saveGoogleDriveConfig(
  * Backs up local records to Google Drive appDataFolder.
  * Only uploads records for patients connected to this Google account (or all if not tagged).
  */
-export async function backupToGoogleDrive(
-  config: GoogleDriveConfig
-): Promise<{ patients: number; reports: number; conditions: number }> {
+export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
+  patients: number;
+  reports: number;
+  conditions: number;
+  consultations: number;
+}> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
   const remoteFileMap = new Map<string, GoogleDriveFile>(
     remoteFiles.map((f) => [f.name, f])
   );
 
-  const [allStoredPatients, allReportsWithObs, allConditions] =
-    await Promise.all([
-      fetchAllStoredPatients(),
-      fetchAllDiagnosticReportRecords(),
-      fetchAllConditionRecords(),
-    ]);
+  const [
+    allStoredPatients,
+    allReportsWithObs,
+    allConditions,
+    allConsultations,
+  ] = await Promise.all([
+    fetchAllStoredPatients(),
+    fetchAllDiagnosticReportRecords(),
+    fetchAllConditionRecords(),
+    fetchAllConsultationRecords(),
+  ]);
 
   // Filter to patients explicitly connected to this Google account
   const eligiblePatients = allStoredPatients.filter(
@@ -153,6 +166,12 @@ export async function backupToGoogleDrive(
   const eligibleConditions = allConditions.filter((c) => {
     const patientId =
       c.subject?.reference?.replace(/^Patient\//, '') || DEFAULT_PATIENT_ID;
+    return eligiblePatientIds.has(patientId);
+  });
+
+  const eligibleConsultations = allConsultations.filter((cons) => {
+    const patientId =
+      cons.subject?.reference?.replace(/^Patient\//, '') || DEFAULT_PATIENT_ID;
     return eligiblePatientIds.has(patientId);
   });
 
@@ -265,6 +284,41 @@ export async function backupToGoogleDrive(
     }
   }
 
+  // Upload/Update Consultations
+  for (const cons of eligibleConsultations) {
+    const fileName = `consultation_${cons.id}.json.enc`;
+    const encBytes = await encryptText(JSON.stringify(cons), key);
+    const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = cons.meta?.lastUpdated;
+    const appProperties = localLastUpdated
+      ? { lastUpdated: localLastUpdated }
+      : undefined;
+
+    if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
+      if (
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
+      ) {
+        continue;
+      }
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
+    } else {
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
+    }
+  }
+
   // Update last sync timestamp
   const updatedConfig: GoogleDriveConfig = {
     ...config,
@@ -276,6 +330,7 @@ export async function backupToGoogleDrive(
     patients: eligiblePatients.length,
     reports: eligibleReports.length,
     conditions: eligibleConditions.length,
+    consultations: eligibleConsultations.length,
   };
 }
 
@@ -317,7 +372,12 @@ export async function listRemoteGooglePatients(
 export async function restoreFromGoogleDrive(
   config: GoogleDriveConfig,
   targetPatientIds?: string[]
-): Promise<{ patients: number; reports: number; conditions: number }> {
+): Promise<{
+  patients: number;
+  reports: number;
+  conditions: number;
+  consultations: number;
+}> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
   const allowedPatientIdSet = targetPatientIds
@@ -327,6 +387,7 @@ export async function restoreFromGoogleDrive(
   let restoredPatients = 0;
   let restoredReports = 0;
   let restoredConditions = 0;
+  let restoredConsultations = 0;
 
   for (const file of remoteFiles) {
     if (!file.name.endsWith('.json.enc')) continue;
@@ -398,14 +459,42 @@ export async function restoreFromGoogleDrive(
           await insertConditionRecord(cond, patientId, true);
           restoredConditions++;
         }
+      } else if (resource.resourceType === 'Encounter') {
+        const cons = resource as Encounter;
+        if (!cons.meta?.lastUpdated) {
+          cons.meta = {
+            ...cons.meta,
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
+          };
+        }
+        const patientId =
+          cons.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          await insertConsultationRecord(cons, patientId, undefined, true);
+          restoredConsultations++;
+        }
       }
     } catch (err) {
       console.warn('Failed to restore file from Google Drive:', file.name, err);
     }
   }
 
-  if (restoredPatients > 0 || restoredReports > 0 || restoredConditions > 0) {
-    notifyDatabaseChanged(['patients', 'conditions', 'diagnostic_reports']);
+  if (
+    restoredPatients > 0 ||
+    restoredReports > 0 ||
+    restoredConditions > 0 ||
+    restoredConsultations > 0
+  ) {
+    notifyDatabaseChanged([
+      'patients',
+      'conditions',
+      'diagnostic_reports',
+      'consultations',
+    ]);
   }
 
   const updatedConfig: GoogleDriveConfig = {
@@ -418,6 +507,7 @@ export async function restoreFromGoogleDrive(
     patients: restoredPatients,
     reports: restoredReports,
     conditions: restoredConditions,
+    consultations: restoredConsultations,
   };
 }
 
@@ -425,9 +515,12 @@ export async function restoreFromGoogleDrive(
  * Performs full two-way incremental sync between local database and Google Drive.
  * ONLY syncs profiles that are currently active/stored locally and marked for sync with this Google account.
  */
-export async function syncWithGoogleDrive(
-  config: GoogleDriveConfig
-): Promise<{ patients: number; reports: number; conditions: number }> {
+export async function syncWithGoogleDrive(config: GoogleDriveConfig): Promise<{
+  patients: number;
+  reports: number;
+  conditions: number;
+  consultations: number;
+}> {
   const allStoredPatients = await fetchAllStoredPatients();
   const eligiblePatients = allStoredPatients.filter(
     (sp) => sp.syncAccount === config.userSub
@@ -472,8 +565,12 @@ export async function deletePatientFromGoogleDrive(
       continue;
     }
 
-    // Check report or condition files belonging to this patient
-    if (file.name.startsWith('report_') || file.name.startsWith('condition_')) {
+    // Check report, condition, or consultation files belonging to this patient
+    if (
+      file.name.startsWith('report_') ||
+      file.name.startsWith('condition_') ||
+      file.name.startsWith('consultation_')
+    ) {
       try {
         const encryptedBytes = await downloadAppDataFile(
           config.accessToken,

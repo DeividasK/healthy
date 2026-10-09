@@ -12,6 +12,7 @@ export interface NativeDatePickerProps {
   variant?: 'pill' | 'input';
   id?: string;
   name?: string;
+  allowFuture?: boolean;
 }
 
 export function NativeDatePicker({
@@ -22,6 +23,7 @@ export function NativeDatePicker({
   variant = 'pill',
   id,
   name,
+  allowFuture = false,
 }: NativeDatePickerProps) {
   const inputRef = useRef<any>(null);
 
@@ -45,18 +47,20 @@ export function NativeDatePicker({
     }
     const [year, month, day] = val.split('-').map(Number);
     const newDate = new Date(year, month - 1, day);
-    const now = new Date();
-    const todayEnd = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      23,
-      59,
-      59,
-      999
-    );
-    if (newDate.getTime() > todayEnd.getTime()) {
-      return;
+    if (!allowFuture) {
+      const now = new Date();
+      const todayEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+        999
+      );
+      if (newDate.getTime() > todayEnd.getTime()) {
+        return;
+      }
     }
     onChange(newDate);
   };
@@ -95,7 +99,7 @@ export function NativeDatePicker({
         id: id || `${testID}-native-input`,
         name: name || `${testID}-date`,
         'aria-label': name || 'Date',
-        max: todayStr,
+        max: allowFuture ? undefined : todayStr,
         value: dateValueStr,
         onChange: handleNativeChange,
         onClick: handleClick,
