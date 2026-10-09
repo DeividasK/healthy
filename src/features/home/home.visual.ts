@@ -1,17 +1,10 @@
-import { test, expect, takeSnapshot } from '@chromatic-com/playwright';
 import {
+  test,
+  takeSnapshot,
   clearAppStorage,
   seedTestPatient,
   seedTestReport,
-} from '@/src/features/testing/testStorage';
-
-test.use({
-  viewport: { width: 360, height: 740 },
-  colorScheme: 'light',
-  disableAutoSnapshot: true,
-});
-
-const FIXED_DATE = new Date('2026-10-02T10:00:00Z');
+} from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
@@ -20,10 +13,8 @@ test.describe('Home View - Visual Regression', () => {
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
-    await expect(page.getByText('Nothing to show yet')).toBeVisible();
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await page.getByTestId('floating-add-button').waitFor();
 
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Home View - Empty State', testInfo);
   });
 
@@ -41,11 +32,8 @@ test.describe('Home View - Visual Regression', () => {
     });
 
     await page.goto('/');
+    await page.getByText('Hemoglobin (Hgb)').waitFor();
 
-    await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-    await expect(page.getByText('"Routine morning blood test"')).toBeVisible();
-
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
   });
 
@@ -73,14 +61,8 @@ test.describe('Home View - Visual Regression', () => {
     });
 
     await page.goto('/');
+    await page.getByText('Normal', { exact: true }).first().waitFor();
 
-    await expect(
-      page.getByText('Normal', { exact: true }).first()
-    ).toBeVisible();
-    await expect(page.getByText('Low', { exact: true })).toBeVisible();
-    await expect(page.getByText('High', { exact: true })).toBeVisible();
-
-    await page.clock.setFixedTime(FIXED_DATE);
     await takeSnapshot(
       page,
       'Home View - Multi-Report with Status Badges',

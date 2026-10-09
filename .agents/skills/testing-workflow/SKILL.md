@@ -31,6 +31,7 @@ Follow these rules when designing, updating, and executing test suites:
 - **No Redundancy**: You **MUST NOT** write a new test if an existing visual test already covers the changes or new additions.
 - **Plan Disclosure**: You **MUST** call out in implementation plans new visual tests that will be added, or the ones you expect to be affected if none will be added.
 - **When to Run**: ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+- **No Assertions / Expectations**: Visual tests **MUST NOT** contain assertions (`expect(...)`). They should strictly navigate, seed or set up UI state, and call `takeSnapshot()`. All functional assertions belong in E2E tests (`*.e2e.ts`).
 
 ## Version Control & Git Guidelines
 
