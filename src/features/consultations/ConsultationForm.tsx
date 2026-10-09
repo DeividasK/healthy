@@ -666,9 +666,7 @@ export function ConsultationForm({
           {showServiceType && (
             <View style={styles.inputSection}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>
-                  Specialty / Service Type (Optional)
-                </Text>
+                <Text style={styles.inputLabel}>Specialty / Service Type</Text>
                 <TouchableOpacity
                   testID="remove-service-type-button"
                   onPress={() => {
@@ -721,9 +719,7 @@ export function ConsultationForm({
           {showDoctor && (
             <View style={styles.inputSection}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>
-                  Doctor or Specialist (Optional)
-                </Text>
+                <Text style={styles.inputLabel}>Doctor or Specialist</Text>
                 <TouchableOpacity
                   testID="remove-doctor-button"
                   onPress={() => {
@@ -737,36 +733,22 @@ export function ConsultationForm({
                   <X color={COLORS.light.iconClear} size={16} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.doctorInputContainer}>
-                <TextInput
-                  testID="consultation-doctor-input"
-                  id="consultation-doctor-input"
-                  nativeID="consultation-doctor-input"
-                  name="doctorName"
-                  accessibilityLabel="Doctor or Specialist"
-                  style={styles.textInput}
-                  placeholder="e.g. Dr. Sarah Adams"
-                  placeholderTextColor={COLORS.light.placeholder}
-                  value={doctorName}
-                  onChangeText={(text) => {
-                    setDoctorName(text);
-                    setIsDoctorFocused(true);
-                  }}
-                  onFocus={() => setIsDoctorFocused(true)}
-                />
-                {doctorName.length > 0 && (
-                  <TouchableOpacity
-                    testID="clear-doctor-button"
-                    onPress={() => setDoctorName('')}
-                    style={styles.clearDoctorButton}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel="Clear doctor name"
-                  >
-                    <X color={COLORS.light.iconClear} size={18} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              <TextInput
+                testID="consultation-doctor-input"
+                id="consultation-doctor-input"
+                nativeID="consultation-doctor-input"
+                name="doctorName"
+                accessibilityLabel="Doctor or Specialist"
+                style={styles.textInput}
+                placeholder="e.g. Dr. Sarah Adams"
+                placeholderTextColor={COLORS.light.placeholder}
+                value={doctorName}
+                onChangeText={(text) => {
+                  setDoctorName(text);
+                  setIsDoctorFocused(true);
+                }}
+                onFocus={() => setIsDoctorFocused(true)}
+              />
 
               {/* Doctor Autocomplete Suggestions */}
               {isDoctorFocused && matchingDoctors.length > 0 && (
@@ -790,7 +772,7 @@ export function ConsultationForm({
           {showNotes && (
             <View style={styles.descriptionContainer}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Notes (Optional)</Text>
+                <Text style={styles.inputLabel}>Notes</Text>
                 <TouchableOpacity
                   testID="remove-notes-button"
                   onPress={() => {
@@ -993,15 +975,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: COLORS.light.foreground,
-  },
-  doctorInputContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  clearDoctorButton: {
-    position: 'absolute',
-    right: 12,
-    padding: 4,
   },
   descriptionContainer: {
     marginBottom: 20,
