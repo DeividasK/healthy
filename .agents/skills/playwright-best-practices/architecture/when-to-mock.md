@@ -19,20 +19,20 @@
 
 ## Decision Matrix
 
-| Scenario | Mock? | Strategy |
-| --- | --- | --- |
-| Your own REST/GraphQL API | Never | Hit real API against staging or local dev |
-| Your database (through your API) | Never | Seed via API or fixtures |
-| Authentication (your auth system) | Mostly no | Use `storageState` to skip login in most tests |
-| Stripe / payment gateway | Always | `route.fulfill()` with expected responses |
-| SendGrid / email service | Always | Mock the API call, verify request payload |
-| OAuth providers (Google, GitHub) | Always | Mock token exchange, test your callback handler |
-| Analytics (Segment, Mixpanel) | Always | `route.abort()` or `route.fulfill()` |
-| Maps / geocoding APIs | Always | Mock with static responses |
-| Feature flags (LaunchDarkly) | Usually | Mock to force specific flag states |
-| CDN / static assets | Never | Let them load normally |
-| Flaky external dependency | CI: mock, local: real | Conditional mocking based on environment |
-| Slow external dependency | Dev: mock, nightly: real | Separate test projects in config |
+| Scenario                          | Mock?                    | Strategy                                        |
+| --------------------------------- | ------------------------ | ----------------------------------------------- |
+| Your own REST/GraphQL API         | Never                    | Hit real API against staging or local dev       |
+| Your database (through your API)  | Never                    | Seed via API or fixtures                        |
+| Authentication (your auth system) | Mostly no                | Use `storageState` to skip login in most tests  |
+| Stripe / payment gateway          | Always                   | `route.fulfill()` with expected responses       |
+| SendGrid / email service          | Always                   | Mock the API call, verify request payload       |
+| OAuth providers (Google, GitHub)  | Always                   | Mock token exchange, test your callback handler |
+| Analytics (Segment, Mixpanel)     | Always                   | `route.abort()` or `route.fulfill()`            |
+| Maps / geocoding APIs             | Always                   | Mock with static responses                      |
+| Feature flags (LaunchDarkly)      | Usually                  | Mock to force specific flag states              |
+| CDN / static assets               | Never                    | Let them load normally                          |
+| Flaky external dependency         | CI: mock, local: real    | Conditional mocking based on environment        |
+| Slow external dependency          | Dev: mock, nightly: real | Separate test projects in config                |
 
 ## Decision Flowchart
 
@@ -56,9 +56,12 @@ Block third-party scripts that slow tests and add no coverage:
 
 ```typescript
 test.beforeEach(async ({ page }) => {
-  await page.route('**/{analytics,tracking,segment,hotjar}.{com,io}/**', (route) => {
-    route.abort();
-  });
+  await page.route(
+    '**/{analytics,tracking,segment,hotjar}.{com,io}/**',
+    (route) => {
+      route.abort();
+    }
+  );
 });
 
 test('dashboard renders without tracking scripts', async ({ page }) => {
@@ -73,13 +76,13 @@ Completely replace a third-party API response:
 
 ```typescript
 test('order flow with mocked payment service', async ({ page }) => {
-  await page.route('**/api/charge', (route) => {
+  await page.route('https://api.stripe.com/v1/charges', (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        transactionId: 'txn_mock_abc',
-        status: 'completed',
+        id: 'ch_mock_abc',
+        status: 'succeeded',
       }),
     });
   });
@@ -90,12 +93,12 @@ test('order flow with mocked payment service', async ({ page }) => {
 });
 
 test('display error on payment decline', async ({ page }) => {
-  await page.route('**/api/charge', (route) => {
+  await page.route('https://api.stripe.com/v1/charges', (route) => {
     route.fulfill({
       status: 402,
       contentType: 'application/json',
       body: JSON.stringify({
-        error: { code: 'insufficient_funds', message: 'Card declined.' },
+        error: { code: 'card_declined', message: 'Card declined.' },
       }),
     });
   });
@@ -268,13 +271,16 @@ export const test = base.extend<MockConfig>({
   mockNotifications: [true, { option: true }],
   mockAnalytics: [true, { option: true }],
 
-  page: async ({ page, mockPayments, mockNotifications, mockAnalytics }, use) => {
+  page: async (
+    { page, mockPayments, mockNotifications, mockAnalytics },
+    use
+  ) => {
     if (mockPayments) {
-      await page.route('**/api/billing/**', (route) => {
+      await page.route('https://api.stripe.com/**', (route) => {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ status: 'paid', id: 'inv_mock_789' }),
+          body: JSON.stringify({ status: 'succeeded', id: 'ch_mock_789' }),
         });
       });
     }
@@ -372,12 +378,12 @@ test.describe('contract validation', () => {
 
 ## Anti-Patterns
 
-| Don't Do This | Problem | Do This Instead |
-| --- | --- | --- |
-| Mock your own API | Tests pass, app breaks. Zero integration coverage. | Hit your real API. Mock only third-party services. |
-| Mock everything for speed | You test a fiction. Frontend and backend may be incompatible. | Mock only external boundaries. |
-| Never mock anything | Tests are slow, flaky, fail when third parties have outages. | Mock third-party services. |
-| Use outdated mocks | Mock returns different shape than real API. | Run contract validation tests. Re-record HAR files regularly. |
-| Mock with `page.evaluate()` to stub fetch | Fragile, doesn't survive navigation. | Use `page.route()` which intercepts at network layer. |
-| Copy-paste mocks across files | One API change requires updating many files. | Centralize mocks in fixtures. |
-| Block all network and whitelist | Extremely brittle. Every new endpoint requires update. | Allow all by default. Selectively mock third-party services. |
+| Don't Do This                             | Problem                                                       | Do This Instead                                               |
+| ----------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| Mock your own API                         | Tests pass, app breaks. Zero integration coverage.            | Hit your real API. Mock only third-party services.            |
+| Mock everything for speed                 | You test a fiction. Frontend and backend may be incompatible. | Mock only external boundaries.                                |
+| Never mock anything                       | Tests are slow, flaky, fail when third parties have outages.  | Mock third-party services.                                    |
+| Use outdated mocks                        | Mock returns different shape than real API.                   | Run contract validation tests. Re-record HAR files regularly. |
+| Mock with `page.evaluate()` to stub fetch | Fragile, doesn't survive navigation.                          | Use `page.route()` which intercepts at network layer.         |
+| Copy-paste mocks across files             | One API change requires updating many files.                  | Centralize mocks in fixtures.                                 |
+| Block all network and whitelist           | Extremely brittle. Every new endpoint requires update.        | Allow all by default. Selectively mock third-party services.  |

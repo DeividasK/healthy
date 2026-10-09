@@ -91,7 +91,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
 
     // Fast-forward countdown by 5 seconds
-    await page.clock.fastForward(5000);
+    await page.clock.runFor(5000);
     await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
 

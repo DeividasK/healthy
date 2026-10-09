@@ -422,7 +422,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(confirmBtn).toContainText('Delete (');
 
     // Fast-forward countdown by 5 seconds
-    await page.clock.fastForward(5000);
+    await page.clock.runFor(5000);
     await expect(confirmBtn).toHaveText('Delete');
     await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
     await confirmBtn.click();
@@ -530,7 +530,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(modal).toBeVisible();
 
     const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await page.clock.fastForward(5000);
+    await page.clock.runFor(5000);
     await expect(confirmBtn).toHaveText('Delete');
     await confirmBtn.click();
 

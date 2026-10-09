@@ -45,9 +45,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI
-      ? 'npm run build && npm run start'
-      : 'npm run dev',
+    command: process.env.CI ? 'npm run build && npm run start' : 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
@@ -79,7 +77,9 @@ NEXTAUTH_SECRET=test-secret-local
 test('renders server component content', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Welcome', level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome', level: 1 })
+  ).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 });
 ```
@@ -126,7 +126,9 @@ test('layouts persist across navigation', async ({ page }) => {
 test('page with getServerSideProps renders data', async ({ page }) => {
   await page.goto('/blog');
 
-  await expect(page.getByRole('heading', { name: 'Blog', level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Blog', level: 1 })
+  ).toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(10);
   await expect(page.getByRole('article').first()).toContainText(/\w+/);
 });
@@ -151,7 +153,9 @@ test('static page shows pre-rendered content', async ({ page }) => {
 test('dynamic [slug] renders correct content', async ({ page }) => {
   await page.goto('/blog/testing-guide');
 
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Testing Guide');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Testing Guide'
+  );
   await expect(page.getByText('Page not found')).toBeHidden();
 });
 
@@ -168,10 +172,14 @@ test('non-existent slug shows 404', async ({ page }) => {
 ```typescript
 test('catch-all handles nested paths', async ({ page }) => {
   await page.goto('/docs/getting-started/installation');
-  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Installation' })
+  ).toBeVisible();
 
   await page.goto('/docs/api/configuration');
-  await expect(page.getByRole('heading', { name: 'Configuration' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Configuration' })
+  ).toBeVisible();
 });
 ```
 
@@ -181,7 +189,9 @@ test('catch-all handles nested paths', async ({ page }) => {
 test('query parameters filter content', async ({ page }) => {
   await page.goto('/products?category=electronics&sort=price-asc');
 
-  await expect(page.getByRole('heading', { name: 'Electronics' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Electronics' })
+  ).toBeVisible();
 
   const prices = await page.getByTestId('product-price').allTextContents();
   const numericPrices = prices.map((p) => parseFloat(p.replace('$', '')));
@@ -221,7 +231,9 @@ test('POST /api/products validates fields', async ({ request }) => {
 
   expect(response.status()).toBe(400);
   const body = await response.json();
-  expect(body.error).toContainEqual(expect.objectContaining({ field: 'price' }));
+  expect(body.error).toContainEqual(
+    expect.objectContaining({ field: 'price' })
+  );
 });
 ```
 
@@ -257,8 +269,9 @@ test('redirect preserves return URL', async ({ page }) => {
 
   const url = new URL(page.url());
   expect(url.pathname).toBe('/login');
-  expect(url.searchParams.get('callbackUrl') || url.searchParams.get('returnTo'))
-    .toContain('/dashboard/settings');
+  expect(
+    url.searchParams.get('callbackUrl') || url.searchParams.get('returnTo')
+  ).toContain('/dashboard/settings');
 });
 ```
 
@@ -415,10 +428,10 @@ test('authenticated user sees dashboard', async ({ page }) => {
 
 ### Dev Server vs Production Build
 
-| Scenario | Command | Trade-off |
-|---|---|---|
-| Local development | `npm run dev` | Fast iteration, no production behavior |
-| CI pipeline | `npm run build && npm run start` | Tests real production bundle |
+| Scenario          | Command                          | Trade-off                              |
+| ----------------- | -------------------------------- | -------------------------------------- |
+| Local development | `npm run dev`                    | Fast iteration, no production behavior |
+| CI pipeline       | `npm run build && npm run start` | Tests real production bundle           |
 
 ### Turbopack
 
@@ -451,15 +464,15 @@ webServer: [
 
 ## Anti-Patterns
 
-| Don't Do This | Problem | Do This Instead |
-|---|---|---|
-| `await page.waitForTimeout(3000)` | Arbitrary waits are fragile | `await page.waitForURL('/path')` or `await expect(locator).toBeVisible()` |
-| Test `getServerSideProps` directly | Depends on req/res context | Navigate to page and verify rendered output |
-| Mock your own API routes | Hides real API bugs | Let real API handle requests; mock only external services |
-| `page.goto('http://localhost:3000/path')` | Breaks when port changes | Use `page.goto('/path')` with `baseURL` |
-| Run `npm run build` locally for every test | Extremely slow | Use `npm run dev` locally with `reuseExistingServer: true` |
-| Test `next/image` by checking exact URLs | Paths change between dev/prod | Assert on `alt`, visibility, `naturalWidth > 0`, `srcset` |
-| Test server actions by calling as functions | Server actions need Next.js runtime | Trigger through UI (forms, buttons) |
+| Don't Do This                               | Problem                             | Do This Instead                                                           |
+| ------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------- |
+| `await page.waitForTimeout(3000)`           | Arbitrary waits are fragile         | `await page.waitForURL('/path')` or `await expect(locator).toBeVisible()` |
+| Test `getServerSideProps` directly          | Depends on req/res context          | Navigate to page and verify rendered output                               |
+| Mock your own API routes                    | Hides real API bugs                 | Let real API handle requests; mock only external services                 |
+| `page.goto('http://localhost:3000/path')`   | Breaks when port changes            | Use `page.goto('/path')` with `baseURL`                                   |
+| Run `npm run build` locally for every test  | Extremely slow                      | Use `npm run dev` locally with `reuseExistingServer: true`                |
+| Test `next/image` by checking exact URLs    | Paths change between dev/prod       | Assert on `alt`, visibility, `naturalWidth > 0`, `srcset`                 |
+| Test server actions by calling as functions | Server actions need Next.js runtime | Trigger through UI (forms, buttons)                                       |
 
 ## Related
 

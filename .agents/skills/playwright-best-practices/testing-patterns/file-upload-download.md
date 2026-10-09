@@ -77,7 +77,9 @@ test('export filename matches selected format', async ({ page }) => {
   await page.getByRole('button', { name: 'Export PDF' }).click();
 
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^analytics-\d{4}-\d{2}-\d{2}\.pdf$/);
+  expect(download.suggestedFilename()).toMatch(
+    /^analytics-\d{4}-\d{2}-\d{2}\.pdf$/
+  );
 });
 
 test('format selector changes output extension', async ({ page }) => {
@@ -146,7 +148,9 @@ test('uploads document from fixture', async ({ page }) => {
   await page.goto('/attachments');
 
   const fileInput = page.locator('input[type="file"]');
-  await fileInput.setInputFiles(path.resolve(__dirname, '../fixtures/invoice.pdf'));
+  await fileInput.setInputFiles(
+    path.resolve(__dirname, '../fixtures/invoice.pdf')
+  );
 
   await expect(page.getByText('invoice.pdf')).toBeVisible();
 
@@ -206,9 +210,21 @@ test('uploads multiple files at once', async ({ page }) => {
 
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles([
-    { name: 'doc1.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf1') },
-    { name: 'doc2.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf2') },
-    { name: 'doc3.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf3') },
+    {
+      name: 'doc1.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('pdf1'),
+    },
+    {
+      name: 'doc2.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('pdf2'),
+    },
+    {
+      name: 'doc3.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('pdf3'),
+    },
   ]);
 
   await expect(page.getByText('doc1.pdf')).toBeVisible();
@@ -226,7 +242,11 @@ test('removes one file from selection', async ({ page }) => {
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles([
     { name: 'keep.txt', mimeType: 'text/plain', buffer: Buffer.from('keep') },
-    { name: 'discard.txt', mimeType: 'text/plain', buffer: Buffer.from('discard') },
+    {
+      name: 'discard.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('discard'),
+    },
   ]);
 
   const discardRow = page.getByText('discard.txt').locator('..');
@@ -459,7 +479,9 @@ test('rejects oversized file', async ({ page }) => {
     buffer: oversizedBuffer,
   });
 
-  await expect(page.getByRole('alert')).toContainText(/file.*too large|exceeds.*10 ?MB/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /file.*too large|exceeds.*10 ?MB/i
+  );
   await expect(page.getByText('huge.pdf')).not.toBeVisible();
 });
 ```
@@ -479,7 +501,9 @@ test('rejects too many files', async ({ page }) => {
 
   await fileInput.setInputFiles(files);
 
-  await expect(page.getByRole('alert')).toContainText(/maximum.*5 files|too many files/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /maximum.*5 files|too many files/i
+  );
 });
 ```
 
@@ -502,7 +526,9 @@ test('rejects image below minimum dimensions', async ({ page }) => {
     buffer: tinyPng,
   });
 
-  await expect(page.getByRole('alert')).toContainText(/minimum.*dimensions|too small/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /minimum.*dimensions|too small/i
+  );
 });
 ```
 
@@ -515,7 +541,9 @@ test('shows image preview after selection', async ({ page }) => {
   await page.goto('/profile/avatar');
 
   const fileInput = page.locator('input[type="file"]');
-  await fileInput.setInputFiles(path.resolve(__dirname, '../fixtures/photo.jpg'));
+  await fileInput.setInputFiles(
+    path.resolve(__dirname, '../fixtures/photo.jpg')
+  );
 
   const preview = page.getByRole('img', { name: /preview|avatar/i });
   await expect(preview).toBeVisible();

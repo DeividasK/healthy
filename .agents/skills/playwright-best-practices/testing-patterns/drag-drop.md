@@ -37,7 +37,9 @@ test('moves card between columns', async ({ page }) => {
   await expect(active.getByText('Update API docs')).toBeVisible();
   await expect(backlog.getByText('Update API docs')).not.toBeVisible();
 
-  await expect(backlog.getByRole('article')).toHaveCount(backlogCountBefore - 1);
+  await expect(backlog.getByRole('article')).toHaveCount(
+    backlogCountBefore - 1
+  );
   await expect(active.getByRole('article')).toHaveCount(activeCountBefore + 1);
 });
 
@@ -119,8 +121,12 @@ test('reorders list items', async ({ page }) => {
   expect(initial[1]).toContain('Priority B');
   expect(initial[2]).toContain('Priority C');
 
-  const priorityC = list.getByRole('listitem').filter({ hasText: 'Priority C' });
-  const priorityA = list.getByRole('listitem').filter({ hasText: 'Priority A' });
+  const priorityC = list
+    .getByRole('listitem')
+    .filter({ hasText: 'Priority C' });
+  const priorityA = list
+    .getByRole('listitem')
+    .filter({ hasText: 'Priority A' });
 
   await priorityC.dragTo(priorityA);
 
@@ -153,13 +159,19 @@ test('reorder persists after reload', async ({ page }) => {
 
   const list = page.getByRole('list', { name: 'Priority list' });
 
-  const priorityC = list.getByRole('listitem').filter({ hasText: 'Priority C' });
-  const priorityA = list.getByRole('listitem').filter({ hasText: 'Priority A' });
+  const priorityC = list
+    .getByRole('listitem')
+    .filter({ hasText: 'Priority C' });
+  const priorityA = list
+    .getByRole('listitem')
+    .filter({ hasText: 'Priority A' });
 
   await priorityC.dragTo(priorityA);
 
-  await page.waitForResponse((response) =>
-    response.url().includes('/api/priorities/reorder') && response.status() === 200
+  await page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/priorities/reorder') &&
+      response.status() === 200
   );
 
   await page.reload();
@@ -256,7 +268,10 @@ test('verifies drag visual feedback', async ({ page }) => {
   await page.mouse.down();
 
   const dropBox = await dropArea.boundingBox();
-  await page.mouse.move(dropBox!.x + dropBox!.width / 2, dropBox!.y + dropBox!.height / 2);
+  await page.mouse.move(
+    dropBox!.x + dropBox!.width / 2,
+    dropBox!.y + dropBox!.height / 2
+  );
 
   await expect(dropArea).toHaveClass(/drag-over|highlight/);
 
@@ -284,7 +299,9 @@ test('uploads file via drop zone', async ({ page }) => {
 
   const fileInput = page.locator('input[type="file"]');
 
-  await fileInput.setInputFiles(path.resolve(__dirname, '../fixtures/report.pdf'));
+  await fileInput.setInputFiles(
+    path.resolve(__dirname, '../fixtures/report.pdf')
+  );
 
   await expect(page.getByText('report.pdf')).toBeVisible();
   await expect(page.getByText(/\d+ KB/)).toBeVisible();
@@ -318,7 +335,9 @@ test('rejects invalid file types', async ({ page }) => {
     buffer: Buffer.from('fake-content'),
   });
 
-  await expect(page.getByRole('alert')).toContainText(/not allowed|invalid file type/i);
+  await expect(page.getByRole('alert')).toContainText(
+    /not allowed|invalid file type/i
+  );
   await expect(page.getByText('script.exe')).not.toBeVisible();
 });
 ```
@@ -378,9 +397,13 @@ test('constrains drag within boundaries', async ({ page }) => {
 
   await shape.hover();
   await page.mouse.down();
-  await page.mouse.move(containerBox!.x + containerBox!.width + 500, containerBox!.y - 200, {
-    steps: 10,
-  });
+  await page.mouse.move(
+    containerBox!.x + containerBox!.width + 500,
+    containerBox!.y - 200,
+    {
+      steps: 10,
+    }
+  );
   await page.mouse.up();
 
   const shapeBox = await shape.boundingBox();
@@ -457,8 +480,12 @@ test('multi-select drag shows item count', async ({ page }) => {
   await page.goto('/board');
 
   await page.locator('[data-testid="ticket-1"]').click();
-  await page.locator('[data-testid="ticket-2"]').click({ modifiers: ['Shift'] });
-  await page.locator('[data-testid="ticket-3"]').click({ modifiers: ['Shift'] });
+  await page
+    .locator('[data-testid="ticket-2"]')
+    .click({ modifiers: ['Shift'] });
+  await page
+    .locator('[data-testid="ticket-3"]')
+    .click({ modifiers: ['Shift'] });
 
   const card = page.locator('[data-testid="ticket-1"]');
   const targetCol = page.locator('[data-column="complete"]');
@@ -490,7 +517,9 @@ test('reorders using keyboard', async ({ page }) => {
   await page.goto('/priorities');
 
   const list = page.getByRole('list', { name: 'Priority list' });
-  const priorityC = list.getByRole('listitem').filter({ hasText: 'Priority C' });
+  const priorityC = list
+    .getByRole('listitem')
+    .filter({ hasText: 'Priority C' });
 
   await priorityC.focus();
   await page.keyboard.press('Space');

@@ -42,7 +42,8 @@ test.describe('cart state persistence', () => {
 
     const badge = page.getByTestId('cart-badge');
 
-    await page.getByRole('listitem')
+    await page
+      .getByRole('listitem')
       .filter({ hasText: 'Wireless Headphones' })
       .getByRole('button', { name: 'Add' })
       .click();
@@ -108,13 +109,17 @@ test.describe('client routing', () => {
     await page.goto('/account/security');
 
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Security', level: 2 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Security', level: 2 })
+    ).toBeVisible();
 
     await page.getByRole('link', { name: 'Privacy' }).click();
     await page.waitForURL('/account/privacy');
 
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Privacy', level: 2 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Privacy', level: 2 })
+    ).toBeVisible();
   });
 
   test('history navigation works', async ({ page }) => {
@@ -140,7 +145,9 @@ test.describe('client routing', () => {
   test('unknown route shows 404', async ({ page }) => {
     await page.goto('/nonexistent-path');
 
-    await expect(page.getByRole('heading', { name: 'Not Found' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Not Found' })
+    ).toBeVisible();
   });
 });
 ```
@@ -163,9 +170,11 @@ test.describe('useDebounce via SearchBox', () => {
       await route.continue();
     });
 
-    await page.getByRole('textbox', { name: 'Search' }).pressSequentially('testing', {
-      delay: 40,
-    });
+    await page
+      .getByRole('textbox', { name: 'Search' })
+      .pressSequentially('testing', {
+        delay: 40,
+      });
 
     await expect(page.getByRole('listitem')).toHaveCount(3);
     expect(apiCalls.length).toBeLessThanOrEqual(2);
@@ -252,7 +261,9 @@ test.describe('signup form', () => {
 
     await page.getByRole('button', { name: 'Register' }).click();
 
-    await expect(page.getByRole('button', { name: /Registering|Loading/ })).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: /Registering|Loading/ })
+    ).toBeDisabled();
   });
 });
 ```
@@ -317,7 +328,9 @@ test.describe('portal components', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('Preferences saved')).toBeVisible();
 
-    await expect(page.getByText('Preferences saved')).toBeHidden({ timeout: 8000 });
+    await expect(page.getByText('Preferences saved')).toBeHidden({
+      timeout: 8000,
+    });
   });
 });
 ```
@@ -353,7 +366,10 @@ test.describe('error boundary', () => {
       if (calls === 1) {
         route.fulfill({ status: 200, json: { widgets: null } });
       } else {
-        route.fulfill({ status: 200, json: { widgets: [{ id: 1, name: 'Chart' }] } });
+        route.fulfill({
+          status: 200,
+          json: { widgets: [{ id: 1, name: 'Chart' }] },
+        });
       }
     });
 
@@ -385,9 +401,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     ctPort: 3100,
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
 ```
 
@@ -451,7 +465,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI ? 'npm run build && npx vite preview --port 5173' : 'npm run dev',
+    command: process.env.CI
+      ? 'npm run build && npx vite preview --port 5173'
+      : 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
@@ -461,12 +477,12 @@ export default defineConfig({
 
 ### CRA vs Vite Differences
 
-| Aspect | Create React App | Vite |
-|---|---|---|
-| Default port | `3000` | `5173` |
-| Build output | `build/` | `dist/` |
+| Aspect           | Create React App             | Vite                           |
+| ---------------- | ---------------------------- | ------------------------------ |
+| Default port     | `3000`                       | `5173`                         |
+| Build output     | `build/`                     | `dist/`                        |
 | Serve production | `npx serve -s build -l 3000` | `npx vite preview --port 5173` |
-| Env var prefix | `REACT_APP_*` | `VITE_*` |
+| Env var prefix   | `REACT_APP_*`                | `VITE_*`                       |
 
 ## Framework Tips
 
@@ -511,15 +527,15 @@ test('no unmounted state warnings', async ({ page }) => {
 
 ## Anti-Patterns
 
-| Don't | Problem | Do Instead |
-|---|---|---|
-| `page.evaluate(() => store.getState())` | Couples tests to implementation | Assert on UI: `expect(badge).toHaveText('3')` |
-| Import components in E2E tests | E2E runs in Node, not browser | Use `@playwright/experimental-ct-react` for components |
-| `page.waitForTimeout(500)` after state changes | Timing varies across machines | `expect(locator).toHaveText('value')` auto-retries |
-| `page.locator('.MuiButton-root')` | Class names change between versions | `page.getByRole('button', { name: 'Submit' })` |
-| Test every component with CT | Overhead for simple components | CT for complex widgets, unit tests for logic, E2E for flows |
-| Skip keyboard navigation tests | Accessibility regressions common | Test Tab, Enter, Escape, Arrow interactions |
-| Assert on `__REACT_FIBER__` internals | Not stable across versions | Only interact with rendered DOM |
+| Don't                                          | Problem                             | Do Instead                                                  |
+| ---------------------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `page.evaluate(() => store.getState())`        | Couples tests to implementation     | Assert on UI: `expect(badge).toHaveText('3')`               |
+| Import components in E2E tests                 | E2E runs in Node, not browser       | Use `@playwright/experimental-ct-react` for components      |
+| `page.waitForTimeout(500)` after state changes | Timing varies across machines       | `expect(locator).toHaveText('value')` auto-retries          |
+| `page.locator('.MuiButton-root')`              | Class names change between versions | `page.getByRole('button', { name: 'Submit' })`              |
+| Test every component with CT                   | Overhead for simple components      | CT for complex widgets, unit tests for logic, E2E for flows |
+| Skip keyboard navigation tests                 | Accessibility regressions common    | Test Tab, Enter, Escape, Arrow interactions                 |
+| Assert on `__REACT_FIBER__` internals          | Not stable across versions          | Only interact with rendered DOM                             |
 
 ## Related
 

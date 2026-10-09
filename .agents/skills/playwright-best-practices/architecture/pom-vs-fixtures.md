@@ -20,12 +20,12 @@ If only using one pattern, choose **custom fixtures** — they handle setup/tear
 
 ## Pattern Comparison
 
-| Aspect | Page Objects | Custom Fixtures | Helper Functions |
-|---|---|---|---|
-| **Purpose** | Encapsulate UI interactions | Provide resources with setup/teardown | Stateless utilities |
-| **Lifecycle** | Manual (constructor/methods) | Built-in (`use()` with automatic teardown) | None |
-| **Composability** | Constructor injection or fixture wiring | Depend on other fixtures | Call other functions |
-| **Best for** | Pages with many reused interactions | Resources needing setup AND teardown | Simple logic with no side effects |
+| Aspect            | Page Objects                            | Custom Fixtures                            | Helper Functions                  |
+| ----------------- | --------------------------------------- | ------------------------------------------ | --------------------------------- |
+| **Purpose**       | Encapsulate UI interactions             | Provide resources with setup/teardown      | Stateless utilities               |
+| **Lifecycle**     | Manual (constructor/methods)            | Built-in (`use()` with automatic teardown) | None                              |
+| **Composability** | Constructor injection or fixture wiring | Depend on other fixtures                   | Call other functions              |
+| **Best for**      | Pages with many reused interactions     | Resources needing setup AND teardown       | Simple logic with no side effects |
 
 ## Selection Flowchart
 
@@ -112,13 +112,18 @@ import { BookingPage } from '../page-objects/booking.page';
 test('complete reservation with standard room', async ({ page }) => {
   const booking = new BookingPage(page);
   await booking.goto();
-  await booking.fillDetails({ date: '2026-03-15', guests: 2, room: 'standard' });
+  await booking.fillDetails({
+    date: '2026-03-15',
+    guests: 2,
+    room: 'standard',
+  });
   await booking.reserve();
   await expect(page.getByText('Reservation confirmed')).toBeVisible();
 });
 ```
 
 **Page object principles:**
+
 - One class per logical page/component, not per URL
 - Constructor takes `Page`
 - Locators as `readonly` properties in constructor
@@ -172,16 +177,21 @@ export { expect } from '@playwright/test';
 import { test, expect } from '../../fixtures/base.fixture';
 
 test('member sees dashboard widgets', async ({ loggedInPage }) => {
-  await expect(loggedInPage.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(
+    loggedInPage.getByRole('heading', { name: 'Dashboard' })
+  ).toBeVisible();
   await expect(loggedInPage.getByTestId('stats-widget')).toBeVisible();
 });
 
 test('new member sees welcome prompt', async ({ loggedInPage, member }) => {
-  await expect(loggedInPage.getByText(`Welcome, ${member.email}`)).toBeVisible();
+  await expect(
+    loggedInPage.getByText(`Welcome, ${member.email}`)
+  ).toBeVisible();
 });
 ```
 
 **Fixture principles:**
+
 - Use `test.extend()` — never module-level variables
 - `use()` callback separates setup from teardown
 - Teardown runs even if test fails
@@ -225,7 +235,10 @@ export function formatPrice(cents: number): string {
 // helpers/assertions.ts
 import { type Page, expect } from '@playwright/test';
 
-export async function expectNotification(page: Page, message: string): Promise<void> {
+export async function expectNotification(
+  page: Page,
+  message: string
+): Promise<void> {
   const notification = page.getByRole('alert').filter({ hasText: message });
   await expect(notification).toBeVisible();
   await expect(notification).toBeHidden({ timeout: 10000 });
@@ -249,6 +262,7 @@ test('update account email', async ({ page }) => {
 ```
 
 **Helper principles:**
+
 - Pure functions with no side effects
 - No browser state — take `page` as parameter if needed
 - Promote to fixture if setup/teardown needed
@@ -281,12 +295,12 @@ playwright.config.ts
 
 **Layer responsibilities:**
 
-| Layer | Pattern | Responsibility |
-|---|---|---|
-| **Test file** | `test()` | Describes behavior, orchestrates layers |
-| **Fixtures** | `test.extend()` | Resource lifecycle — setup, provide, teardown |
-| **Page objects** | Classes | UI interaction — navigation, actions, locators |
-| **Helpers** | Functions | Utilities — data generation, formatting, assertions |
+| Layer            | Pattern         | Responsibility                                      |
+| ---------------- | --------------- | --------------------------------------------------- |
+| **Test file**    | `test()`        | Describes behavior, orchestrates layers             |
+| **Fixtures**     | `test.extend()` | Resource lifecycle — setup, provide, teardown       |
+| **Page objects** | Classes         | UI interaction — navigation, actions, locators      |
+| **Helpers**      | Functions       | Utilities — data generation, formatting, assertions |
 
 ## Anti-Patterns
 
@@ -295,9 +309,15 @@ playwright.config.ts
 ```typescript
 // BAD: page object handling API calls and database
 class LoginPage {
-  async createUser() { /* API call */ }
-  async deleteUser() { /* API call */ }
-  async signIn(email: string, password: string) { /* UI */ }
+  async createUser() {
+    /* API call */
+  }
+  async deleteUser() {
+    /* API call */
+  }
+  async signIn(email: string, password: string) {
+    /* UI */
+  }
 }
 ```
 
@@ -342,7 +362,9 @@ Break into small, composable fixtures. Each fixture does one thing.
 let createdUserId: string;
 
 export async function createTestUser(request: APIRequestContext) {
-  const res = await request.post('/api/users', { data: { email: 'test@example.com' } });
+  const res = await request.post('/api/users', {
+    data: { email: 'test@example.com' },
+  });
   const user = await res.json();
   createdUserId = user.id; // shared across tests!
   return user;

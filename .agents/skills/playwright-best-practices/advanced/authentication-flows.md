@@ -57,7 +57,10 @@ test('verifies email with mocked endpoints', async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ message: 'Verification sent', verificationToken: mockToken }),
+      body: JSON.stringify({
+        message: 'Verification sent',
+        verificationToken: mockToken,
+      }),
     });
   });
 
@@ -107,7 +110,9 @@ test('resets password through email link', async ({ page }) => {
   expect(resetToken).toBeTruthy();
   await page.goto(`/reset-password?token=${resetToken}`);
 
-  await page.getByLabel('New password', { exact: true }).fill('NewPassword456!');
+  await page
+    .getByLabel('New password', { exact: true })
+    .fill('NewPassword456!');
   await page.getByLabel('Confirm password').fill('NewPassword456!');
   await page.getByRole('button', { name: 'Update password' }).click();
 
@@ -184,8 +189,12 @@ test('shows warning before session expires', async ({ page }) => {
 
   await page.goto('/home');
 
-  await expect(page.getByText(/session.*expir/i)).toBeVisible({ timeout: 10000 });
-  await expect(page.getByRole('button', { name: /extend|stay signed in/i })).toBeVisible();
+  await expect(page.getByText(/session.*expir/i)).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(
+    page.getByRole('button', { name: /extend|stay signed in/i })
+  ).toBeVisible();
 });
 ```
 
@@ -214,7 +223,9 @@ test('extends session when user clicks extend', async ({ page }) => {
 
   await page.goto('/home');
 
-  await expect(page.getByRole('button', { name: /extend|stay signed in/i })).toBeVisible({
+  await expect(
+    page.getByRole('button', { name: /extend|stay signed in/i })
+  ).toBeVisible({
     timeout: 10000,
   });
   await page.getByRole('button', { name: /extend|stay signed in/i }).click();
@@ -260,7 +271,9 @@ test('persists session with remember me enabled', async ({ browser }) => {
 ### Session-Only Login
 
 ```typescript
-test('session-only login does not persist across browser restarts', async ({ browser }) => {
+test('session-only login does not persist across browser restarts', async ({
+  browser,
+}) => {
   const ctx1 = await browser.newContext();
   const page1 = await ctx1.newPage();
 
@@ -309,7 +322,9 @@ test('logs out and clears session', async ({ page, context }) => {
   await expect(page).toHaveURL('/signin');
 
   const cookies = await context.cookies();
-  const sessionCookies = cookies.filter((c) => c.name.includes('session') || c.name.includes('token'));
+  const sessionCookies = cookies.filter(
+    (c) => c.name.includes('session') || c.name.includes('token')
+  );
   expect(sessionCookies).toHaveLength(0);
 
   await page.goto('/home');
@@ -335,7 +350,10 @@ test('logs out from all devices', async ({ page }) => {
   await page.goto('/settings/security');
 
   await page.getByRole('button', { name: 'Sign out everywhere' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Confirm' })
+    .click();
 
   expect(logoutAllCalled).toBe(true);
   await expect(page).toHaveURL(/\/signin/);
