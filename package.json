@@ -76,6 +76,7 @@
     "build:web": "expo export --platform web",
     "build:pages": "EXPO_BASE_URL=/healthy expo export --platform web && touch dist/.nojekyll && cp dist/index.html dist/404.html",
     "test:e2e": "playwright test --project=chromium",
+    "test:e2e:smoke": "playwright test --project=chromium --grep @smoke",
     "test:visual": "playwright test --project=visual",
     "chromatic": "chromatic --playwright",
     "lint": "expo lint",

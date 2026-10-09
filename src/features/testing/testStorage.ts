@@ -250,3 +250,4 @@ export function setupConsoleMonitor(page: Page): ConsoleMonitor {
 }
 
 export * from './testSeed';
+export * from './mockGoogleDrive';
