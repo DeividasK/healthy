@@ -10,6 +10,10 @@ import {
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
+import {
+  recordPendingConsultationDeletion,
+  clearPendingConsultationDeletions,
+} from '@/src/services/syncDeletions';
 
 /**
  * Persists an Encounter (Consultation) record using SQLite.
@@ -77,8 +81,8 @@ export async function insertConsultationRecord(
     let validConditionId: string | null = null;
     if (resolvedConditionId) {
       const condRow = await db.getFirstAsync<{ id: string }>(
-        `SELECT id FROM conditions WHERE id = ?;`,
-        [resolvedConditionId]
+        `SELECT id FROM conditions WHERE id = ? AND patient_id = ?;`,
+        [resolvedConditionId, patientId]
       );
       if (condRow) {
         validConditionId = resolvedConditionId;
@@ -117,6 +121,7 @@ export async function insertConsultationRecord(
   });
 
   if (didUpdate) {
+    await clearPendingConsultationDeletions([consId]);
     notifyDatabaseChanged(['consultations']);
   }
 }
@@ -194,6 +199,7 @@ export async function fetchConsultationById(
 export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
+  await recordPendingConsultationDeletion(id);
   notifyDatabaseChanged(['consultations']);
 }
 

@@ -38,6 +38,17 @@ import {
 } from '@/src/features/consultations/consultationsRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
+import {
+  getPendingDeletedConsultationIds,
+  clearPendingConsultationDeletions,
+} from './syncDeletions';
+
+export {
+  recordPendingConsultationDeletion,
+  getPendingDeletedConsultationIds,
+  clearPendingConsultationDeletions,
+  PENDING_DELETED_CONSULTATIONS_KEY,
+} from './syncDeletions';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
 
@@ -383,6 +394,8 @@ export async function restoreFromGoogleDrive(
   const allowedPatientIdSet = targetPatientIds
     ? new Set(targetPatientIds)
     : null;
+  const pendingDeletedConsultations = await getPendingDeletedConsultationIds();
+  const pendingDeletedSet = new Set(pendingDeletedConsultations);
 
   let restoredPatients = 0;
   let restoredReports = 0;
@@ -400,6 +413,15 @@ export async function restoreFromGoogleDrive(
 
   for (const file of remoteFiles) {
     if (!file.name.endsWith('.json.enc')) continue;
+    if (file.name.startsWith('consultation_')) {
+      const fileConsId = file.name.slice(
+        'consultation_'.length,
+        -'.json.enc'.length
+      );
+      if (pendingDeletedSet.has(fileConsId)) {
+        continue;
+      }
+    }
     try {
       const encryptedBytes = await downloadAppDataFile(
         config.accessToken,
@@ -462,6 +484,9 @@ export async function restoreFromGoogleDrive(
         }
       } else if (resource.resourceType === 'Encounter') {
         const cons = resource as Encounter;
+        if (cons.id && pendingDeletedSet.has(cons.id)) {
+          continue;
+        }
         if (!cons.meta?.lastUpdated) {
           cons.meta = {
             ...cons.meta,
@@ -569,9 +594,42 @@ export async function syncWithGoogleDrive(config: GoogleDriveConfig): Promise<{
     .map((sp) => sp.patient.id)
     .filter((id): id is string => Boolean(id));
 
-  // 1. Pull down remote records only for local eligible patients (or none if empty array)
+  // 1. Process pending consultation deletions before restoring remote data
+  const pendingDeletedConsultations = await getPendingDeletedConsultationIds();
+  if (pendingDeletedConsultations.length > 0) {
+    const remoteFiles = await listAppDataFiles(config.accessToken);
+    const remoteFileMap = new Map<string, GoogleDriveFile>(
+      remoteFiles.map((f) => [f.name, f])
+    );
+    const successfullyDeletedIds: string[] = [];
+
+    for (const id of pendingDeletedConsultations) {
+      const fileName = `consultation_${id}.json.enc`;
+      const remoteFile = remoteFileMap.get(fileName);
+      if (remoteFile) {
+        try {
+          await deleteAppDataFile(config.accessToken, remoteFile.id);
+          successfullyDeletedIds.push(id);
+        } catch (err) {
+          console.warn(
+            `Failed to delete remote consultation file ${fileName}:`,
+            err
+          );
+        }
+      } else {
+        // Not present remotely, deletion already effective
+        successfullyDeletedIds.push(id);
+      }
+    }
+
+    if (successfullyDeletedIds.length > 0) {
+      await clearPendingConsultationDeletions(successfullyDeletedIds);
+    }
+  }
+
+  // 2. Pull down remote records only for local eligible patients (or none if empty array)
   const restored = await restoreFromGoogleDrive(config, eligiblePatientIds);
-  // 2. Push any local records up for eligible patients
+  // 3. Push any local records up for eligible patients
   await backupToGoogleDrive(config);
   return restored;
 }
@@ -668,6 +726,11 @@ export async function deleteAllAppDataFromGoogleDrive(
         );
       }
     }
+  }
+
+  const pending = await getPendingDeletedConsultationIds();
+  if (pending.length > 0) {
+    await clearPendingConsultationDeletions(pending);
   }
 
   return { deletedFiles: deletedCount };

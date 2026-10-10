@@ -134,11 +134,16 @@ test.describe('Edit Consultation Flow', () => {
         await confirmBtn.click();
       });
 
-      await test.step('Verify consultation removed from Condition view', async () => {
+      await test.step('Verify consultation removed from Condition view and pending deletion persisted', async () => {
         await expect(
           page.getByText('Consultation To Delete')
         ).not.toBeVisible();
         await expect(page.getByTestId('empty-consultations')).toBeVisible();
+
+        const pendingDeletions = await page.evaluate(() => {
+          return localStorage.getItem('@healthy_pending_deleted_consultations');
+        });
+        expect(pendingDeletions).toContain(consultationId);
       });
     }
   );
