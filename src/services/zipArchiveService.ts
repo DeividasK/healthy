@@ -7,6 +7,7 @@ import type {
   DiagnosticReport,
   Observation,
   Condition,
+  Encounter,
 } from 'fhir/r5';
 import { deriveKeyFromPassphrase, decryptText } from './cryptoService';
 import {
@@ -22,11 +23,16 @@ import {
   fetchAllConditionRecords,
   insertConditionRecord,
 } from '@/src/features/conditions/conditionsRepository';
+import {
+  fetchAllConsultationRecords,
+  insertConsultationRecord,
+} from '@/src/features/consultations/consultationsRepository';
 
 export interface ZipExportSummary {
   patientCount: number;
   reportCount: number;
   conditionCount: number;
+  consultationCount: number;
   fileName: string;
 }
 
@@ -34,11 +40,13 @@ export interface ZipExportSummary {
  * Exports all local health records across all profiles into a standard Zip archive (unencrypted).
  */
 export async function exportZipArchive(): Promise<ZipExportSummary> {
-  const [patients, reportsWithObs, conditions] = await Promise.all([
-    fetchAllPatients(),
-    fetchAllDiagnosticReportRecords(),
-    fetchAllConditionRecords(),
-  ]);
+  const [patients, reportsWithObs, conditions, consultations] =
+    await Promise.all([
+      fetchAllPatients(),
+      fetchAllDiagnosticReportRecords(),
+      fetchAllConditionRecords(),
+      fetchAllConsultationRecords(),
+    ]);
 
   const zipFiles: Record<string, Uint8Array> = {};
 
@@ -64,6 +72,12 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     zipFiles[`records/condition_${cond.id}.json`] = strToU8(jsonStr);
   }
 
+  // Export Consultations as plain JSON
+  for (const cons of consultations) {
+    const jsonStr = JSON.stringify(cons, null, 2);
+    zipFiles[`records/consultation_${cons.id}.json`] = strToU8(jsonStr);
+  }
+
   // Manifest as plain JSON
   const manifest = {
     version: 1,
@@ -71,6 +85,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     patientCount: patients.length,
     reportCount: reportsWithObs.length,
     conditionCount: conditions.length,
+    consultationCount: consultations.length,
   };
   zipFiles['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2));
 
@@ -108,6 +123,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     patientCount: patients.length,
     reportCount: reportsWithObs.length,
     conditionCount: conditions.length,
+    consultationCount: consultations.length,
     fileName,
   };
 }
@@ -118,13 +134,28 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
 export async function restoreFromZipBytes(
   zipBytes: Uint8Array,
   legacyPassphrase: string = 'healthy-backup'
-): Promise<{ patients: number; reports: number; conditions: number }> {
+): Promise<{
+  patients: number;
+  reports: number;
+  conditions: number;
+  consultations: number;
+}> {
   const unzipped = unzipSync(zipBytes);
 
   let restoredPatients = 0;
   let restoredReports = 0;
   let restoredConditions = 0;
+  let restoredConsultations = 0;
   let legacyKey: import('expo-crypto').AESEncryptionKey | null = null;
+
+  const patientResources: Patient[] = [];
+  const conditionResources: { cond: Condition; patientId: string }[] = [];
+  const reportResources: {
+    report: DiagnosticReport;
+    observations: Observation[];
+    patientId: string;
+  }[] = [];
+  const consultationResources: { cons: Encounter; patientId: string }[] = [];
 
   for (const [path, fileBytes] of Object.entries(unzipped)) {
     let jsonText: string | null = null;
@@ -152,26 +183,66 @@ export async function restoreFromZipBytes(
       const resource = JSON.parse(jsonText);
 
       if (resource.resourceType === 'Patient') {
-        await insertPatientRecord(resource as Patient);
-        restoredPatients++;
+        patientResources.push(resource as Patient);
+      } else if (resource.resourceType === 'Condition') {
+        const cond = resource as Condition;
+        const patientId =
+          cond.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        conditionResources.push({ cond, patientId });
       } else if (resource.resourceType === 'DiagnosticReport') {
         const report = resource as DiagnosticReport;
         const observations = (report.contained || []) as Observation[];
         const patientId =
           report.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
-        await insertDiagnosticReportRecord(report, observations, patientId);
-        restoredReports++;
-      } else if (resource.resourceType === 'Condition') {
-        const cond = resource as Condition;
+        reportResources.push({ report, observations, patientId });
+      } else if (resource.resourceType === 'Encounter') {
+        const cons = resource as Encounter;
         const patientId =
-          cond.subject?.reference?.replace(/^Patient\//, '') ||
+          cons.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
-        await insertConditionRecord(cond, patientId);
-        restoredConditions++;
+        consultationResources.push({ cons, patientId });
       }
     } catch (err) {
       console.warn('Failed to parse record from zip:', path, err);
+    }
+  }
+
+  // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters
+  for (const patient of patientResources) {
+    try {
+      await insertPatientRecord(patient);
+      restoredPatients++;
+    } catch (err) {
+      console.warn('Failed to insert patient record from zip:', err);
+    }
+  }
+
+  for (const { cond, patientId } of conditionResources) {
+    try {
+      await insertConditionRecord(cond, patientId);
+      restoredConditions++;
+    } catch (err) {
+      console.warn('Failed to insert condition record from zip:', err);
+    }
+  }
+
+  for (const { report, observations, patientId } of reportResources) {
+    try {
+      await insertDiagnosticReportRecord(report, observations, patientId);
+      restoredReports++;
+    } catch (err) {
+      console.warn('Failed to insert diagnostic report record from zip:', err);
+    }
+  }
+
+  for (const { cons, patientId } of consultationResources) {
+    try {
+      await insertConsultationRecord(cons, patientId);
+      restoredConsultations++;
+    } catch (err) {
+      console.warn('Failed to insert consultation record from zip:', err);
     }
   }
 
@@ -179,5 +250,6 @@ export async function restoreFromZipBytes(
     patients: restoredPatients,
     reports: restoredReports,
     conditions: restoredConditions,
+    consultations: restoredConsultations,
   };
 }

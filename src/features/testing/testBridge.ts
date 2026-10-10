@@ -3,10 +3,23 @@ import { createOrUpdatePatient } from '@/src/features/profile/patientService';
 import {
   setActivePatientId,
   getActivePatientId,
+  fetchAllPatients,
 } from '@/src/features/profile/patientRepository';
 import { createOrUpdateCondition } from '@/src/features/conditions/conditionService';
+import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+
+async function resolvePatientId(
+  explicitId?: string
+): Promise<string | undefined> {
+  if (explicitId) return explicitId;
+  const activeId = await getActivePatientId();
+  if (activeId) return activeId;
+  const all = await fetchAllPatients();
+  if (all.length > 0 && all[0].id) return all[0].id;
+  return undefined;
+}
 
 export function setupTestBridge() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -35,10 +48,10 @@ export function setupTestBridge() {
       notes?: string;
       onsetDate?: string;
     }) => {
-      const activePatientId = await getActivePatientId();
+      const patientId = await resolvePatientId(input.patientId);
       return await createOrUpdateCondition({
         id: input.id,
-        patientId: input.patientId || activePatientId || undefined,
+        patientId,
         title: input.title,
         clinicalStatus: input.status || 'active',
         verificationStatus: 'confirmed',
@@ -57,7 +70,7 @@ export function setupTestBridge() {
         unit?: string;
       }[];
     }) => {
-      const activePatientId = await getActivePatientId();
+      const patientId = await resolvePatientId(input.patientId);
       const items = input.biomarkers.map((b) => {
         const query = b.name.toLowerCase().trim();
         const def = CBC_MARKERS.find(
@@ -92,10 +105,34 @@ export function setupTestBridge() {
 
       return await createAndSaveDiagnosticReport({
         reportId: input.id,
-        patientId: input.patientId || activePatientId || undefined,
+        patientId,
         date: input.date || new Date().toISOString().split('T')[0],
         notes: input.notes,
         items,
+      });
+    },
+    seedConsultation: async (input: {
+      id?: string;
+      patientId?: string;
+      conditionId?: string | null;
+      title: string;
+      doctorName?: string;
+      serviceType?: string;
+      date?: string;
+      notes?: string;
+      status?: string;
+    }) => {
+      const patientId = await resolvePatientId(input.patientId);
+      return await createOrUpdateConsultation({
+        id: input.id,
+        patientId,
+        conditionId: input.conditionId,
+        title: input.title,
+        doctorName: input.doctorName,
+        serviceType: input.serviceType,
+        date: input.date || new Date().toISOString().split('T')[0],
+        notes: input.notes,
+        status: input.status || 'completed',
       });
     },
   };

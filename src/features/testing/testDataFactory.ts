@@ -2,6 +2,7 @@ import {
   type SeedPatientOptions,
   type SeedConditionOptions,
   type SeedReportOptions,
+  type SeedConsultationOptions,
 } from './testSeed';
 
 let entityCounter = 0;
@@ -61,5 +62,25 @@ export function buildReportData(
       { name: 'Hemoglobin', value: 14.5, unit: 'g/dL' },
       { name: 'White Blood Cells', value: 6.8, unit: '10*3/uL' },
     ],
+  };
+}
+
+/**
+ * Builds a deterministic or unique Consultation data object.
+ */
+export function buildConsultationData(
+  overrides?: Partial<SeedConsultationOptions>
+): SeedConsultationOptions {
+  const id = overrides?.id ?? nextId('consultation');
+  return {
+    id,
+    patientId: overrides?.patientId,
+    conditionId: overrides?.conditionId,
+    title: overrides?.title ?? `General Checkup ${entityCounter + 1}`,
+    doctorName: overrides?.doctorName ?? 'Dr. Smith',
+    serviceType: overrides?.serviceType,
+    date: overrides?.date ?? new Date().toISOString().split('T')[0],
+    notes: overrides?.notes,
+    status: overrides?.status ?? 'completed',
   };
 }

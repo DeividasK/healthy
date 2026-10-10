@@ -20,4 +20,5 @@ export {
   seedTestPatient,
   seedTestReport,
   seedTestCondition,
+  seedTestConsultation,
 } from './testStorage';

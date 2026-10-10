@@ -44,6 +44,28 @@ export function formatDisplayDate(dateStr: string): string {
 }
 
 /**
+ * Formats a date string ('YYYY-MM-DD' or with time) for display (e.g., 'Sep 26, 2026' or 'Sep 26, 2026, 14:30').
+ */
+export function formatDisplayDateTime(dateStr: string): string {
+  try {
+    const date = parseLocalDate(dateStr);
+    const datePart = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    if (dateStr.includes('T')) {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${datePart}, ${hours}:${minutes}`;
+    }
+    return datePart;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
  * Compares two ISO timestamp strings numerically using millisecond timestamps.
  * Returns true if existingTimestamp is newer than or equal to incomingTimestamp.
  */

@@ -42,34 +42,38 @@ test.describe('Edit Condition Flow', () => {
   );
 
   test(
-    'should allow deleting a Condition with confirmation modal and cancel option',
+    'should allow clicking into Condition View and deleting from Condition View',
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create a condition', async () => {
         await createTestConditionViaUI(page);
       });
 
-      const deleteBtn = page.getByTestId(/^delete-condition-button-/);
+      await test.step('Click condition card to open Condition View', async () => {
+        const condCard = page.getByTestId(/^condition-card-/);
+        await condCard.click();
+        await expect(page).toHaveURL(/.*condition\/[a-zA-Z0-9_-]+$/);
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          DEFAULT_CONDITION_TITLE
+        );
+      });
 
-      await test.step('Open delete modal and test cancellation', async () => {
+      await test.step('Delete condition from Condition View', async () => {
+        const deleteBtn = page.getByTestId('delete-condition-button');
         await deleteBtn.click();
 
         const modal = page.getByTestId('delete-confirmation-modal');
         await expect(modal).toBeVisible();
-        await expect(page.getByText('Delete Condition')).toBeVisible();
 
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByText(DEFAULT_CONDITION_TITLE)).toBeVisible();
-      });
+        await expect(page.getByTestId('condition-title')).toBeVisible();
 
-      await test.step('Re-open modal, verify 5-second countdown, and confirm deletion', async () => {
         await page.clock.install();
         await deleteBtn.click();
         const confirmBtn = page.getByTestId('delete-modal-confirm-button');
         await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
-        await expect(confirmBtn).toContainText('Delete (');
 
         await page.clock.runFor(5000);
         await expect(confirmBtn).toHaveText('Delete');
@@ -77,7 +81,8 @@ test.describe('Edit Condition Flow', () => {
         await confirmBtn.click();
       });
 
-      await test.step('Verify condition removed and empty state shown', async () => {
+      await test.step('Verify returned to Home and condition removed', async () => {
+        await expect(page).toHaveURL(/.*(\/|#)$/);
         await expect(page.getByText(DEFAULT_CONDITION_TITLE)).not.toBeVisible();
         await expect(page.getByText('Nothing to show yet')).toBeVisible();
       });

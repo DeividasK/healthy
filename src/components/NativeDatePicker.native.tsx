@@ -12,6 +12,7 @@ export interface NativeDatePickerProps {
   variant?: 'pill' | 'input';
   id?: string;
   name?: string;
+  allowFuture?: boolean;
 }
 
 export function NativeDatePicker({
@@ -20,6 +21,7 @@ export function NativeDatePicker({
   placeholder = 'Not specified',
   testID = 'date-picker-button',
   variant = 'pill',
+  allowFuture = false,
 }: NativeDatePickerProps) {
   const formattedDate = value
     ? value.toLocaleDateString('en-US', {
@@ -44,7 +46,7 @@ export function NativeDatePicker({
           }
         },
         mode: 'date',
-        maximumDate: new Date(),
+        maximumDate: allowFuture ? undefined : new Date(),
         is24Hour: true,
       });
     }

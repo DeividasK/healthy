@@ -30,6 +30,18 @@ export interface SeedReportOptions {
   }[];
 }
 
+export interface SeedConsultationOptions {
+  id?: string;
+  patientId?: string;
+  conditionId?: string | null;
+  title: string;
+  doctorName?: string;
+  serviceType?: string;
+  date?: string;
+  notes?: string;
+  status?: string;
+}
+
 /**
  * Seeds a Patient directly into SQLite via the test bridge.
  */
@@ -78,5 +90,18 @@ export async function seedTestReport(
   await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return await page.evaluate(async (opts) => {
     return await (window as any).__HEALTHY_TEST_BRIDGE__.seedReport(opts);
+  }, options);
+}
+
+/**
+ * Seeds a Consultation directly into SQLite via the test bridge.
+ */
+export async function seedTestConsultation(
+  page: Page,
+  options: SeedConsultationOptions
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(async (opts) => {
+    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedConsultation(opts);
   }, options);
 }

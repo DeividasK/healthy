@@ -162,7 +162,28 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="condition/[id]/index"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
           name="condition/[id]/edit"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="consultation/add"
+          options={{
+            headerShown: false,
+            presentation: Platform.OS === 'ios' ? 'modal' : 'card',
+          }}
+        />
+        <Stack.Screen
+          name="consultation/[id]/edit"
           options={{
             headerShown: false,
             presentation: Platform.OS === 'ios' ? 'modal' : 'card',
