@@ -37,3 +37,10 @@ runs:
           touch dist/.nojekyll
           cp dist/index.html dist/404.html
         fi
+
+    - name: Ensure GitHub Pages fallback files
+      if: inputs.base-url != ''
+      shell: bash
+      run: |
+        touch dist/.nojekyll
+        cp dist/index.html dist/404.html
