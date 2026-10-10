@@ -4,7 +4,6 @@ import {
   clearAppStorage,
   seedTestPatient,
   seedTestCondition,
-  seedTestConsultation,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Condition View - Visual Regression', () => {
@@ -17,15 +16,6 @@ test.describe('Edit Condition View - Visual Regression', () => {
       status: 'active',
       notes: 'Persistent ache after running on tarmac.',
       onsetDate: '2026-10-02',
-    });
-    await seedTestConsultation(page, {
-      id: 'cons-cond-visual-test',
-      conditionId: cond.id,
-      title: 'Orthopedic Evaluation',
-      doctorName: 'Dr. Sarah Connor',
-      date: '2026-10-04',
-      notes: 'MRI recommended for ligament check.',
-      status: 'completed',
     });
 
     await page.goto(`/condition/${cond.id}/edit`);

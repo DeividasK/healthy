@@ -4,13 +4,11 @@ import { useLocalSearchParams } from 'expo-router';
 import { ConsultationForm } from './ConsultationForm';
 import { createOrUpdateConsultation } from './consultationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function AddConsultationView() {
   const { conditionId } = useLocalSearchParams<{ conditionId?: string }>();
   const { activePatientId, isLoading } = useActivePatient();
-  const { triggerSync } = useSync();
 
   if (isLoading) {
     return (
@@ -34,9 +32,6 @@ export function AddConsultationView() {
       ...values,
       patientId: activePatientId,
     });
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on add consultation:', err)
-    );
   };
 
   return (

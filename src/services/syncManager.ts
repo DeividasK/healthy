@@ -389,6 +389,15 @@ export async function restoreFromGoogleDrive(
   let restoredConditions = 0;
   let restoredConsultations = 0;
 
+  const patientResources: Patient[] = [];
+  const conditionResources: { cond: Condition; patientId: string }[] = [];
+  const reportResources: {
+    report: DiagnosticReport;
+    observations: Observation[];
+    patientId: string;
+  }[] = [];
+  const consultationResources: { cons: Encounter; patientId: string }[] = [];
+
   for (const file of remoteFiles) {
     if (!file.name.endsWith('.json.enc')) continue;
     try {
@@ -414,8 +423,24 @@ export async function restoreFromGoogleDrive(
           !allowedPatientIdSet ||
           (pat.id && allowedPatientIdSet.has(pat.id))
         ) {
-          await insertPatientRecord(pat, config.userSub, true);
-          restoredPatients++;
+          patientResources.push(pat);
+        }
+      } else if (resource.resourceType === 'Condition') {
+        const cond = resource as Condition;
+        if (!cond.meta?.lastUpdated) {
+          cond.meta = {
+            ...cond.meta,
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
+          };
+        }
+        const patientId =
+          cond.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          conditionResources.push({ cond, patientId });
         }
       } else if (resource.resourceType === 'DiagnosticReport') {
         const report = resource as DiagnosticReport;
@@ -433,31 +458,7 @@ export async function restoreFromGoogleDrive(
           report.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
-          await insertDiagnosticReportRecord(
-            report,
-            observations,
-            patientId,
-            true
-          );
-          restoredReports++;
-        }
-      } else if (resource.resourceType === 'Condition') {
-        const cond = resource as Condition;
-        if (!cond.meta?.lastUpdated) {
-          cond.meta = {
-            ...cond.meta,
-            lastUpdated:
-              file.appProperties?.lastUpdated ||
-              file.modifiedTime ||
-              '1970-01-01T00:00:00.000Z',
-          };
-        }
-        const patientId =
-          cond.subject?.reference?.replace(/^Patient\//, '') ||
-          DEFAULT_PATIENT_ID;
-        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
-          await insertConditionRecord(cond, patientId, true);
-          restoredConditions++;
+          reportResources.push({ report, observations, patientId });
         }
       } else if (resource.resourceType === 'Encounter') {
         const cons = resource as Encounter;
@@ -474,12 +475,51 @@ export async function restoreFromGoogleDrive(
           cons.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
-          await insertConsultationRecord(cons, patientId, undefined, true);
-          restoredConsultations++;
+          consultationResources.push({ cons, patientId });
         }
       }
     } catch (err) {
       console.warn('Failed to restore file from Google Drive:', file.name, err);
+    }
+  }
+
+  // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters
+  for (const pat of patientResources) {
+    try {
+      await insertPatientRecord(pat, config.userSub, true);
+      restoredPatients++;
+    } catch (err) {
+      console.warn('Failed to insert patient record from Google Drive:', err);
+    }
+  }
+
+  for (const { cond, patientId } of conditionResources) {
+    try {
+      await insertConditionRecord(cond, patientId, true);
+      restoredConditions++;
+    } catch (err) {
+      console.warn('Failed to insert condition record from Google Drive:', err);
+    }
+  }
+
+  for (const { report, observations, patientId } of reportResources) {
+    try {
+      await insertDiagnosticReportRecord(report, observations, patientId, true);
+      restoredReports++;
+    } catch (err) {
+      console.warn('Failed to insert report record from Google Drive:', err);
+    }
+  }
+
+  for (const { cons, patientId } of consultationResources) {
+    try {
+      await insertConsultationRecord(cons, patientId, undefined, true);
+      restoredConsultations++;
+    } catch (err) {
+      console.warn(
+        'Failed to insert consultation record from Google Drive:',
+        err
+      );
     }
   }
 

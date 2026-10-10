@@ -14,12 +14,10 @@ import {
   getConsultationConditionId,
 } from '@/src/utils/fhirUtils';
 import { parseLocalDate } from '@/src/utils/dateUtils';
-import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConsultationFormValues | null>(null);
   const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
@@ -122,9 +120,6 @@ export function EditConsultationView() {
       id,
       patientId: initialPatientId,
     });
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on edit consultation:', err)
-    );
   };
 
   return (

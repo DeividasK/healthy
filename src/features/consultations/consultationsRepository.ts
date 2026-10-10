@@ -74,6 +74,17 @@ export async function insertConsultationRecord(
       return;
     }
 
+    let validConditionId: string | null = null;
+    if (resolvedConditionId) {
+      const condRow = await db.getFirstAsync<{ id: string }>(
+        `SELECT id FROM conditions WHERE id = ?;`,
+        [resolvedConditionId]
+      );
+      if (condRow) {
+        validConditionId = resolvedConditionId;
+      }
+    }
+
     await db.runAsync(
       `INSERT INTO consultations (id, patient_id, condition_id, date, doctor_name, service_type, title, notes, status, fhir_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -90,7 +101,7 @@ export async function insertConsultationRecord(
       [
         consId,
         patientId,
-        resolvedConditionId ?? null,
+        validConditionId ?? null,
         date,
         doctorName ?? null,
         serviceType ?? null,

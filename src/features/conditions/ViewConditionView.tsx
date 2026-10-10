@@ -51,6 +51,7 @@ export function ViewConditionView() {
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
+  const [hasLoadError, setHasLoadError] = useState(false);
 
   const [deleteModal, setDeleteModal] = useState<{
     visible: boolean;
@@ -73,6 +74,7 @@ export function ViewConditionView() {
         getConditionById(id),
         getConsultationsByConditionId(id),
       ]);
+      setHasLoadError(false);
       if (!condData) {
         setNotFound(true);
         setCondition(null);
@@ -84,7 +86,7 @@ export function ViewConditionView() {
       }
     } catch (err) {
       console.error('Failed to load condition view data:', err);
-      setNotFound(true);
+      setHasLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -181,6 +183,28 @@ export function ViewConditionView() {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.light.primary} />
       </View>
+    );
+  }
+
+  if (hasLoadError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            testID="back-button"
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Condition</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Failed to load condition.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
