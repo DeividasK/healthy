@@ -1,8 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { requestWebAccessToken } from '@/src/services/googleAuthWebService';
+import {
+  loadGisScript,
+  requestWebAccessToken,
+} from '@/src/services/googleAuthWebService';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -25,12 +28,18 @@ export interface GoogleAuthPayload {
 /**
  * Fetches Google user info using a bearer token and calls onSuccess.
  * Shared between the web (GIS) and native (expo-auth-session) paths.
+ *
+ * @param isMounted - A function that returns false once the calling effect has
+ *   cleaned up. The resolver checks this immediately before invoking onSuccess
+ *   so that a stale native-effect response cannot update sync state after the
+ *   user has already navigated away.
  */
 async function resolveUserAndNotify(
   accessToken: string,
   tokenExpiresAt: number,
   refreshToken: string | undefined,
-  onSuccess: (authData: GoogleAuthPayload) => Promise<void>
+  onSuccess: (authData: GoogleAuthPayload) => Promise<void>,
+  isMounted: () => boolean
 ): Promise<void> {
   const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -44,6 +53,9 @@ async function resolveUserAndNotify(
       'Google user info response did not contain a user ID (sub).'
     );
   }
+  // Guard: don't call onSuccess if the effect has already cleaned up (e.g.
+  // the user navigated away while the user-info fetch was in flight).
+  if (!isMounted()) return;
   await onSuccess({
     accessToken,
     refreshToken,
@@ -58,11 +70,24 @@ export function useGoogleAuthSignIn(
   onSuccess: (authData: GoogleAuthPayload) => Promise<void>
 ) {
   const [isLoading, setIsLoading] = useState(false);
+  // Track whether the GIS script has finished loading so the button is only
+  // enabled once requestWebAccessToken() can actually be called synchronously
+  // within the user gesture (browsers block popups opened outside of a direct
+  // user gesture, and GIS itself requires the script to be ready).
+  const [isGisReady, setIsGisReady] = useState(false);
   const onSuccessRef = useRef(onSuccess);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
   }, [onSuccess]);
+
+  // Pre-load the GIS script on web so the button is ready when the user taps.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    loadGisScript().then((loaded) => {
+      setIsGisReady(loaded);
+    });
+  }, []);
 
   // ── Native path: expo-auth-session ──────────────────────────────────────────
   const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
@@ -93,7 +118,7 @@ export function useGoogleAuthSignIn(
   // Handle native auth-session response
   useEffect(() => {
     if (Platform.OS === 'web') return; // handled in signIn() for web
-    let isMounted = true;
+    let mounted = true;
     if (response?.type === 'success') {
       const accessToken =
         response.authentication?.accessToken ||
@@ -115,19 +140,20 @@ export function useGoogleAuthSignIn(
 
       if (accessToken) {
         (async () => {
-          if (!isMounted) return;
+          if (!mounted) return;
           setIsLoading(true);
           try {
             await resolveUserAndNotify(
               accessToken,
               tokenExpiresAt,
               refreshToken,
-              onSuccessRef.current
+              onSuccessRef.current,
+              () => mounted
             );
           } catch (err) {
             console.error('Google profile fetch failed:', err);
           } finally {
-            if (isMounted) {
+            if (mounted) {
               setIsLoading(false);
             }
           }
@@ -136,26 +162,30 @@ export function useGoogleAuthSignIn(
     }
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [response]);
 
   // ── signIn: web uses GIS (no redirect URI), native uses expo-auth-session ──
-  const signIn = async () => {
+  const signIn = useCallback(async () => {
     setIsLoading(true);
     try {
       if (Platform.OS === 'web') {
         // GIS manages its own popup — no redirect URI needed, so no 404 on
-        // GitHub Pages subpath deployments.
+        // GitHub Pages subpath deployments. The GIS script is guaranteed to be
+        // loaded before this callback fires (isGisReady gates the button).
         const { accessToken, expiresIn } = await requestWebAccessToken({
           prompt: 'select_account',
         });
         const tokenExpiresAt = Date.now() + expiresIn * 1000;
+        // Web signIn() is always called within the user gesture; no mounted
+        // check needed here — the component is still mounted at call time.
         await resolveUserAndNotify(
           accessToken,
           tokenExpiresAt,
           undefined, // GIS implicit flow does not return a refresh token
-          onSuccessRef.current
+          onSuccessRef.current,
+          () => true
         );
       } else {
         if (!request) return;
@@ -167,12 +197,14 @@ export function useGoogleAuthSignIn(
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [request, promptAsync]);
 
   return {
     signIn,
     isLoading,
-    // On web the GIS script load is async but happens in signIn(); treat as always ready.
-    isReady: Platform.OS === 'web' ? true : Boolean(request),
+    // On web: ready once the GIS script has loaded (so the popup is available
+    // synchronously inside the user gesture). On native: ready once the
+    // auth request has been prepared by expo-auth-session.
+    isReady: Platform.OS === 'web' ? isGisReady : Boolean(request),
   };
 }
