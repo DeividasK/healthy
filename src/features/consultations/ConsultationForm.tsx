@@ -103,6 +103,7 @@ export interface ConsultationFormProps {
   initialValues?: Partial<ConsultationFormValues>;
   initialConditionId?: string | null;
   isEdit?: boolean;
+  onDelete?: () => Promise<void>;
   onSave: (values: {
     id?: string;
     title: string;
@@ -128,6 +129,7 @@ export function ConsultationForm({
   initialConditionId,
   isEdit = false,
   onSave,
+  onDelete,
 }: ConsultationFormProps) {
   const router = useRouter();
   const { triggerSync } = useSync();
@@ -784,7 +786,22 @@ export function ConsultationForm({
         </ScrollView>
 
         {/* Bottom Save Action */}
-        <FormActionDock onSave={handleSubmit} isSaving={isSaving} />
+        <FormActionDock
+          onSave={handleSubmit}
+          isSaving={isSaving}
+          deleteLabel="Delete consultation"
+          deleteTestID="delete-consultation-button"
+          deleteConfirmation={
+            isEdit && onDelete
+              ? {
+                  title: 'Delete Consultation',
+                  message:
+                    'Are you sure you want to delete this consultation? This action cannot be undone.',
+                  onConfirm: onDelete,
+                }
+              : undefined
+          }
+        />
 
         {/* Plus Menu Modal for adding optional fields */}
         <AddOptionsModal

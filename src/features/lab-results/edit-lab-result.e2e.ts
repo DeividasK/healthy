@@ -91,6 +91,28 @@ test.describe('Edit Lab Results Flow', () => {
         ).not.toBeVisible();
         await expect(page.getByText('"Updated checkup note"')).toBeVisible();
       });
+      await test.step('Cancel and confirm deletion from the edit island', async () => {
+        await page.getByTestId(/^edit-report-button-/).click();
+        await page.getByTestId('delete-report-button').click();
+        const modal = page.getByTestId('delete-confirmation-modal');
+        await expect(modal).toBeVisible();
+        await page.getByTestId('delete-modal-cancel-button').click();
+        await expect(modal).not.toBeVisible();
+        await expect(page.getByTestId('notes-input')).toHaveValue(
+          'Updated checkup note'
+        );
+
+        await page.clock.install();
+        await page.getByTestId('delete-report-button').click();
+        const confirm = page.getByTestId('delete-modal-confirm-button');
+        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+        await page.clock.runFor(5000);
+        await confirm.click();
+        await expect(page).toHaveURL(/\/$/);
+        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
+        await page.reload();
+        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
+      });
     }
   );
 

@@ -34,7 +34,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await createPatientViaUI(page);
   });
 
-  test('keeps the shared header mounted and moves the logo between Home and Condition', async ({
+  test('keeps the shared header mounted, logo on the left, and island transitions continuous', async ({
     page,
   }) => {
     const condition = await seedTestCondition(page, {
@@ -86,10 +86,14 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     });
     await page.getByTestId(`condition-card-${condition.id}`).click();
     await expect(page.getByTestId('back-button')).toBeVisible();
-    const center = page.viewportSize()!.width / 2 - 22;
+    await expect(header.getByTestId('back-button')).toHaveCount(0);
+    await expect(
+      page.getByTestId('resource-action-dock').getByTestId('back-button')
+    ).toBeVisible();
+    await expect(page.getByTestId('delete-condition-button')).toHaveCount(0);
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(center);
+      .toBeCloseTo(16);
     const motion = await page.evaluate(() => {
       const state = (window as any).__headerMotion;
       cancelAnimationFrame(state.frame);
@@ -106,7 +110,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     });
     expect(motion.persisted).toBe(true);
     expect(motion.primaryPersisted).toBe(true);
-    expect(motion.positions.some((x) => x > 17 && x < center - 1)).toBe(true);
+    expect(motion.positions.every((x) => x === 16)).toBe(true);
     expect(motion.heights.length).toBeGreaterThan(0);
     expect(
       motion.heights.every((height) => height === primarySize.height)
@@ -187,6 +191,17 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(
       dock.getByRole('button', { name: 'Save', exact: true })
     ).toBeVisible();
+    await expect(dock.getByTestId('back-button')).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const trash = (await dock
+          .getByTestId('delete-condition-button')
+          .boundingBox())!;
+        const save = (await dock.getByTestId('save-button').boundingBox())!;
+        const close = (await dock.getByTestId('cancel-button').boundingBox())!;
+        return trash.x + trash.width < save.x && save.x + save.width < close.x;
+      })
+      .toBe(true);
     await page.getByTestId('condition-title-input').fill('Unsaved change');
     await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByTestId('condition-title')).toHaveText(

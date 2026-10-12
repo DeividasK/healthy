@@ -110,6 +110,7 @@ export interface ConditionFormValues {
 export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
+  onDelete?: () => Promise<void>;
   onSave: (values: {
     id?: string;
     title: string;
@@ -135,6 +136,7 @@ export function ConditionForm({
   initialValues,
   isEdit = false,
   onSave,
+  onDelete,
 }: ConditionFormProps) {
   const router = useRouter();
   const { triggerSync } = useSync();
@@ -586,7 +588,22 @@ export function ConditionForm({
         </ScrollView>
 
         {/* Bottom Save Action */}
-        <FormActionDock onSave={handleSubmit} isSaving={isSaving} />
+        <FormActionDock
+          onSave={handleSubmit}
+          isSaving={isSaving}
+          deleteLabel="Delete condition"
+          deleteTestID="delete-condition-button"
+          deleteConfirmation={
+            isEdit && onDelete
+              ? {
+                  title: 'Delete Condition',
+                  message:
+                    'Are you sure you want to delete this condition? This action cannot be undone.',
+                  onConfirm: onDelete,
+                }
+              : undefined
+          }
+        />
 
         {/* Plus Action Modal */}
         <AddOptionsModal

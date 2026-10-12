@@ -1,4 +1,7 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Plus } from 'lucide-react-native';
+import { Keyboard } from 'react-native';
+import { usePathname, useRouter } from 'expo-router';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useActionDock } from './AppChrome';
 import type { DockAction } from './ActionDock';
 export type { DockAction } from './ActionDock';
@@ -6,42 +9,32 @@ export { getActionDockMenuOffset } from './ActionDock';
 
 interface ResourceActionDockProps {
   actions?: DockAction[];
-  deleteLabel?: string;
   editLabel?: string;
-  onDelete?: () => void;
   onEdit?: () => void;
   onAdd?: () => void;
   addLabel?: string;
-  deleteTestID?: string;
   editTestID?: string;
   addTestID?: string;
   addMenuExpanded?: boolean;
+  showBack?: boolean;
 }
 
 export function ResourceActionDock({
   actions,
-  deleteLabel,
   editLabel,
-  onDelete,
   onEdit,
   onAdd,
   addLabel,
-  deleteTestID,
   editTestID,
   addTestID,
   addMenuExpanded,
+  showBack,
 }: ResourceActionDockProps) {
-  const dockActions: DockAction[] = actions ?? [
-    ...(onDelete && deleteLabel && deleteTestID
-      ? [
-          {
-            label: deleteLabel,
-            testID: deleteTestID,
-            icon: Trash2,
-            onPress: onDelete,
-          },
-        ]
-      : []),
+  const router = useRouter();
+  const pathname = usePathname();
+  const { patients } = useActivePatient();
+  const shouldShowBack = showBack ?? (pathname !== '/' && patients.length > 0);
+  const resourceActions: DockAction[] = actions ?? [
     ...(onAdd && addLabel && addTestID
       ? [
           {
@@ -64,6 +57,23 @@ export function ResourceActionDock({
           },
         ]
       : []),
+  ];
+  const dockActions: DockAction[] = [
+    ...(shouldShowBack
+      ? [
+          {
+            label: 'Go back',
+            testID: 'back-button',
+            icon: ChevronLeft,
+            onPress: () => {
+              Keyboard.dismiss();
+              if (router.canGoBack()) router.back();
+              else router.replace('/');
+            },
+          },
+        ]
+      : []),
+    ...resourceActions,
   ];
   useActionDock(dockActions);
   return null;

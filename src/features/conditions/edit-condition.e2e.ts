@@ -45,7 +45,7 @@ test.describe('Edit Condition Flow', () => {
   );
 
   test(
-    'should allow clicking into Condition View and deleting from Condition View',
+    'should open Condition View and delete from edit mode',
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create a condition', async () => {
@@ -61,7 +61,11 @@ test.describe('Edit Condition Flow', () => {
         );
       });
 
-      await test.step('Delete condition from Condition View', async () => {
+      await test.step('Delete condition from edit mode', async () => {
+        await expect(page.getByTestId('delete-condition-button')).toHaveCount(
+          0
+        );
+        await page.getByTestId('edit-condition-button').click();
         const deleteBtn = page.getByTestId('delete-condition-button');
         await deleteBtn.click();
 
@@ -71,7 +75,9 @@ test.describe('Edit Condition Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('condition-title')).toBeVisible();
+        await expect(page.getByTestId('condition-title-input')).toHaveValue(
+          DEFAULT_CONDITION_TITLE
+        );
 
         await page.clock.install();
         await deleteBtn.click();

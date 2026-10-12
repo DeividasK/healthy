@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ConditionForm, ConditionFormValues } from './ConditionForm';
-import { getConditionById, createOrUpdateCondition } from './conditionService';
+import {
+  getConditionById,
+  createOrUpdateCondition,
+  deleteCondition,
+} from './conditionService';
 import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
 import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function EditConditionView() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConditionFormValues | null>(null);
@@ -122,7 +127,19 @@ export function EditConditionView() {
   };
 
   return (
-    <ConditionForm isEdit initialValues={initialValues} onSave={handleSave} />
+    <ConditionForm
+      isEdit
+      initialValues={initialValues}
+      onSave={handleSave}
+      onDelete={async () => {
+        if (!id) return;
+        await deleteCondition(id);
+        triggerSync().catch((error) =>
+          console.warn('Background sync failed on delete condition:', error)
+        );
+        router.dismissTo('/');
+      }}
+    />
   );
 }
 

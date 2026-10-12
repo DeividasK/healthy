@@ -9,10 +9,8 @@ import {
   User,
 } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
-import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
 import {
@@ -28,19 +26,17 @@ import {
   getConsultationTitle,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { deleteCondition, getConditionById } from './conditionService';
+import { getConditionById } from './conditionService';
 import type { Condition, Encounter } from 'fhir/r5';
 
 export function ViewConditionView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { triggerSync } = useSync();
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -85,21 +81,6 @@ export function ViewConditionView() {
     if (clinicalStatus === 'resolved')
       return { label: 'Resolved', color: '#717973' };
     return { label: 'Active', color: '#10B981' };
-  };
-
-  const handleDelete = async () => {
-    if (!id) return;
-    try {
-      await deleteCondition(id);
-      setDeleteModalVisible(false);
-      triggerSync().catch((error) =>
-        console.warn('Background sync failed on delete condition:', error)
-      );
-      if (router.canGoBack()) router.back();
-      else router.replace('/');
-    } catch (error) {
-      console.error('Failed to delete condition:', error);
-    }
   };
 
   if (isLoading) {
@@ -159,12 +140,7 @@ export function ViewConditionView() {
             ]}
           />
           <ResourceActionDock
-            deleteLabel="Delete condition"
             editLabel="Edit condition"
-            onDelete={() => {
-              setShowAddMenu(false);
-              setDeleteModalVisible(true);
-            }}
             onEdit={() => {
               setShowAddMenu(false);
               router.push(`/condition/${id}/edit`);
@@ -172,21 +148,10 @@ export function ViewConditionView() {
             onAdd={() => setShowAddMenu((visible) => !visible)}
             addLabel="Add consultation"
             addMenuExpanded={showAddMenu}
-            deleteTestID="delete-condition-button"
             editTestID="edit-condition-button"
             addTestID="condition-add-button"
           />
         </>
-      }
-      modal={
-        <DeleteConfirmationModal
-          visible={deleteModalVisible}
-          title="Delete Condition"
-          message="Are you sure you want to delete this condition? This action cannot be undone."
-          requireCountdown
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteModalVisible(false)}
-        />
       }
     >
       {(severity || bodySite || abatementDate || notes) && (
@@ -217,10 +182,18 @@ export function ViewConditionView() {
       )}
 
       <View
-        style={styles.consultationsSection}
+        style={[
+          styles.consultationsSection,
+          consultations.length > 0 && styles.consultationsList,
+        ]}
         testID="condition-consultations-section"
       >
-        <Text style={styles.sectionTitle}>Consultations</Text>
+        <View style={styles.sectionHeading}>
+          <Stethoscope size={18} color={COLORS.light.primary} />
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            Recent Consultations
+          </Text>
+        </View>
         {consultations.length ? (
           consultations.map((consultation) => {
             const consultationId = consultation.id || '';
@@ -317,14 +290,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginHorizontal: -20,
     paddingHorizontal: 20,
+  },
+  consultationsList: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.light.cardBorder,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.light.foreground,
-    marginBottom: 8,
   },
   consultationRow: {
     minHeight: 60,
@@ -335,7 +315,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.light.cardBorder,
-    backgroundColor: COLORS.light.dropdownSeparator,
     gap: 10,
   },
   consultationItem: {

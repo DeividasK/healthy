@@ -30,6 +30,7 @@ import {
   createAndSaveDiagnosticReport,
   BiomarkerInputItem,
   getReportById,
+  deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
@@ -566,6 +567,27 @@ export function LabResultForm({
           onSave={handleSave}
           isSaving={isSaving}
           saveDisabled={activeItems.length === 0}
+          deleteLabel="Delete lab result"
+          deleteTestID="delete-report-button"
+          deleteConfirmation={
+            isEdit && reportId
+              ? {
+                  title: 'Delete Lab Result',
+                  message:
+                    'Are you sure you want to delete this lab result? This action cannot be undone.',
+                  onConfirm: async () => {
+                    await deleteReport(reportId);
+                    triggerSync().catch((error) =>
+                      console.warn(
+                        'Background sync failed on delete report:',
+                        error
+                      )
+                    );
+                    router.dismissTo('/');
+                  },
+                }
+              : undefined
+          }
         />
 
         {/* Plus Action Overlay ("Add Time", "Add Notes") */}

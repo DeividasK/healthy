@@ -104,6 +104,7 @@ export function PlusCircleButton({
 
 const styles = StyleSheet.create({
   buttonSecondary: {
+    borderWidth: 0,
     ...Platform.select({
       web: { boxShadow: 'none' },
       default: { shadowOpacity: 0, elevation: 0 },

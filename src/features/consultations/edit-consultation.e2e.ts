@@ -81,7 +81,7 @@ test.describe('Edit Consultation Flow', () => {
   );
 
   test(
-    'should allow deleting a Consultation from Condition view with confirmation modal',
+    'should delete a linked Consultation from edit mode with confirmation modal',
     { tag: ['@critical'] },
     async ({ page }) => {
       let conditionId = '';
@@ -116,6 +116,10 @@ test.describe('Edit Consultation Flow', () => {
           new RegExp(`.*consultation\\/${consultationId}$`)
         );
 
+        await expect(
+          page.getByTestId('delete-consultation-button')
+        ).toHaveCount(0);
+        await page.getByTestId('edit-consultation-button').click();
         const deleteBtn = page.getByTestId('delete-consultation-button');
         await deleteBtn.click();
 
@@ -126,7 +130,7 @@ test.describe('Edit Consultation Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('consultation-title')).toHaveText(
+        await expect(page.getByTestId('consultation-title-input')).toHaveValue(
           'Consultation To Delete'
         );
       });

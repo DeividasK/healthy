@@ -54,12 +54,16 @@ test.describe('View Consultation Flow', () => {
       'Updated Physical'
     );
 
+    await expect(page.getByTestId('delete-consultation-button')).toHaveCount(0);
+    await page.getByTestId('edit-consultation-button').click();
     await page.getByTestId('delete-consultation-button').click();
     const modal = page.getByTestId('delete-confirmation-modal');
     await expect(modal).toBeVisible();
     await page.getByTestId('delete-modal-cancel-button').click();
     await expect(modal).not.toBeVisible();
-    await expect(page.getByTestId('consultation-title')).toBeVisible();
+    await expect(page.getByTestId('consultation-title-input')).toHaveValue(
+      'Updated Physical'
+    );
 
     await page.clock.install();
     await page.getByTestId('delete-consultation-button').click();
