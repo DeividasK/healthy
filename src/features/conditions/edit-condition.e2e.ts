@@ -14,6 +14,62 @@ test.describe('Edit Condition Flow', () => {
     await seedTestPatient(page);
   });
 
+  test('explains a failed deletion and allows retrying from the confirmation modal', async ({
+    page,
+    consoleMonitor,
+  }) => {
+    const condition = await seedTestCondition(page, {
+      id: 'condition-delete-failure',
+      title: 'Condition to delete',
+    });
+    await page.reload();
+    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId('edit-condition-button').click();
+    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+      'Condition to delete'
+    );
+    await page.evaluate(async () => {
+      await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        `CREATE TEMP TRIGGER fail_condition_delete BEFORE DELETE ON conditions
+         WHEN OLD.id = 'condition-delete-failure'
+         BEGIN SELECT RAISE(ABORT, 'Simulated deletion failure'); END;`
+      );
+    });
+    consoleMonitor.ignore('Failed to delete resource:');
+    await page.clock.install();
+    await page.getByTestId('delete-condition-button').click();
+    await page.clock.runFor(5000);
+    const confirm = page.getByTestId('delete-modal-confirm-button');
+    await expect(confirm).toBeEnabled();
+    const dialogPromise = page.waitForEvent('dialog');
+    const clickPromise = confirm.click();
+    const dialog = await dialogPromise;
+    expect(dialog.type()).toBe('alert');
+    expect(dialog.message()).toBe('Error\nFailed to delete. Please try again.');
+    await dialog.accept();
+    await clickPromise;
+    await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}/edit$`));
+    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+      'Condition to delete'
+    );
+
+    await page.evaluate(async () => {
+      await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'DROP TRIGGER fail_condition_delete;'
+      );
+    });
+    await confirm.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByTestId(`condition-card-${condition.id}`)
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(
+      page.getByTestId(`condition-card-${condition.id}`)
+    ).toHaveCount(0);
+  });
+
   test(
     'should allow editing an existing Condition',
     { tag: ['@smoke'] },

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Keyboard } from 'react-native';
+import { Alert, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check, Trash2, X } from 'lucide-react-native';
 import { ResourceActionDock, type DockAction } from './ResourceActionDock';
@@ -81,6 +81,12 @@ export function FormActionDock({
               setDeleteVisible(false);
             } catch (error) {
               console.error('Failed to delete resource:', error);
+              const message = 'Failed to delete. Please try again.';
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.alert(`Error\n${message}`);
+              } else {
+                Alert.alert('Error', message);
+              }
             }
           }}
           onCancel={() => setDeleteVisible(false)}

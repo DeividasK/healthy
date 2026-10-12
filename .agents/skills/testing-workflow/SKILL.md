@@ -33,6 +33,14 @@ Follow these rules when designing, updating, and executing test suites:
 - **When to Run**: ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
 - **No Assertions / Expectations**: Visual tests **MUST NOT** contain assertions (`expect(...)`). They should strictly navigate, seed or set up UI state, and call `takeSnapshot()`. All functional assertions belong in E2E tests (`*.e2e.ts`).
 
+## Persistent Chrome and Animation Coverage
+
+- Wait for destination-specific readiness after navigation, such as its loaded title or form field and active action. The shared header stays mounted and cannot establish that the destination finished loading.
+- Capture settled UI states in visual tests using reduced motion, as configured for the `visual` project. Cover meaningful variants in existing collocated tests when possible.
+- When a transition has a demonstrated continuity bug, use E2E coverage with normal motion: sample frames around the interaction and check observable invariants such as constant height, intermediate scale or opacity, and element continuity. Settled screenshots alone cannot detect flicker or abrupt removal; avoid transition snapshots unless explicitly requested.
+- For disappearing overlays, wait for the outgoing menu to become hidden before interacting with or auditing the destination. Prefer role-scoped locators when an exiting menu repeats a screen's heading text.
+- Run E2E and visual suites sequentially while they share the same dev-server port and output directory. Parallelize workers within a suite instead of starting competing suites.
+
 ## Version Control & Git Guidelines
 
 - **NEVER run `git commit` or `git push` on the user's behalf.**

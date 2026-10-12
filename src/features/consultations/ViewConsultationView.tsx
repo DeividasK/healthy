@@ -43,7 +43,10 @@ export function ViewConsultationView() {
       }
       const conditionId = getConsultationConditionId(value);
       const condition = conditionId
-        ? await getConditionById(conditionId)
+        ? await getConditionById(conditionId).catch((error) => {
+            console.warn('Failed to load related condition:', error);
+            return null;
+          })
         : null;
       setConsultation(value);
       setRelatedCondition(condition);

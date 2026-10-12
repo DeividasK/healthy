@@ -122,4 +122,51 @@ test.describe('View Consultation Flow', () => {
     await page.getByTestId('back-button').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
   });
+
+  test('keeps consultation details available when the linked condition fails to load', async ({
+    page,
+    consoleMonitor,
+  }) => {
+    const condition = await seedTestCondition(page, {
+      id: 'condition-unreadable',
+      title: 'Unreadable condition',
+    });
+    const consultation = await seedTestConsultation(page, {
+      id: 'consultation-readable',
+      conditionId: condition.id,
+      title: 'Available consultation',
+      doctorName: 'Dr. Sarah Connor',
+      notes: 'Consultation notes remain available.',
+    });
+    await page.reload();
+    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await expect(
+      page.getByTestId(`condition-consultation-item-${consultation.id}`)
+    ).toBeVisible();
+    // Invalid FHIR JSON makes only the linked-condition lookup throw.
+    await page.evaluate(async (conditionId) => {
+      await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'UPDATE conditions SET fhir_json = ? WHERE id = ?;',
+        ['invalid-json', conditionId]
+      );
+    }, condition.id);
+    consoleMonitor.ignore('Failed to load related condition:');
+
+    await page
+      .getByTestId(`condition-consultation-item-${consultation.id}`)
+      .click();
+    await expect(page.getByTestId('consultation-title')).toHaveText(
+      'Available consultation'
+    );
+    const view = page.getByTestId('consultation-view');
+    await expect(view.getByText('Dr. Sarah Connor')).toBeVisible();
+    await expect(
+      view.getByText('Consultation notes remain available.')
+    ).toBeVisible();
+    await expect(view.getByText('Failed to load consultation.')).toHaveCount(0);
+    await expect(
+      page.getByTestId('consultation-related-condition')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('edit-consultation-button')).toBeEnabled();
+  });
 });

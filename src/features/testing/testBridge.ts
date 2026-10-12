@@ -9,6 +9,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { getDb } from '@/src/database/db';
 
 async function resolvePatientId(
   explicitId?: string
@@ -26,6 +27,11 @@ export function setupTestBridge() {
   if (process.env.NODE_ENV === 'production' && !__DEV__) return;
 
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
+    // Prepare database failure scenarios without changing production behavior.
+    executeSql: async (sql: string, params: string[] = []) => {
+      const db = await getDb();
+      await db.runAsync(sql, params);
+    },
     seedPatient: async (input: {
       id?: string;
       givenName: string;

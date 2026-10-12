@@ -22,3 +22,10 @@ When planning or implementing UI features in this codebase:
    - In any implementation plan, explicitly dedicate a section listing existing components to be reused, as well as any reusable components being extracted to avoid style duplication.
 6. **Confirm New Components in Plans**:
    - Always explicitly list and confirm in the plan if any new components need to be created, providing justification for why existing components cannot be reused.
+
+## Shared Navigation Chrome
+
+- `AppChrome` owns the persistent `AppHeader`, action island, and overlay host above the navigator. Screens register actions through `ResourceActionDock`; forms use `FormActionDock`, and add menus use `FloatingAddMenu`. Reuse these components when adding screens.
+- Keep shared animated chrome mounted across route changes. Register actions for the focused screen and guard cleanup by the registration's owner so an outgoing screen cannot clear the destination's actions.
+- During destination loading, retain the outgoing island's geometry while disabling its actions. Keep disappearing action content mounted until its exit animation completes, with pointer and accessibility interaction disabled.
+- Animate changes within stable action slots. Preserve layout invariants, such as island height, throughout transitions; an exit animation needs its elements to remain mounted long enough to finish.
