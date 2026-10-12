@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 249 250 246;
+    --background: 255 255 255;
     --foreground: 26 28 26;
     --card: 255 255 255;
     --card-foreground: 26 28 26;
@@ -29,7 +29,7 @@
     --alert-blue: 59 130 246;
     --privacy-green: 16 185 129;
 
-    --android-background: 249 250 246;
+    --android-background: 255 255 255;
     --android-foreground: 26 28 26;
     --android-card: 255 255 255;
     --android-card-foreground: 26 28 26;

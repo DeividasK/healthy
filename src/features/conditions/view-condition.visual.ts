@@ -21,6 +21,15 @@ test.describe('View Condition View - Visual Regression', () => {
       onsetDate: '2026-10-02',
     });
     await seedTestConsultation(page, {
+      id: 'cons-cond-view-visual-follow-up',
+      conditionId: cond.id,
+      title: 'Follow-up for Left Knee Pain',
+      doctorName: 'Dr. Marcus Welby',
+      date: '2026-10-07',
+      notes: 'Continue physiotherapy and review MRI results.',
+      status: 'completed',
+    });
+    await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-test',
       conditionId: cond.id,
       title: 'Orthopedic Evaluation',

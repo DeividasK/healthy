@@ -1,7 +1,7 @@
 export const THEME_COLORS = {
   light: {
     // Base surfaces & layout
-    background: '#f9faf6',
+    background: '#ffffff',
     foreground: '#1a1c1a',
     card: '#ffffff',
     cardForeground: '#1a1c1a',

@@ -89,14 +89,29 @@ test.describe('Add Consultation Flow', () => {
           )
         ).toBeVisible();
 
-        const editBtn = page.getByTestId(/^edit-consultation-button-/);
-        const deleteBtn = page.getByTestId(/^delete-consultation-button-/);
-        await expect(editBtn).toBeVisible();
-        await expect(deleteBtn).toBeVisible();
+        const consultationRow = page.getByTestId(
+          /^condition-consultation-item-/
+        );
+        await expect(consultationRow).toBeVisible();
+        await consultationRow.click();
+        await expect(page).toHaveURL(/.*consultation\/.*$/);
+        await expect(page.getByTestId('consultation-title')).toHaveText(
+          'General Cardiology Review'
+        );
       });
 
       await test.step('Verify consultation is not on Home view', async () => {
-        await page.getByTestId('back-button').click();
+        await page
+          .getByTestId('consultation-view')
+          .getByTestId('back-button')
+          .click();
+        await expect(page).toHaveURL(
+          new RegExp(`.*condition\\/${conditionId}$`)
+        );
+        await page
+          .getByTestId('condition-view')
+          .getByTestId('back-button')
+          .click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
         // Home view should NOT have consultations
         await expect(
@@ -270,38 +285,14 @@ test.describe('Add Consultation Flow', () => {
         ).toBeVisible();
       });
 
-      await test.step('Edit standalone consultation from Home view', async () => {
-        const editBtn = page.getByTestId(/^edit-consultation-button-/);
-        await expect(editBtn).toBeVisible();
-        await editBtn.click();
-
-        await expect(page).toHaveURL(/.*consultation\/.*\/edit/);
-        const titleInput = page.getByTestId('consultation-title-input');
-        await expect(titleInput).toHaveValue('Annual Physical Exam');
-        await titleInput.fill('Updated Physical Exam');
-        await page.getByTestId('save-button').click();
-
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Updated Physical Exam')).toBeVisible();
-      });
-
-      await test.step('Delete standalone consultation from Home view', async () => {
-        await page.clock.install();
-        const deleteBtn = page.getByTestId(/^delete-consultation-button-/);
-        await expect(deleteBtn).toBeVisible();
-        await deleteBtn.click();
-
-        // Confirm modal with countdown
-        const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-        await expect(confirmBtn).toBeVisible();
-        await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
-
-        await page.clock.runFor(5000);
-        await expect(confirmBtn).toHaveText('Delete');
-        await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
-        await confirmBtn.click();
-
-        await expect(page.getByText('Updated Physical Exam')).not.toBeVisible();
+      await test.step('Open the new standalone consultation view from Home', async () => {
+        await page.getByTestId(/^consultation-card-/).click();
+        await expect(page).toHaveURL(/.*consultation\/.*$/);
+        const view = page.getByTestId('consultation-view');
+        await expect(view.getByTestId('consultation-title')).toHaveText(
+          'Annual Physical Exam'
+        );
+        await expect(view.getByText('Dr. Beverly Crusher')).toBeVisible();
       });
     }
   );

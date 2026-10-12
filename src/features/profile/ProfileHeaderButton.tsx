@@ -1,12 +1,22 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, Text } from 'react-native';
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import { getPatientInitials } from './patientService';
 import { COLORS } from '@/src/theme/colors';
 
-export function ProfileHeaderButton() {
+export function ProfileHeaderButton({
+  style,
+}: {
+  style?: StyleProp<ViewStyle>;
+}) {
   const router = useRouter();
   const { activePatient } = useActivePatient();
   const initials = getPatientInitials(activePatient);
@@ -16,7 +26,7 @@ export function ProfileHeaderButton() {
       testID="profile-header-button"
       accessibilityLabel="View Profile"
       activeOpacity={0.7}
-      style={styles.button}
+      style={[styles.button, style]}
       onPress={() => router.push('/profile')}
     >
       {initials && initials !== 'S' ? (

@@ -25,14 +25,8 @@ import {
   getAllReports,
   deleteReport,
 } from '@/src/features/lab-results/diagnosticReportService';
-import {
-  getAllConditions,
-  deleteCondition,
-} from '@/src/features/conditions/conditionService';
-import {
-  getAllConsultations,
-  deleteConsultation,
-} from '@/src/features/consultations/consultationService';
+import { getAllConditions } from '@/src/features/conditions/conditionService';
+import { getAllConsultations } from '@/src/features/consultations/consultationService';
 
 import type { Observation, Condition, Encounter } from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
@@ -94,7 +88,7 @@ export function HomeView() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     visible: boolean;
-    type: 'report' | 'condition' | 'consultation';
+    type: 'report';
     id: string;
     title: string;
     message: string;
@@ -210,39 +204,9 @@ export function HomeView() {
     });
   };
 
-  const handleDeleteConditionClick = (id: string) => {
-    setDeleteModal({
-      visible: true,
-      type: 'condition',
-      id,
-      title: 'Delete Condition',
-      message:
-        'Are you sure you want to delete this condition? This action cannot be undone.',
-      requireCountdown: true,
-    });
-  };
-
-  const handleDeleteConsultationClick = (id: string) => {
-    setDeleteModal({
-      visible: true,
-      type: 'consultation',
-      id,
-      title: 'Delete Consultation',
-      message:
-        'Are you sure you want to delete this consultation? This action cannot be undone.',
-      requireCountdown: true,
-    });
-  };
-
   const handleConfirmDelete = async () => {
     try {
-      if (deleteModal.type === 'report') {
-        await deleteReport(deleteModal.id);
-      } else if (deleteModal.type === 'condition') {
-        await deleteCondition(deleteModal.id);
-      } else {
-        await deleteConsultation(deleteModal.id);
-      }
+      await deleteReport(deleteModal.id);
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
       triggerSync().catch((err) =>
@@ -372,7 +336,7 @@ export function HomeView() {
                         router.push(`/condition/${condId}`);
                       }}
                     >
-                      {/* Card Header: Status, Date & Action Icons */}
+                      {/* Card Header: Status and Date */}
                       <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
                           {getConditionStatusBadge(conditionItem)}
@@ -384,38 +348,6 @@ export function HomeView() {
                           <Text style={styles.cardDate}>
                             {formatDate(conditionItem.onsetDateTime || '')}
                           </Text>
-                        </View>
-                        <View style={styles.cardHeaderActions}>
-                          <TouchableOpacity
-                            testID={`edit-condition-button-${condId}`}
-                            style={styles.editReportButton}
-                            onPress={(e) => {
-                              e?.stopPropagation?.();
-                              if (
-                                Platform.OS === 'web' &&
-                                typeof document !== 'undefined'
-                              ) {
-                                (
-                                  document.activeElement as HTMLElement
-                                )?.blur?.();
-                              }
-                              router.push(`/condition/${condId}/edit`);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Pencil color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            testID={`delete-condition-button-${condId}`}
-                            style={styles.deleteReportButton}
-                            onPress={(e) => {
-                              e?.stopPropagation?.();
-                              handleDeleteConditionClick(condId);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
                         </View>
                       </View>
 
@@ -558,10 +490,19 @@ export function HomeView() {
                     cons.actualPeriod?.start || cons.plannedStartDate || '';
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={consId || 'consultation'}
                       style={styles.reportCard}
                       testID={`consultation-card-${consId}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View consultation: ${consTitle}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/consultation/[id]',
+                          params: { id: consId },
+                        })
+                      }
+                      activeOpacity={0.8}
                     >
                       <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
@@ -573,28 +514,6 @@ export function HomeView() {
                           <Text style={styles.cardDate}>
                             {formatDate(consDate)}
                           </Text>
-                        </View>
-                        <View style={styles.cardHeaderActions}>
-                          <TouchableOpacity
-                            testID={`edit-consultation-button-${consId}`}
-                            style={styles.editReportButton}
-                            onPress={() =>
-                              router.push(`/consultation/${consId}/edit`)
-                            }
-                            activeOpacity={0.7}
-                          >
-                            <Pencil color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            testID={`delete-consultation-button-${consId}`}
-                            style={styles.deleteReportButton}
-                            onPress={() =>
-                              handleDeleteConsultationClick(consId)
-                            }
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
                         </View>
                       </View>
 
@@ -628,7 +547,7 @@ export function HomeView() {
                           </Text>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>

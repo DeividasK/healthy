@@ -22,8 +22,8 @@ test.describe('Edit Condition Flow', () => {
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
-        const editBtn = page.getByTestId(/^edit-condition-button-/);
-        await editBtn.click();
+        await page.getByTestId(/^condition-card-/).click();
+        await page.getByTestId('edit-condition-button').click();
         await expect(page).toHaveURL(/.*condition\/.*\/edit/);
         await expect(page.getByText('Edit Condition')).toBeVisible();
 
@@ -34,9 +34,11 @@ test.describe('Edit Condition Flow', () => {
         await page.getByTestId('save-button').click();
       });
 
-      await test.step('Verify home view reflects updated condition title', async () => {
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Updated Condition')).toBeVisible();
+      await test.step('Verify Condition view reflects the updated title', async () => {
+        await expect(page).toHaveURL(/.*condition\/.*$/);
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          'Updated Condition'
+        );
       });
     }
   );
