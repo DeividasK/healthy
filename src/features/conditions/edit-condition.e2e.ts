@@ -236,6 +236,11 @@ test.describe('Edit Condition Flow', () => {
     ).toBe(true);
     await expect(addButton).toHaveAttribute('aria-expanded', 'false');
     await expect(addButton).toHaveAccessibleName('Add consultation');
+    await expect(addButton).toHaveCSS('background-color', 'rgb(61, 100, 80)');
+    await expect(page.getByTestId('condition-add-button-icon')).toHaveCSS(
+      'transform',
+      'matrix(1, 0, 0, 1, 0, 0)'
+    );
     await addButton.click();
     await page
       .getByTestId('condition-add-menu-backdrop')

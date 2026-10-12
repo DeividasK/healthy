@@ -55,6 +55,23 @@ test.describe('View Condition View - Visual Regression', () => {
     await takeSnapshot(page, 'Condition View - Add menu', testInfo);
     await page.getByTestId('condition-add-button').click();
     await page.setViewportSize({ width: 1280, height: 900 });
+    await page.getByTestId('condition-add-menu').waitFor({ state: 'hidden' });
+    // Chromatic archives inline styles before pending Reanimated updates finish.
+    // Wait for the closed button's rendered appearance, not just aria-expanded.
+    await page.waitForFunction(() => {
+      const button = document.querySelector(
+        '[data-testid="condition-add-button"]'
+      );
+      const icon = document.querySelector(
+        '[data-testid="condition-add-button-icon"]'
+      );
+      return (
+        button?.getAttribute('aria-expanded') === 'false' &&
+        getComputedStyle(button).backgroundColor === 'rgb(61, 100, 80)' &&
+        icon &&
+        getComputedStyle(icon).transform === 'matrix(1, 0, 0, 1, 0, 0)'
+      );
+    });
     await takeSnapshot(page, 'Condition View - Wide layout', testInfo);
   });
 });
