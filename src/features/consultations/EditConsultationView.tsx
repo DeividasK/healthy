@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSync } from '@/src/context/SyncContext';
 import { ConsultationForm, ConsultationFormValues } from './ConsultationForm';
 import {
   getConsultationById,
   createOrUpdateConsultation,
+  deleteConsultation,
 } from './consultationService';
 import {
   getConsultationTitle,
@@ -18,6 +20,8 @@ import { COLORS } from '@/src/theme/colors';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConsultationFormValues | null>(null);
   const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
@@ -127,6 +131,18 @@ export function EditConsultationView() {
       isEdit
       initialValues={initialValues}
       onSave={handleSave}
+      onDelete={async () => {
+        if (!id) return;
+        await deleteConsultation(id);
+        triggerSync().catch((error) =>
+          console.warn('Background sync failed on delete consultation:', error)
+        );
+        router.dismissTo(
+          initialValues.conditionId
+            ? `/condition/${initialValues.conditionId}`
+            : '/'
+        );
+      }}
     />
   );
 }

@@ -61,10 +61,14 @@ test.describe('Add Condition Flow', () => {
         ).toBeVisible();
         await expect(page.getByText('Active')).toBeVisible();
 
-        const editBtn = page.getByTestId(/^edit-condition-button-/);
-        const deleteBtn = page.getByTestId(/^delete-condition-button-/);
-        await expect(editBtn).toBeVisible();
-        await expect(deleteBtn).toBeVisible();
+        const conditionCard = page.getByTestId(/^condition-card-/);
+        await expect(conditionCard).toBeVisible();
+        await expect(page.getByTestId(/^edit-condition-button-/)).toHaveCount(
+          0
+        );
+        await expect(page.getByTestId(/^delete-condition-button-/)).toHaveCount(
+          0
+        );
       });
     }
   );

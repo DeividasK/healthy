@@ -28,6 +28,7 @@ export default defineConfig<ChromaticConfig>({
       use: {
         viewport: { width: 360, height: 740 },
         colorScheme: 'light',
+        reducedMotion: 'reduce',
         disableAutoSnapshot: true,
       },
       testMatch: /.*\.visual\.ts/,

@@ -102,6 +102,8 @@ export async function createPatientViaUI(page: Page): Promise<void> {
     .getByTestId('patient-family-name-input')
     .fill(DEFAULT_PROFILE_LAST_NAME);
   await page.getByTestId('save-profile-button').click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('floating-add-button')).toBeVisible();
 }
 
 export async function createReportViaUI(

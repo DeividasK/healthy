@@ -351,12 +351,16 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
     await page.getByTestId('option-restore-file').click();
     await expect(page.getByTestId('select-profile-file-button')).toBeVisible();
-    await expect(page.getByText('Select profile')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Select profile', exact: true })
+    ).toBeVisible();
 
     // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
     await page.getByTestId('option-restore-gdrive').click();
     await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
-    await expect(page.getByText('Connect Google Drive')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Connect Google Drive', exact: true })
+    ).toBeVisible();
 
     // Click "Create" -> navigates back to /profile/new with manual form
     await page.getByTestId('option-create-profile').click();
@@ -411,11 +415,15 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     page,
   }) => {
     // 1. Mock Google Drive configuration and connect
+    await mockGoogleDriveRoutes(page);
+    await mockGoogleAuthRoutes(page);
+    await mockGoogleIdentityServices(page);
     await page.evaluate(() => {
       localStorage.setItem(
         '@healthy_device_google_sync_config',
         JSON.stringify({
           accessToken: 'mock-google-token',
+          tokenExpiresAt: Date.now() + 3600000,
           userEmail: 'user@gmail.com',
           userName: 'Synced User',
           userSub: 'google-sub-user-999',
@@ -423,6 +431,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         })
       );
     });
+    await page.reload();
 
     // 2. Open /profile/new and create a profile (or tag active patient)
     await page.getByTestId('profile-header-button').click();
@@ -438,9 +447,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     // Connect "Synced Jane" to Google Drive
     const connectBtn = page.getByTestId('google-signin-button');
-    if (await connectBtn.isVisible()) {
-      await connectBtn.click();
-    }
+    await connectBtn.click();
+    await expect(page.getByTestId('connected-user-email')).toHaveText(
+      'user@gmail.com'
+    );
 
     // Let's edit the profile
     await page.getByTestId('edit-profile-button').first().click();
@@ -453,14 +463,10 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     const modal = page.getByTestId('delete-profile-modal');
     await expect(modal).toBeVisible();
 
-    // If un-synced, checkbox is not visible
-    // To verify synced behavior, let's also test toggling if visible
     const checkbox = modal.getByTestId('delete-from-cloud-checkbox');
-    if (await checkbox.isVisible()) {
-      await expect(modal.getByText('Delete from Google Drive')).toBeVisible();
-      await checkbox.click();
-      await expect(checkbox).toHaveAttribute('aria-checked', 'true');
-    }
+    await expect(modal.getByText('Delete from Google Drive')).toBeVisible();
+    await checkbox.click();
+    await expect(checkbox).toHaveAttribute('aria-checked', 'true');
   });
 
   test('should not re-sync locally deleted profile from Google Drive on subsequent sync', async ({

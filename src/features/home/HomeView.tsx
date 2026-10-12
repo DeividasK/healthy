@@ -12,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,14 +24,8 @@ import {
   getAllReports,
   deleteReport,
 } from '@/src/features/lab-results/diagnosticReportService';
-import {
-  getAllConditions,
-  deleteCondition,
-} from '@/src/features/conditions/conditionService';
-import {
-  getAllConsultations,
-  deleteConsultation,
-} from '@/src/features/consultations/consultationService';
+import { getAllConditions } from '@/src/features/conditions/conditionService';
+import { getAllConsultations } from '@/src/features/consultations/consultationService';
 
 import type { Observation, Condition, Encounter } from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
@@ -47,7 +40,8 @@ import {
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -94,7 +88,7 @@ export function HomeView() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     visible: boolean;
-    type: 'report' | 'condition' | 'consultation';
+    type: 'report';
     id: string;
     title: string;
     message: string;
@@ -210,39 +204,9 @@ export function HomeView() {
     });
   };
 
-  const handleDeleteConditionClick = (id: string) => {
-    setDeleteModal({
-      visible: true,
-      type: 'condition',
-      id,
-      title: 'Delete Condition',
-      message:
-        'Are you sure you want to delete this condition? This action cannot be undone.',
-      requireCountdown: true,
-    });
-  };
-
-  const handleDeleteConsultationClick = (id: string) => {
-    setDeleteModal({
-      visible: true,
-      type: 'consultation',
-      id,
-      title: 'Delete Consultation',
-      message:
-        'Are you sure you want to delete this consultation? This action cannot be undone.',
-      requireCountdown: true,
-    });
-  };
-
   const handleConfirmDelete = async () => {
     try {
-      if (deleteModal.type === 'report') {
-        await deleteReport(deleteModal.id);
-      } else if (deleteModal.type === 'condition') {
-        await deleteCondition(deleteModal.id);
-      } else {
-        await deleteConsultation(deleteModal.id);
-      }
+      await deleteReport(deleteModal.id);
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
       triggerSync().catch((err) =>
@@ -323,7 +287,7 @@ export function HomeView() {
     standaloneConsultations.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.container}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -372,7 +336,7 @@ export function HomeView() {
                         router.push(`/condition/${condId}`);
                       }}
                     >
-                      {/* Card Header: Status, Date & Action Icons */}
+                      {/* Card Header: Status and Date */}
                       <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
                           {getConditionStatusBadge(conditionItem)}
@@ -384,38 +348,6 @@ export function HomeView() {
                           <Text style={styles.cardDate}>
                             {formatDate(conditionItem.onsetDateTime || '')}
                           </Text>
-                        </View>
-                        <View style={styles.cardHeaderActions}>
-                          <TouchableOpacity
-                            testID={`edit-condition-button-${condId}`}
-                            style={styles.editReportButton}
-                            onPress={(e) => {
-                              e?.stopPropagation?.();
-                              if (
-                                Platform.OS === 'web' &&
-                                typeof document !== 'undefined'
-                              ) {
-                                (
-                                  document.activeElement as HTMLElement
-                                )?.blur?.();
-                              }
-                              router.push(`/condition/${condId}/edit`);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Pencil color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            testID={`delete-condition-button-${condId}`}
-                            style={styles.deleteReportButton}
-                            onPress={(e) => {
-                              e?.stopPropagation?.();
-                              handleDeleteConditionClick(condId);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
                         </View>
                       </View>
 
@@ -558,10 +490,19 @@ export function HomeView() {
                     cons.actualPeriod?.start || cons.plannedStartDate || '';
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={consId || 'consultation'}
                       style={styles.reportCard}
                       testID={`consultation-card-${consId}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View consultation: ${consTitle}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/consultation/[id]',
+                          params: { id: consId },
+                        })
+                      }
+                      activeOpacity={0.8}
                     >
                       <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
@@ -573,28 +514,6 @@ export function HomeView() {
                           <Text style={styles.cardDate}>
                             {formatDate(consDate)}
                           </Text>
-                        </View>
-                        <View style={styles.cardHeaderActions}>
-                          <TouchableOpacity
-                            testID={`edit-consultation-button-${consId}`}
-                            style={styles.editReportButton}
-                            onPress={() =>
-                              router.push(`/consultation/${consId}/edit`)
-                            }
-                            activeOpacity={0.7}
-                          >
-                            <Pencil color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            testID={`delete-consultation-button-${consId}`}
-                            style={styles.deleteReportButton}
-                            onPress={() =>
-                              handleDeleteConsultationClick(consId)
-                            }
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
                         </View>
                       </View>
 
@@ -628,7 +547,7 @@ export function HomeView() {
                           </Text>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -636,82 +555,58 @@ export function HomeView() {
           </ScrollView>
         )}
 
-        {/* Floating Add Menu & Backdrop */}
-        {showAddMenu && (
-          <Pressable
-            style={styles.floatingMenuBackdrop}
-            onPress={() => setShowAddMenu(false)}
-          />
-        )}
+        <FloatingAddMenu
+          visible={showAddMenu}
+          onClose={() => setShowAddMenu(false)}
+          options={[
+            {
+              id: 'condition',
+              label: 'Add Condition',
+              testID: 'menu-add-condition',
+              icon: (
+                <FolderPlus
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/condition/add'),
+            },
+            {
+              id: 'consultation',
+              label: 'Add Consultation',
+              testID: 'menu-add-consultation',
+              icon: (
+                <Stethoscope
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/consultation/add'),
+            },
+            {
+              id: 'lab-results',
+              label: 'Add Lab Results',
+              testID: 'menu-add-lab-results',
+              icon: (
+                <FileText
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/lab-result/add'),
+            },
+          ]}
+        />
 
-        {showAddMenu && (
-          <View style={styles.floatingMenu} testID="floating-add-menu">
-            <TouchableOpacity
-              testID="menu-add-condition"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/condition/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <FolderPlus
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Condition</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              testID="menu-add-consultation"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/consultation/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <Stethoscope
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Consultation</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              testID="menu-add-lab-results"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/lab-result/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <FileText
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Lab Results</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Floating Add Button at bottom middle */}
-        <View style={styles.floatingButtonContainer}>
-          <PlusCircleButton
-            testID="floating-add-button"
-            variant="primary"
-            onPress={() => setShowAddMenu((prev) => !prev)}
-            style={styles.floatingButton}
-          />
-        </View>
+        <ResourceActionDock
+          onAdd={() => setShowAddMenu((visible) => !visible)}
+          addLabel="Add record"
+          addTestID="floating-add-button"
+          addMenuExpanded={showAddMenu}
+        />
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
@@ -775,7 +670,7 @@ const styles = StyleSheet.create({
   },
   scrollListContent: {
     padding: 16,
-    paddingBottom: 90,
+    paddingBottom: 132,
   },
   sectionContainer: {
     marginBottom: 16,
@@ -980,76 +875,5 @@ const styles = StyleSheet.create({
   },
   badgeTextHigh: {
     color: COLORS.light.badgeHighText,
-  },
-  floatingButtonContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 100,
-    pointerEvents: 'box-none',
-  },
-  floatingButton: {
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 14px rgba(61, 100, 80, 0.35)',
-      },
-      default: {
-        shadowColor: COLORS.light.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 6,
-        elevation: 8,
-      },
-    }),
-  },
-  floatingMenuBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.light.modalBackdrop,
-    zIndex: 90,
-  },
-  floatingMenu: {
-    position: 'absolute',
-    bottom: 96,
-    alignSelf: 'center',
-    backgroundColor: COLORS.light.card,
-    borderRadius: 12,
-    paddingVertical: 6,
-    width: 200,
-    zIndex: 95,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebModalCard,
-      },
-      default: {
-        shadowColor: COLORS.light.shadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 6,
-      },
-    }),
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  menuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: COLORS.light.border,
   },
 });

@@ -1,3 +1,5 @@
+import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React from 'react';
 import {
   StyleSheet,
@@ -10,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Pencil, Plus, User, Check } from 'lucide-react-native';
+import { Plus, User, Check } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import {
   getPatientDisplayName,
@@ -65,30 +67,8 @@ export function ProfileView() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              testID="back-button"
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              style={styles.backButton}
-              onPress={() => {
-                if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                  (document.activeElement as HTMLElement)?.blur?.();
-                }
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/');
-                }
-              }}
-            >
-              <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Profile</Text>
-            <View style={{ width: 28 }} />
-          </View>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.light.primary} />
           </View>
@@ -98,55 +78,13 @@ export function ProfileView() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="back-button"
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            style={styles.backButton}
-            onPress={() => {
-              if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                (document.activeElement as HTMLElement)?.blur?.();
-              }
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/');
-              }
-            }}
-          >
-            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity
-            testID="edit-profile-button"
-            accessibilityRole="button"
-            accessibilityLabel="Edit Profile"
-            disabled={isLoading || !targetId}
-            style={[
-              styles.editHeaderButton,
-              (isLoading || !targetId) && { opacity: 0.6 },
-            ]}
-            onPress={() => {
-              if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                (document.activeElement as HTMLElement)?.blur?.();
-              }
-              if (targetId) {
-                router.push(`/profile/${targetId}/edit`);
-              }
-            }}
-          >
-            <Pencil color={COLORS.light.primaryForeground} size={20} />
-          </TouchableOpacity>
-        </View>
-
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
         >
+          <ScreenHeading>Profile</ScreenHeading>
           {/* Active Profile Card */}
           <View style={styles.profileCard} testID="active-profile-card">
             <View style={styles.avatarSection}>
@@ -240,6 +178,13 @@ export function ProfileView() {
           {/* Cloud Sync & Backup Section */}
           <GoogleSyncCard />
         </ScrollView>
+        {targetId && (
+          <ResourceActionDock
+            onEdit={() => router.push(`/profile/${targetId}/edit`)}
+            editLabel="Edit Profile"
+            editTestID="edit-profile-button"
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -248,7 +193,7 @@ export function ProfileView() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.light.primary,
+    backgroundColor: COLORS.light.background,
   },
   container: {
     flex: 1,
@@ -259,31 +204,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.light.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.primaryForeground,
-  },
-  editHeaderButton: {
-    padding: 4,
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 132,
   },
   profileCard: {
     backgroundColor: COLORS.light.card,

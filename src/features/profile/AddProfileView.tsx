@@ -1,3 +1,5 @@
+import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
@@ -6,19 +8,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  ActivityIndicator,
   Modal,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  UserPlus,
-  Archive,
-  Cloud,
-  Check,
-} from 'lucide-react-native';
+import { UserPlus, Archive, Cloud, Check } from 'lucide-react-native';
 import type { Patient } from 'fhir/r5';
 import { ProfileForm } from './ProfileForm';
 import {
@@ -243,7 +238,7 @@ export function AddProfileView({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       {/* Hidden file input for web zip restore */}
       {Platform.OS === 'web' && (
         <input
@@ -257,31 +252,14 @@ export function AddProfileView({
         />
       )}
 
-      {/* Header */}
-      <View style={styles.header}>
-        {hasExistingPatients ? (
-          <TouchableOpacity
-            testID="back-button"
-            accessibilityLabel="Back"
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 32 }} />
-        )}
-        <Text testID="add-profile-header-title" style={styles.headerTitle}>
-          Add Profile
-        </Text>
-        <View style={{ width: 32 }} />
-      </View>
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        <ScreenHeading testID="add-profile-header-title">
+          Add Profile
+        </ScreenHeading>
         <Text style={styles.sectionSubtitle}>
           Choose how you would like to set up this profile:
         </Text>
@@ -397,7 +375,7 @@ export function AddProfileView({
 
             <ProfileForm
               isEdit={false}
-              showBackButton={false}
+              showBackButton={hasExistingPatients}
               hideHeader={true}
               navigateOnSave={false}
               onSave={handleManualSave}
@@ -419,44 +397,6 @@ export function AddProfileView({
                 Select an encrypted or unencrypted .zip backup file from your
                 device storage to restore profiles, conditions, and lab results.
               </Text>
-
-              <TouchableOpacity
-                testID="select-profile-file-button"
-                style={[
-                  styles.primaryActionButton,
-                  actionLoading !== null && styles.buttonDisabled,
-                ]}
-                disabled={actionLoading !== null}
-                onPress={() => {
-                  if (Platform.OS === 'web' && fileInputRef.current) {
-                    fileInputRef.current.click();
-                  } else {
-                    Alert.alert(
-                      'Restore from file',
-                      'Select a Healthy .zip backup file from your device.'
-                    );
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                {actionLoading === 'file' ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={COLORS.light.primaryForeground}
-                  />
-                ) : (
-                  <>
-                    <Archive
-                      size={18}
-                      color={COLORS.light.primaryForeground}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.primaryActionButtonText}>
-                      Select profile
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -475,37 +415,42 @@ export function AddProfileView({
                 Connect your Google Drive account to find and restore previously
                 backed up profiles.
               </Text>
-
-              <TouchableOpacity
-                testID="connect-google-drive-button"
-                style={[
-                  styles.googleActionButton,
-                  (!isGoogleReady || actionLoading !== null) &&
-                    styles.buttonDisabled,
-                ]}
-                disabled={!isGoogleReady || actionLoading !== null}
-                onPress={() => promptGoogleSignIn()}
-                activeOpacity={0.8}
-              >
-                {actionLoading === 'gdrive' ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Cloud
-                      size={18}
-                      color="#FFFFFF"
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.googleActionButtonText}>
-                      Connect Google Drive
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
             </View>
           </View>
         )}
       </ScrollView>
+      {activeTab !== 'create' && (
+        <ResourceActionDock
+          actions={[
+            {
+              label:
+                activeTab === 'file'
+                  ? 'Select profile'
+                  : 'Connect Google Drive',
+              testID:
+                activeTab === 'file'
+                  ? 'select-profile-file-button'
+                  : 'connect-google-drive-button',
+              icon: activeTab === 'file' ? Archive : Cloud,
+              primary: true,
+              disabled:
+                actionLoading !== null ||
+                (activeTab === 'gdrive' && !isGoogleReady),
+              busy: actionLoading !== null,
+              onPress: () => {
+                if (activeTab === 'gdrive') promptGoogleSignIn();
+                else if (Platform.OS === 'web' && fileInputRef.current)
+                  fileInputRef.current.click();
+                else
+                  Alert.alert(
+                    'Restore from file',
+                    'Select a Healthy .zip backup file from your device.'
+                  );
+              },
+            },
+          ]}
+        />
+      )}
 
       {/* Multi-Profile Picker Modal for Google Drive */}
       <Modal
@@ -644,25 +589,10 @@ export function AddProfileView({
 }
 
 const styles = StyleSheet.create({
+  buttonDisabled: { opacity: 0.6 },
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.light.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.light.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.primaryForeground,
+    backgroundColor: COLORS.light.background,
   },
   scroll: {
     flex: 1,
@@ -670,7 +600,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 132,
   },
   sectionSubtitle: {
     fontSize: 14,
@@ -857,9 +787,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: COLORS.light.primary,
   },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
   restoreSelectedButtonText: {
     fontSize: 14,
     color: COLORS.light.primaryForeground,
@@ -891,35 +818,5 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 20,
-  },
-  primaryActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    width: '100%',
-  },
-  primaryActionButtonText: {
-    color: COLORS.light.primaryForeground,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  googleActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4285F4',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    width: '100%',
-  },
-  googleActionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

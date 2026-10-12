@@ -4,6 +4,8 @@ import {
   clearAppStorage,
   seedTestPatient,
   seedTestReport,
+  seedTestCondition,
+  seedTestConsultation,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
@@ -16,6 +18,36 @@ test.describe('Home View - Visual Regression', () => {
     await page.getByTestId('floating-add-button').waitFor();
 
     await takeSnapshot(page, 'Home View - Empty State', testInfo);
+  });
+
+  test('Home View - Condition and Consultation cards', async ({
+    page,
+  }, testInfo) => {
+    await seedTestCondition(page, {
+      id: 'condition-home-visual',
+      title: 'Left Knee Pain',
+      onsetDate: '2026-10-02',
+      notes: 'Persistent ache after running.',
+    });
+    await seedTestConsultation(page, {
+      id: 'consultation-home-visual',
+      title: 'Annual Physical Exam',
+      date: '2026-10-04',
+      doctorName: 'Dr. Sarah Connor',
+      notes: 'Follow-up next year.',
+    });
+    await page.goto('/');
+    await page
+      .getByTestId('consultation-card-consultation-home-visual')
+      .waitFor();
+    await takeSnapshot(
+      page,
+      'Home View - Condition and Consultation cards',
+      testInfo
+    );
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('floating-add-menu').waitFor();
+    await takeSnapshot(page, 'Home View - Add menu', testInfo);
   });
 
   test('Home View - Populated with Single Report', async ({

@@ -37,16 +37,19 @@ test.describe('Edit Consultation Flow', () => {
         await page.reload();
       });
 
-      await test.step('Open Condition view and click edit consultation', async () => {
+      await test.step('Open the consultation view from Condition and edit it', async () => {
         await page.getByTestId(`condition-card-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
 
-        const editBtn = page.getByTestId(
-          `edit-consultation-button-${consultationId}`
+        await page
+          .getByTestId(`condition-consultation-item-${consultationId}`)
+          .click();
+        await expect(page).toHaveURL(
+          new RegExp(`.*consultation\\/${consultationId}$`)
         );
-        await editBtn.click();
+        await page.getByTestId('edit-consultation-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*consultation\\/${consultationId}\\/edit`)
         );
@@ -63,18 +66,22 @@ test.describe('Edit Consultation Flow', () => {
         await page.getByTestId('save-button').click();
       });
 
-      await test.step('Verify Condition view reflects updated consultation', async () => {
+      await test.step('Verify the consultation view reflects the update', async () => {
         await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
+          new RegExp(`.*consultation\\/${consultationId}$`)
         );
-        await expect(page.getByText('Follow-up Examination')).toBeVisible();
-        await expect(page.getByText('Dr. John Watson')).toBeVisible();
+        await expect(page.getByTestId('consultation-title')).toHaveText(
+          'Follow-up Examination'
+        );
+        await expect(
+          page.getByTestId('consultation-view').getByText('Dr. John Watson')
+        ).toBeVisible();
       });
     }
   );
 
   test(
-    'should allow deleting a Consultation from Condition view with confirmation modal',
+    'should delete a linked Consultation from edit mode with confirmation modal',
     { tag: ['@critical'] },
     async ({ page }) => {
       let conditionId = '';
@@ -96,15 +103,24 @@ test.describe('Edit Consultation Flow', () => {
         await page.reload();
       });
 
-      await test.step('Open Condition view and test delete cancellation', async () => {
+      await test.step('Open the consultation view and test delete cancellation', async () => {
         await page.getByTestId(`condition-card-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
 
-        const deleteBtn = page.getByTestId(
-          `delete-consultation-button-${consultationId}`
+        await page
+          .getByTestId(`condition-consultation-item-${consultationId}`)
+          .click();
+        await expect(page).toHaveURL(
+          new RegExp(`.*consultation\\/${consultationId}$`)
         );
+
+        await expect(
+          page.getByTestId('delete-consultation-button')
+        ).toHaveCount(0);
+        await page.getByTestId('edit-consultation-button').click();
+        const deleteBtn = page.getByTestId('delete-consultation-button');
         await deleteBtn.click();
 
         const modal = page.getByTestId('delete-confirmation-modal');
@@ -114,15 +130,14 @@ test.describe('Edit Consultation Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByText('Consultation To Delete')).toBeVisible();
+        await expect(page.getByTestId('consultation-title-input')).toHaveValue(
+          'Consultation To Delete'
+        );
       });
 
       await test.step('Re-open modal, verify countdown, and confirm deletion', async () => {
         await page.clock.install();
-        const deleteBtn = page.getByTestId(
-          `delete-consultation-button-${consultationId}`
-        );
-        await deleteBtn.click();
+        await page.getByTestId('delete-consultation-button').click();
 
         const confirmBtn = page.getByTestId('delete-modal-confirm-button');
         await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
@@ -135,6 +150,9 @@ test.describe('Edit Consultation Flow', () => {
       });
 
       await test.step('Verify consultation removed from Condition view and pending deletion persisted', async () => {
+        await expect(page).toHaveURL(
+          new RegExp(`.*condition\\/${conditionId}`)
+        );
         await expect(
           page.getByText('Consultation To Delete')
         ).not.toBeVisible();

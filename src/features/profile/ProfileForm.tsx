@@ -1,3 +1,5 @@
+import { FormActionDock } from '@/src/components/FormActionDock';
+import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -8,12 +10,11 @@ import {
   ScrollView,
   Platform,
   Alert,
-  KeyboardAvoidingView,
   ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, ChevronDown, User } from 'lucide-react-native';
+import { ChevronDown, User } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { AddOptionsModal } from '@/src/components/AddOptionsModal';
 import { formatLocalDate } from '@/src/utils/dateUtils';
@@ -147,27 +148,6 @@ export function ProfileForm({
 
   const formContent = (
     <>
-      {!hideHeader && (
-        <View style={styles.header}>
-          {showBackButton ? (
-            <TouchableOpacity
-              testID="back-button"
-              accessibilityLabel="Back"
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 32 }} />
-          )}
-          <Text style={styles.headerTitle}>
-            {isEdit ? 'Edit Profile' : 'New Profile'}
-          </Text>
-          <View style={{ width: 32 }} />
-        </View>
-      )}
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -176,6 +156,11 @@ export function ProfileForm({
         ]}
         keyboardShouldPersistTaps="handled"
       >
+        {!hideHeader && (
+          <ScreenHeading>
+            {isEdit ? 'Edit Profile' : 'New Profile'}
+          </ScreenHeading>
+        )}
         {/* Avatar Preview */}
         <View style={styles.avatarPreviewContainer}>
           <View style={styles.avatarCircle}>
@@ -280,31 +265,16 @@ export function ProfileForm({
         </View>
       </ScrollView>
 
-      {/* Bottom Save Bar */}
-      <View style={[styles.bottomBar, hideHeader && styles.bottomBarEmbedded]}>
-        <TouchableOpacity
-          testID="save-profile-button"
-          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={isSaving}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.saveButtonText}>
-            {isSaving ? 'Saving...' : 'Save Profile'}
-          </Text>
-        </TouchableOpacity>
-
-        {isEdit && onDelete && (
-          <TouchableOpacity
-            testID="delete-profile-button"
-            style={styles.deleteProfileButton}
-            onPress={onDelete}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.deleteProfileButtonText}>Delete Profile</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <FormActionDock
+        onSave={handleSubmit}
+        isSaving={isSaving}
+        saveLabel="Save Profile"
+        saveTestID="save-profile-button"
+        showCancel={showBackButton}
+        onDelete={isEdit ? onDelete : undefined}
+        deleteLabel="Delete Profile"
+        deleteTestID="delete-profile-button"
+      />
 
       {/* Gender Selection Modal for Android */}
       <AddOptionsModal
@@ -331,13 +301,8 @@ export function ProfileForm({
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {formContent}
-      </KeyboardAvoidingView>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <View style={styles.container}>{formContent}</View>
     </SafeAreaView>
   );
 }
@@ -345,34 +310,18 @@ export function ProfileForm({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.light.primary,
+    backgroundColor: COLORS.light.background,
   },
   container: {
     flex: 1,
     backgroundColor: COLORS.light.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.light.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.primaryForeground,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 132,
   },
   scrollContentEmbedded: {
     paddingHorizontal: 0,
@@ -429,48 +378,5 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     fontSize: 16,
     color: COLORS.light.foreground,
-  },
-  bottomBar: {
-    padding: 16,
-    backgroundColor: COLORS.light.card,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.light.border,
-  },
-  bottomBarEmbedded: {
-    paddingHorizontal: 0,
-    paddingTop: 8,
-    paddingBottom: 24,
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-  },
-  saveButton: {
-    backgroundColor: COLORS.light.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: COLORS.light.primaryForeground,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  deleteProfileButton: {
-    marginTop: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteProfileButtonText: {
-    color: COLORS.light.destructive,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

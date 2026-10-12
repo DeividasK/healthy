@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet,
   TouchableOpacity,
@@ -8,13 +8,24 @@ import {
   Platform,
 } from 'react-native';
 import { Plus } from 'lucide-react-native';
+import Animated, {
+  interpolateColor,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { COLORS } from '@/src/theme/colors';
+
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 export interface PlusCircleButtonProps extends TouchableOpacityProps {
   size?: number;
   iconSize?: number;
   iconColor?: string;
   variant?: 'default' | 'primary';
+  expanded?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -23,39 +34,82 @@ export function PlusCircleButton({
   iconSize,
   iconColor,
   variant = 'default',
+  expanded = false,
   style,
   activeOpacity = 0.8,
+  children,
   ...props
 }: PlusCircleButtonProps) {
   const isPrimary = variant === 'primary';
+  const progress = useSharedValue(expanded ? 1 : 0);
+  useEffect(() => {
+    progress.value = withTiming(expanded ? 1 : 0, {
+      duration: 200,
+      reduceMotion: ReduceMotion.System,
+    });
+  }, [expanded, progress]);
+  const buttonStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      progress.value,
+      [0, 1],
+      [isPrimary ? COLORS.light.primary : COLORS.light.card, COLORS.light.card]
+    ),
+    borderColor: interpolateColor(
+      progress.value,
+      [0, 1],
+      [
+        isPrimary ? COLORS.light.primary : COLORS.light.pillBorder,
+        COLORS.light.pillBorder,
+      ]
+    ),
+  }));
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${progress.value * 45}deg` }],
+  }));
   const defaultSize = isPrimary ? 56 : 36;
   const actualSize = size ?? defaultSize;
   const actualIconSize = iconSize ?? (isPrimary ? 26 : 18);
   const actualIconColor =
     iconColor ??
-    (isPrimary ? COLORS.light.primaryForeground : COLORS.light.iconMuted);
+    (isPrimary && !expanded
+      ? COLORS.light.primaryForeground
+      : COLORS.light.iconMuted);
 
   return (
-    <TouchableOpacity
+    <AnimatedTouchableOpacity
       activeOpacity={activeOpacity}
       style={[
         styles.button,
         isPrimary && styles.buttonPrimary,
+        expanded && styles.buttonSecondary,
         {
           width: actualSize,
           height: actualSize,
           borderRadius: actualSize / 2,
         },
         style,
+        buttonStyle,
       ]}
       {...props}
     >
-      <Plus color={actualIconColor} size={actualIconSize} />
-    </TouchableOpacity>
+      <Animated.View
+        testID={props.testID ? `${props.testID}-icon` : undefined}
+        style={iconStyle}
+      >
+        {children ?? <Plus color={actualIconColor} size={actualIconSize} />}
+      </Animated.View>
+    </AnimatedTouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  buttonSecondary: {
+    borderWidth: 0,
+    ...Platform.select({
+      web: { boxShadow: 'none' },
+      default: { shadowOpacity: 0, elevation: 0 },
+    }),
+  },
   button: {
     borderWidth: 1,
     borderColor: COLORS.light.pillBorder,
