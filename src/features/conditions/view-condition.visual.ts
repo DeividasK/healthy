@@ -47,5 +47,11 @@ test.describe('View Condition View - Visual Regression', () => {
       'Condition View - Details with Consultations',
       testInfo
     );
+    await page.getByTestId('condition-add-button').click();
+    await page.getByTestId('condition-add-menu').waitFor();
+    await takeSnapshot(page, 'Condition View - Add menu', testInfo);
+    await page.getByTestId('condition-add-button').click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await takeSnapshot(page, 'Condition View - Wide layout', testInfo);
   });
 });

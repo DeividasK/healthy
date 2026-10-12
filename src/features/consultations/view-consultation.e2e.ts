@@ -115,7 +115,7 @@ test.describe('View Consultation Flow', () => {
     await expect(conditionView.getByTestId('condition-title')).toHaveText(
       'Knee Osteoarthritis'
     );
-    await conditionView.getByTestId('back-button').click();
+    await page.getByTestId('back-button').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
   });
 });

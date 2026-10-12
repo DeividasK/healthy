@@ -4,17 +4,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { ChevronLeft, Calendar } from 'lucide-react-native';
-import { AppLogo } from './AppLogo';
-import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton';
+import { Calendar } from 'lucide-react-native';
+import { ResourceActionDock } from './ResourceActionDock';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceViewLayoutProps {
@@ -43,44 +40,16 @@ export function ResourceViewLayout({
   actions,
   modal,
 }: ResourceViewLayoutProps) {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView
       testID={testID}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
       style={styles.safeArea}
     >
       <View style={styles.page}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="back-button"
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={styles.headerButton}
-            onPress={() => {
-              if (router.canGoBack()) router.back();
-              else router.replace('/');
-            }}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft color={COLORS.light.primary} size={24} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Home"
-            style={styles.headerButton}
-            onPress={() => router.dismissTo('/')}
-            activeOpacity={0.8}
-          >
-            <AppLogo size={28} color={COLORS.light.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerButton}>
-            <ProfileHeaderButton style={styles.profileButton} />
-          </View>
-        </View>
-
+        {error && <ResourceActionDock actions={[]} />}
         {isLoading || error ? (
           <View style={styles.center}>
             {isLoading ? (
@@ -149,32 +118,7 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     width: '100%',
-    maxWidth: 448,
     alignSelf: 'center',
-  },
-  header: {
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
-    backgroundColor: COLORS.light.card,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileButton: {
-    marginRight: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.light.emptyIconContainer,
-    borderColor: COLORS.light.card,
   },
   center: {
     flex: 1,

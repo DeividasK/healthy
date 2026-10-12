@@ -33,5 +33,7 @@ test.describe('View Consultation - Visual Regression', () => {
     await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-title').waitFor();
     await takeSnapshot(page, 'Consultation View - Details', testInfo);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await takeSnapshot(page, 'Consultation View - Wide layout', testInfo);
   });
 });

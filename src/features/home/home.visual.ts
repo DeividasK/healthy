@@ -45,6 +45,9 @@ test.describe('Home View - Visual Regression', () => {
       'Home View - Condition and Consultation cards',
       testInfo
     );
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('floating-add-menu').waitFor();
+    await takeSnapshot(page, 'Home View - Add menu', testInfo);
   });
 
   test('Home View - Populated with Single Report', async ({

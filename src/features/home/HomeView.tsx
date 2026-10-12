@@ -12,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -41,7 +40,8 @@ import {
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -287,7 +287,7 @@ export function HomeView() {
     standaloneConsultations.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.container}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -555,82 +555,58 @@ export function HomeView() {
           </ScrollView>
         )}
 
-        {/* Floating Add Menu & Backdrop */}
-        {showAddMenu && (
-          <Pressable
-            style={styles.floatingMenuBackdrop}
-            onPress={() => setShowAddMenu(false)}
-          />
-        )}
+        <FloatingAddMenu
+          visible={showAddMenu}
+          onClose={() => setShowAddMenu(false)}
+          options={[
+            {
+              id: 'condition',
+              label: 'Add Condition',
+              testID: 'menu-add-condition',
+              icon: (
+                <FolderPlus
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/condition/add'),
+            },
+            {
+              id: 'consultation',
+              label: 'Add Consultation',
+              testID: 'menu-add-consultation',
+              icon: (
+                <Stethoscope
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/consultation/add'),
+            },
+            {
+              id: 'lab-results',
+              label: 'Add Lab Results',
+              testID: 'menu-add-lab-results',
+              icon: (
+                <FileText
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/lab-result/add'),
+            },
+          ]}
+        />
 
-        {showAddMenu && (
-          <View style={styles.floatingMenu} testID="floating-add-menu">
-            <TouchableOpacity
-              testID="menu-add-condition"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/condition/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <FolderPlus
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Condition</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              testID="menu-add-consultation"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/consultation/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <Stethoscope
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Consultation</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              testID="menu-add-lab-results"
-              style={styles.menuItem}
-              onPress={() => {
-                setShowAddMenu(false);
-                router.push('/lab-result/add');
-              }}
-              activeOpacity={0.7}
-            >
-              <FileText
-                color={COLORS.light.primary}
-                size={18}
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.menuItemText}>Add Lab Results</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Floating Add Button at bottom middle */}
-        <View style={styles.floatingButtonContainer}>
-          <PlusCircleButton
-            testID="floating-add-button"
-            variant="primary"
-            onPress={() => setShowAddMenu((prev) => !prev)}
-            style={styles.floatingButton}
-          />
-        </View>
+        <ResourceActionDock
+          onAdd={() => setShowAddMenu((visible) => !visible)}
+          addLabel="Add record"
+          addTestID="floating-add-button"
+          addMenuExpanded={showAddMenu}
+        />
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
@@ -694,7 +670,7 @@ const styles = StyleSheet.create({
   },
   scrollListContent: {
     padding: 16,
-    paddingBottom: 90,
+    paddingBottom: 132,
   },
   sectionContainer: {
     marginBottom: 16,
@@ -899,76 +875,5 @@ const styles = StyleSheet.create({
   },
   badgeTextHigh: {
     color: COLORS.light.badgeHighText,
-  },
-  floatingButtonContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 100,
-    pointerEvents: 'box-none',
-  },
-  floatingButton: {
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 14px rgba(61, 100, 80, 0.35)',
-      },
-      default: {
-        shadowColor: COLORS.light.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 6,
-        elevation: 8,
-      },
-    }),
-  },
-  floatingMenuBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.light.modalBackdrop,
-    zIndex: 90,
-  },
-  floatingMenu: {
-    position: 'absolute',
-    bottom: 96,
-    alignSelf: 'center',
-    backgroundColor: COLORS.light.card,
-    borderRadius: 12,
-    paddingVertical: 6,
-    width: 200,
-    zIndex: 95,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebModalCard,
-      },
-      default: {
-        shadowColor: COLORS.light.shadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 6,
-      },
-    }),
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  menuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: COLORS.light.border,
   },
 });

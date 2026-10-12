@@ -1,3 +1,5 @@
+import { FormActionDock } from '@/src/components/FormActionDock';
+import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
@@ -8,14 +10,12 @@ import {
   ScrollView,
   Platform,
   Alert,
-  KeyboardAvoidingView,
   ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
-  ArrowLeft,
   ChevronDown,
   Clock,
   FileText,
@@ -446,37 +446,16 @@ export function ConsultationForm({
   }));
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Top Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="back-button"
-            style={styles.backButton}
-            onPress={() => {
-              if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                (document.activeElement as HTMLElement)?.blur?.();
-              }
-              router.back();
-            }}
-            activeOpacity={0.7}
-          >
-            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} testID="header-title">
-            {isEdit ? 'Edit Consultation' : 'New Consultation'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <View style={styles.keyboardContainer}>
         <ScrollView
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentContainer}
           keyboardShouldPersistTaps="handled"
         >
+          <ScreenHeading testID="header-title">
+            {isEdit ? 'Edit Consultation' : 'New Consultation'}
+          </ScreenHeading>
           {/* Top Pill Row: Status, Date, Time, Condition, Plus Button */}
           <View style={styles.pillRow}>
             {/* Status Pill */}
@@ -805,19 +784,7 @@ export function ConsultationForm({
         </ScrollView>
 
         {/* Bottom Save Action */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            testID="save-button"
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            disabled={isSaving}
-            onPress={handleSubmit}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <FormActionDock onSave={handleSubmit} isSaving={isSaving} />
 
         {/* Plus Menu Modal for adding optional fields */}
         <AddOptionsModal
@@ -859,7 +826,7 @@ export function ConsultationForm({
           cardTestID="condition-menu-card"
           options={conditionModalOptions}
         />
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -872,28 +839,12 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: COLORS.light.primary,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.primaryForeground,
-  },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 132,
   },
   pillRow: {
     flexDirection: 'row',
@@ -990,26 +941,5 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
     minHeight: 110,
     textAlignVertical: 'top',
-  },
-  bottomBar: {
-    padding: 16,
-    backgroundColor: COLORS.light.card,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.light.border,
-  },
-  saveButton: {
-    backgroundColor: COLORS.light.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    color: COLORS.light.primaryForeground,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

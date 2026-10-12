@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import { getPatientInitials } from './patientService';
@@ -18,16 +18,21 @@ export function ProfileHeaderButton({
   style?: StyleProp<ViewStyle>;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { activePatient } = useActivePatient();
   const initials = getPatientInitials(activePatient);
 
   return (
     <TouchableOpacity
       testID="profile-header-button"
+      accessibilityRole="button"
       accessibilityLabel="View Profile"
       activeOpacity={0.7}
       style={[styles.button, style]}
-      onPress={() => router.push('/profile')}
+      onPress={() => {
+        const target = activePatient ? '/profile' : '/profile/new';
+        if (pathname !== target) router.navigate(target);
+      }}
     >
       {initials && initials !== 'S' ? (
         <Text style={styles.initialsText}>{initials}</Text>
@@ -40,15 +45,14 @@ export function ProfileHeaderButton({
 
 const styles = StyleSheet.create({
   button: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.light.pillBackground,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.light.emptyIconContainer,
     borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
+    borderColor: COLORS.light.card,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
   initialsText: {
     fontSize: 13,

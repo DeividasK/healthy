@@ -1,3 +1,5 @@
+import { FormActionDock } from '@/src/components/FormActionDock';
+import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -8,14 +10,12 @@ import {
   ScrollView,
   Platform,
   Alert,
-  KeyboardAvoidingView,
   ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
-  ArrowLeft,
   Calendar,
   ChevronDown,
   FileText,
@@ -340,37 +340,16 @@ export function ConditionForm({
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Top Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            testID="back-button"
-            style={styles.backButton}
-            onPress={() => {
-              if (Platform.OS === 'web' && typeof document !== 'undefined') {
-                (document.activeElement as HTMLElement)?.blur?.();
-              }
-              router.back();
-            }}
-            activeOpacity={0.7}
-          >
-            <ArrowLeft color={COLORS.light.primaryForeground} size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEdit ? 'Edit Condition' : 'New Condition'}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <View style={styles.keyboardContainer}>
         <ScrollView
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentContainer}
           keyboardShouldPersistTaps="handled"
         >
+          <ScreenHeading>
+            {isEdit ? 'Edit Condition' : 'New Condition'}
+          </ScreenHeading>
           {/* Top Pill Row: Status, Date, Plus */}
           <View style={styles.pillRow}>
             {/* Status Pill */}
@@ -607,19 +586,7 @@ export function ConditionForm({
         </ScrollView>
 
         {/* Bottom Save Action */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            testID="save-button"
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            disabled={isSaving}
-            onPress={handleSubmit}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <FormActionDock onSave={handleSubmit} isSaving={isSaving} />
 
         {/* Plus Action Modal */}
         <AddOptionsModal
@@ -654,7 +621,7 @@ export function ConditionForm({
             },
           }))}
         />
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -662,34 +629,18 @@ export function ConditionForm({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.light.primary,
+    backgroundColor: COLORS.light.background,
   },
   keyboardContainer: {
     flex: 1,
     backgroundColor: COLORS.light.background,
-  },
-  header: {
-    backgroundColor: COLORS.light.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.primaryForeground,
   },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 132,
   },
   pillRow: {
     flexDirection: 'row',
@@ -798,38 +749,5 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
     minHeight: 100,
     textAlignVertical: 'top',
-  },
-  bottomBar: {
-    padding: 16,
-    backgroundColor: COLORS.light.card,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.light.border,
-  },
-  saveButton: {
-    backgroundColor: COLORS.light.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebPrimaryButton,
-      },
-      default: {
-        shadowColor: COLORS.light.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 2,
-      },
-    }),
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: COLORS.light.primaryForeground,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

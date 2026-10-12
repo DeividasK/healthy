@@ -6,6 +6,8 @@ import {
   createReportViaUI,
   createTestConditionViaUI,
   checkA11y,
+  seedTestCondition,
+  seedTestConsultation,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -30,6 +32,173 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
+  });
+
+  test('keeps the shared header mounted and moves the logo between Home and Condition', async ({
+    page,
+  }) => {
+    const condition = await seedTestCondition(page, {
+      title: 'Header navigation',
+    });
+    const consultation = await seedTestConsultation(page, {
+      conditionId: condition.id,
+      title: 'Dock navigation',
+    });
+    await page.goto('/');
+    const header = page.getByTestId('app-header');
+    const logo = page.getByTestId('app-home-button');
+    await expect(header).toBeVisible();
+    await expect(page.getByTestId('back-button')).toHaveCount(0);
+    const background = page.getByTestId('action-dock-background');
+    const primaryButton = page.getByTestId('floating-add-button');
+    await expect(background).toHaveCSS('opacity', '0');
+    const collapsedSize = (await background.boundingBox())!;
+    const primarySize = (await primaryButton.boundingBox())!;
+    expect(collapsedSize.width).toBeLessThan(primarySize.width);
+    expect(collapsedSize.height).toBeLessThan(primarySize.height);
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(16);
+
+    // Sample actual positions across route changes to verify visible motion and persistence.
+    await page.evaluate(() => {
+      const element = document.querySelector(
+        '[data-testid="app-home-button"]'
+      )!;
+      const state = {
+        element,
+        primary: document.querySelector('[data-testid="floating-add-button"]'),
+        positions: [] as number[],
+        heights: [] as number[],
+        frame: 0,
+      };
+      (window as any).__headerMotion = state;
+      const sample = () => {
+        state.positions.push(element.getBoundingClientRect().x);
+        const dock = document.querySelector(
+          '[data-testid="resource-action-dock"]'
+        );
+        const height = dock?.getBoundingClientRect().height;
+        state.heights.push(height ?? 0);
+        state.frame = requestAnimationFrame(sample);
+      };
+      sample();
+    });
+    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await expect(page.getByTestId('back-button')).toBeVisible();
+    const center = page.viewportSize()!.width / 2 - 22;
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(center);
+    const motion = await page.evaluate(() => {
+      const state = (window as any).__headerMotion;
+      cancelAnimationFrame(state.frame);
+      return {
+        persisted:
+          state.element ===
+          document.querySelector('[data-testid="app-home-button"]'),
+        positions: state.positions as number[],
+        heights: state.heights as number[],
+        primaryPersisted:
+          state.primary ===
+          document.querySelector('[data-testid="condition-add-button"]'),
+      };
+    });
+    expect(motion.persisted).toBe(true);
+    expect(motion.primaryPersisted).toBe(true);
+    expect(motion.positions.some((x) => x > 17 && x < center - 1)).toBe(true);
+    expect(motion.heights.length).toBeGreaterThan(0);
+    expect(
+      motion.heights.every((height) => height === primarySize.height)
+    ).toBe(true);
+    await expect(background).toHaveCSS('opacity', '1');
+    const expandedSize = (await background.boundingBox())!;
+    expect(expandedSize.width).toBeGreaterThan(primarySize.width);
+    expect(expandedSize.height).toBe(primarySize.height);
+    const conditionPrimary = (await page
+      .getByTestId('condition-add-button')
+      .boundingBox())!;
+    expect(conditionPrimary.y).toBe(expandedSize.y);
+
+    await page.evaluate(() => {
+      const primary = document.querySelector(
+        '[data-testid="action-dock-primary-slot"]'
+      )!;
+      const state = {
+        primary,
+        widths: [] as number[],
+        heights: [] as number[],
+        frame: 0,
+      };
+      (window as any).__dockMotion = state;
+      const sample = () => {
+        state.widths.push(primary.getBoundingClientRect().width);
+        state.heights.push(
+          document
+            .querySelector('[data-testid="resource-action-dock"]')
+            ?.getBoundingClientRect().height ?? 0
+        );
+        state.frame = requestAnimationFrame(sample);
+      };
+      sample();
+    });
+
+    await page
+      .getByTestId(`condition-consultation-item-${consultation.id}`)
+      .click();
+    await expect(page.getByTestId('consultation-title')).toHaveText(
+      'Dock navigation'
+    );
+    await expect(page.getByTestId('condition-add-button')).toHaveCount(0);
+    await expect
+      .poll(
+        async () =>
+          (await page.getByTestId('action-dock-primary-slot').boundingBox())
+            ?.width
+      )
+      .toBe(0);
+    const dockMotion = await page.evaluate(() => {
+      const state = (window as any).__dockMotion;
+      cancelAnimationFrame(state.frame);
+      return {
+        widths: state.widths as number[],
+        heights: state.heights as number[],
+      };
+    });
+    expect(
+      dockMotion.widths.some((width) => width > 0 && width < primarySize.width)
+    ).toBe(true);
+    expect(
+      dockMotion.heights.every((height) => height === primarySize.height)
+    ).toBe(true);
+    await expect
+      .poll(async () => {
+        const size = (await background.boundingBox())!;
+        return (
+          size.width < expandedSize.width && size.height === expandedSize.height
+        );
+      })
+      .toBe(true);
+    await page.getByTestId('back-button').click();
+
+    await page.getByTestId('edit-condition-button').click();
+    await expect(header).toBeVisible();
+    const dock = page.getByTestId('resource-action-dock');
+    await expect(
+      dock.getByRole('button', { name: 'Save', exact: true })
+    ).toBeVisible();
+    await page.getByTestId('condition-title-input').fill('Unsaved change');
+    await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByTestId('condition-title')).toHaveText(
+      'Header navigation'
+    );
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('back-button')).toHaveCount(0);
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(16);
+    await expect(dock.getByTestId('floating-add-button')).toBeVisible();
   });
 
   test(

@@ -1,7 +1,14 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Calendar, ChevronRight, MapPin, User } from 'lucide-react-native';
+import {
+  Calendar,
+  ChevronRight,
+  MapPin,
+  Stethoscope,
+  User,
+} from 'lucide-react-native';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -34,6 +41,7 @@ export function ViewConditionView() {
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -125,17 +133,50 @@ export function ViewConditionView() {
       date={onsetDate ? formatDisplayDate(onsetDate) : undefined}
       status={status}
       actions={
-        <ResourceActionDock
-          deleteLabel="Delete condition"
-          editLabel="Edit condition"
-          onDelete={() => setDeleteModalVisible(true)}
-          onEdit={() => router.push(`/condition/${id}/edit`)}
-          onAdd={() => router.push(`/consultation/add?conditionId=${id}`)}
-          addLabel="Add consultation"
-          deleteTestID="delete-condition-button"
-          editTestID="edit-condition-button"
-          addTestID="add-consultation-to-condition-button"
-        />
+        <>
+          <FloatingAddMenu
+            visible={showAddMenu}
+            onClose={() => setShowAddMenu(false)}
+            testID="condition-add-menu"
+            options={[
+              {
+                id: 'consultation',
+                label: 'Add Consultation',
+                testID: 'menu-add-consultation',
+                icon: (
+                  <Stethoscope
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/consultation/add',
+                    params: { conditionId: id },
+                  }),
+              },
+            ]}
+          />
+          <ResourceActionDock
+            deleteLabel="Delete condition"
+            editLabel="Edit condition"
+            onDelete={() => {
+              setShowAddMenu(false);
+              setDeleteModalVisible(true);
+            }}
+            onEdit={() => {
+              setShowAddMenu(false);
+              router.push(`/condition/${id}/edit`);
+            }}
+            onAdd={() => setShowAddMenu((visible) => !visible)}
+            addLabel="Add consultation"
+            addMenuExpanded={showAddMenu}
+            deleteTestID="delete-condition-button"
+            editTestID="edit-condition-button"
+            addTestID="condition-add-button"
+          />
+        </>
       }
       modal={
         <DeleteConfirmationModal
@@ -274,6 +315,10 @@ const styles = StyleSheet.create({
   },
   consultationsSection: {
     marginTop: 2,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.light.cardBorder,
   },
   sectionTitle: {
     fontSize: 18,

@@ -24,7 +24,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await addLabResultsMenuBtn.click();
 
         await expect(page).toHaveURL(/.*lab-result\/add/);
-        await expect(page.getByText('Add Lab Results')).toBeVisible();
+        await expect(
+          page.getByRole('heading', { name: 'Add Lab Results', exact: true })
+        ).toBeVisible();
+        await expect(addLabResultsMenuBtn).not.toBeVisible();
         await checkA11y(page, { disableRules: ['color-contrast'] });
       });
 

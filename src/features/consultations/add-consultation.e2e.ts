@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import {
   test,
   expect,
@@ -8,6 +9,22 @@ import {
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
+async function openAddConsultationForCondition(
+  page: Page,
+  conditionId: string
+) {
+  await page.goto('/');
+  await page.getByTestId(`condition-card-${conditionId}`).click();
+  await page.getByTestId('condition-add-button').click();
+  await page
+    .getByTestId('condition-add-menu')
+    .getByTestId('menu-add-consultation')
+    .click();
+  await expect(page.getByTestId('condition-picker-select')).toHaveValue(
+    conditionId
+  );
+}
+
 test.describe('Add Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
@@ -15,7 +32,7 @@ test.describe('Add Consultation Flow', () => {
   });
 
   test(
-    'should allow creating a Consultation from Condition view and audit a11y',
+    'should allow creating a linked Consultation from Condition and audit a11y',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       let conditionId: string;
@@ -40,14 +57,8 @@ test.describe('Add Consultation Flow', () => {
         );
       });
 
-      await test.step('Click bottom floating add button in Condition view', async () => {
-        const addBtn = page.getByTestId('add-consultation-to-condition-button');
-        await expect(addBtn).toBeVisible();
-        await addBtn.click();
-
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/add\\?conditionId=${conditionId}`)
-        );
+      await test.step('Open the Condition’s linked Consultation form', async () => {
+        await openAddConsultationForCondition(page, conditionId);
         await expect(page.getByText('New Consultation')).toBeVisible();
         await checkA11y(page, { disableRules: ['color-contrast'] });
       });
@@ -101,17 +112,11 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Verify consultation is not on Home view', async () => {
-        await page
-          .getByTestId('consultation-view')
-          .getByTestId('back-button')
-          .click();
+        await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
         );
-        await page
-          .getByTestId('condition-view')
-          .getByTestId('back-button')
-          .click();
+        await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
         // Home view should NOT have consultations
         await expect(
@@ -142,16 +147,8 @@ test.describe('Add Consultation Flow', () => {
         await page.reload();
       });
 
-      await test.step('Open Condition view and click add consultation', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-
-        await page.getByTestId('add-consultation-to-condition-button').click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/add\\?conditionId=${conditionId}`)
-        );
+      await test.step('Open the Condition’s linked Consultation form', async () => {
+        await openAddConsultationForCondition(page, conditionId);
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-doctor').click();
@@ -200,9 +197,7 @@ test.describe('Add Consultation Flow', () => {
         await expect(
           page.getByTestId('condition-consultations-section')
         ).toBeVisible();
-        await expect(
-          page.getByTestId('add-consultation-to-condition-button')
-        ).toBeVisible();
+        await expect(page.getByTestId('condition-add-button')).toBeVisible();
 
         // Click edit condition button
         await page.getByTestId('edit-condition-button').click();
@@ -215,7 +210,7 @@ test.describe('Add Consultation Flow', () => {
           page.getByTestId('condition-consultations-section')
         ).not.toBeVisible();
         await expect(
-          page.getByTestId('add-consultation-to-condition-button')
+          page.getByTestId('condition-add-button')
         ).not.toBeVisible();
       });
 
@@ -303,15 +298,13 @@ test.describe('Add Consultation Flow', () => {
     async ({ page }) => {
       let conditionId: string;
 
-      await test.step('Seed condition and navigate to Add Consultation via Condition view', async () => {
+      await test.step('Seed a condition and open its linked Consultation form', async () => {
         const cond = await seedTestCondition(page, {
           title: 'Heart Health Review',
           status: 'active',
         });
         conditionId = cond.id;
-        await page.goto(`/condition/${conditionId}`);
-        await expect(page.getByTestId('condition-title')).toBeVisible();
-        await page.getByTestId('add-consultation-to-condition-button').click();
+        await openAddConsultationForCondition(page, conditionId);
         await expect(page.getByText('New Consultation')).toBeVisible();
       });
 
