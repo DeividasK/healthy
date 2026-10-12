@@ -69,3 +69,7 @@ Docs: https://docs.expo.dev/eas/index.md
 - **Database Migrations & Breaking Changes**: All database changes must have migrations, and migrations must be highlighted in the plan. You MUST explicitly highlight any breaking changes (or explicitly confirm that changes are non-breaking/additive).
 - **Strict UI Scope**: Never add UI elements (badges, buttons, indicators, icons, labels, tags, etc.) that are not explicitly mentioned in the user request or approved implementation plan. Adhere strictly to the requested UI specifications and do not invent unsolicited visual elements.
 - **Git Staging & File Management**: Never stage (`git add`), unstage (`git restore --staged`, `git reset`), commit (`git commit`), or push (`git push`) any git files or changes in the branch unless explicitly asked by the user. Leave all modified files unstaged for the user to review.
+
+## FHIR database standard
+
+All database structures MUST follow HL7 FHIR R5 (v5.0.0). Persist clinical records as standard FHIR R5 resources using `fhir/r5` types. Relational columns, indexes and relationship tables are projections of those resources, not independent clinical schemas. Use standard FHIR elements, cardinalities, choice types, terminology bindings and references; never introduce custom clinical properties into resource JSON. Preserve valid fields that an editing form does not expose. App settings, sync metadata and storage timestamps are application infrastructure, not clinical FHIR resources.
