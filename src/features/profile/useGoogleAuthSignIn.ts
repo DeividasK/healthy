@@ -76,10 +76,21 @@ export function useGoogleAuthSignIn(
   // user gesture, and GIS itself requires the script to be ready).
   const [isGisReady, setIsGisReady] = useState(false);
   const onSuccessRef = useRef(onSuccess);
+  // Tracks whether the hook's host component is still mounted. Used by both
+  // the native effect and the web sign-in path to prevent calling onSuccess
+  // after the user navigates away while a fetch is in flight.
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
   }, [onSuccess]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Pre-load the GIS script on web so the button is ready when the user taps.
   useEffect(() => {
@@ -185,7 +196,7 @@ export function useGoogleAuthSignIn(
           tokenExpiresAt,
           undefined, // GIS implicit flow does not return a refresh token
           onSuccessRef.current,
-          () => true
+          () => mountedRef.current
         );
       } else {
         if (!request) return;
