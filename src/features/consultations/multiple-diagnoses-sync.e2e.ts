@@ -1,3 +1,4 @@
+import { mockGoogleDrive } from '@/src/features/testing/mockGoogleDrive';
 /// <reference types="node" />
 import {
   test,
@@ -24,56 +25,22 @@ test('encrypted Drive restoration rebuilds diagnoses and retains a newer local E
     conditionIds: ['first', 'second'],
     notes: 'Full narrative',
   });
-  const files = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      appProperties?: Record<string, string>;
-      bytes: Buffer;
-    }
-  >();
-  await page.route('https://www.googleapis.com/**', async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (request.method() === 'POST' || request.method() === 'PATCH') {
-      const body = request.postDataBuffer()!;
-      const boundary = request.headers()['content-type'].split('boundary=')[1];
-      const first = body.indexOf('\r\n\r\n') + 4;
-      const metadataEnd = body.indexOf(`\r\n--${boundary}`, first);
-      const metadata = JSON.parse(body.subarray(first, metadataEnd).toString());
-      const binaryStart = body.indexOf('\r\n\r\n', metadataEnd) + 4;
-      const binaryEnd = body.lastIndexOf(`\r\n--${boundary}--`);
-      const existing =
-        request.method() === 'PATCH'
-          ? files.get(url.pathname.split('/').pop()!)
-          : undefined;
-      const id = existing?.id || `file-${files.size}`;
-      const record = {
-        id,
-        name: metadata.name || existing?.name,
-        appProperties: metadata.appProperties,
-        bytes: body.subarray(binaryStart, binaryEnd),
-      };
-      files.set(id, record);
-      await route.fulfill({
-        json: { id, name: record.name, appProperties: record.appProperties },
-      });
-    } else if (url.searchParams.get('alt') === 'media') {
-      await route.fulfill({
-        contentType: 'application/octet-stream',
-        body: files.get(url.pathname.split('/').pop()!)!.bytes,
-      });
-    } else {
-      await route.fulfill({
-        json: {
-          files: Array.from(files.values()).map(
-            ({ bytes: _bytes, ...metadata }) => metadata
-          ),
-        },
-      });
-    }
-  });
+  original.reason = [
+    { value: [{ reference: { reference: 'Condition/first' } }] },
+  ];
+  original.diagnosis[0].condition[0].concept = {
+    text: 'Independent outcome',
+    coding: [{ code: 'L21' }],
+  };
+  await page.evaluate(
+    (encounter) =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.saveEncounter(
+        encounter,
+        'sync-diagnoses'
+      ),
+    original
+  );
+  const files = await mockGoogleDrive(page);
   const config = {
     accessToken: 'synthetic-token',
     userSub: 'synthetic-google-sub',

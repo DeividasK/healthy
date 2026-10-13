@@ -37,6 +37,7 @@ import {
   getConsultationServiceType,
   getConsultationNotes,
   getConsultationConditionIds,
+  getConsultationReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
@@ -283,7 +284,9 @@ export function HomeView() {
   };
 
   const standaloneConsultations = consultations.filter(
-    (c) => getConsultationConditionIds(c).length === 0
+    (c) =>
+      getConsultationConditionIds(c).length === 0 &&
+      getConsultationReasonConditionIds(c).length === 0
   );
 
   const hasAnyData =

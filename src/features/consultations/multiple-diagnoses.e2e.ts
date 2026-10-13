@@ -16,7 +16,7 @@ test.describe('Multiple consultation diagnoses', () => {
     await seedTestPatient(page, { id: 'diagnosis-patient' });
   });
 
-  test('creates, edits and removes links through the form and every condition detail', async ({
+  test('creates, edits and removes reason links through the form and every condition detail', async ({
     page,
   }) => {
     for (const [id, title] of [
@@ -268,6 +268,21 @@ test.describe('Multiple consultation diagnoses', () => {
       conditionIds: ['first', 'second'],
       notes: 'Original narrative',
     });
+    original.reason = [
+      { value: [{ reference: { reference: 'Condition/first' } }] },
+    ];
+    original.diagnosis[0].condition[0].concept = {
+      text: 'Independent outcome',
+      coding: [{ code: 'L21' }],
+    };
+    await page.evaluate(
+      (encounter) =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.saveEncounter(
+          encounter,
+          'diagnosis-patient'
+        ),
+      original
+    );
     const legacy = {
       ...original,
       id: 'legacy-single',

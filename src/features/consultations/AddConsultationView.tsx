@@ -1,3 +1,4 @@
+import type { ConsultationInput } from './consultationService';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -18,16 +19,7 @@ export function AddConsultationView() {
     );
   }
 
-  const handleSave = async (values: {
-    id?: string;
-    title: string;
-    status: string;
-    date: string;
-    doctorName?: string;
-    serviceType?: string;
-    conditionIds?: string[];
-    notes?: string;
-  }) => {
+  const handleSave = async (values: ConsultationInput) => {
     await createOrUpdateConsultation({
       ...values,
       patientId: activePatientId,

@@ -13,6 +13,7 @@ import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConditionTitle,
   getConsultationConditionIds,
+  getConsultationReasonConditionIds,
   getConsultationDoctor,
   getConsultationNotes,
   getConsultationServiceType,
@@ -45,7 +46,12 @@ export function ViewConsultationView() {
         return;
       }
       const conditions = await Promise.all(
-        getConsultationConditionIds(value).map((conditionId) =>
+        [
+          ...new Set([
+            ...getConsultationConditionIds(value),
+            ...getConsultationReasonConditionIds(value),
+          ]),
+        ].map((conditionId) =>
           getConditionById(conditionId).catch((error) => {
             console.warn('Failed to load related condition:', error);
             return null;
@@ -127,34 +133,93 @@ export function ViewConsultationView() {
         </View>
       )}
 
-      {relatedConditions.length > 0 && (
-        <View style={styles.relatedSection}>
-          <Text style={styles.sectionTitle}>
-            {relatedConditions.length === 1 ? 'Condition' : 'Conditions'}
-          </Text>
-          {relatedConditions.map((relatedCondition, index) => (
-            <TouchableOpacity
-              key={relatedCondition.id}
-              testID={
-                index === 0
-                  ? 'consultation-related-condition'
-                  : `consultation-related-condition-${relatedCondition.id}`
-              }
-              accessibilityRole="button"
-              accessibilityLabel={`View condition: ${getConditionTitle(relatedCondition)}`}
-              style={styles.conditionRow}
-              onPress={() =>
-                relatedCondition.id &&
-                router.dismissTo(`/condition/${relatedCondition.id}`)
-              }
-              activeOpacity={0.75}
-            >
-              <Text style={styles.conditionTitle}>
-                {getConditionTitle(relatedCondition)}
-              </Text>
-              <ChevronRight color={COLORS.light.muted} size={18} />
-            </TouchableOpacity>
-          ))}
+      {getConsultationReasonConditionIds(consultation).length > 0 && (
+        <View style={styles.relatedSection} testID="consultation-reasons">
+          <Text style={styles.sectionTitle}>Reasons for visit</Text>
+          {relatedConditions
+            .filter((condition) =>
+              getConsultationReasonConditionIds(consultation).includes(
+                condition.id!
+              )
+            )
+            .map((condition, index) => (
+              <TouchableOpacity
+                key={condition.id}
+                testID={
+                  index === 0
+                    ? 'consultation-related-condition'
+                    : `consultation-related-condition-${condition.id}`
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
+                style={styles.conditionRow}
+                onPress={() => router.dismissTo(`/condition/${condition.id}`)}
+              >
+                <Text style={styles.conditionTitle}>
+                  {getConditionTitle(condition)}
+                </Text>
+                <ChevronRight color={COLORS.light.muted} size={18} />
+              </TouchableOpacity>
+            ))}
+        </View>
+      )}
+      {Boolean(consultation.diagnosis?.length) && (
+        <View style={styles.relatedSection} testID="consultation-diagnoses">
+          <Text style={styles.sectionTitle}>Diagnoses</Text>
+          {consultation.diagnosis?.flatMap((diagnosis, index) =>
+            (diagnosis.condition || []).map((value, valueIndex) => {
+              const id = value.reference?.reference?.startsWith('Condition/')
+                ? value.reference.reference.slice(10)
+                : undefined;
+              const condition = relatedConditions.find(
+                (item) => item.id === id
+              );
+              const label =
+                value.concept?.text ||
+                value.concept?.coding?.[0]?.display ||
+                (condition
+                  ? getConditionTitle(condition)
+                  : value.reference?.display);
+              if (!label) return null;
+              const contents = (
+                <>
+                  <Text style={styles.conditionTitle}>{label}</Text>
+                  {value.concept?.coding?.map((coding, codingIndex) => (
+                    <Text key={codingIndex} style={styles.notes}>
+                      {[coding.system, coding.code, coding.display]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  ))}
+                </>
+              );
+              return condition ? (
+                <TouchableOpacity
+                  key={`${index}-${valueIndex}`}
+                  testID={
+                    index === 0
+                      ? 'consultation-diagnosis-condition'
+                      : `consultation-diagnosis-condition-${id}`
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
+                  style={styles.conditionRow}
+                  onPress={() => router.dismissTo(`/condition/${id}`)}
+                >
+                  <View style={{ flex: 1 }}>{contents}</View>
+                  <ChevronRight color={COLORS.light.muted} size={18} />
+                </TouchableOpacity>
+              ) : (
+                <View
+                  key={`${index}-${valueIndex}`}
+                  testID={`consultation-diagnosis-${index}`}
+                  style={styles.details}
+                >
+                  {contents}
+                </View>
+              );
+            })
+          )}
         </View>
       )}
     </ResourceViewLayout>

@@ -133,3 +133,58 @@ export async function mockGoogleIdentityServices(
     { injectedToken: token, injectedExpiresIn: expiresIn }
   );
 }
+
+/** In-memory Drive transport; production encryption and sync still run. */
+export async function mockGoogleDrive(page: Page) {
+  const files = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      appProperties?: Record<string, string>;
+      bytes: Buffer;
+    }
+  >();
+  await page.route('https://www.googleapis.com/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'POST' || request.method() === 'PATCH') {
+      const body = request.postDataBuffer()!;
+      const boundary = request.headers()['content-type'].split('boundary=')[1];
+      const first = body.indexOf('\r\n\r\n') + 4;
+      const metadataEnd = body.indexOf(`\r\n--${boundary}`, first);
+      const metadata = JSON.parse(body.subarray(first, metadataEnd).toString());
+      const binaryStart = body.indexOf('\r\n\r\n', metadataEnd) + 4;
+      const binaryEnd = body.lastIndexOf(`\r\n--${boundary}--`);
+      const existing =
+        request.method() === 'PATCH'
+          ? files.get(url.pathname.split('/').pop()!)
+          : undefined;
+      const id = existing?.id || `file-${files.size}`;
+      const record = {
+        id,
+        name: metadata.name || existing?.name,
+        appProperties: metadata.appProperties,
+        bytes: body.subarray(binaryStart, binaryEnd),
+      };
+      files.set(id, record);
+      await route.fulfill({
+        json: { id, name: record.name, appProperties: record.appProperties },
+      });
+    } else if (url.searchParams.get('alt') === 'media') {
+      await route.fulfill({
+        contentType: 'application/octet-stream',
+        body: files.get(url.pathname.split('/').pop()!)!.bytes,
+      });
+    } else {
+      await route.fulfill({
+        json: {
+          files: Array.from(files.values()).map(
+            ({ bytes: _bytes, ...metadata }) => metadata
+          ),
+        },
+      });
+    }
+  });
+  return files;
+}

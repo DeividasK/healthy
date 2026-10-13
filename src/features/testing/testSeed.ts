@@ -10,6 +10,7 @@ export interface SeedPatientOptions {
 }
 
 export interface SeedConditionOptions {
+  terminology?: { system?: string; code?: string; display?: string };
   id?: string;
   patientId?: string;
   title: string;
@@ -31,6 +32,7 @@ export interface SeedReportOptions {
 }
 
 export interface SeedConsultationOptions {
+  reasonConditionIds?: string[];
   id?: string;
   patientId?: string;
   conditionIds?: string[];

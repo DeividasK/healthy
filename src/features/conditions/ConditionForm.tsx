@@ -1,3 +1,6 @@
+import { CATEGORY_OPTIONS } from './conditionCategories';
+import { ConditionDropdown } from './ConditionDropdown';
+import type { ConditionInput } from './conditionService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState } from 'react';
@@ -16,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
+  BadgeCheck,
+  Tag,
   Calendar,
   ChevronDown,
   FileText,
@@ -23,7 +28,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { AddOptionsModal } from '@/src/components/AddOptionsModal';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -33,53 +38,61 @@ export interface ConditionStatusOption {
   id: string;
   label: string;
   clinicalStatus: string;
-  verificationStatus: string;
   dotColor: string;
 }
 
 export const CONDITION_STATUS_OPTIONS: ConditionStatusOption[] = [
   {
-    id: 'unconfirmed',
-    label: 'Unconfirmed',
-    clinicalStatus: 'active',
-    verificationStatus: 'unconfirmed',
-    dotColor: '#F59E0B',
-  },
-  {
-    id: 'provisional',
-    label: 'Provisional',
-    clinicalStatus: 'active',
-    verificationStatus: 'provisional',
-    dotColor: '#3B82F6',
-  },
-  {
     id: 'active',
     label: 'Active',
     clinicalStatus: 'active',
-    verificationStatus: 'confirmed',
     dotColor: '#10B981',
+  },
+  {
+    id: 'recurrence',
+    label: 'Recurrence',
+    clinicalStatus: 'recurrence',
+    dotColor: '#F59E0B',
+  },
+  {
+    id: 'relapse',
+    label: 'Relapse',
+    clinicalStatus: 'relapse',
+    dotColor: '#F59E0B',
   },
   {
     id: 'inactive',
     label: 'Inactive',
     clinicalStatus: 'inactive',
-    verificationStatus: 'confirmed',
     dotColor: '#6B7280',
   },
   {
     id: 'remission',
     label: 'Remission',
     clinicalStatus: 'remission',
-    verificationStatus: 'confirmed',
     dotColor: '#8B5CF6',
   },
   {
     id: 'resolved',
     label: 'Resolved',
     clinicalStatus: 'resolved',
-    verificationStatus: 'confirmed',
     dotColor: '#717973',
   },
+  {
+    id: 'unknown',
+    label: 'Unknown',
+    clinicalStatus: 'unknown',
+    dotColor: '#6B7280',
+  },
+];
+export const VERIFICATION_OPTIONS = [
+  { id: '', label: 'Not specified' },
+  { id: 'unconfirmed', label: 'Unconfirmed' },
+  { id: 'provisional', label: 'Provisional' },
+  { id: 'differential', label: 'Differential' },
+  { id: 'confirmed', label: 'Confirmed' },
+  { id: 'refuted', label: 'Refuted' },
+  { id: 'entered-in-error', label: 'Entered in error' },
 ];
 
 export interface SeverityOption {
@@ -100,6 +113,7 @@ export interface ConditionFormValues {
   statusId?: string;
   clinicalStatus?: string;
   verificationStatus?: string;
+  category?: string;
   onsetDate: Date;
   severity?: string;
   bodySite?: string;
@@ -111,17 +125,7 @@ export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: {
-    id?: string;
-    title: string;
-    clinicalStatus: string;
-    verificationStatus: string;
-    onsetDate: string;
-    severity?: string;
-    bodySite?: string;
-    abatementDate?: string;
-    notes?: string;
-  }) => Promise<void>;
+  onSave: (values: ConditionInput) => Promise<void>;
 }
 
 function showAlert(title: string, message: string) {
@@ -143,24 +147,20 @@ export function ConditionForm({
 
   const [title, setTitle] = useState(initialValues?.title || '');
 
-  // Determine initial status option
-  const initialStatus = (() => {
-    if (initialValues?.statusId) {
-      const found = CONDITION_STATUS_OPTIONS.find(
-        (s) => s.id === initialValues.statusId
-      );
-      if (found) return found;
-    }
-    if (initialValues?.clinicalStatus && initialValues?.verificationStatus) {
-      const found = CONDITION_STATUS_OPTIONS.find(
-        (s) =>
-          s.clinicalStatus === initialValues.clinicalStatus &&
-          s.verificationStatus === initialValues.verificationStatus
-      );
-      if (found) return found;
-    }
-    return CONDITION_STATUS_OPTIONS[0]; // 'unconfirmed'
-  })();
+  const initialStatus =
+    CONDITION_STATUS_OPTIONS.find(
+      (s) => s.id === (initialValues?.clinicalStatus || initialValues?.statusId)
+    ) || CONDITION_STATUS_OPTIONS[0];
+  const initialVerification =
+    initialValues?.verificationStatus ?? (isEdit ? '' : 'unconfirmed');
+  const [verificationStatus, setVerificationStatus] =
+    useState(initialVerification);
+  const initialCategory = initialValues?.category ?? (isEdit ? '' : 'Ongoing');
+  const [category, setCategory] = useState(initialCategory);
+  const [showVerification, setShowVerification] = useState(
+    Boolean(initialVerification)
+  );
+  const [showCategory, setShowCategory] = useState(Boolean(initialCategory));
 
   const [selectedStatus, setSelectedStatus] =
     useState<ConditionStatusOption>(initialStatus);
@@ -238,17 +238,42 @@ export function ConditionForm({
           ? formatLocalDate(abatementDate)
           : undefined;
 
-      await onSave({
+      const values: ConditionInput = {
         id: initialValues?.id,
         title: trimmedTitle,
         clinicalStatus: selectedStatus.clinicalStatus,
-        verificationStatus: selectedStatus.verificationStatus,
+        verificationStatus: showVerification ? verificationStatus : '',
+        category: showCategory ? category : '',
         onsetDate: formattedOnsetDate,
         severity: showSeverity ? severity : undefined,
         bodySite: showBodySite && bodySite.trim() ? bodySite.trim() : undefined,
         abatementDate: formattedAbatementDate,
         notes: showNotes && notes.trim() ? notes.trim() : undefined,
-      });
+      };
+      if (isEdit) {
+        const baseline: Partial<ConditionInput> = {
+          title: initialValues?.title,
+          clinicalStatus: initialStatus.clinicalStatus,
+          verificationStatus: initialVerification,
+          category: initialCategory,
+          onsetDate: initialValues?.onsetDate
+            ? formatLocalDate(initialValues.onsetDate)
+            : formattedOnsetDate,
+          severity: initialValues?.severity,
+          bodySite: initialValues?.bodySite,
+          abatementDate: initialValues?.abatementDate
+            ? formatLocalDate(initialValues.abatementDate)
+            : undefined,
+          notes: initialValues?.notes,
+        };
+        const normalize = (value: unknown) => {
+          return typeof value === 'string' ? value.trim() : value;
+        };
+        values.changedFields = (
+          Object.keys(baseline) as (keyof ConditionInput)[]
+        ).filter((key) => normalize(values[key]) !== normalize(baseline[key]));
+      }
+      await onSave(values);
 
       // Trigger automatic background sync
       triggerSync().catch((err) =>
@@ -274,6 +299,34 @@ export function ConditionForm({
 
   // Build list of options available in the '+' menu
   const plusMenuOptions = [];
+  if (!showVerification)
+    plusMenuOptions.push({
+      id: 'add-verification',
+      label: 'Add Verification Status',
+      icon: (
+        <BadgeCheck
+          color={COLORS.light.primary}
+          size={20}
+          style={{ marginRight: 12 }}
+        />
+      ),
+      testID: 'menu-add-verification',
+      onPress: () => setShowVerification(true),
+    });
+  if (!showCategory)
+    plusMenuOptions.push({
+      id: 'add-category',
+      label: 'Add Category',
+      icon: (
+        <Tag
+          color={COLORS.light.primary}
+          size={20}
+          style={{ marginRight: 12 }}
+        />
+      ),
+      testID: 'menu-add-category',
+      onPress: () => setShowCategory(true),
+    });
   if (!showSeverity) {
     plusMenuOptions.push({
       id: 'add-severity',
@@ -422,12 +475,6 @@ export function ConditionForm({
             />
 
             {/* Plus Button to add optional fields */}
-            {plusMenuOptions.length > 0 && (
-              <PlusCircleButton
-                testID="add-option-button"
-                onPress={() => setShowPlusMenu(true)}
-              />
-            )}
           </View>
 
           {/* Condition Name Section (Required) */}
@@ -446,6 +493,69 @@ export function ConditionForm({
               onChangeText={setTitle}
             />
           </View>
+
+          {showVerification && (
+            <View style={styles.inputSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.inputLabel}>Verification status</Text>
+                <TouchableOpacity
+                  testID="remove-verification-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove verification status"
+                  onPress={() => {
+                    setShowVerification(false);
+                    setVerificationStatus('');
+                  }}
+                >
+                  <X color={COLORS.light.iconClear} size={16} />
+                </TouchableOpacity>
+              </View>
+              <ConditionDropdown
+                testID="verification-picker-button"
+                name="verificationStatus"
+                label="Verification status"
+                value={verificationStatus}
+                options={VERIFICATION_OPTIONS}
+                onChange={setVerificationStatus}
+              />
+            </View>
+          )}
+          {showCategory && (
+            <View style={styles.inputSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.inputLabel}>Category</Text>
+                <TouchableOpacity
+                  testID="remove-category-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove category"
+                  onPress={() => {
+                    setShowCategory(false);
+                    setCategory('');
+                  }}
+                >
+                  <X color={COLORS.light.iconClear} size={16} />
+                </TouchableOpacity>
+              </View>
+              <ConditionDropdown
+                testID="condition-category-input"
+                name="category"
+                label="Category"
+                value={category}
+                options={[
+                  { id: '', label: 'Not specified' },
+                  ...CATEGORY_OPTIONS.map((option) => ({
+                    id: option.label,
+                    label: option.label,
+                  })),
+                  ...(category &&
+                  !CATEGORY_OPTIONS.some((option) => option.label === category)
+                    ? [{ id: category, label: category }]
+                    : []),
+                ]}
+                onChange={setCategory}
+              />
+            </View>
+          )}
 
           {/* Severity Section if toggled */}
           {showSeverity && (
@@ -589,6 +699,10 @@ export function ConditionForm({
 
         {/* Bottom Save Action */}
         <FormActionDock
+          onAdd={() => setShowPlusMenu((visible) => !visible)}
+          addExpanded={showPlusMenu}
+          addDisabled={plusMenuOptions.length === 0}
+          addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
           deleteLabel="Delete condition"
@@ -606,7 +720,8 @@ export function ConditionForm({
         />
 
         {/* Plus Action Modal */}
-        <AddOptionsModal
+        <FloatingAddMenu
+          testID="form-add-menu"
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
           options={plusMenuOptions}

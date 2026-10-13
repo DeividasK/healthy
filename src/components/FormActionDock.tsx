@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Alert, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check, Trash2, X } from 'lucide-react-native';
+import { Check, Plus, Trash2, X } from 'lucide-react-native';
 import { ResourceActionDock, type DockAction } from './ResourceActionDock';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 export function FormActionDock({
+  onAdd,
+  addDisabled = false,
+  addExpanded = false,
+  addTestID = 'add-option-button',
   onSave,
   isSaving = false,
   saveDisabled = false,
@@ -17,6 +21,10 @@ export function FormActionDock({
   deleteTestID = 'delete-button',
   deleteConfirmation,
 }: {
+  onAdd?: () => void;
+  addDisabled?: boolean;
+  addExpanded?: boolean;
+  addTestID?: string;
   onSave: () => void;
   isSaving?: boolean;
   saveDisabled?: boolean;
@@ -55,7 +63,7 @@ export function FormActionDock({
       onPress: onDelete ?? (() => setDeleteVisible(true)),
       disabled: isSaving,
     });
-  else if (showCancel) actions.push(cancelAction);
+  if (showCancel) actions.push(cancelAction);
   actions.push({
     label: isSaving ? 'Saving...' : saveLabel,
     testID: saveTestID,
@@ -65,7 +73,15 @@ export function FormActionDock({
     disabled: isSaving || saveDisabled,
     busy: isSaving,
   });
-  if (hasDelete && showCancel) actions.push(cancelAction);
+  if (onAdd)
+    actions.push({
+      label: 'Add optional fields',
+      testID: addTestID,
+      icon: Plus,
+      onPress: onAdd,
+      disabled: isSaving || addDisabled,
+      expanded: addExpanded,
+    });
   return (
     <>
       <ResourceActionDock actions={actions} showBack={false} />
