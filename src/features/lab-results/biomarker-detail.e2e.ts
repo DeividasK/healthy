@@ -77,6 +77,16 @@ test.describe('Biomarker detail', () => {
     ).toBeVisible();
     await expect(page.getByText('High', { exact: true })).toBeVisible();
 
+    const historyListToggle = page.getByTestId('biomarker-history-list-toggle');
+    const historyList = page.getByTestId('biomarker-history-list');
+    await expect(historyListToggle).toHaveText('List');
+    await expect(historyListToggle).toHaveAttribute('aria-expanded', 'true');
+    await historyListToggle.click();
+    await expect(historyList).toBeHidden();
+    await expect(historyListToggle).toHaveAttribute('aria-expanded', 'false');
+    await historyListToggle.click();
+    await expect(historyList).toBeVisible();
+
     await page.getByTestId('biomarker-point-2').hover();
     const tooltip = page.getByTestId('biomarker-tooltip');
     await expect(tooltip).toBeVisible();

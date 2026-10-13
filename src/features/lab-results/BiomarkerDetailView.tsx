@@ -43,6 +43,7 @@ export function BiomarkerDetailView() {
   const [reports, setReports] = useState<
     Awaited<ReturnType<typeof getAllReports>>
   >([]);
+  const [isHistoryListExpanded, setIsHistoryListExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -187,22 +188,43 @@ export function BiomarkerDetailView() {
             high={marker?.referenceRange?.high}
           />
         )}
-        <View style={styles.history}>
-          {[...measurements].reverse().map((measurement) => (
-            <View key={measurement.id} style={styles.historyRow}>
-              <Text style={styles.historyDate}>
-                {formatDisplayDate(measurement.date)}
-              </Text>
-              <View style={styles.valueGroup}>
-                <Text style={styles.historyValue}>{measurement.value}</Text>
-                <Text style={styles.unit}>{measurement.unit}</Text>
-                <MeasurementStatusBadge
-                  status={measurement.status}
-                  testID={`biomarker-status-${measurement.id}`}
-                />
-              </View>
+        <View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isHistoryListExpanded }}
+            onPress={() => setIsHistoryListExpanded((expanded) => !expanded)}
+            style={styles.historyListToggle}
+            testID="biomarker-history-list-toggle"
+          >
+            <Text style={styles.historyListTitle}>List</Text>
+            <View
+              style={[
+                styles.learnChevronBox,
+                isHistoryListExpanded && styles.learnChevronExpanded,
+              ]}
+            >
+              <ChevronDown size={18} color={COLORS.light.foreground} />
             </View>
-          ))}
+          </Pressable>
+          {isHistoryListExpanded && (
+            <View style={styles.history} testID="biomarker-history-list">
+              {[...measurements].reverse().map((measurement) => (
+                <View key={measurement.id} style={styles.historyRow}>
+                  <Text style={styles.historyDate}>
+                    {formatDisplayDate(measurement.date)}
+                  </Text>
+                  <View style={styles.valueGroup}>
+                    <Text style={styles.historyValue}>{measurement.value}</Text>
+                    <Text style={styles.unit}>{measurement.unit}</Text>
+                    <MeasurementStatusBadge
+                      status={measurement.status}
+                      testID={`biomarker-status-${measurement.id}`}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
       <View style={styles.section} testID="biomarker-learn">
@@ -569,6 +591,19 @@ const styles = StyleSheet.create({
   },
   learnItem: { marginBottom: 0 },
   learnItemExpanded: { marginBottom: 18 },
+  historyListToggle: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 6,
+    marginBottom: 6,
+  },
+  historyListTitle: {
+    color: COLORS.light.foreground,
+    fontSize: 15,
+    fontWeight: '600',
+  },
   learnItemToggle: {
     minHeight: 40,
     flexDirection: 'row',
