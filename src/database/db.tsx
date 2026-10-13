@@ -128,6 +128,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
   await db.execAsync(`
     DELETE FROM observations;
     DELETE FROM diagnostic_reports;
+    DELETE FROM clinical_documents;
     DELETE FROM consultation_conditions;
     DELETE FROM consultations;
     DELETE FROM conditions;
@@ -137,6 +138,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
   notifyDatabaseChanged([
     'observations',
     'diagnostic_reports',
+    'clinical_documents',
     'consultations',
     'consultation_conditions',
     'conditions',

@@ -231,8 +231,8 @@ test.describe('Multiple consultation diagnoses', () => {
       (window as any).__HEALTHY_TEST_BRIDGE__.verifyDiagnosisMigration()
     );
     expect(migrated.failed).toBe(false);
-    expect(migrated.version.user_version).toBe(8);
-    expect(migrated.repeatedVersion.user_version).toBe(8);
+    expect(migrated.version.user_version).toBeGreaterThanOrEqual(8);
+    expect(migrated.repeatedVersion.user_version).toBeGreaterThanOrEqual(8);
     expect(migrated.columns).not.toContain('condition_id');
     expect(migrated.links).toEqual([
       { consultation_id: 'legacy', condition_id: 'first' },

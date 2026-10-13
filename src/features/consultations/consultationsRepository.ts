@@ -14,6 +14,7 @@ import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import {
   recordPendingConsultationDeletion,
   clearPendingConsultationDeletions,
+  recordPendingClinicalResourceDeletion,
 } from '@/src/services/syncDeletions';
 
 /**
@@ -242,9 +243,24 @@ export async function fetchConsultationById(
  */
 export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
+  const doc = await db.getFirstAsync<{ id: string; patient_id: string }>(
+    `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
+    [id]
+  );
+  if (doc) {
+    await recordPendingClinicalResourceDeletion(
+      'Composition',
+      doc.id,
+      doc.patient_id
+    );
+  }
   await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
   await recordPendingConsultationDeletion(id);
-  notifyDatabaseChanged(['consultations', 'consultation_conditions']);
+  notifyDatabaseChanged([
+    'consultations',
+    'consultation_conditions',
+    'clinical_documents',
+  ]);
 }
 
 /**

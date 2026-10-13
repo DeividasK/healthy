@@ -5,6 +5,11 @@ import {
   deleteConsultationRecord,
 } from '@/src/features/consultations/consultationsRepository';
 import {
+  fetchClinicalDocumentByConsultationId,
+  insertClinicalDocumentRecord,
+  deleteClinicalDocumentRecord,
+} from '@/src/features/consultations/clinicalDocumentsRepository';
+import {
   deleteConditionRecord,
   fetchConditionById,
   insertConditionRecord,
@@ -55,6 +60,8 @@ export function setupTestBridge() {
     saveEncounter: insertConsultationRecord,
     deleteConsultation: deleteConsultationRecord,
     deleteCondition: deleteConditionRecord,
+    saveClinicalDocument: insertClinicalDocumentRecord,
+    deleteClinicalDocument: deleteClinicalDocumentRecord,
     clearDatabase: clearAllDatabaseTables,
     exportArchive: exportZipArchive,
     restoreArchive: (bytes: number[]) =>
@@ -180,6 +187,9 @@ export function setupTestBridge() {
         notes: input.notes,
         status: input.status || 'completed',
       });
+    },
+    getClinicalDocumentByConsultationId: async (consultationId: string) => {
+      return await fetchClinicalDocumentByConsultationId(consultationId);
     },
   };
 }

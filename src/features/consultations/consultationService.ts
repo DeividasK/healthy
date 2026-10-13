@@ -6,7 +6,7 @@ import {
   type ConditionInput,
 } from '@/src/features/conditions/conditionService';
 import * as Crypto from 'expo-crypto';
-import type { Encounter, CodeableReference } from 'fhir/r5';
+import type { Encounter, CodeableReference, Composition } from 'fhir/r5';
 import {
   insertConsultationRecord,
   fetchAllConsultationRecords,
@@ -16,6 +16,11 @@ import {
   fetchDistinctDoctorNames,
   fetchDistinctServiceTypes,
 } from './consultationsRepository';
+import {
+  insertClinicalDocumentRecord,
+  fetchClinicalDocumentByConsultationId,
+  deleteClinicalDocumentRecord,
+} from './clinicalDocumentsRepository';
 import {
   createNarrativeDiv,
   withConsultationConditions,
@@ -55,59 +60,63 @@ export async function createOrUpdateConsultation(
   input: ConsultationInput,
   withinTransaction = false
 ): Promise<Encounter> {
-  if (
-    input.diagnoses?.some((diagnosis) => diagnosis.createCondition) &&
-    !withinTransaction
-  ) {
-    const patientId = input.patientId || 'patient-default';
+  if (!withinTransaction) {
     const db = await getDb();
     let saved: Encounter | undefined;
     await db.withTransactionAsync(async () => {
-      const diagnoses: ConsultationDiagnosisInput[] = [];
-      for (const diagnosis of input.diagnoses || []) {
-        if (!diagnosis.title.trim())
-          throw new Error('Diagnosis name is required');
-        if (!diagnosis.createCondition) {
-          diagnoses.push(diagnosis);
-          continue;
-        }
-        const condition = await createOrUpdateCondition(
-          {
-            patientId,
-            title: diagnosis.title,
-            terminology: diagnosis.terminology,
-            clinicalStatus: 'active',
-            verificationStatus: 'unconfirmed',
-            category: 'encounter-diagnosis',
-          },
-          true
-        );
-        diagnoses.push({
-          ...diagnosis,
-          createCondition: false,
-          conditionId: condition.id,
-        });
-      }
-      saved = await createOrUpdateConsultation({ ...input, diagnoses }, true);
+      saved = await createOrUpdateConsultation(input, true);
     });
     await clearPendingConsultationDeletions([saved!.id!]);
     notifyDatabaseChanged([
       'conditions',
       'consultations',
       'consultation_conditions',
+      'clinical_documents',
     ]);
     return saved!;
   }
-  const consId = input.id || `cons-${Crypto.randomUUID()}`;
-  const trimmedTitle = input.title.trim();
-  if (!trimmedTitle) throw new Error('Consultation title is required');
-  const trimmedDoctor = input.doctorName?.trim() || undefined;
-  const trimmedServiceType = input.serviceType?.trim() || undefined;
-  const trimmedNotes = input.notes?.trim() || undefined;
+
   const patientId = input.patientId || 'patient-default';
-  const existing = input.id ? await fetchConsultationById(input.id) : null;
+  let processedInput = input;
+  if (input.diagnoses?.some((diagnosis) => diagnosis.createCondition)) {
+    const diagnoses: ConsultationDiagnosisInput[] = [];
+    for (const diagnosis of input.diagnoses || []) {
+      if (!diagnosis.title.trim())
+        throw new Error('Diagnosis name is required');
+      if (!diagnosis.createCondition) {
+        diagnoses.push(diagnosis);
+        continue;
+      }
+      const condition = await createOrUpdateCondition(
+        {
+          patientId,
+          title: diagnosis.title,
+          terminology: diagnosis.terminology,
+          clinicalStatus: 'active',
+          verificationStatus: 'unconfirmed',
+          category: 'encounter-diagnosis',
+        },
+        true
+      );
+      diagnoses.push({
+        ...diagnosis,
+        createCondition: false,
+        conditionId: condition.id,
+      });
+    }
+    processedInput = { ...input, diagnoses };
+  }
+  const consId = processedInput.id || `cons-${Crypto.randomUUID()}`;
+  const trimmedTitle = processedInput.title.trim();
+  if (!trimmedTitle) throw new Error('Consultation title is required');
+  const trimmedDoctor = processedInput.doctorName?.trim() || undefined;
+  const trimmedServiceType = processedInput.serviceType?.trim() || undefined;
+  const trimmedNotes = processedInput.notes?.trim() || undefined;
+  const existing = processedInput.id
+    ? await fetchConsultationById(processedInput.id)
+    : null;
   const conditionIds =
-    input.conditionIds ??
+    processedInput.conditionIds ??
     (existing ? getConsultationConditionIds(existing) : []);
   if (
     ![
@@ -120,11 +129,14 @@ export async function createOrUpdateConsultation(
       'discontinued',
       'entered-in-error',
       'unknown',
-    ].includes(input.status || existing?.status || 'completed')
+    ].includes(processedInput.status || existing?.status || 'completed')
   ) {
     throw new Error('Invalid Encounter status');
   }
-  if (input.date.includes('T') && !/(Z|[+-]\d{2}:\d{2})$/.test(input.date)) {
+  if (
+    processedInput.date.includes('T') &&
+    !/(Z|[+-]\d{2}:\d{2})$/.test(processedInput.date)
+  ) {
     throw new Error('Encounter date-time requires a timezone offset');
   }
   const now = new Date().toISOString();
@@ -138,7 +150,9 @@ export async function createOrUpdateConsultation(
       lastUpdated: now,
     },
     status:
-      (input.status as Encounter['status']) || existing?.status || 'completed',
+      (processedInput.status as Encounter['status']) ||
+      existing?.status ||
+      'completed',
     class: existing?.class || [
       {
         coding: [
@@ -156,7 +170,7 @@ export async function createOrUpdateConsultation(
     },
     actualPeriod: {
       ...existing?.actualPeriod,
-      start: input.date,
+      start: processedInput.date,
     },
     type: [
       {
@@ -219,10 +233,10 @@ export async function createOrUpdateConsultation(
   };
 
   let result = withConsultationConditions(encounter, conditionIds);
-  if (input.reasonConditionIds !== undefined)
-    result = withConsultationReasons(result, input.reasonConditionIds);
-  if (input.diagnoses !== undefined) {
-    result.diagnosis = input.diagnoses.map((diagnosis) => {
+  if (processedInput.reasonConditionIds !== undefined)
+    result = withConsultationReasons(result, processedInput.reasonConditionIds);
+  if (processedInput.diagnoses !== undefined) {
+    result.diagnosis = processedInput.diagnoses.map((diagnosis) => {
       if (!diagnosis.title.trim())
         throw new Error('Diagnosis name is required');
       const original = diagnosis.original;
@@ -272,6 +286,106 @@ export async function createOrUpdateConsultation(
   if (!result.serviceType?.length) delete result.serviceType;
   if (!result.participant?.length) delete result.participant;
   await insertConsultationRecord(result, patientId, false, withinTransaction);
+
+  const existingDoc = await fetchClinicalDocumentByConsultationId(
+    consId,
+    patientId
+  );
+
+  if (trimmedNotes) {
+    const docId = existingDoc?.id || `comp-${Crypto.randomUUID()}`;
+    const compStatus: Composition['status'] =
+      result.status === 'completed' ? 'final' : 'preliminary';
+    const composition: Composition = {
+      ...existingDoc,
+      resourceType: 'Composition',
+      id: docId,
+      meta: {
+        ...existingDoc?.meta,
+        lastUpdated: now,
+      },
+      status: compStatus,
+      type: existingDoc?.type || {
+        coding: [
+          {
+            system: 'http://loinc.org',
+            code: '11488-4',
+            display: 'Consultation note',
+          },
+        ],
+        text: 'Consultation note',
+      },
+      title: existingDoc?.title || `${trimmedTitle} Note`,
+      subject: [{ reference: `Patient/${patientId}` }],
+      encounter: { reference: `Encounter/${consId}` },
+      date: processedInput.date,
+      author: trimmedDoctor
+        ? [{ display: trimmedDoctor }]
+        : [{ reference: `Patient/${patientId}` }],
+      section: [
+        {
+          title: 'Notes',
+          code: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '48767-8',
+                display: 'Annotation comment',
+              },
+            ],
+            text: 'Notes',
+          },
+          text: {
+            status: 'generated',
+            div: createNarrativeDiv(trimmedNotes),
+          },
+          ...(existingDoc?.section?.[0]?.entry
+            ? { entry: existingDoc.section[0].entry }
+            : {}),
+        },
+        ...(existingDoc?.section?.slice(1) || []),
+      ],
+    };
+    await insertClinicalDocumentRecord(
+      composition,
+      patientId,
+      false,
+      withinTransaction
+    );
+  } else if (existingDoc) {
+    const hasOtherSections = (existingDoc.section?.length || 0) > 1;
+    const hasEntries = Boolean(existingDoc.section?.[0]?.entry?.length);
+    if (!hasOtherSections && !hasEntries && existingDoc.id) {
+      await deleteClinicalDocumentRecord(
+        existingDoc.id,
+        patientId,
+        withinTransaction
+      );
+    } else {
+      const updatedComposition: Composition = {
+        ...existingDoc,
+        meta: {
+          ...existingDoc.meta,
+          lastUpdated: now,
+        },
+        section: existingDoc.section?.map((sec, idx) => {
+          if (idx === 0) {
+            const nextSec = { ...sec };
+            delete nextSec.text;
+            return nextSec;
+          }
+          return sec;
+        }),
+      };
+      await insertClinicalDocumentRecord(
+        updatedComposition,
+        patientId,
+        false,
+        withinTransaction
+      );
+    }
+  }
+
   return result;
 }
 
@@ -326,4 +440,31 @@ export async function getDistinctServiceTypes(
   patientId?: string
 ): Promise<string[]> {
   return await fetchDistinctServiceTypes(patientId);
+}
+
+/**
+ * Fetches the Composition linked to a Consultation.
+ */
+export async function getClinicalDocumentByConsultationId(
+  consultationId: string,
+  patientId?: string
+): Promise<Composition | null> {
+  return await fetchClinicalDocumentByConsultationId(consultationId, patientId);
+}
+
+/**
+ * Fetches a Consultation along with its linked clinical document.
+ */
+export async function getConsultationWithDetails(
+  id: string,
+  patientId?: string
+): Promise<{
+  consultation: Encounter | null;
+  document: Composition | null;
+}> {
+  const consultation = await fetchConsultationById(id, patientId);
+  const document = consultation
+    ? await fetchClinicalDocumentByConsultationId(consultation.id!, patientId)
+    : null;
+  return { consultation, document };
 }
