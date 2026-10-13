@@ -310,12 +310,13 @@ function BiomarkerChart({
   high?: number;
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const width = Math.max(360, measurements.length * 84);
-  const height = 160;
-  const paddingLeft = 16;
-  const paddingRight = 32;
-  const paddingTop = 16;
-  const paddingBottom = 30;
+  const [chartWidth, setChartWidth] = useState(0);
+  const width = chartWidth || 240;
+  const height = 320;
+  const paddingLeft = 64;
+  const paddingRight = 48;
+  const paddingTop = 32;
+  const paddingBottom = 48;
   const values = measurements.map((item) => item.value);
   const lowValue = low ?? Math.min(...values);
   const highValue = high ?? Math.max(...values);
@@ -343,192 +344,194 @@ function BiomarkerChart({
       style={styles.chart}
       testID="biomarker-chart"
       accessibilityLabel="Biomarker values over time"
+      onLayout={(event) =>
+        setChartWidth(Math.max(1, event.nativeEvent.layout.width - 24))
+      }
     >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chartContent}
-      >
-        <View style={{ width: width * 2, height: height * 2 }}>
-          <Svg
-            width={width * 2}
-            height={height * 2}
-            viewBox={`0 0 ${width} ${height}`}
+      <View style={{ width, height }}>
+        <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+          <Rect
+            x={paddingLeft}
+            y={yFor(lowValue)}
+            width={width - paddingLeft - paddingRight}
+            height={yFor(min) - yFor(lowValue)}
+            fill="#3B82F6"
+            opacity={0.1}
+          />
+          <Rect
+            x={paddingLeft}
+            y={yFor(highValue)}
+            width={width - paddingLeft - paddingRight}
+            height={yFor(lowValue) - yFor(highValue)}
+            fill="#10B981"
+            opacity={0.1}
+          />
+          <Rect
+            x={paddingLeft}
+            y={paddingTop}
+            width={width - paddingLeft - paddingRight}
+            height={yFor(highValue) - paddingTop}
+            fill="#EF4444"
+            opacity={0.1}
+          />
+          <Line
+            x1={paddingLeft}
+            y1={paddingTop}
+            x2={paddingLeft}
+            y2={height - paddingBottom}
+            stroke={COLORS.light.border}
+            strokeWidth="1"
+          />
+          <Line
+            x1={paddingLeft}
+            y1={yFor(highValue)}
+            x2={width - paddingRight}
+            y2={yFor(highValue)}
+            stroke="#EF4444"
+            strokeWidth="1"
+            strokeDasharray="4,4"
+            strokeOpacity={1}
+          />
+          <Line
+            x1={paddingLeft}
+            y1={yFor(lowValue)}
+            x2={width - paddingRight}
+            y2={yFor(lowValue)}
+            stroke="#3B82F6"
+            strokeWidth="1"
+            strokeDasharray="4,4"
+            strokeOpacity={1}
+          />
+          <Line
+            x1={paddingLeft}
+            y1={yFor(min)}
+            x2={width - paddingRight}
+            y2={yFor(min)}
+            stroke={COLORS.light.border}
+            strokeWidth="1"
+          />
+          <SvgText
+            x={paddingLeft - 2}
+            y={yFor(highValue) - 4}
+            fill="#EF4444"
+            fontSize="12"
+            textAnchor="end"
+            fillOpacity={1}
           >
-            <Rect
-              x={paddingLeft}
-              y={yFor(lowValue)}
-              width={width - paddingLeft - paddingRight}
-              height={yFor(min) - yFor(lowValue)}
-              fill="#3B82F6"
-              opacity={0.1}
-            />
-            <Rect
-              x={paddingLeft}
-              y={yFor(highValue)}
-              width={width - paddingLeft - paddingRight}
-              height={yFor(lowValue) - yFor(highValue)}
-              fill="#10B981"
-              opacity={0.1}
-            />
-            <Rect
-              x={paddingLeft}
-              y={paddingTop}
-              width={width - paddingLeft - paddingRight}
-              height={yFor(highValue) - paddingTop}
-              fill="#EF4444"
-              opacity={0.1}
-            />
-            <Line
-              x1={paddingLeft}
-              y1={paddingTop}
-              x2={paddingLeft}
-              y2={height - paddingBottom}
-              stroke={COLORS.light.border}
-              strokeWidth="1"
-            />
-            <Line
-              x1={paddingLeft}
-              y1={yFor(highValue)}
-              x2={width - paddingRight}
-              y2={yFor(highValue)}
-              stroke="#EF4444"
-              strokeWidth="1"
-              strokeDasharray="4,4"
-              strokeOpacity={1}
-            />
-            <Line
-              x1={paddingLeft}
-              y1={yFor(lowValue)}
-              x2={width - paddingRight}
-              y2={yFor(lowValue)}
-              stroke="#3B82F6"
-              strokeWidth="1"
-              strokeDasharray="4,4"
-              strokeOpacity={1}
-            />
-            <Line
-              x1={paddingLeft}
-              y1={yFor(min)}
-              x2={width - paddingRight}
-              y2={yFor(min)}
-              stroke={COLORS.light.border}
-              strokeWidth="1"
-            />
-            <SvgText
-              x={paddingLeft - 2}
-              y={yFor(highValue) - 2}
-              fill="#EF4444"
-              fontSize="6"
-              textAnchor="end"
-              fillOpacity={1}
-            >
-              High
-            </SvgText>
-            <SvgText
-              x={paddingLeft - 2}
-              y={yFor(highValue) + 6}
-              fill="#EF4444"
-              fontSize="6"
-              textAnchor="end"
-              fillOpacity={1}
-            >
-              {highValue}
-            </SvgText>
-            <SvgText
-              x={paddingLeft - 2}
-              y={yFor(lowValue) - 2}
-              fill="#3B82F6"
-              fontSize="6"
-              textAnchor="end"
-              fillOpacity={1}
-            >
-              Low
-            </SvgText>
-            <SvgText
-              x={paddingLeft - 2}
-              y={yFor(lowValue) + 6}
-              fill="#3B82F6"
-              fontSize="6"
-              textAnchor="end"
-              fillOpacity={1}
-            >
-              {lowValue}
-            </SvgText>
-            <Polyline
-              points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
-              fill="none"
-              stroke="#000000"
-              strokeWidth="0.75"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            {points.map(({ x, y }, index) => (
-              <React.Fragment key={measurements[index].id}>
-                <Circle
-                  cx={x}
-                  cy={y}
-                  r="2"
-                  fill={colorFor(measurements[index].value)}
-                />
-                <SvgText
-                  x={x}
-                  y={height - 8}
-                  fill={COLORS.light.mutedForeground}
-                  fontSize="6"
-                  textAnchor="middle"
-                >
-                  {formatDisplayDate(measurements[index].date)}
-                </SvgText>
-              </React.Fragment>
-            ))}
-          </Svg>
-          {points.map((point, index) => (
-            <Pressable
-              key={measurements[index].id}
-              testID={`biomarker-point-${index}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${measurements[index].value} ${measurements[index].unit}`}
-              onHoverIn={() => setHoveredIndex(index)}
-              onHoverOut={() => setHoveredIndex(null)}
-              onPressIn={() => setHoveredIndex(index)}
-              onPressOut={() => setHoveredIndex(null)}
-              style={[
-                styles.pointHitTarget,
-                { left: point.x * 2 - 12, top: point.y * 2 - 12 },
-              ]}
-            />
+            High
+          </SvgText>
+          <SvgText
+            x={paddingLeft - 2}
+            y={yFor(highValue) + 12}
+            fill="#EF4444"
+            fontSize="12"
+            textAnchor="end"
+            fillOpacity={1}
+          >
+            {highValue}
+          </SvgText>
+          <SvgText
+            x={paddingLeft - 2}
+            y={yFor(lowValue) - 4}
+            fill="#3B82F6"
+            fontSize="12"
+            textAnchor="end"
+            fillOpacity={1}
+          >
+            Low
+          </SvgText>
+          <SvgText
+            x={paddingLeft - 2}
+            y={yFor(lowValue) + 12}
+            fill="#3B82F6"
+            fontSize="12"
+            textAnchor="end"
+            fillOpacity={1}
+          >
+            {lowValue}
+          </SvgText>
+          <Polyline
+            points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
+            fill="none"
+            stroke="#000000"
+            strokeWidth="0.75"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          {points.map(({ x, y }, index) => (
+            <React.Fragment key={measurements[index].id}>
+              <Circle
+                cx={x}
+                cy={y}
+                r="6"
+                fill={colorFor(measurements[index].value)}
+              />
+              <SvgText
+                x={x}
+                y={height - 34}
+                fill={COLORS.light.mutedForeground}
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {formatDisplayDate(measurements[index].date).split(', ')[0]}
+              </SvgText>
+              <SvgText
+                x={x}
+                y={height - 20}
+                fill={COLORS.light.mutedForeground}
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {formatDisplayDate(measurements[index].date).split(', ')[1]}
+              </SvgText>
+            </React.Fragment>
           ))}
-          {hoveredIndex !== null && (
-            <View
-              pointerEvents="none"
-              testID="biomarker-tooltip"
-              style={[
-                styles.tooltip,
-                {
-                  left: Math.min(
-                    Math.max(points[hoveredIndex].x * 2 - 90, 0),
-                    width * 2 - 180
-                  ),
-                  top: Math.max(points[hoveredIndex].y * 2 - 58, 0),
-                },
-              ]}
-            >
-              <Text style={styles.tooltipDate}>
-                {formatDisplayDate(measurements[hoveredIndex].date)}
+        </Svg>
+        {points.map((point, index) => (
+          <Pressable
+            key={measurements[index].id}
+            testID={`biomarker-point-${index}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${measurements[index].value} ${measurements[index].unit}`}
+            onHoverIn={() => setHoveredIndex(index)}
+            onHoverOut={() => setHoveredIndex(null)}
+            onPressIn={() => setHoveredIndex(index)}
+            onPressOut={() => setHoveredIndex(null)}
+            style={[
+              styles.pointHitTarget,
+              { left: point.x - 12, top: point.y - 12 },
+            ]}
+          />
+        ))}
+        {hoveredIndex !== null && (
+          <View
+            pointerEvents="none"
+            testID="biomarker-tooltip"
+            style={[
+              styles.tooltip,
+              {
+                left: Math.min(
+                  Math.max(points[hoveredIndex].x - 90, 0),
+                  width - 180
+                ),
+                top: Math.max(points[hoveredIndex].y - 58, 0),
+              },
+            ]}
+          >
+            <Text style={styles.tooltipDate}>
+              {formatDisplayDate(measurements[hoveredIndex].date)}
+            </Text>
+            <View style={styles.tooltipMeasurement}>
+              <Text style={styles.tooltipValue}>
+                {measurements[hoveredIndex].value}
               </Text>
-              <View style={styles.tooltipMeasurement}>
-                <Text style={styles.tooltipValue}>
-                  {measurements[hoveredIndex].value}
-                </Text>
-                <Text style={styles.tooltipUnit}>
-                  {measurements[hoveredIndex].unit}
-                </Text>
-              </View>
+              <Text style={styles.tooltipUnit}>
+                {measurements[hoveredIndex].unit}
+              </Text>
             </View>
-          )}
-        </View>
-      </ScrollView>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -613,12 +616,13 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   chart: {
+    width: '100%',
+    maxWidth: 600,
     borderRadius: 16,
     padding: 12,
     backgroundColor: COLORS.light.card,
     marginBottom: 16,
   },
-  chartContent: { alignItems: 'flex-start' },
   history: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.light.border,
