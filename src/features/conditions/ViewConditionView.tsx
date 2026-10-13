@@ -1,4 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import { getConditionCategoryLabel } from './conditionCategories';
+import {
+  CONDITION_STATUS_OPTIONS,
+  VERIFICATION_OPTIONS,
+} from './ConditionForm';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -30,6 +36,7 @@ import { getConditionById } from './conditionService';
 import type { Condition, Encounter } from 'fhir/r5';
 
 export function ViewConditionView() {
+  const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [condition, setCondition] = useState<Condition | null>(null);
@@ -39,13 +46,16 @@ export function ViewConditionView() {
   const [hasLoadError, setHasLoadError] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
+  const loadSequence = useRef(0);
   const loadData = useCallback(async () => {
-    if (!id) return;
+    const sequence = ++loadSequence.current;
+    if (!id || isPatientLoading || !activePatientId) return;
     try {
       const [conditionData, consultationData] = await Promise.all([
-        getConditionById(id),
+        getConditionById(id, activePatientId),
         getConsultationsByConditionId(id),
       ]);
+      if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
       if (!conditionData) {
         setNotFound(true);
@@ -57,33 +67,33 @@ export function ViewConditionView() {
         setConsultations(consultationData);
       }
     } catch (error) {
+      if (sequence !== loadSequence.current) return;
       console.error('Failed to load condition view data:', error);
       setHasLoadError(true);
     } finally {
-      setIsLoading(false);
+      if (sequence === loadSequence.current) setIsLoading(false);
     }
-  }, [id]);
+  }, [id, activePatientId, isPatientLoading]);
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(['conditions', 'consultations'], loadData);
 
   const getStatus = (value: Condition) => {
     const clinicalStatus = value.clinicalStatus?.coding?.[0]?.code;
-    const verificationStatus = value.verificationStatus?.coding?.[0]?.code;
-    if (verificationStatus === 'unconfirmed')
-      return { label: 'Unconfirmed', color: '#F59E0B' };
-    if (verificationStatus === 'provisional')
-      return { label: 'Provisional', color: '#3B82F6' };
-    if (clinicalStatus === 'inactive')
-      return { label: 'Inactive', color: '#6B7280' };
-    if (clinicalStatus === 'remission')
-      return { label: 'Remission', color: '#8B5CF6' };
-    if (clinicalStatus === 'resolved')
-      return { label: 'Resolved', color: '#717973' };
-    return { label: 'Active', color: '#10B981' };
+    const option = CONDITION_STATUS_OPTIONS.find(
+      (item) => item.id === clinicalStatus
+    );
+    return {
+      label: option?.label || clinicalStatus || 'Unknown',
+      color: option?.dotColor || '#6B7280',
+    };
   };
 
-  if (isLoading) {
+  if (
+    isLoading ||
+    isPatientLoading ||
+    (condition && condition.subject.reference !== `Patient/${activePatientId}`)
+  ) {
     return <ResourceViewLayout testID="condition-view" isLoading />;
   }
 
@@ -154,6 +164,50 @@ export function ViewConditionView() {
         </>
       }
     >
+      <View style={styles.details}>
+        {condition.verificationStatus && (
+          <Text style={styles.notes} testID="condition-verification-status">
+            Verification status:{' '}
+            {VERIFICATION_OPTIONS.find(
+              (item) =>
+                item.id === condition.verificationStatus?.coding?.[0]?.code
+            )?.label ||
+              condition.verificationStatus.text ||
+              condition.verificationStatus.coding?.[0]?.display ||
+              condition.verificationStatus.coding?.[0]?.code}
+          </Text>
+        )}
+        {condition.category?.map((category, index) => (
+          <Text
+            key={index}
+            style={styles.notes}
+            testID={`condition-category-${index}`}
+          >
+            Category: {getConditionCategoryLabel(category)}
+          </Text>
+        ))}
+      </View>
+      {condition.code?.coding?.map((coding, index) => (
+        <View
+          key={index}
+          style={styles.details}
+          testID={`condition-terminology-${index}`}
+        >
+          {coding.system && (
+            <Text style={styles.notes}>
+              Terminology System: {coding.system}
+            </Text>
+          )}
+          {coding.code && (
+            <Text style={styles.notes}>Diagnosis Code: {coding.code}</Text>
+          )}
+          {coding.display && (
+            <Text style={styles.notes}>
+              Terminology Display: {coding.display}
+            </Text>
+          )}
+        </View>
+      ))}
       {(severity || bodySite || abatementDate || notes) && (
         <View style={styles.details}>
           {(severity || bodySite || abatementDate) && (

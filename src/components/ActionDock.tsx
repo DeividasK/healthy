@@ -51,7 +51,18 @@ export function ActionDock({
   const rowWidth =
     actions.reduce((sum, action) => sum + (action.primary ? 52 : 44), 0) +
     Math.max(0, actions.length - 1) * 10;
-  const targetWidth = onlyPrimary ? 40 : rowWidth + 20;
+  const primaryIndex = actions.findIndex((action) => action.primary);
+  const primaryCenter =
+    primaryIndex < 0
+      ? rowWidth / 2
+      : actions
+          .slice(0, primaryIndex)
+          .reduce((sum, action) => sum + (action.primary ? 52 : 44) + 10, 0) +
+        26;
+  // Keep the primary action at the island/screen center even with more actions on one side.
+  const targetWidth = onlyPrimary
+    ? 40
+    : 2 * Math.max(primaryCenter, rowWidth - primaryCenter) + 20;
   const width = useSharedValue(targetWidth);
   const height = useSharedValue(onlyPrimary ? 40 : 52);
   const backgroundOpacity = useSharedValue(onlyPrimary ? 0 : 1);
@@ -90,7 +101,7 @@ export function ActionDock({
     const precedingWidth = actions
       .slice(0, index)
       .reduce((sum, preceding) => sum + (preceding.primary ? 52 : 44) + 10, 0);
-    const offset = -rowWidth / 2 + precedingWidth + size / 2;
+    const offset = -primaryCenter + precedingWidth + size / 2;
     return { action, offset };
   });
   const primary = positioned.find(({ action }) => action.primary);
@@ -131,6 +142,11 @@ export function ActionDock({
           offset={secondary[1]?.offset ?? 0}
           enabled={enabled}
         />
+        <ActionSlot
+          action={secondary[2]?.action}
+          offset={secondary[2]?.offset ?? 0}
+          enabled={enabled}
+        />
       </Animated.View>
     </View>
   );
@@ -161,7 +177,14 @@ function ActionSlot({
     return <Animated.View style={[styles.slot, animatedStyle]} />;
   const Icon = displayedAction.icon;
   const content = displayedAction.busy ? (
-    <ActivityIndicator size="small" color={COLORS.light.primaryForeground} />
+    <ActivityIndicator
+      size="small"
+      color={
+        displayedAction.primary
+          ? COLORS.light.primaryForeground
+          : COLORS.light.primary
+      }
+    />
   ) : (
     <Icon
       color={
@@ -246,7 +269,7 @@ const styles = StyleSheet.create({
   background: {
     pointerEvents: 'none',
     position: 'absolute',
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: COLORS.light.card,
     borderWidth: 1,
     borderColor: COLORS.light.cardBorder,
     borderRadius: 999,

@@ -1,3 +1,4 @@
+import type { ConsultationInput } from './consultationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
@@ -15,7 +16,9 @@ import {
   getConsultationServiceType,
   getConsultationNotes,
   getConsultationConditionIds,
+  getConsultationReasonConditionIds,
 } from '@/src/utils/fhirUtils';
+import { getConditionById } from '@/src/features/conditions/conditionService';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 
@@ -70,6 +73,35 @@ export function EditConsultationView() {
         const serviceType = getConsultationServiceType(encounter) || undefined;
         const notes = getConsultationNotes(encounter) || undefined;
         const conditionIds = getConsultationConditionIds(encounter);
+        const diagnoses = await Promise.all(
+          (encounter.diagnosis || []).map(async (original) => {
+            const value = original.condition?.[0];
+            const reference = value?.reference?.reference;
+            const conditionId = reference?.startsWith('Condition/')
+              ? reference.slice(10)
+              : undefined;
+            const condition = conditionId
+              ? await getConditionById(conditionId, activePatientId)
+              : null;
+            const title =
+              value?.concept?.text ||
+              condition?.code?.text ||
+              value?.concept?.coding?.[0]?.display ||
+              value?.reference?.display ||
+              'Diagnosis';
+            const terminology = value?.concept?.coding?.[0] || {};
+            return {
+              title,
+              terminology,
+              conditionId,
+              original,
+              originalTitle: title,
+              originalTerminology: terminology,
+              originalConditionId: conditionId,
+            };
+          })
+        );
+        if (!isMounted) return;
         const status = encounter.status || 'completed';
 
         setInitialValues({
@@ -81,6 +113,8 @@ export function EditConsultationView() {
           doctorName,
           serviceType,
           conditionIds,
+          reasonConditionIds: getConsultationReasonConditionIds(encounter),
+          diagnoses,
           notes,
         });
       } catch (err) {
@@ -112,16 +146,7 @@ export function EditConsultationView() {
     );
   }
 
-  const handleSave = async (values: {
-    id?: string;
-    title: string;
-    status: string;
-    date: string;
-    doctorName?: string;
-    serviceType?: string;
-    conditionIds?: string[];
-    notes?: string;
-  }) => {
+  const handleSave = async (values: ConsultationInput) => {
     await createOrUpdateConsultation({
       ...values,
       id,

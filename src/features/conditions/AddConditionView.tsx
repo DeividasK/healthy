@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { ConditionForm } from './ConditionForm';
-import { createOrUpdateCondition } from './conditionService';
+import {
+  createOrUpdateCondition,
+  type ConditionInput,
+} from './conditionService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
@@ -18,17 +21,7 @@ export function AddConditionView() {
     );
   }
 
-  const handleSave = async (values: {
-    id?: string;
-    title: string;
-    clinicalStatus: string;
-    verificationStatus: string;
-    onsetDate: string;
-    severity?: string;
-    bodySite?: string;
-    abatementDate?: string;
-    notes?: string;
-  }) => {
+  const handleSave = async (values: ConditionInput) => {
     await createOrUpdateCondition({
       ...values,
       patientId: activePatientId,

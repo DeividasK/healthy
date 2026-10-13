@@ -140,3 +140,48 @@ export function withConsultationConditions(
   }
   return { ...encounter, diagnosis: diagnosis.length ? diagnosis : undefined };
 }
+
+/** Pre-visit Condition references are distinct from post-visit diagnoses. */
+export function getConsultationReasonConditionIds(
+  encounter: Encounter
+): string[] {
+  return [
+    ...new Set(
+      (encounter.reason || []).flatMap((reason) =>
+        (reason.value || []).flatMap((value) => {
+          const reference = value.reference?.reference;
+          return reference?.startsWith('Condition/')
+            ? [reference.slice(10)]
+            : [];
+        })
+      )
+    ),
+  ];
+}
+
+export function withConsultationReasons(
+  encounter: Encounter,
+  ids: string[]
+): Encounter {
+  const selected = new Set(ids);
+  const retained = new Set<string>();
+  const reason = (encounter.reason || []).flatMap((entry) => {
+    const value = (entry.value || []).flatMap((item) => {
+      const reference = item.reference?.reference;
+      if (!reference?.startsWith('Condition/')) return [item];
+      const id = reference.slice(10);
+      if (selected.has(id)) {
+        retained.add(id);
+        return [item];
+      }
+      const unlinked = { ...item };
+      delete unlinked.reference;
+      return unlinked.concept ? [unlinked] : [];
+    });
+    return value.length ? [{ ...entry, value }] : [];
+  });
+  for (const id of selected)
+    if (!retained.has(id))
+      reason.push({ value: [{ reference: { reference: `Condition/${id}` } }] });
+  return { ...encounter, reason: reason.length ? reason : undefined };
+}

@@ -25,7 +25,8 @@ test.describe('View Consultation - Visual Regression', () => {
     });
     const consultation = await seedTestConsultation(page, {
       id: 'consultation-view-visual',
-      conditionIds: [condition.id, second.id],
+      conditionIds: [second.id],
+      reasonConditionIds: [condition.id],
       title: 'Orthopedic Evaluation',
       doctorName: 'Dr. Sarah Connor',
       serviceType: 'Orthopedics',

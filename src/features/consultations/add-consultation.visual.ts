@@ -18,6 +18,27 @@ test.describe('Add Consultation View - Visual Regression', () => {
 
     await takeSnapshot(page, 'Consultation View - Add New Form', testInfo);
     await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-diagnosis').click();
+    await page.getByTestId('diagnosis-0-title-input').fill('Scalp irritation');
+    await page.getByTestId('diagnosis-0-code-input').fill('L21');
+    await page
+      .getByTestId('diagnosis-0-system-input')
+      .fill('http://hl7.org/fhir/sid/icd-10');
+    await page
+      .getByTestId('diagnosis-0-display-input')
+      .fill('Seborrhoeic dermatitis');
+    await takeSnapshot(page, 'Consultation View - Add Diagnosis', testInfo);
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-diagnosis').click();
+    await page.getByTestId('diagnosis-1-title-input').fill('Second diagnosis');
+    await takeSnapshot(
+      page,
+      'Consultation View - Separate diagnosis items',
+      testInfo
+    );
+    await page.getByTestId('remove-diagnosis-1').click();
+    await page.getByTestId('remove-diagnosis-0').click();
+    await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-condition').click();
     await page.getByTestId('condition-search-input').waitFor();
     await takeSnapshot(

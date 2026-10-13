@@ -6,6 +6,7 @@ import {
   getConsultationServiceType,
   getConsultationNotes,
   getConsultationConditionIds,
+  getConsultationReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
@@ -22,7 +23,8 @@ import {
 export async function insertConsultationRecord(
   consultation: Encounter,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false
+  isRemoteSync: boolean = false,
+  withinTransaction: boolean = false
 ): Promise<void> {
   if (!consultation.id) {
     throw new Error('Consultation requires an id to be persisted');
@@ -81,7 +83,7 @@ export async function insertConsultationRecord(
   const consId = consultation.id;
 
   let didUpdate = false;
-  await db.withTransactionAsync(async () => {
+  const persist = async () => {
     const existing = await db.getFirstAsync<{
       patient_id: string;
       updated_at: string;
@@ -103,7 +105,10 @@ export async function insertConsultationRecord(
       return;
     }
 
-    for (const conditionId of conditionIds) {
+    for (const conditionId of new Set([
+      ...conditionIds,
+      ...getConsultationReasonConditionIds(consultation),
+    ])) {
       const condition = await db.getFirstAsync<{ id: string }>(
         'SELECT id FROM conditions WHERE id = ? AND patient_id = ?;',
         [conditionId, patientId]
@@ -151,9 +156,11 @@ export async function insertConsultationRecord(
       );
     }
     didUpdate = true;
-  });
+  };
+  if (withinTransaction) await persist();
+  else await db.withTransactionAsync(persist);
 
-  if (didUpdate) {
+  if (didUpdate && !withinTransaction) {
     await clearPendingConsultationDeletions([consId]);
     notifyDatabaseChanged(['consultations', 'consultation_conditions']);
   }
@@ -195,8 +202,8 @@ export async function fetchConsultationsByConditionId(
 ): Promise<Encounter[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
-    `SELECT c.fhir_json, c.updated_at FROM consultations c JOIN consultation_conditions cc ON cc.consultation_id = c.id WHERE cc.condition_id = ? ORDER BY c.date DESC, c.created_at DESC, c.id DESC;`,
-    [conditionId]
+    `SELECT c.fhir_json, c.updated_at FROM consultations c WHERE c.id IN (SELECT consultation_id FROM consultation_conditions WHERE condition_id = ?) OR EXISTS (SELECT 1 FROM json_each(c.fhir_json, '$.reason') r, json_each(r.value, '$.value') v WHERE json_extract(v.value, '$.reference.reference') = ?) ORDER BY c.date DESC, c.created_at DESC, c.id DESC;`,
+    [conditionId, `Condition/${conditionId}`]
   );
   return rows.map((r) => {
     const enc: Encounter = JSON.parse(r.fhir_json);

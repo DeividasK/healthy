@@ -17,7 +17,8 @@ import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 export async function insertConditionRecord(
   condition: Condition,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false
+  isRemoteSync: boolean = false,
+  withinTransaction: boolean = false
 ): Promise<void> {
   if (!condition.id) {
     throw new Error('Condition requires an id to be persisted');
@@ -46,7 +47,7 @@ export async function insertConditionRecord(
   const condId = condition.id;
 
   let didUpdate = false;
-  await db.withTransactionAsync(async () => {
+  const persist = async () => {
     const existing = await db.getFirstAsync<{
       patient_id: string;
       updated_at: string;
@@ -97,9 +98,11 @@ export async function insertConditionRecord(
       ]
     );
     didUpdate = true;
-  });
+  };
+  if (withinTransaction) await persist();
+  else await db.withTransactionAsync(persist);
 
-  if (didUpdate) {
+  if (didUpdate && !withinTransaction) {
     notifyDatabaseChanged(['conditions']);
   }
 }
@@ -178,6 +181,16 @@ export async function deleteConditionRecord(id: string): Promise<void> {
           (conditionId) => conditionId !== id
         )
       );
+      updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
+        const condition = entry.condition?.flatMap((value) => {
+          if (value.reference?.reference !== reference) return [value];
+          const retained = { ...value };
+          delete retained.reference;
+          return retained.concept ? [retained] : [];
+        });
+        return condition?.length ? [{ ...entry, condition }] : [];
+      });
+      if (!updated.diagnosis?.length) delete updated.diagnosis;
       updated.reason = encounter.reason?.flatMap((reason) => {
         if (
           !reason.value?.some(
@@ -185,9 +198,12 @@ export async function deleteConditionRecord(id: string): Promise<void> {
           )
         )
           return [reason];
-        const value = reason.value?.filter(
-          (value) => value.reference?.reference !== reference
-        );
+        const value = reason.value?.flatMap((value) => {
+          if (value.reference?.reference !== reference) return [value];
+          const retained = { ...value };
+          delete retained.reference;
+          return retained.concept ? [retained] : [];
+        });
         return value?.length ? [{ ...reason, value }] : [];
       });
       if (!updated.reason?.length) delete updated.reason;

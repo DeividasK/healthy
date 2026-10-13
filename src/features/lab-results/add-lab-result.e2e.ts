@@ -146,7 +146,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await expect(page.getByTestId('time-picker-button')).toContainText('08:15');
   });
 
-  test('should hide plus menu options and plus button when time and notes are added, and reappear when removed', async ({
+  test('should disable add when all optional fields are present and re-enable it when removed', async ({
     page,
   }) => {
     await page.getByTestId('floating-add-button').click();
@@ -173,10 +173,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await page.getByTestId('menu-add-notes').click();
     await expect(page.getByTestId('notes-input')).toBeVisible();
 
-    // 4. Once BOTH Time and Notes are added, plus button must disappear
-    await expect(plusBtn).not.toBeVisible();
+    // 4. Keep the primary add action in place, disabled when all fields are present
+    await expect(plusBtn).toBeDisabled();
 
-    // 5. Remove Notes -> plus button should reappear
+    // 5. Removing notes makes it available to add again
     await page.getByTestId('remove-notes-button').click();
     await expect(page.getByTestId('notes-input')).not.toBeVisible();
     await expect(plusBtn).toBeVisible();
@@ -185,7 +185,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await plusBtn.click();
     await expect(page.getByTestId('menu-add-time')).not.toBeVisible();
     await page
-      .getByTestId('plus-menu-overlay')
+      .getByTestId('form-add-menu-backdrop')
       .click({ position: { x: 5, y: 5 } });
 
     // 7. Remove Time -> "Add Time" should reappear in menu

@@ -17,8 +17,7 @@ import { X, Clock, FileText } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
-import { AddOptionsModal } from '@/src/components/AddOptionsModal';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -394,12 +393,6 @@ export function LabResultForm({
             )}
 
             {/* Plus Action Button */}
-            {showPlusButton && (
-              <PlusCircleButton
-                testID="plus-menu-button"
-                onPress={() => setShowPlusMenu(true)}
-              />
-            )}
           </View>
 
           {/* Optional Notes Section if added */}
@@ -564,6 +557,10 @@ export function LabResultForm({
 
         {/* Bottom Save Action */}
         <FormActionDock
+          onAdd={() => setShowPlusMenu((visible) => !visible)}
+          addExpanded={showPlusMenu}
+          addDisabled={!showPlusButton}
+          addTestID="plus-menu-button"
           onSave={handleSave}
           isSaving={isSaving}
           saveDisabled={activeItems.length === 0}
@@ -591,7 +588,8 @@ export function LabResultForm({
         />
 
         {/* Plus Action Overlay ("Add Time", "Add Notes") */}
-        <AddOptionsModal
+        <FloatingAddMenu
+          testID="form-add-menu"
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
           options={[
