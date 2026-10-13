@@ -81,6 +81,9 @@ test.describe('Biomarker detail', () => {
       page.getByText('Normal', { exact: true }).first()
     ).toBeVisible();
     await expect(page.getByText('High', { exact: true })).toBeVisible();
+    await expect(
+      page.locator('[data-testid^="biomarker-history-range-"]').first()
+    ).toBeVisible();
 
     const historyListToggle = page.getByTestId('biomarker-history-list-toggle');
     const historyList = page.getByTestId('biomarker-history-list');

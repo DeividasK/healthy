@@ -47,6 +47,40 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
 import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
+
+function getObservationReferenceRange(observation: Observation) {
+  const coding = observation.code?.coding?.[0];
+  const loinc = coding?.code;
+  const name = (coding?.display || observation.code?.text || '').toLowerCase();
+  const marker = CBC_MARKERS.find(
+    (candidate) =>
+      candidate.loinc === loinc ||
+      candidate.name.toLowerCase() === name ||
+      candidate.aliases.some((alias) => alias.toLowerCase() === name)
+  );
+  const unitCode = observation.valueQuantity?.code;
+  const unitFactor =
+    marker?.units.find((unit) => unit.ucum === unitCode)?.factor ?? 1;
+  const observationRange = observation.referenceRange?.find(
+    (range) => range.low?.value !== undefined || range.high?.value !== undefined
+  );
+  const low =
+    observationRange?.low?.value ??
+    (marker?.referenceRange?.low !== undefined
+      ? marker.referenceRange.low * unitFactor
+      : undefined);
+  const high =
+    observationRange?.high?.value ??
+    (marker?.referenceRange?.high !== undefined
+      ? marker.referenceRange.high * unitFactor
+      : undefined);
+
+  return low !== undefined && high !== undefined && high > low
+    ? { low, high }
+    : undefined;
+}
 
 export function HomeView() {
   const router = useRouter();
@@ -313,7 +347,7 @@ export function HomeView() {
           >
             {/* Conditions Section */}
             {conditions.length > 0 && (
-              <View style={styles.sectionContainer}>
+              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 <Text style={styles.sectionTitle}>Conditions</Text>
                 {conditions.map((conditionItem) => {
                   const title = getConditionTitle(conditionItem);
@@ -372,7 +406,7 @@ export function HomeView() {
 
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
-              <View style={styles.sectionContainer}>
+              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 {conditions.length > 0 && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
@@ -479,7 +513,17 @@ export function HomeView() {
                                   <Text style={styles.obsValue}>{value}</Text>
                                   <Text style={styles.obsUnit}>{unit}</Text>
                                 </View>
-                                {getStatusBadge(obs)}
+                                <View style={styles.obsStatusRangeRow}>
+                                  {getStatusBadge(obs)}
+                                  {typeof obs.valueQuantity?.value ===
+                                    'number' && (
+                                    <BiomarkerRangeLine
+                                      value={obs.valueQuantity.value}
+                                      {...getObservationReferenceRange(obs)}
+                                      testID={`biomarker-range-line-${obs.code?.coding?.[0]?.code || obs.id || 'unknown'}`}
+                                    />
+                                  )}
+                                </View>
                               </View>
                             </TouchableOpacity>
                           );
@@ -690,6 +734,11 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginBottom: 16,
   },
+  maxWidthSection: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -846,6 +895,11 @@ const styles = StyleSheet.create({
     color: COLORS.light.muted,
   },
   obsRight: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  obsStatusRangeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

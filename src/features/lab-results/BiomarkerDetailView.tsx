@@ -1,5 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown, FileText } from 'lucide-react-native';
 import Svg, {
@@ -13,6 +21,7 @@ import type { Observation } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
@@ -221,7 +230,7 @@ export function BiomarkerDetailView() {
             high={marker?.referenceRange?.high}
           />
         )}
-        <View>
+        <View style={styles.historyListContainer}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ expanded: isHistoryListExpanded }}
@@ -246,12 +255,22 @@ export function BiomarkerDetailView() {
                   <Text style={styles.historyDate}>
                     {formatDisplayDate(measurement.date)}
                   </Text>
-                  <View style={styles.valueGroup}>
-                    <Text style={styles.historyValue}>{measurement.value}</Text>
-                    <Text style={styles.unit}>{measurement.unit}</Text>
-                    <MeasurementStatusBadge
-                      status={measurement.status}
-                      testID={`biomarker-status-${measurement.id}`}
+                  <View style={styles.historyValueColumn}>
+                    <View style={styles.valueGroup}>
+                      <Text style={styles.historyValue}>
+                        {measurement.value}
+                      </Text>
+                      <Text style={styles.unit}>{measurement.unit}</Text>
+                      <MeasurementStatusBadge
+                        status={measurement.status}
+                        testID={`biomarker-status-${measurement.id}`}
+                      />
+                    </View>
+                    <BiomarkerRangeLine
+                      value={measurement.value}
+                      low={marker?.referenceRange?.low}
+                      high={marker?.referenceRange?.high}
+                      testID={`biomarker-history-range-${measurement.id}`}
                     />
                   </View>
                 </View>
@@ -366,10 +385,17 @@ function BiomarkerChart({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
-  const width = chartWidth || 240;
+  const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const maxChartWidth = Math.max(
+    1,
+    Math.min(600, screenWidth - insets.left - insets.right - 4)
+  );
+  const width = chartWidth || Math.max(1, maxChartWidth - 24);
   const height = 320;
-  const paddingLeft = 64;
-  const paddingRight = 48;
+  // Keep axis labels and date ticks inside the SVG viewport on narrow screens.
+  const paddingLeft = Math.min(64, Math.max(32, width * 0.1));
+  const paddingRight = Math.min(48, Math.max(28, width * 0.12));
   const paddingTop = 32;
   const paddingBottom = 48;
   const values = measurements.map((item) => item.value);
@@ -396,11 +422,16 @@ function BiomarkerChart({
   });
   return (
     <View
-      style={styles.chart}
+      style={[styles.chart, { width: maxChartWidth }]}
       testID="biomarker-chart"
       accessibilityLabel="Biomarker values over time"
       onLayout={(event) =>
-        setChartWidth(Math.max(1, event.nativeEvent.layout.width - 24))
+        setChartWidth(
+          Math.max(
+            1,
+            Math.min(maxChartWidth, event.nativeEvent.layout.width) - 24
+          )
+        )
       }
     >
       <View style={{ width, height }}>
@@ -466,7 +497,7 @@ function BiomarkerChart({
             strokeWidth="1"
           />
           <SvgText
-            x={paddingLeft - 2}
+            x={paddingLeft - 8}
             y={yFor(highValue) - 4}
             fill="#EF4444"
             fontSize="12"
@@ -476,7 +507,7 @@ function BiomarkerChart({
             High
           </SvgText>
           <SvgText
-            x={paddingLeft - 2}
+            x={paddingLeft - 8}
             y={yFor(highValue) + 12}
             fill="#EF4444"
             fontSize="12"
@@ -486,7 +517,7 @@ function BiomarkerChart({
             {highValue}
           </SvgText>
           <SvgText
-            x={paddingLeft - 2}
+            x={paddingLeft - 8}
             y={yFor(lowValue) - 4}
             fill="#3B82F6"
             fontSize="12"
@@ -496,7 +527,7 @@ function BiomarkerChart({
             Low
           </SvgText>
           <SvgText
-            x={paddingLeft - 2}
+            x={paddingLeft - 8}
             y={yFor(lowValue) + 12}
             fill="#3B82F6"
             fontSize="12"
@@ -632,6 +663,11 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 6,
   },
+  historyListContainer: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'flex-start',
+  },
   historyListTitle: {
     color: COLORS.light.foreground,
     fontSize: 15,
@@ -684,8 +720,8 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   chart: {
-    width: '100%',
     maxWidth: 600,
+    marginHorizontal: -6,
     borderRadius: 16,
     padding: 12,
     backgroundColor: COLORS.light.card,
@@ -705,6 +741,7 @@ const styles = StyleSheet.create({
   },
   historyDate: { color: COLORS.light.textSecondary, fontSize: 14 },
   valueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  historyValueColumn: { alignItems: 'flex-end', gap: 8 },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
