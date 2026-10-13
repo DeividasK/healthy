@@ -50,3 +50,8 @@
     --android-ring: 61 100 80;
   }
 }
+
+/* Keep this field's text color when NativeWind applies its placeholder-shown reset. */
+#condition-search-input:placeholder-shown {
+  color: rgb(var(--foreground));
+}

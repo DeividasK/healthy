@@ -75,7 +75,7 @@ export function buildConsultationData(
   return {
     id,
     patientId: overrides?.patientId,
-    conditionId: overrides?.conditionId,
+    conditionIds: overrides?.conditionIds,
     title: overrides?.title ?? `General Checkup ${entityCounter + 1}`,
     doctorName: overrides?.doctorName ?? 'Dr. Smith',
     serviceType: overrides?.serviceType,

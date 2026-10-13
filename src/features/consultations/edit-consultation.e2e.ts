@@ -27,7 +27,7 @@ test.describe('Edit Consultation Flow', () => {
         conditionId = cond.id;
 
         const cons = await seedTestConsultation(page, {
-          conditionId,
+          conditionIds: [conditionId],
           title: 'Initial Checkup',
           doctorName: 'Dr. Watson',
           date: '2026-10-01',
@@ -94,7 +94,7 @@ test.describe('Edit Consultation Flow', () => {
         conditionId = cond.id;
 
         const cons = await seedTestConsultation(page, {
-          conditionId,
+          conditionIds: [conditionId],
           title: 'Consultation To Delete',
           doctorName: 'Dr. Strange',
           date: '2026-10-02',

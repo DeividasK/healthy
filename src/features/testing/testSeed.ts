@@ -33,7 +33,7 @@ export interface SeedReportOptions {
 export interface SeedConsultationOptions {
   id?: string;
   patientId?: string;
-  conditionId?: string | null;
+  conditionIds?: string[];
   title: string;
   doctorName?: string;
   serviceType?: string;
@@ -64,6 +64,7 @@ export async function seedTestPatient(
   if (page.url().includes('/profile/new')) {
     await page.goto('/');
   }
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return patient;
 }
 

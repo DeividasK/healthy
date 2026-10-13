@@ -41,7 +41,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       title: 'Header navigation',
     });
     const consultation = await seedTestConsultation(page, {
-      conditionId: condition.id,
+      conditionIds: [condition.id],
       title: 'Dock navigation',
     });
     await page.goto('/');

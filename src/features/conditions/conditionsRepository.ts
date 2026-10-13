@@ -1,6 +1,11 @@
-import type { Condition } from 'fhir/r5';
+import type { Condition, Encounter } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
-import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
+import {
+  getConditionTitle,
+  getConditionNotes,
+  getConsultationConditionIds,
+  withConsultationConditions,
+} from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
@@ -153,6 +158,50 @@ export async function fetchConditionById(
  */
 export async function deleteConditionRecord(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM conditions WHERE id = ?;`, [id]);
-  notifyDatabaseChanged(['conditions']);
+  await db.withTransactionAsync(async () => {
+    const rows = await db.getAllAsync<{ id: string; fhir_json: string }>(
+      'SELECT id, fhir_json FROM consultations WHERE patient_id = (SELECT patient_id FROM conditions WHERE id = ?);',
+      [id]
+    );
+    const now = new Date().toISOString();
+    for (const row of rows) {
+      const encounter: Encounter = JSON.parse(row.fhir_json);
+      const reference = `Condition/${id}`;
+      const hasReason = encounter.reason?.some((reason) =>
+        reason.value?.some((value) => value.reference?.reference === reference)
+      );
+      if (!getConsultationConditionIds(encounter).includes(id) && !hasReason)
+        continue;
+      const updated = withConsultationConditions(
+        encounter,
+        getConsultationConditionIds(encounter).filter(
+          (conditionId) => conditionId !== id
+        )
+      );
+      updated.reason = encounter.reason?.flatMap((reason) => {
+        if (
+          !reason.value?.some(
+            (value) => value.reference?.reference === reference
+          )
+        )
+          return [reason];
+        const value = reason.value?.filter(
+          (value) => value.reference?.reference !== reference
+        );
+        return value?.length ? [{ ...reason, value }] : [];
+      });
+      if (!updated.reason?.length) delete updated.reason;
+      updated.meta = { ...encounter.meta, lastUpdated: now };
+      await db.runAsync(
+        'UPDATE consultations SET fhir_json = ?, updated_at = ? WHERE id = ?;',
+        [JSON.stringify(updated), now, row.id]
+      );
+    }
+    await db.runAsync('DELETE FROM conditions WHERE id = ?;', [id]);
+  });
+  notifyDatabaseChanged([
+    'conditions',
+    'consultations',
+    'consultation_conditions',
+  ]);
 }

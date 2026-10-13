@@ -25,16 +25,20 @@ test.describe('View Condition View - Visual Regression', () => {
     await takeSnapshot(page, 'Condition View - No consultations', testInfo);
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-follow-up',
-      conditionId: cond.id,
+      conditionIds: [cond.id],
       title: 'Follow-up for Left Knee Pain',
       doctorName: 'Dr. Marcus Welby',
       date: '2026-10-07',
       notes: 'Continue physiotherapy and review MRI results.',
       status: 'completed',
     });
+    const second = await seedTestCondition(page, {
+      id: 'condition-secondary-visual',
+      title: 'Ligament injury',
+    });
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-test',
-      conditionId: cond.id,
+      conditionIds: [cond.id, second.id],
       title: 'Orthopedic Evaluation',
       doctorName: 'Dr. Sarah Connor',
       date: '2026-10-04',

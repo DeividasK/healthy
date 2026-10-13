@@ -178,7 +178,12 @@ export async function fetchStoredPatientById(
 export async function deletePatientRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM patients WHERE id = ?;`, [id]);
-  notifyDatabaseChanged(['patients']);
+  notifyDatabaseChanged([
+    'patients',
+    'conditions',
+    'consultations',
+    'consultation_conditions',
+  ]);
 }
 
 /**

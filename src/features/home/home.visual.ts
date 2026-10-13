@@ -45,6 +45,22 @@ test.describe('Home View - Visual Regression', () => {
       'Home View - Condition and Consultation cards',
       testInfo
     );
+    await seedTestCondition(page, {
+      id: 'second-home-visual',
+      title: 'Ligament injury',
+    });
+    await seedTestConsultation(page, {
+      id: 'multi-home-visual',
+      title: 'Combined review',
+      conditionIds: ['condition-home-visual', 'second-home-visual'],
+    });
+    await page.goto('/');
+    await page.getByTestId('condition-card-second-home-visual').waitFor();
+    await takeSnapshot(
+      page,
+      'Home View - Shared consultation diagnoses',
+      testInfo
+    );
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('floating-add-menu').waitFor();
     await takeSnapshot(page, 'Home View - Add menu', testInfo);

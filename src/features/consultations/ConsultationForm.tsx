@@ -1,6 +1,6 @@
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -46,7 +46,7 @@ import type { Condition } from 'fhir/r5';
 export interface ConsultationStatusOption {
   id: string;
   label: string;
-  status: 'completed' | 'planned';
+  status: string;
   dotColor: string;
 }
 
@@ -95,13 +95,13 @@ export interface ConsultationFormValues {
   time?: string | null;
   doctorName?: string;
   serviceType?: string;
-  conditionId?: string | null;
+  conditionIds?: string[];
   notes?: string;
 }
 
 export interface ConsultationFormProps {
   initialValues?: Partial<ConsultationFormValues>;
-  initialConditionId?: string | null;
+  initialConditionIds?: string[];
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
   onSave: (values: {
@@ -111,7 +111,7 @@ export interface ConsultationFormProps {
     date: string;
     doctorName?: string;
     serviceType?: string;
-    conditionId?: string | null;
+    conditionIds?: string[];
     notes?: string;
   }) => Promise<void>;
 }
@@ -126,7 +126,7 @@ function showAlert(title: string, message: string) {
 
 export function ConsultationForm({
   initialValues,
-  initialConditionId,
+  initialConditionIds,
   isEdit = false,
   onSave,
   onDelete,
@@ -135,17 +135,37 @@ export function ConsultationForm({
   const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
 
+  const statusOptions = useMemo(() => {
+    const existingStatus = initialValues?.status;
+    if (
+      !existingStatus ||
+      CONSULTATION_STATUS_OPTIONS.some(
+        (option) => option.status === existingStatus
+      )
+    )
+      return CONSULTATION_STATUS_OPTIONS;
+    return [
+      ...CONSULTATION_STATUS_OPTIONS,
+      {
+        id: existingStatus,
+        label: existingStatus.charAt(0).toUpperCase() + existingStatus.slice(1),
+        status: existingStatus,
+        dotColor: COLORS.light.muted,
+      },
+    ];
+  }, [initialValues?.status]);
+
   const [title, setTitle] = useState(initialValues?.title || '');
   const [selectedStatus, setSelectedStatus] =
     useState<ConsultationStatusOption>(() => {
       if (initialValues?.status) {
-        const found = CONSULTATION_STATUS_OPTIONS.find(
+        const found = statusOptions.find(
           (s) =>
             s.status === initialValues.status || s.id === initialValues.status
         );
         if (found) return found;
       }
-      return CONSULTATION_STATUS_OPTIONS[0]; // Completed
+      return statusOptions[0]; // Completed
     });
 
   const [date, setDate] = useState<Date>(initialValues?.date || new Date());
@@ -169,17 +189,15 @@ export function ConsultationForm({
   );
   const [notes, setNotes] = useState(initialValues?.notes || '');
 
-  // Associated condition selection (removable optional field)
-  const initialCondId =
-    initialValues?.conditionId !== undefined
-      ? initialValues.conditionId
-      : initialConditionId || null;
-  const [selectedConditionId, setSelectedConditionId] = useState<string | null>(
-    initialCondId
+  const [selectedConditionIds, setSelectedConditionIds] = useState<string[]>(
+    initialValues?.conditionIds ?? initialConditionIds ?? []
   );
-  const [showCondition, setShowCondition] = useState<boolean>(
-    Boolean(initialCondId)
+  const [showCondition, setShowCondition] = useState(
+    Boolean((initialValues?.conditionIds ?? initialConditionIds)?.length)
   );
+  const [conditionQuery, setConditionQuery] = useState('');
+  const [isConditionFocused, setIsConditionFocused] = useState(false);
+  const conditionSearchRef = useRef<View>(null);
 
   const [availableConditions, setAvailableConditions] = useState<Condition[]>(
     []
@@ -190,7 +208,6 @@ export function ConsultationForm({
   const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showConditionModal, setShowConditionModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load patient conditions, doctors, and service types
@@ -237,18 +254,9 @@ export function ConsultationForm({
     return all.filter((st) => st.toLowerCase().includes(trimmed));
   }, [serviceType, knownServiceTypes]);
 
-  const selectedConditionLabel = useMemo(() => {
-    if (!selectedConditionId) return 'Select condition';
-    const found = availableConditions.find((c) => c.id === selectedConditionId);
-    return found ? getConditionTitle(found) : 'Select condition';
-  }, [selectedConditionId, availableConditions]);
-
   const handleStatusPress = () => {
     if (Platform.OS === 'ios') {
-      const options = [
-        ...CONSULTATION_STATUS_OPTIONS.map((s) => s.label),
-        'Cancel',
-      ];
+      const options = [...statusOptions.map((s) => s.label), 'Cancel'];
       const cancelButtonIndex = options.length - 1;
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -258,7 +266,7 @@ export function ConsultationForm({
         },
         (buttonIndex) => {
           if (buttonIndex !== cancelButtonIndex) {
-            setSelectedStatus(CONSULTATION_STATUS_OPTIONS[buttonIndex]);
+            setSelectedStatus(statusOptions[buttonIndex]);
           }
         }
       );
@@ -267,29 +275,14 @@ export function ConsultationForm({
     }
   };
 
-  const handleConditionPress = () => {
-    if (Platform.OS === 'ios') {
-      const conditionOptions = [
-        ...availableConditions.map((c) => getConditionTitle(c)),
-        'Cancel',
-      ];
-      const cancelButtonIndex = conditionOptions.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: conditionOptions,
-          cancelButtonIndex,
-          title: 'Select Condition',
-        },
-        (buttonIndex) => {
-          if (buttonIndex === cancelButtonIndex) return;
-          const picked = availableConditions[buttonIndex];
-          if (picked?.id) setSelectedConditionId(picked.id);
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowConditionModal(true);
-    }
-  };
+  const conditionOptions = availableConditions.filter(
+    (condition) =>
+      condition.id &&
+      !selectedConditionIds.includes(condition.id) &&
+      getConditionTitle(condition)
+        .toLowerCase()
+        .includes(conditionQuery.trim().toLowerCase())
+  );
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -301,7 +294,16 @@ export function ConsultationForm({
     try {
       setIsSaving(true);
       const formattedDate = formatLocalDate(date);
-      const fullDate = time ? `${formattedDate}T${time}:00` : formattedDate;
+      const localDate = new Date(date);
+      if (time) {
+        const [hours, minutes] = time.split(':').map(Number);
+        localDate.setHours(hours, minutes, 0, 0);
+      }
+      const offset = -localDate.getTimezoneOffset();
+      const zone = `${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0')}:${String(Math.abs(offset) % 60).padStart(2, '0')}`;
+      const fullDate = time
+        ? `${formattedDate}T${time}:00${zone}`
+        : formattedDate;
 
       await onSave({
         id: initialValues?.id,
@@ -314,7 +316,7 @@ export function ConsultationForm({
           showServiceType && serviceType.trim()
             ? serviceType.trim()
             : undefined,
-        conditionId: showCondition ? selectedConditionId : null,
+        conditionIds: selectedConditionIds.filter(Boolean),
         notes: showNotes && notes.trim() ? notes.trim() : undefined,
       });
 
@@ -328,8 +330,8 @@ export function ConsultationForm({
 
       if (router.canGoBack()) {
         router.back();
-      } else if (showCondition && selectedConditionId) {
-        router.replace(`/condition/${selectedConditionId}` as any);
+      } else if (showCondition && selectedConditionIds[0]) {
+        router.replace(`/condition/${selectedConditionIds[0]}` as any);
       } else {
         router.replace('/');
       }
@@ -366,7 +368,7 @@ export function ConsultationForm({
   if (!showCondition) {
     plusMenuOptions.push({
       id: 'add-condition',
-      label: 'Add Condition',
+      label: 'Add Conditions',
       icon: (
         <FolderPlus
           color={COLORS.light.primary}
@@ -375,16 +377,7 @@ export function ConsultationForm({
         />
       ),
       testID: 'menu-add-condition',
-      onPress: () => {
-        setShowCondition(true);
-        const targetId =
-          selectedConditionId ||
-          initialConditionId ||
-          (availableConditions.length > 0 ? availableConditions[0].id : null);
-        if (targetId) {
-          setSelectedConditionId(targetId);
-        }
-      },
+      onPress: () => setShowCondition(true),
     });
   }
   if (!showDoctor) {
@@ -433,20 +426,6 @@ export function ConsultationForm({
     });
   }
 
-  const conditionModalOptions = availableConditions.map((c) => ({
-    id: c.id || 'cond',
-    label: getConditionTitle(c),
-    icon: (
-      <FolderPlus
-        color={COLORS.light.primary}
-        size={18}
-        style={{ marginRight: 12 }}
-      />
-    ),
-    testID: `condition-option-${c.id}`,
-    onPress: () => setSelectedConditionId(c.id || null),
-  }));
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.keyboardContainer}>
@@ -458,7 +437,7 @@ export function ConsultationForm({
           <ScreenHeading testID="header-title">
             {isEdit ? 'Edit Consultation' : 'New Consultation'}
           </ScreenHeading>
-          {/* Top Pill Row: Status, Date, Time, Condition, Plus Button */}
+          {/* Top Pill Row: Status, Date, Time, Plus Button */}
           <View style={styles.pillRow}>
             {/* Status Pill */}
             <TouchableOpacity
@@ -489,7 +468,7 @@ export function ConsultationForm({
                     'aria-label': 'Consultation status',
                     value: selectedStatus.id,
                     onChange: (e: any) => {
-                      const found = CONSULTATION_STATUS_OPTIONS.find(
+                      const found = statusOptions.find(
                         (s) => s.id === e.target.value
                       );
                       if (found) setSelectedStatus(found);
@@ -508,7 +487,7 @@ export function ConsultationForm({
                     },
                     'data-testid': 'status-picker-select',
                   },
-                  CONSULTATION_STATUS_OPTIONS.map((opt) =>
+                  statusOptions.map((opt) =>
                     React.createElement(
                       'option',
                       { key: opt.id, value: opt.id },
@@ -538,85 +517,6 @@ export function ConsultationForm({
               />
             )}
 
-            {/* Optional Condition Association Pill */}
-            {showCondition && (
-              <View style={styles.conditionPill}>
-                <TouchableOpacity
-                  testID="condition-picker-button"
-                  style={styles.conditionPillTouchable}
-                  onPress={handleConditionPress}
-                  activeOpacity={0.8}
-                >
-                  <FolderPlus
-                    color={COLORS.light.iconMuted}
-                    size={15}
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text
-                    style={styles.conditionPillText}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {selectedConditionLabel}
-                  </Text>
-                  <ChevronDown
-                    color={COLORS.light.iconClear}
-                    size={16}
-                    style={{ marginLeft: 4 }}
-                  />
-
-                  {Platform.OS === 'web' &&
-                    React.createElement(
-                      'select',
-                      {
-                        id: 'consultation-condition-select',
-                        name: 'conditionId',
-                        'aria-label': 'Associated condition',
-                        value: selectedConditionId || '',
-                        onChange: (e: any) => {
-                          const val = e.target.value;
-                          setSelectedConditionId(val ? val : null);
-                        },
-                        style: {
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 28,
-                          bottom: 0,
-                          opacity: 0,
-                          width: 'calc(100% - 28px)',
-                          height: '100%',
-                          cursor: 'pointer',
-                          zIndex: 10,
-                        },
-                        'data-testid': 'condition-picker-select',
-                      },
-                      availableConditions.map((cond) =>
-                        React.createElement(
-                          'option',
-                          { key: cond.id, value: cond.id },
-                          getConditionTitle(cond)
-                        )
-                      )
-                    )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  testID="remove-condition-button"
-                  onPress={() => {
-                    setShowCondition(false);
-                    setSelectedConditionId(null);
-                  }}
-                  style={styles.removePillButton}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove condition"
-                >
-                  <X color={COLORS.light.iconClear} size={14} />
-                </TouchableOpacity>
-              </View>
-            )}
-
             {/* Plus Action Button */}
             {plusMenuOptions.length > 0 && (
               <PlusCircleButton
@@ -642,6 +542,109 @@ export function ConsultationForm({
               onChangeText={setTitle}
             />
           </View>
+
+          {showCondition && (
+            <View
+              style={styles.inputSection}
+              testID="consultation-conditions-section"
+            >
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.inputLabel}>Conditions</Text>
+                <TouchableOpacity
+                  testID="remove-conditions-section-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove conditions section"
+                  onPress={() => {
+                    setShowCondition(false);
+                    setSelectedConditionIds([]);
+                    setConditionQuery('');
+                    setIsConditionFocused(false);
+                  }}
+                >
+                  <X color={COLORS.light.iconClear} size={16} />
+                </TouchableOpacity>
+              </View>
+              {selectedConditionIds.map((conditionId, index) => (
+                <View
+                  key={conditionId}
+                  style={styles.selectedConditionRow}
+                  testID={`selected-condition-${conditionId}`}
+                >
+                  <Text style={styles.selectedConditionText}>
+                    {availableConditions
+                      .filter((condition) => condition.id === conditionId)
+                      .map(getConditionTitle)[0] || conditionId}
+                  </Text>
+                  <TouchableOpacity
+                    testID={
+                      index === 0
+                        ? 'remove-condition-button'
+                        : `remove-condition-button-${index}`
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove condition ${availableConditions.filter((condition) => condition.id === conditionId).map(getConditionTitle)[0] || conditionId}`}
+                    onPress={() =>
+                      setSelectedConditionIds((current) =>
+                        current.filter((id) => id !== conditionId)
+                      )
+                    }
+                  >
+                    <X color={COLORS.light.iconClear} size={16} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <View
+                ref={conditionSearchRef}
+                onFocus={() => setIsConditionFocused(true)}
+                onBlur={(event: any) => {
+                  const next = event.relatedTarget;
+                  if (
+                    next &&
+                    (conditionSearchRef.current as any)?.contains?.(next)
+                  )
+                    return;
+                  setIsConditionFocused(false);
+                }}
+              >
+                <TextInput
+                  testID="condition-search-input"
+                  id="condition-search-input"
+                  nativeID="condition-search-input"
+                  name="conditionSearch"
+                  accessibilityLabel="Select conditions"
+                  style={styles.textInput}
+                  placeholder="Select..."
+                  placeholderTextColor={COLORS.light.mutedForeground}
+                  value={conditionQuery}
+                  onChangeText={(value) => {
+                    setConditionQuery(value);
+                    setIsConditionFocused(true);
+                  }}
+                  onFocus={() => setIsConditionFocused(true)}
+                  onPressIn={() => setIsConditionFocused(true)}
+                />
+                {isConditionFocused && (
+                  <AutocompleteDropdown
+                    testID="condition-autocomplete-list"
+                    itemTestIDPrefix="condition-autocomplete-item-"
+                    items={conditionOptions.map((condition) => ({
+                      id: condition.id!,
+                      label: getConditionTitle(condition),
+                    }))}
+                    onSelect={(item) => {
+                      setSelectedConditionIds((current) =>
+                        current.includes(item.id)
+                          ? current
+                          : [...current, item.id]
+                      );
+                      setConditionQuery('');
+                      setIsConditionFocused(false);
+                    }}
+                  />
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Service Type / Specialty Section (Optional) */}
           {showServiceType && (
@@ -816,7 +819,7 @@ export function ConsultationForm({
           onClose={() => setShowStatusModal(false)}
           overlayTestID="status-menu-overlay"
           cardTestID="status-menu-card"
-          options={CONSULTATION_STATUS_OPTIONS.map((opt) => ({
+          options={statusOptions.map((opt) => ({
             id: opt.id,
             label: opt.label,
             icon: (
@@ -833,15 +836,6 @@ export function ConsultationForm({
             testID: `status-option-${opt.id}`,
             onPress: () => setSelectedStatus(opt),
           }))}
-        />
-
-        {/* Condition Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showConditionModal}
-          onClose={() => setShowConditionModal(false)}
-          overlayTestID="condition-menu-overlay"
-          cardTestID="condition-menu-card"
-          options={conditionModalOptions}
         />
       </View>
     </SafeAreaView>
@@ -892,33 +886,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
   },
-  conditionPill: {
-    position: 'relative',
+  selectedConditionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    paddingLeft: 12,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderRadius: 20,
-    maxWidth: 220,
+    gap: 12,
+    paddingVertical: 10,
   },
-  conditionPillTouchable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  conditionPillText: {
-    fontSize: 14,
-    fontWeight: '500',
+  selectedConditionText: {
+    flex: 1,
+    fontSize: 15,
     color: COLORS.light.foreground,
-    maxWidth: 120,
-  },
-  removePillButton: {
-    padding: 4,
-    marginLeft: 4,
-    zIndex: 20,
   },
   sectionHeaderRow: {
     flexDirection: 'row',

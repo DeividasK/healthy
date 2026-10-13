@@ -5,7 +5,7 @@ import {
   getConsultationDoctor,
   getConsultationServiceType,
   getConsultationNotes,
-  getConsultationConditionId,
+  getConsultationConditionIds,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
@@ -22,11 +22,36 @@ import {
 export async function insertConsultationRecord(
   consultation: Encounter,
   patientId: string = DEFAULT_PATIENT_ID,
-  explicitConditionId?: string | null,
   isRemoteSync: boolean = false
 ): Promise<void> {
   if (!consultation.id) {
     throw new Error('Consultation requires an id to be persisted');
+  }
+
+  if (
+    consultation.resourceType !== 'Encounter' ||
+    ![
+      'planned',
+      'in-progress',
+      'on-hold',
+      'discharged',
+      'completed',
+      'cancelled',
+      'discontinued',
+      'entered-in-error',
+      'unknown',
+    ].includes(consultation.status)
+  ) {
+    throw new Error('Encounter requires a valid FHIR R5 status');
+  }
+  for (const date of [
+    consultation.actualPeriod?.start,
+    consultation.actualPeriod?.end,
+    consultation.plannedStartDate,
+    consultation.plannedEndDate,
+  ]) {
+    if (date?.includes('T') && !/(Z|[+-]\d{2}:\d{2})$/.test(date))
+      throw new Error('Encounter date-time requires a timezone offset');
   }
 
   const db = await getDb();
@@ -48,10 +73,10 @@ export async function insertConsultationRecord(
   const doctorName = getConsultationDoctor(consultation);
   const serviceType = getConsultationServiceType(consultation);
   const notesText = getConsultationNotes(consultation);
-  const resolvedConditionId =
-    explicitConditionId !== undefined
-      ? explicitConditionId
-      : getConsultationConditionId(consultation);
+  const conditionIds = getConsultationConditionIds(consultation);
+  if (consultation.subject?.reference !== `Patient/${patientId}`) {
+    throw new Error('Encounter subject must match its patient');
+  }
   const status = consultation.status || 'completed';
   const consId = consultation.id;
 
@@ -78,22 +103,21 @@ export async function insertConsultationRecord(
       return;
     }
 
-    let validConditionId: string | null = null;
-    if (resolvedConditionId) {
-      const condRow = await db.getFirstAsync<{ id: string }>(
-        `SELECT id FROM conditions WHERE id = ? AND patient_id = ?;`,
-        [resolvedConditionId, patientId]
+    for (const conditionId of conditionIds) {
+      const condition = await db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM conditions WHERE id = ? AND patient_id = ?;',
+        [conditionId, patientId]
       );
-      if (condRow) {
-        validConditionId = resolvedConditionId;
-      }
+      if (!condition)
+        throw new Error(
+          'Diagnosis must reference an existing condition belonging to the same patient'
+        );
     }
 
     await db.runAsync(
-      `INSERT INTO consultations (id, patient_id, condition_id, date, doctor_name, service_type, title, notes, status, fhir_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO consultations (id, patient_id, date, doctor_name, service_type, title, notes, status, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         condition_id = excluded.condition_id,
          date = excluded.date,
          doctor_name = excluded.doctor_name,
          service_type = excluded.service_type,
@@ -105,7 +129,6 @@ export async function insertConsultationRecord(
       [
         consId,
         patientId,
-        validConditionId ?? null,
         date,
         doctorName ?? null,
         serviceType ?? null,
@@ -117,12 +140,22 @@ export async function insertConsultationRecord(
         incomingTimestamp,
       ]
     );
+    await db.runAsync(
+      'DELETE FROM consultation_conditions WHERE consultation_id = ?;',
+      [consId]
+    );
+    for (const conditionId of conditionIds) {
+      await db.runAsync(
+        'INSERT INTO consultation_conditions (consultation_id, condition_id) VALUES (?, ?);',
+        [consId, conditionId]
+      );
+    }
     didUpdate = true;
   });
 
   if (didUpdate) {
     await clearPendingConsultationDeletions([consId]);
-    notifyDatabaseChanged(['consultations']);
+    notifyDatabaseChanged(['consultations', 'consultation_conditions']);
   }
 }
 
@@ -162,7 +195,7 @@ export async function fetchConsultationsByConditionId(
 ): Promise<Encounter[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
-    `SELECT fhir_json, updated_at FROM consultations WHERE condition_id = ? ORDER BY date DESC, created_at DESC, id DESC;`,
+    `SELECT c.fhir_json, c.updated_at FROM consultations c JOIN consultation_conditions cc ON cc.consultation_id = c.id WHERE cc.condition_id = ? ORDER BY c.date DESC, c.created_at DESC, c.id DESC;`,
     [conditionId]
   );
   return rows.map((r) => {
@@ -178,13 +211,17 @@ export async function fetchConsultationsByConditionId(
  * Retrieves a single Consultation record by ID from SQLite.
  */
 export async function fetchConsultationById(
-  id: string
+  id: string,
+  patientId?: string
 ): Promise<Encounter | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<{
     fhir_json: string;
     updated_at: string;
-  }>(`SELECT fhir_json, updated_at FROM consultations WHERE id = ?;`, [id]);
+  }>(
+    `SELECT fhir_json, updated_at FROM consultations WHERE id = ? AND (? IS NULL OR patient_id = ?);`,
+    [id, patientId ?? null, patientId ?? null]
+  );
   if (!row) return null;
   const enc: Encounter = JSON.parse(row.fhir_json);
   if (!enc.meta?.lastUpdated && row.updated_at) {
@@ -200,7 +237,7 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
   await recordPendingConsultationDeletion(id);
-  notifyDatabaseChanged(['consultations']);
+  notifyDatabaseChanged(['consultations', 'consultation_conditions']);
 }
 
 /**

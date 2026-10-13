@@ -20,9 +20,9 @@ async function openAddConsultationForCondition(
     .getByTestId('condition-add-menu')
     .getByTestId('menu-add-consultation')
     .click();
-  await expect(page.getByTestId('condition-picker-select')).toHaveValue(
-    conditionId
-  );
+  await expect(
+    page.getByTestId(`selected-condition-${conditionId}`)
+  ).toBeVisible();
 }
 
 test.describe('Add Consultation Flow', () => {
@@ -139,7 +139,7 @@ test.describe('Add Consultation Flow', () => {
         });
         conditionId = cond.id;
         await seedTestConsultation(page, {
-          conditionId,
+          conditionIds: [conditionId],
           title: 'Initial Consultation',
           doctorName: 'Dr. Gregory House',
           date: '2026-10-01',
@@ -180,7 +180,7 @@ test.describe('Add Consultation Flow', () => {
         });
         conditionId = cond.id;
         await seedTestConsultation(page, {
-          conditionId,
+          conditionIds: [conditionId],
           title: 'Knee Arthroscopy Review',
           doctorName: 'Dr. John Doe',
         });
@@ -308,8 +308,10 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByText('New Consultation')).toBeVisible();
       });
 
-      await test.step('Verify condition pill is present and test removal and re-addition', async () => {
-        const conditionPill = page.getByTestId('condition-picker-button');
+      await test.step('Verify conditions section supports individual and whole-section removal', async () => {
+        const conditionPill = page.getByTestId(
+          `selected-condition-${conditionId}`
+        );
         await expect(conditionPill).toBeVisible();
         await expect(conditionPill).toContainText('Heart Health Review');
 
@@ -320,11 +322,24 @@ test.describe('Add Consultation Flow', () => {
 
         await expect(conditionPill).not.toBeVisible();
 
+        await expect(
+          page.getByTestId('consultation-conditions-section')
+        ).toBeVisible();
+        await expect(page.getByTestId('condition-search-input')).toBeVisible();
+        await page.getByTestId('remove-conditions-section-button').click();
+        await expect(
+          page.getByTestId('consultation-conditions-section')
+        ).not.toBeVisible();
+
         // Re-add condition via + menu
         await page.getByTestId('add-option-button').click();
         const addCondMenu = page.getByTestId('menu-add-condition');
         await expect(addCondMenu).toBeVisible();
         await addCondMenu.click();
+        await page.getByTestId('condition-search-input').click();
+        await page
+          .getByTestId(`condition-autocomplete-item-${conditionId}`)
+          .click();
 
         await expect(conditionPill).toBeVisible();
       });

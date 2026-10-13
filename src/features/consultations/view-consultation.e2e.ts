@@ -92,7 +92,7 @@ test.describe('View Consultation Flow', () => {
     });
     const consultation = await seedTestConsultation(page, {
       id: 'consultation-condition-navigation',
-      conditionId: condition.id,
+      conditionIds: [condition.id],
       title: 'Orthopedic Review',
       doctorName: 'Dr. Sarah Connor',
       date: '2026-10-04',
@@ -133,7 +133,7 @@ test.describe('View Consultation Flow', () => {
     });
     const consultation = await seedTestConsultation(page, {
       id: 'consultation-readable',
-      conditionId: condition.id,
+      conditionIds: [condition.id],
       title: 'Available consultation',
       doctorName: 'Dr. Sarah Connor',
       notes: 'Consultation notes remain available.',

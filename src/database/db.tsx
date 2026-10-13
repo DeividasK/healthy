@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
+import { notifyDatabaseChanged } from './dbEvents';
 import { COLORS } from '@/src/theme/colors';
 
 export * from './migrations';
@@ -127,8 +128,19 @@ export async function clearAllDatabaseTables(): Promise<void> {
   await db.execAsync(`
     DELETE FROM observations;
     DELETE FROM diagnostic_reports;
+    DELETE FROM consultation_conditions;
+    DELETE FROM consultations;
     DELETE FROM conditions;
     DELETE FROM app_settings;
     DELETE FROM patients;
   `);
+  notifyDatabaseChanged([
+    'observations',
+    'diagnostic_reports',
+    'consultations',
+    'consultation_conditions',
+    'conditions',
+    'patients',
+    'app_settings',
+  ]);
 }
