@@ -51,3 +51,6 @@ storybook-static/
 # Storybook
 build-archive.log
 chromatic.log
+
+# Local implementation plans (never commit)
+/.agents/plans/

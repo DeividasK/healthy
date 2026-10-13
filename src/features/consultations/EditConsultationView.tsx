@@ -1,3 +1,4 @@
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,7 +14,7 @@ import {
   getConsultationDoctor,
   getConsultationServiceType,
   getConsultationNotes,
-  getConsultationConditionId,
+  getConsultationConditionIds,
 } from '@/src/utils/fhirUtils';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -21,6 +22,7 @@ import { COLORS } from '@/src/theme/colors';
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConsultationFormValues | null>(null);
@@ -31,12 +33,12 @@ export function EditConsultationView() {
   const [notFound, setNotFound] = useState(!id);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !activePatientId || isPatientLoading) return;
 
     let isMounted = true;
     (async () => {
       try {
-        const encounter = await getConsultationById(id);
+        const encounter = await getConsultationById(id, activePatientId);
         if (!isMounted) return;
         if (!encounter) {
           setNotFound(true);
@@ -48,6 +50,7 @@ export function EditConsultationView() {
           ? patientRef.replace('Patient/', '')
           : patientRef;
         setInitialPatientId(parsedPatientId);
+        setNotFound(false);
 
         const dateStr =
           encounter.actualPeriod?.start ||
@@ -66,7 +69,7 @@ export function EditConsultationView() {
         const doctorName = getConsultationDoctor(encounter) || undefined;
         const serviceType = getConsultationServiceType(encounter) || undefined;
         const notes = getConsultationNotes(encounter) || undefined;
-        const conditionId = getConsultationConditionId(encounter);
+        const conditionIds = getConsultationConditionIds(encounter);
         const status = encounter.status || 'completed';
 
         setInitialValues({
@@ -77,23 +80,23 @@ export function EditConsultationView() {
           time: timeStr,
           doctorName,
           serviceType,
-          conditionId,
+          conditionIds,
           notes,
         });
       } catch (err) {
         console.error('Failed to load consultation for edit:', err);
-        setNotFound(true);
+        if (isMounted) setNotFound(true);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, activePatientId, isPatientLoading]);
 
-  if (isLoading) {
+  if (isLoading || isPatientLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.light.primary} />
@@ -101,7 +104,7 @@ export function EditConsultationView() {
     );
   }
 
-  if (notFound || !initialValues) {
+  if (notFound || !initialValues || initialPatientId !== activePatientId) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Consultation not found.</Text>
@@ -116,7 +119,7 @@ export function EditConsultationView() {
     date: string;
     doctorName?: string;
     serviceType?: string;
-    conditionId?: string | null;
+    conditionIds?: string[];
     notes?: string;
   }) => {
     await createOrUpdateConsultation({
@@ -138,8 +141,8 @@ export function EditConsultationView() {
           console.warn('Background sync failed on delete consultation:', error)
         );
         router.dismissTo(
-          initialValues.conditionId
-            ? `/condition/${initialValues.conditionId}`
+          initialValues.conditionIds?.[0]
+            ? `/condition/${initialValues.conditionIds?.[0]}`
             : '/'
         );
       }}

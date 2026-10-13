@@ -7,7 +7,8 @@ export type DatabaseTable =
   | 'diagnostic_reports'
   | 'observations'
   | 'app_settings'
-  | 'consultations';
+  | 'consultations'
+  | 'consultation_conditions';
 
 type Listener = (tables: DatabaseTable[]) => void;
 

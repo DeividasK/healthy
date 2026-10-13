@@ -67,7 +67,6 @@ export interface ConditionRecord {
 export interface StoredConsultationRow {
   id: string;
   patient_id: string;
-  condition_id: string | null;
   date: string;
   doctor_name: string | null;
   service_type: string | null;

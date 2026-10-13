@@ -1,3 +1,19 @@
+import { verifyDiagnosisMigration } from '@/src/features/consultations/multipleDiagnosesMigrationFixture';
+import {
+  fetchConsultationById,
+  insertConsultationRecord,
+  deleteConsultationRecord,
+} from '@/src/features/consultations/consultationsRepository';
+import { deleteConditionRecord } from '@/src/features/conditions/conditionsRepository';
+import {
+  exportZipArchive,
+  restoreFromZipBytes,
+} from '@/src/services/zipArchiveService';
+import {
+  backupToGoogleDrive,
+  restoreFromGoogleDrive,
+} from '@/src/services/syncManager';
+import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
 import { createOrUpdatePatient } from '@/src/features/profile/patientService';
 import {
@@ -9,7 +25,6 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
-import { getDb } from '@/src/database/db';
 
 async function resolvePatientId(
   explicitId?: string
@@ -27,6 +42,19 @@ export function setupTestBridge() {
   if (process.env.NODE_ENV === 'production' && !__DEV__) return;
 
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
+    verifyDiagnosisMigration,
+    getConsultation: fetchConsultationById,
+    saveEncounter: insertConsultationRecord,
+    deleteConsultation: deleteConsultationRecord,
+    deleteCondition: deleteConditionRecord,
+    clearDatabase: clearAllDatabaseTables,
+    exportArchive: exportZipArchive,
+    restoreArchive: (bytes: number[]) =>
+      restoreFromZipBytes(new Uint8Array(bytes)),
+    backupToGoogleDrive,
+    restoreFromGoogleDrive,
+    querySql: async (sql: string, params: string[] = []) =>
+      (await getDb()).getAllAsync(sql, params),
     // Prepare database failure scenarios without changing production behavior.
     executeSql: async (sql: string, params: string[] = []) => {
       const db = await getDb();
@@ -120,7 +148,7 @@ export function setupTestBridge() {
     seedConsultation: async (input: {
       id?: string;
       patientId?: string;
-      conditionId?: string | null;
+      conditionIds?: string[];
       title: string;
       doctorName?: string;
       serviceType?: string;
@@ -132,7 +160,7 @@ export function setupTestBridge() {
       return await createOrUpdateConsultation({
         id: input.id,
         patientId,
-        conditionId: input.conditionId,
+        conditionIds: input.conditionIds,
         title: input.title,
         doctorName: input.doctorName,
         serviceType: input.serviceType,

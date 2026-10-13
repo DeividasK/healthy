@@ -25,7 +25,7 @@ export function AddConsultationView() {
     date: string;
     doctorName?: string;
     serviceType?: string;
-    conditionId?: string | null;
+    conditionIds?: string[];
     notes?: string;
   }) => {
     await createOrUpdateConsultation({
@@ -36,7 +36,7 @@ export function AddConsultationView() {
 
   return (
     <ConsultationForm
-      initialConditionId={conditionId || null}
+      initialConditionIds={conditionId ? [conditionId] : []}
       onSave={handleSave}
     />
   );

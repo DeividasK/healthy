@@ -1,4 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
@@ -11,7 +12,7 @@ import { getConditionById } from '@/src/features/conditions/conditionService';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConditionTitle,
-  getConsultationConditionId,
+  getConsultationConditionIds,
   getConsultationDoctor,
   getConsultationNotes,
   getConsultationServiceType,
@@ -22,43 +23,51 @@ import { COLORS } from '@/src/theme/colors';
 export function ViewConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { activePatientId } = useActivePatient();
+  const loadGeneration = useRef(0);
   const [consultation, setConsultation] = useState<Encounter | null>(null);
-  const [relatedCondition, setRelatedCondition] = useState<Condition | null>(
-    null
-  );
+  const [relatedConditions, setRelatedConditions] = useState<Condition[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!id) return;
+    const generation = ++loadGeneration.current;
+    if (!id || !activePatientId) return;
     try {
-      const value = await getConsultationById(id);
+      const value = await getConsultationById(id, activePatientId);
+      if (generation !== loadGeneration.current) return;
       if (!value) {
         setConsultation(null);
-        setRelatedCondition(null);
+        setRelatedConditions([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
       }
-      const conditionId = getConsultationConditionId(value);
-      const condition = conditionId
-        ? await getConditionById(conditionId).catch((error) => {
+      const conditions = await Promise.all(
+        getConsultationConditionIds(value).map((conditionId) =>
+          getConditionById(conditionId).catch((error) => {
             console.warn('Failed to load related condition:', error);
             return null;
           })
-        : null;
+        )
+      );
+      if (generation !== loadGeneration.current) return;
       setConsultation(value);
-      setRelatedCondition(condition);
+      setRelatedConditions(
+        conditions.filter((condition): condition is Condition =>
+          Boolean(condition)
+        )
+      );
       setNotFound(false);
       setHasLoadError(false);
     } catch (error) {
       console.error('Failed to load consultation view data:', error);
-      setHasLoadError(true);
+      if (generation === loadGeneration.current) setHasLoadError(true);
     } finally {
-      setIsLoading(false);
+      if (generation === loadGeneration.current) setIsLoading(false);
     }
-  }, [id]);
+  }, [id, activePatientId]);
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(['consultations', 'conditions'], loadData);
@@ -67,7 +76,12 @@ export function ViewConsultationView() {
     return <ResourceViewLayout testID="consultation-view" isLoading />;
   }
 
-  if (hasLoadError || notFound || !consultation) {
+  if (
+    hasLoadError ||
+    notFound ||
+    !consultation ||
+    consultation.subject?.reference !== `Patient/${activePatientId}`
+  ) {
     return (
       <ResourceViewLayout
         testID="consultation-view"
@@ -113,25 +127,34 @@ export function ViewConsultationView() {
         </View>
       )}
 
-      {relatedCondition && (
+      {relatedConditions.length > 0 && (
         <View style={styles.relatedSection}>
-          <Text style={styles.sectionTitle}>Condition</Text>
-          <TouchableOpacity
-            testID="consultation-related-condition"
-            accessibilityRole="button"
-            accessibilityLabel={`View condition: ${getConditionTitle(relatedCondition)}`}
-            style={styles.conditionRow}
-            onPress={() =>
-              relatedCondition.id &&
-              router.dismissTo(`/condition/${relatedCondition.id}`)
-            }
-            activeOpacity={0.75}
-          >
-            <Text style={styles.conditionTitle}>
-              {getConditionTitle(relatedCondition)}
-            </Text>
-            <ChevronRight color={COLORS.light.muted} size={18} />
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>
+            {relatedConditions.length === 1 ? 'Condition' : 'Conditions'}
+          </Text>
+          {relatedConditions.map((relatedCondition, index) => (
+            <TouchableOpacity
+              key={relatedCondition.id}
+              testID={
+                index === 0
+                  ? 'consultation-related-condition'
+                  : `consultation-related-condition-${relatedCondition.id}`
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`View condition: ${getConditionTitle(relatedCondition)}`}
+              style={styles.conditionRow}
+              onPress={() =>
+                relatedCondition.id &&
+                router.dismissTo(`/condition/${relatedCondition.id}`)
+              }
+              activeOpacity={0.75}
+            >
+              <Text style={styles.conditionTitle}>
+                {getConditionTitle(relatedCondition)}
+              </Text>
+              <ChevronRight color={COLORS.light.muted} size={18} />
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </ResourceViewLayout>

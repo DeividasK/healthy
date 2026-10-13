@@ -19,9 +19,13 @@ test.describe('View Consultation - Visual Regression', () => {
       status: 'active',
       onsetDate: '2026-10-02',
     });
+    const second = await seedTestCondition(page, {
+      id: 'second-diagnosis-visual',
+      title: 'Ligament injury with a long original diagnosis description',
+    });
     const consultation = await seedTestConsultation(page, {
       id: 'consultation-view-visual',
-      conditionId: condition.id,
+      conditionIds: [condition.id, second.id],
       title: 'Orthopedic Evaluation',
       doctorName: 'Dr. Sarah Connor',
       serviceType: 'Orthopedics',

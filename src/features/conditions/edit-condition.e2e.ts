@@ -254,9 +254,9 @@ test.describe('Edit Condition Flow', () => {
     await expect(page).toHaveURL(
       new RegExp(`.*consultation/add\\?conditionId=${initial.id}$`)
     );
-    await expect(page.getByTestId('condition-picker-select')).toHaveValue(
-      initial.id
-    );
+    await expect(
+      page.getByTestId(`selected-condition-${initial.id}`)
+    ).toBeVisible();
     await page
       .getByTestId('consultation-title-input')
       .fill('Linked Consultation');

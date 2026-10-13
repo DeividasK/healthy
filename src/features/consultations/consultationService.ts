@@ -9,13 +9,17 @@ import {
   fetchDistinctDoctorNames,
   fetchDistinctServiceTypes,
 } from './consultationsRepository';
-import { createNarrativeDiv } from '@/src/utils/fhirUtils';
+import {
+  createNarrativeDiv,
+  withConsultationConditions,
+  getConsultationConditionIds,
+} from '@/src/utils/fhirUtils';
 
 export interface ConsultationInput {
   id?: string;
   patientId?: string;
-  conditionId?: string | null;
-  date: string; // YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  conditionIds?: string[];
+  date: string; // FHIR date or date-time with timezone offset
   title: string;
   doctorName?: string;
   serviceType?: string;
@@ -31,21 +35,46 @@ export async function createOrUpdateConsultation(
 ): Promise<Encounter> {
   const consId = input.id || `cons-${Crypto.randomUUID()}`;
   const trimmedTitle = input.title.trim();
+  if (!trimmedTitle) throw new Error('Consultation title is required');
   const trimmedDoctor = input.doctorName?.trim() || undefined;
   const trimmedServiceType = input.serviceType?.trim() || undefined;
   const trimmedNotes = input.notes?.trim() || undefined;
   const patientId = input.patientId || 'patient-default';
-  const conditionId = input.conditionId || null;
+  const existing = input.id ? await fetchConsultationById(input.id) : null;
+  const conditionIds =
+    input.conditionIds ??
+    (existing ? getConsultationConditionIds(existing) : []);
+  if (
+    ![
+      'planned',
+      'in-progress',
+      'on-hold',
+      'discharged',
+      'completed',
+      'cancelled',
+      'discontinued',
+      'entered-in-error',
+      'unknown',
+    ].includes(input.status || existing?.status || 'completed')
+  ) {
+    throw new Error('Invalid Encounter status');
+  }
+  if (input.date.includes('T') && !/(Z|[+-]\d{2}:\d{2})$/.test(input.date)) {
+    throw new Error('Encounter date-time requires a timezone offset');
+  }
   const now = new Date().toISOString();
 
   const encounter: Encounter = {
+    ...existing,
     resourceType: 'Encounter',
     id: consId,
     meta: {
+      ...existing?.meta,
       lastUpdated: now,
     },
-    status: (input.status as any) || 'completed',
-    class: [
+    status:
+      (input.status as Encounter['status']) || existing?.status || 'completed',
+    class: existing?.class || [
       {
         coding: [
           {
@@ -57,71 +86,78 @@ export async function createOrUpdateConsultation(
       },
     ],
     subject: {
+      ...existing?.subject,
       reference: `Patient/${patientId}`,
-      display: 'Self',
     },
     actualPeriod: {
+      ...existing?.actualPeriod,
       start: input.date,
     },
     type: [
       {
+        ...existing?.type?.[0],
         text: trimmedTitle,
       },
+      ...(existing?.type?.slice(1) || []),
     ],
     serviceType: trimmedServiceType
       ? [
           {
+            ...existing?.serviceType?.[0],
             concept: {
+              ...existing?.serviceType?.[0]?.concept,
               text: trimmedServiceType,
             },
           },
+          ...(existing?.serviceType?.slice(1) || []),
         ]
-      : undefined,
+      : existing?.serviceType?.flatMap((value, index) => {
+          if (index) return [value];
+          const concept = { ...value.concept };
+          delete concept.text;
+          const updated = {
+            ...value,
+            concept: Object.keys(concept).length ? concept : undefined,
+          };
+          return updated.reference || updated.concept || updated.extension
+            ? [updated]
+            : [];
+        }),
     participant: trimmedDoctor
       ? [
           {
+            ...existing?.participant?.[0],
             actor: {
+              ...existing?.participant?.[0]?.actor,
               display: trimmedDoctor,
             },
           },
+          ...(existing?.participant?.slice(1) || []),
         ]
-      : undefined,
-    reason: conditionId
-      ? [
-          {
-            value: [
-              {
-                reference: {
-                  reference: `Condition/${conditionId}`,
-                },
-              },
-            ],
-          },
-        ]
-      : undefined,
-    diagnosis: conditionId
-      ? [
-          {
-            condition: [
-              {
-                reference: {
-                  reference: `Condition/${conditionId}`,
-                },
-              },
-            ],
-          },
-        ]
-      : undefined,
+      : existing?.participant?.flatMap((value, index) => {
+          if (index) return [value];
+          const actor = { ...value.actor };
+          delete actor.display;
+          const updated = {
+            ...value,
+            actor: Object.keys(actor).length ? actor : undefined,
+          };
+          return updated.actor || updated.type?.length ? [updated] : [];
+        }),
     text: trimmedNotes
       ? {
-          status: 'generated',
+          ...existing?.text,
+          status: existing?.text?.status || 'generated',
           div: createNarrativeDiv(trimmedNotes),
         }
       : undefined,
   };
 
-  await insertConsultationRecord(encounter, patientId, conditionId);
-  return encounter;
+  const result = withConsultationConditions(encounter, conditionIds);
+  if (!result.serviceType?.length) delete result.serviceType;
+  if (!result.participant?.length) delete result.participant;
+  await insertConsultationRecord(result, patientId);
+  return result;
 }
 
 /**
@@ -146,9 +182,10 @@ export async function getConsultationsByConditionId(
  * Fetches a single Consultation by ID.
  */
 export async function getConsultationById(
-  id: string
+  id: string,
+  patientId?: string
 ): Promise<Encounter | null> {
-  return await fetchConsultationById(id);
+  return await fetchConsultationById(id, patientId);
 }
 
 /**

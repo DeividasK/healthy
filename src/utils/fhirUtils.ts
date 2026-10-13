@@ -98,24 +98,45 @@ export function getConsultationNotes(encounter: Encounter): string | null {
   return null;
 }
 
-/**
- * Safely extracts the associated Condition ID from an Encounter resource.
- */
-export function getConsultationConditionId(
-  encounter: Encounter
-): string | null {
-  // Check reason reference
-  const reasonRef = encounter.reason?.[0]?.value?.[0]?.reference?.reference;
-  if (reasonRef && reasonRef.startsWith('Condition/')) {
-    return reasonRef.replace('Condition/', '');
-  }
+/** Extracts every local diagnosis reference, without treating clinical reasons as diagnoses. */
+export function getConsultationConditionIds(encounter: Encounter): string[] {
+  return [
+    ...new Set(
+      (encounter.diagnosis || []).flatMap((diagnosis) =>
+        (diagnosis.condition || []).flatMap((condition) => {
+          const reference = condition.reference?.reference;
+          return reference?.startsWith('Condition/')
+            ? [reference.slice(10)]
+            : [];
+        })
+      )
+    ),
+  ];
+}
 
-  // Check diagnosis reference
-  const diagRef =
-    encounter.diagnosis?.[0]?.condition?.[0]?.reference?.reference;
-  if (diagRef && diagRef.startsWith('Condition/')) {
-    return diagRef.replace('Condition/', '');
+/** Updates diagnosis links while preserving backbone metadata and unexposed concepts/references. */
+export function withConsultationConditions(
+  encounter: Encounter,
+  conditionIds: string[]
+): Encounter {
+  const selected = new Set(conditionIds);
+  const retained = new Set<string>();
+  const diagnosis = (encounter.diagnosis || []).flatMap((entry) => {
+    const condition = (entry.condition || []).filter((value) => {
+      const reference = value.reference?.reference;
+      if (!reference?.startsWith('Condition/')) return true;
+      const id = reference.slice(10);
+      if (!selected.has(id)) return false;
+      retained.add(id);
+      return true;
+    });
+    return condition.length ? [{ ...entry, condition }] : [];
+  });
+  for (const id of selected) {
+    if (!retained.has(id))
+      diagnosis.push({
+        condition: [{ reference: { reference: `Condition/${id}` } }],
+      });
   }
-
-  return null;
+  return { ...encounter, diagnosis: diagnosis.length ? diagnosis : undefined };
 }

@@ -538,7 +538,7 @@ export async function restoreFromGoogleDrive(
 
   for (const { cons, patientId } of consultationResources) {
     try {
-      await insertConsultationRecord(cons, patientId, undefined, true);
+      await insertConsultationRecord(cons, patientId, true);
       restoredConsultations++;
     } catch (err) {
       console.warn(
