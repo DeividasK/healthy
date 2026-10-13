@@ -73,3 +73,10 @@ Docs: https://docs.expo.dev/eas/index.md
 ## FHIR database standard
 
 All database structures MUST follow HL7 FHIR R5 (v5.0.0). Persist clinical records as standard FHIR R5 resources using `fhir/r5` types. Relational columns, indexes and relationship tables are projections of those resources, not independent clinical schemas. Use standard FHIR elements, cardinalities, choice types, terminology bindings and references; never introduce custom clinical properties into resource JSON. Preserve valid fields that an editing form does not expose. App settings, sync metadata and storage timestamps are application infrastructure, not clinical FHIR resources.
+
+## Local implementation plans
+
+- Store implementation plans only in the local `.agents/plans/` directory. Treat them as local working artifacts.
+- Never stage, commit, force-add, or publish `.agents/plans/` files. The directory must remain ignored by Git.
+- When implementation and its required verification are complete, delete the implemented plan from `.agents/plans/`. Retain unfinished plans and update any local plan index to remove stale links.
+- Put durable architecture, migration and recovery documentation outside `.agents/plans/`; those documents may be committed under the normal Git authorization rules.
