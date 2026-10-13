@@ -6,6 +6,30 @@ import {
   seedTestReport,
 } from '@/src/features/testing/visualTest';
 
+test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
+  page,
+}, testInfo) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page);
+  await seedTestReport(page, {
+    id: 'hemoglobin-visual-first',
+    date: '2026-09-01',
+    biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+  });
+  await seedTestReport(page, {
+    id: 'hemoglobin-visual-second',
+    date: '2026-10-01',
+    biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
+  });
+  await page.goto('/biomarker/718-7');
+  await page.getByTestId('biomarker-title').waitFor();
+  await takeSnapshot(
+    page,
+    'Biomarker detail - Mixed hemoglobin units and empty education',
+    testInfo
+  );
+});
+
 test('Biomarker detail - Red Blood Cells history', async ({
   page,
 }, testInfo) => {

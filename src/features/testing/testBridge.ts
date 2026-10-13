@@ -141,11 +141,21 @@ export function setupTestBridge() {
             referenceLow:
               def.referenceRange?.low === undefined
                 ? undefined
-                : convertBiomarkerValue(def.referenceRange.low, def.ucumCode, ucumCode, def),
+                : convertBiomarkerValue(
+                    def.referenceRange.low,
+                    def.ucumCode,
+                    ucumCode,
+                    def
+                  ),
             referenceHigh:
               def.referenceRange?.high === undefined
                 ? undefined
-                : convertBiomarkerValue(def.referenceRange.high, def.ucumCode, ucumCode, def),
+                : convertBiomarkerValue(
+                    def.referenceRange.high,
+                    def.ucumCode,
+                    ucumCode,
+                    def
+                  ),
           };
         }
         return {
