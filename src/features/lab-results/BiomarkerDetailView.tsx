@@ -1,0 +1,629 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ChevronDown } from 'lucide-react-native';
+import Svg, {
+  Circle,
+  Line,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
+import type { Observation } from 'fhir/r5';
+import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
+import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { getAllReports } from './diagnosticReportService';
+import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { COLORS } from '@/src/theme/colors';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+
+type MeasurementStatus = 'Low' | 'Normal' | 'High';
+
+type Measurement = {
+  date: string;
+  value: number;
+  unit: string;
+  id: string;
+  name: string;
+  status?: MeasurementStatus;
+};
+
+function getObservationName(observation: Observation) {
+  return (
+    observation.code?.coding?.[0]?.display ||
+    observation.code?.text ||
+    'Biomarker'
+  );
+}
+
+export function BiomarkerDetailView() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { activePatientId } = useActivePatient();
+  const [reports, setReports] = useState<
+    Awaited<ReturnType<typeof getAllReports>>
+  >([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setReports(await getAllReports(activePatientId));
+      setHasError(false);
+    } catch (error) {
+      console.error('Failed to load biomarker history:', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activePatientId]);
+
+  useFocusEffect(useCallback(() => void load(), [load]));
+  useDatabaseSubscription(['diagnostic_reports', 'observations'], load);
+
+  const marker = CBC_MARKERS.find(
+    (candidate) =>
+      candidate.id === id ||
+      candidate.loinc === id ||
+      candidate.name.toLowerCase() ===
+        decodeURIComponent(id || '').toLowerCase() ||
+      candidate.aliases.some(
+        (alias) =>
+          alias.toLowerCase() === decodeURIComponent(id || '').toLowerCase()
+      )
+  );
+
+  const measurements = useMemo(() => {
+    const matches: Measurement[] = [];
+    for (const record of reports) {
+      const reportDate = record.report.effectiveDateTime || '';
+      for (const observation of record.observations) {
+        const code = observation.code?.coding?.[0]?.code;
+        const name = getObservationName(observation).toLowerCase();
+        const isMatch = marker
+          ? code === marker.loinc ||
+            marker.aliases.some((alias) => name === alias.toLowerCase()) ||
+            name === marker.name.toLowerCase()
+          : code === id || name === decodeURIComponent(id || '').toLowerCase();
+        const value = observation.valueQuantity?.value;
+        if (isMatch && typeof value === 'number') {
+          const interpretationCodes =
+            observation.interpretation?.flatMap(
+              (interpretation) =>
+                interpretation.coding?.map((coding) => coding.code) || []
+            ) || [];
+          const interpretationCode = interpretationCodes.find((candidate) =>
+            ['L', 'LL', 'N', 'H', 'HH'].includes(candidate || '')
+          );
+          let status: MeasurementStatus | undefined;
+          if (interpretationCode === 'L' || interpretationCode === 'LL') {
+            status = 'Low';
+          } else if (
+            interpretationCode === 'H' ||
+            interpretationCode === 'HH'
+          ) {
+            status = 'High';
+          } else if (interpretationCode === 'N') {
+            status = 'Normal';
+          } else if (marker?.referenceRange) {
+            const { low, high } = marker.referenceRange;
+            status =
+              low !== undefined && value < low
+                ? 'Low'
+                : high !== undefined && value > high
+                  ? 'High'
+                  : 'Normal';
+          }
+          matches.push({
+            date: observation.effectiveDateTime || reportDate,
+            value,
+            unit:
+              observation.valueQuantity?.unit ||
+              observation.valueQuantity?.code ||
+              '',
+            id: observation.id || `${record.report.id}-${matches.length}`,
+            name,
+            status,
+          });
+        }
+      }
+    }
+    return matches.sort((a, b) => a.date.localeCompare(b.date));
+  }, [id, marker, reports]);
+
+  if (isLoading)
+    return <ResourceViewLayout testID="biomarker-view" isLoading />;
+  if (hasError)
+    return (
+      <ResourceViewLayout
+        testID="biomarker-view"
+        error="Failed to load biomarker history."
+      />
+    );
+  if (!id || measurements.length === 0)
+    return (
+      <ResourceViewLayout
+        testID="biomarker-view"
+        error="Biomarker not found."
+      />
+    );
+
+  const title = marker?.name || measurements[0].name;
+  const latestMeasurement = measurements[measurements.length - 1];
+
+  return (
+    <ResourceViewLayout
+      testID="biomarker-view"
+      title={title}
+      titleTestID="biomarker-title"
+    >
+      {marker?.description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.description}>{marker.description}</Text>
+        </View>
+      )}
+      <View style={styles.latestSection} testID="biomarker-latest">
+        <Text style={styles.sectionTitle}>Latest</Text>
+        <View style={styles.latestValueGroup}>
+          <Text style={styles.latestValue} testID="biomarker-latest-value">
+            {latestMeasurement.value}
+          </Text>
+          <Text style={styles.unit} testID="biomarker-latest-unit">
+            {latestMeasurement.unit}
+          </Text>
+          <MeasurementStatusBadge
+            status={latestMeasurement.status}
+            testID="biomarker-latest-status"
+          />
+        </View>
+      </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Value history</Text>
+        {measurements.length > 1 && (
+          <BiomarkerChart
+            measurements={measurements}
+            low={marker?.referenceRange?.low}
+            high={marker?.referenceRange?.high}
+          />
+        )}
+        <View style={styles.history}>
+          {[...measurements].reverse().map((measurement) => (
+            <View key={measurement.id} style={styles.historyRow}>
+              <Text style={styles.historyDate}>
+                {formatDisplayDate(measurement.date)}
+              </Text>
+              <View style={styles.valueGroup}>
+                <Text style={styles.historyValue}>{measurement.value}</Text>
+                <Text style={styles.unit}>{measurement.unit}</Text>
+                <MeasurementStatusBadge
+                  status={measurement.status}
+                  testID={`biomarker-status-${measurement.id}`}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+      <View style={styles.section} testID="biomarker-learn">
+        <Text style={styles.sectionTitle}>Learn</Text>
+        <LearnItem title="About this biomarker">
+          {marker?.education?.about ||
+            marker?.description ||
+            'This biomarker is one part of your laboratory result and is interpreted together with other findings.'}
+        </LearnItem>
+        <LearnItem title="Why it matters">
+          {marker?.education?.whyItMatters ||
+            'This result adds information about this part of your blood health. It is interpreted together with related test results and your health history.'}
+        </LearnItem>
+        <LearnItem title="What it may affect">
+          {marker?.education?.whatItMayAffect || ''}
+        </LearnItem>
+        <LearnItem title="What may be related to a change">
+          {marker?.education?.whatMayBeRelatedToAChange || ''}
+        </LearnItem>
+        <Text style={styles.learnNote}>
+          A result outside the reference range does not diagnose a condition by
+          itself. Your clinician can interpret it with your other results and
+          health history.
+        </Text>
+      </View>
+    </ResourceViewLayout>
+  );
+}
+
+function LearnItem({ title, children }: { title: string; children: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <View
+      style={[
+        styles.learnItem,
+        expanded && children.length > 0 && styles.learnItemExpanded,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={title}
+        testID={`learn-toggle-${title.toLowerCase().replaceAll(' ', '-')}`}
+        onPress={() => setExpanded((current) => !current)}
+        style={styles.learnItemToggle}
+      >
+        <Text style={styles.learnItemTitle}>{title}</Text>
+        <View
+          style={[
+            styles.learnChevronBox,
+            expanded && styles.learnChevronExpanded,
+          ]}
+        >
+          <ChevronDown size={18} color={COLORS.light.foreground} />
+        </View>
+      </Pressable>
+      {expanded && children.length > 0 && (
+        <Text style={styles.learnText}>{children}</Text>
+      )}
+    </View>
+  );
+}
+
+function MeasurementStatusBadge({
+  status,
+  testID,
+}: {
+  status?: MeasurementStatus;
+  testID: string;
+}) {
+  if (!status) return null;
+  return (
+    <View
+      testID={testID}
+      style={[
+        styles.statusBadge,
+        styles[
+          `status${status}` as 'statusLow' | 'statusNormal' | 'statusHigh'
+        ],
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusText,
+          styles[
+            `statusText${status}` as
+              'statusTextLow' | 'statusTextNormal' | 'statusTextHigh'
+          ],
+        ]}
+      >
+        {status}
+      </Text>
+    </View>
+  );
+}
+
+function BiomarkerChart({
+  measurements,
+  low,
+  high,
+}: {
+  measurements: Measurement[];
+  low?: number;
+  high?: number;
+}) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const width = Math.max(360, measurements.length * 84);
+  const height = 160;
+  const paddingLeft = 122;
+  const paddingRight = 64;
+  const paddingTop = 16;
+  const paddingBottom = 30;
+  const values = measurements.map((item) => item.value);
+  const lowValue = low ?? Math.min(...values);
+  const highValue = high ?? Math.max(...values);
+  const referenceSpan =
+    highValue - lowValue || Math.max(Math.abs(highValue) * 0.1, 1);
+  const min = Math.min(lowValue, ...values) - referenceSpan * 0.15;
+  const max = Math.max(highValue, ...values) + referenceSpan * 0.15;
+  const spread = max - min;
+  const yFor = (value: number) =>
+    height -
+    paddingBottom -
+    ((value - min) / spread) * (height - paddingTop - paddingBottom);
+  const colorFor = (value: number) =>
+    value < lowValue ? '#3B82F6' : value > highValue ? '#EF4444' : '#10B981';
+  const points = measurements.map((item, index) => {
+    const x =
+      paddingLeft +
+      (index / (measurements.length - 1)) *
+        (width - paddingLeft - paddingRight);
+    const y = yFor(item.value);
+    return { x, y };
+  });
+  return (
+    <View
+      style={styles.chart}
+      testID="biomarker-chart"
+      accessibilityLabel="Biomarker values over time"
+    >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{ width: width * 2, height: height * 2 }}>
+          <Svg
+            width={width * 2}
+            height={height * 2}
+            viewBox={`0 0 ${width} ${height}`}
+          >
+            <Rect
+              x={paddingLeft}
+              y={yFor(lowValue)}
+              width={width - paddingLeft - paddingRight}
+              height={yFor(min) - yFor(lowValue)}
+              fill="#3B82F6"
+              opacity={0.1}
+            />
+            <Rect
+              x={paddingLeft}
+              y={yFor(highValue)}
+              width={width - paddingLeft - paddingRight}
+              height={yFor(lowValue) - yFor(highValue)}
+              fill="#10B981"
+              opacity={0.1}
+            />
+            <Rect
+              x={paddingLeft}
+              y={paddingTop}
+              width={width - paddingLeft - paddingRight}
+              height={yFor(highValue) - paddingTop}
+              fill="#EF4444"
+              opacity={0.1}
+            />
+            <Line
+              x1={paddingLeft}
+              y1={paddingTop}
+              x2={paddingLeft}
+              y2={height - paddingBottom}
+              stroke={COLORS.light.border}
+              strokeWidth="1"
+            />
+            <Line
+              x1={paddingLeft}
+              y1={yFor(highValue)}
+              x2={width - paddingRight}
+              y2={yFor(highValue)}
+              stroke="#EF4444"
+              strokeWidth="1"
+              strokeDasharray="4,4"
+              strokeOpacity={1}
+            />
+            <Line
+              x1={paddingLeft}
+              y1={yFor(lowValue)}
+              x2={width - paddingRight}
+              y2={yFor(lowValue)}
+              stroke="#3B82F6"
+              strokeWidth="1"
+              strokeDasharray="4,4"
+              strokeOpacity={1}
+            />
+            <Line
+              x1={paddingLeft}
+              y1={yFor(min)}
+              x2={width - paddingRight}
+              y2={yFor(min)}
+              stroke={COLORS.light.border}
+              strokeWidth="1"
+            />
+            <SvgText
+              x={paddingLeft - 8}
+              y={yFor(highValue) + 4}
+              fill="#EF4444"
+              fontSize="6"
+              textAnchor="end"
+              fillOpacity={1}
+            >
+              High: {highValue}
+            </SvgText>
+            <SvgText
+              x={paddingLeft - 8}
+              y={yFor(lowValue) + 4}
+              fill="#3B82F6"
+              fontSize="6"
+              textAnchor="end"
+              fillOpacity={1}
+            >
+              Low: {lowValue}
+            </SvgText>
+            <Polyline
+              points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
+              fill="none"
+              stroke="#000000"
+              strokeWidth="0.75"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            {points.map(({ x, y }, index) => (
+              <React.Fragment key={measurements[index].id}>
+                <Circle
+                  cx={x}
+                  cy={y}
+                  r="2"
+                  fill={colorFor(measurements[index].value)}
+                />
+                <SvgText
+                  x={x}
+                  y={height - 8}
+                  fill={COLORS.light.mutedForeground}
+                  fontSize="6"
+                  textAnchor="middle"
+                >
+                  {formatDisplayDate(measurements[index].date)}
+                </SvgText>
+              </React.Fragment>
+            ))}
+          </Svg>
+          {points.map((point, index) => (
+            <Pressable
+              key={measurements[index].id}
+              testID={`biomarker-point-${index}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${measurements[index].value} ${measurements[index].unit}`}
+              onHoverIn={() => setHoveredIndex(index)}
+              onHoverOut={() => setHoveredIndex(null)}
+              onPressIn={() => setHoveredIndex(index)}
+              onPressOut={() => setHoveredIndex(null)}
+              style={[
+                styles.pointHitTarget,
+                { left: point.x * 2 - 12, top: point.y * 2 - 12 },
+              ]}
+            />
+          ))}
+          {hoveredIndex !== null && (
+            <View
+              pointerEvents="none"
+              testID="biomarker-tooltip"
+              style={[
+                styles.tooltip,
+                {
+                  left: Math.min(
+                    Math.max(points[hoveredIndex].x * 2 - 90, 0),
+                    width * 2 - 180
+                  ),
+                  top: Math.max(points[hoveredIndex].y * 2 - 58, 0),
+                },
+              ]}
+            >
+              <Text style={styles.tooltipDate}>
+                {formatDisplayDate(measurements[hoveredIndex].date)}
+              </Text>
+              <View style={styles.tooltipMeasurement}>
+                <Text style={styles.tooltipValue}>
+                  {measurements[hoveredIndex].value}
+                </Text>
+                <Text style={styles.tooltipUnit}>
+                  {measurements[hoveredIndex].unit}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  pointHitTarget: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  tooltip: {
+    position: 'absolute',
+    minWidth: 180,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.light.foreground,
+  },
+  tooltipMeasurement: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  tooltipDate: { color: '#ffffff', fontSize: 12, marginBottom: 3 },
+  tooltipValue: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  tooltipUnit: { color: '#ffffff', fontSize: 12, fontWeight: '400' },
+  latestSection: { marginBottom: 20 },
+  latestValueGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  latestValue: {
+    color: COLORS.light.foreground,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  learnItem: { marginBottom: 0 },
+  learnItemExpanded: { marginBottom: 18 },
+  learnItemToggle: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 6,
+  },
+  learnItemTitle: {
+    color: COLORS.light.foreground,
+    fontSize: 15,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  learnChevronBox: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  learnChevronExpanded: {
+    transform: [{ rotate: '180deg' }],
+  },
+  learnText: {
+    color: COLORS.light.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  learnNote: {
+    color: COLORS.light.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  section: { marginBottom: 28 },
+  sectionTitle: {
+    color: COLORS.light.foreground,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  description: {
+    color: COLORS.light.textSecondary,
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  chart: {
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: COLORS.light.card,
+    marginBottom: 16,
+  },
+  history: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.light.border,
+  },
+  historyRow: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.light.border,
+  },
+  historyDate: { color: COLORS.light.textSecondary, fontSize: 14 },
+  valueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  statusLow: { backgroundColor: COLORS.light.badgeLowBg },
+  statusNormal: { backgroundColor: COLORS.light.badgeNormalBg },
+  statusHigh: { backgroundColor: COLORS.light.badgeHighBg },
+  statusText: { fontSize: 11, fontWeight: '600' },
+  statusTextLow: { color: COLORS.light.badgeLowText },
+  statusTextNormal: { color: COLORS.light.badgeNormalText },
+  statusTextHigh: { color: COLORS.light.badgeHighText },
+  historyValue: {
+    color: COLORS.light.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  unit: { color: COLORS.light.mutedForeground, fontSize: 12 },
+});

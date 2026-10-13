@@ -448,7 +448,22 @@ export function HomeView() {
                             '';
 
                           return (
-                            <View key={obs.id} style={styles.obsItem}>
+                            <TouchableOpacity
+                              key={obs.id}
+                              style={styles.obsItem}
+                              testID={`biomarker-row-${obs.code?.coding?.[0]?.code || obs.id}`}
+                              accessibilityRole="button"
+                              accessibilityLabel={`View biomarker: ${name}`}
+                              onPress={() =>
+                                router.push({
+                                  pathname: '/biomarker/[id]',
+                                  params: {
+                                    id: obs.code?.coding?.[0]?.code || name,
+                                  },
+                                })
+                              }
+                              activeOpacity={0.75}
+                            >
                               <View style={styles.obsLeft}>
                                 <Text style={styles.obsName}>{name}</Text>
                                 {obs.code?.coding?.[0]?.code &&
@@ -466,7 +481,7 @@ export function HomeView() {
                                 </View>
                                 {getStatusBadge(obs)}
                               </View>
-                            </View>
+                            </TouchableOpacity>
                           );
                         })}
                       </View>

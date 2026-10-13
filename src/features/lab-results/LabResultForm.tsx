@@ -165,6 +165,12 @@ export function LabResultForm({
               ucumCode: ucum,
               units: [{ label: unit, ucum }],
               description: name,
+              education: {
+                about: '',
+                whyItMatters: '',
+                whatItMayAffect: '',
+                whatMayBeRelatedToAChange: '',
+              },
             };
 
             return {
