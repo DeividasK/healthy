@@ -5,6 +5,7 @@ import type {
   Observation,
   Condition,
   Encounter,
+  Composition,
 } from 'fhir/r5';
 import {
   deriveKeyFromGoogleUser,
@@ -36,11 +37,17 @@ import {
   fetchAllConsultationRecords,
   insertConsultationRecord,
 } from '@/src/features/consultations/consultationsRepository';
+import {
+  fetchAllClinicalDocumentRecords,
+  insertClinicalDocumentRecord,
+} from '@/src/features/consultations/clinicalDocumentsRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import {
   getPendingDeletedConsultationIds,
   clearPendingConsultationDeletions,
+  getPendingDeletedClinicalResources,
+  clearPendingClinicalResourceDeletions,
 } from './syncDeletions';
 
 export {
@@ -48,6 +55,10 @@ export {
   getPendingDeletedConsultationIds,
   clearPendingConsultationDeletions,
   PENDING_DELETED_CONSULTATIONS_KEY,
+  recordPendingClinicalResourceDeletion,
+  getPendingDeletedClinicalResources,
+  clearPendingClinicalResourceDeletions,
+  PENDING_DELETED_CLINICAL_RESOURCES_KEY,
 } from './syncDeletions';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
@@ -140,6 +151,7 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
   reports: number;
   conditions: number;
   consultations: number;
+  clinicalDocuments: number;
 }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
@@ -152,11 +164,13 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     allReportsWithObs,
     allConditions,
     allConsultations,
+    allClinicalDocs,
   ] = await Promise.all([
     fetchAllStoredPatients(),
     fetchAllDiagnosticReportRecords(),
     fetchAllConditionRecords(),
     fetchAllConsultationRecords(),
+    fetchAllClinicalDocumentRecords(),
   ]);
 
   // Filter to patients explicitly connected to this Google account
@@ -185,6 +199,10 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
       cons.subject?.reference?.replace(/^Patient\//, '') || DEFAULT_PATIENT_ID;
     return eligiblePatientIds.has(patientId);
   });
+
+  const eligibleClinicalDocs = allClinicalDocs.filter((cd) =>
+    eligiblePatientIds.has(cd.patientId)
+  );
 
   // Upload/Update Eligible Patients
   for (const { patient: pat } of eligiblePatients) {
@@ -330,6 +348,42 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     }
   }
 
+  // Upload/Update Clinical Documents (Compositions)
+  for (const { document: doc, patientId } of eligibleClinicalDocs) {
+    const fileName = `composition_${doc.id}.json.enc`;
+    const encBytes = await encryptText(JSON.stringify(doc), key);
+    const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = doc.meta?.lastUpdated;
+    const appProperties = {
+      patientId,
+      ...(localLastUpdated ? { lastUpdated: localLastUpdated } : {}),
+    };
+
+    if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
+      if (
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
+      ) {
+        continue;
+      }
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
+    } else {
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
+    }
+  }
+
   // Update last sync timestamp
   const updatedConfig: GoogleDriveConfig = {
     ...config,
@@ -342,6 +396,7 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     reports: eligibleReports.length,
     conditions: eligibleConditions.length,
     consultations: eligibleConsultations.length,
+    clinicalDocuments: eligibleClinicalDocs.length,
   };
 }
 
@@ -388,6 +443,7 @@ export async function restoreFromGoogleDrive(
   reports: number;
   conditions: number;
   consultations: number;
+  clinicalDocuments: number;
 }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
@@ -396,11 +452,18 @@ export async function restoreFromGoogleDrive(
     : null;
   const pendingDeletedConsultations = await getPendingDeletedConsultationIds();
   const pendingDeletedSet = new Set(pendingDeletedConsultations);
+  const pendingDeletedClinical = await getPendingDeletedClinicalResources();
+  const pendingDeletedClinicalSet = new Set(
+    pendingDeletedClinical
+      .filter((p) => p.resourceType === 'Composition')
+      .map((p) => p.id)
+  );
 
   let restoredPatients = 0;
   let restoredReports = 0;
   let restoredConditions = 0;
   let restoredConsultations = 0;
+  let restoredClinicalDocuments = 0;
 
   const patientResources: Patient[] = [];
   const conditionResources: { cond: Condition; patientId: string }[] = [];
@@ -410,6 +473,7 @@ export async function restoreFromGoogleDrive(
     patientId: string;
   }[] = [];
   const consultationResources: { cons: Encounter; patientId: string }[] = [];
+  const compositionResources: { doc: Composition; patientId: string }[] = [];
 
   for (const file of remoteFiles) {
     if (!file.name.endsWith('.json.enc')) continue;
@@ -502,13 +566,34 @@ export async function restoreFromGoogleDrive(
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
           consultationResources.push({ cons, patientId });
         }
+      } else if (resource.resourceType === 'Composition') {
+        const doc = resource as Composition;
+        if (doc.id && pendingDeletedClinicalSet.has(doc.id)) {
+          continue;
+        }
+        if (!doc.meta?.lastUpdated) {
+          doc.meta = {
+            ...doc.meta,
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
+          };
+        }
+        const patientId =
+          file.appProperties?.patientId ||
+          doc.subject?.[0]?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          compositionResources.push({ doc, patientId });
+        }
       }
     } catch (err) {
       console.warn('Failed to restore file from Google Drive:', file.name, err);
     }
   }
 
-  // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters
+  // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters -> Compositions
   for (const pat of patientResources) {
     try {
       await insertPatientRecord(pat, config.userSub, true);
@@ -548,17 +633,31 @@ export async function restoreFromGoogleDrive(
     }
   }
 
+  for (const { doc, patientId } of compositionResources) {
+    try {
+      await insertClinicalDocumentRecord(doc, patientId, true);
+      restoredClinicalDocuments++;
+    } catch (err) {
+      console.warn(
+        'Failed to insert clinical document record from Google Drive:',
+        err
+      );
+    }
+  }
+
   if (
     restoredPatients > 0 ||
     restoredReports > 0 ||
     restoredConditions > 0 ||
-    restoredConsultations > 0
+    restoredConsultations > 0 ||
+    restoredClinicalDocuments > 0
   ) {
     notifyDatabaseChanged([
       'patients',
       'conditions',
       'diagnostic_reports',
       'consultations',
+      'clinical_documents',
     ]);
   }
 
@@ -573,6 +672,7 @@ export async function restoreFromGoogleDrive(
     reports: restoredReports,
     conditions: restoredConditions,
     consultations: restoredConsultations,
+    clinicalDocuments: restoredClinicalDocuments,
   };
 }
 
@@ -585,6 +685,7 @@ export async function syncWithGoogleDrive(config: GoogleDriveConfig): Promise<{
   reports: number;
   conditions: number;
   consultations: number;
+  clinicalDocuments: number;
 }> {
   const allStoredPatients = await fetchAllStoredPatients();
   const eligiblePatients = allStoredPatients.filter(
@@ -627,6 +728,38 @@ export async function syncWithGoogleDrive(config: GoogleDriveConfig): Promise<{
     }
   }
 
+  // Process pending clinical resource deletions before restoring remote data
+  const pendingDeletedClinical = await getPendingDeletedClinicalResources();
+  if (pendingDeletedClinical.length > 0) {
+    const remoteFiles = await listAppDataFiles(config.accessToken);
+    const remoteFileMap = new Map<string, GoogleDriveFile>(
+      remoteFiles.map((f) => [f.name, f])
+    );
+    const successfullyDeletedClinical: typeof pendingDeletedClinical = [];
+
+    for (const item of pendingDeletedClinical) {
+      const fileName = `${item.resourceType.toLowerCase()}_${item.id}.json.enc`;
+      const remoteFile = remoteFileMap.get(fileName);
+      if (remoteFile) {
+        try {
+          await deleteAppDataFile(config.accessToken, remoteFile.id);
+          successfullyDeletedClinical.push(item);
+        } catch (err) {
+          console.warn(
+            `Failed to delete remote clinical file ${fileName}:`,
+            err
+          );
+        }
+      } else {
+        successfullyDeletedClinical.push(item);
+      }
+    }
+
+    if (successfullyDeletedClinical.length > 0) {
+      await clearPendingClinicalResourceDeletions(successfullyDeletedClinical);
+    }
+  }
+
   // 2. Pull down remote records only for local eligible patients (or none if empty array)
   const restored = await restoreFromGoogleDrive(config, eligiblePatientIds);
   // 3. Push any local records up for eligible patients
@@ -663,11 +796,12 @@ export async function deletePatientFromGoogleDrive(
       continue;
     }
 
-    // Check report, condition, or consultation files belonging to this patient
+    // Check report, condition, consultation, or composition files belonging to this patient
     if (
       file.name.startsWith('report_') ||
       file.name.startsWith('condition_') ||
-      file.name.startsWith('consultation_')
+      file.name.startsWith('consultation_') ||
+      file.name.startsWith('composition_')
     ) {
       try {
         const encryptedBytes = await downloadAppDataFile(
@@ -677,8 +811,14 @@ export async function deletePatientFromGoogleDrive(
         const decryptedText = await decryptText(encryptedBytes, key);
         const resource = JSON.parse(decryptedText);
 
+        const subjectRef = Array.isArray(resource.subject)
+          ? resource.subject[0]?.reference
+          : resource.subject?.reference;
         const resourcePatientId =
-          resource.subject?.reference?.replace(/^Patient\//, '') ||
+          (resource.resourceType === 'Composition'
+            ? file.appProperties?.patientId
+            : undefined) ||
+          subjectRef?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
 
         if (resourcePatientId === patientId) {
@@ -731,6 +871,11 @@ export async function deleteAllAppDataFromGoogleDrive(
   const pending = await getPendingDeletedConsultationIds();
   if (pending.length > 0) {
     await clearPendingConsultationDeletions(pending);
+  }
+
+  const pendingClinical = await getPendingDeletedClinicalResources();
+  if (pendingClinical.length > 0) {
+    await clearPendingClinicalResourceDeletions(pendingClinical);
   }
 
   return { deletedFiles: deletedCount };

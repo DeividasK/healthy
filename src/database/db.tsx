@@ -127,16 +127,22 @@ export async function clearAllDatabaseTables(): Promise<void> {
   const db = await getDb();
   await db.execAsync(`
     DELETE FROM observations;
+    DELETE FROM pending_clinical_resource_deletions;
     DELETE FROM diagnostic_reports;
+    DELETE FROM clinical_documents;
     DELETE FROM consultation_conditions;
     DELETE FROM consultations;
     DELETE FROM conditions;
     DELETE FROM app_settings;
+    -- A reset must not reimport acknowledged entries from the legacy queue.
+    INSERT INTO app_settings (key, value)
+      VALUES ('clinical_deletion_outbox_v10_imported', 'true');
     DELETE FROM patients;
   `);
   notifyDatabaseChanged([
     'observations',
     'diagnostic_reports',
+    'clinical_documents',
     'consultations',
     'consultation_conditions',
     'conditions',

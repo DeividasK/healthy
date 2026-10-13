@@ -171,6 +171,9 @@ export async function mockGoogleDrive(page: Page) {
       await route.fulfill({
         json: { id, name: record.name, appProperties: record.appProperties },
       });
+    } else if (request.method() === 'DELETE') {
+      files.delete(url.pathname.split('/').pop()!);
+      await route.fulfill({ status: 204 });
     } else if (url.searchParams.get('alt') === 'media') {
       await route.fulfill({
         contentType: 'application/octet-stream',
