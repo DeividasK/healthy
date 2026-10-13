@@ -1,0 +1,85 @@
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  visual:
+    name: Visual Snapshots (Auto-Accept)
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+
+      - name: Build Web Static Export
+        uses: ./.github/actions/build-web
+
+      - name: Run Visual Tests
+        run: pnpm test:visual
+
+      - name: Upload Test Results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-test-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Accept Snapshots in Chromatic
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: pnpm chromatic --auto-accept-changes=main
+
+  deploy-to-github-pages:
+    name: Build & Deploy to GitHub Pages
+    needs: [visual]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+
+      - name: Build for GitHub Pages
+        uses: ./.github/actions/build-web
+        with:
+          base-url: /healthy
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+          include-hidden-files: true
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
