@@ -1,5 +1,12 @@
+import { getDb } from '@/src/database/db';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { clearPendingConsultationDeletions } from '@/src/services/syncDeletions';
+import {
+  createOrUpdateCondition,
+  type ConditionInput,
+} from '@/src/features/conditions/conditionService';
 import * as Crypto from 'expo-crypto';
-import type { Encounter } from 'fhir/r5';
+import type { Encounter, CodeableReference } from 'fhir/r5';
 import {
   insertConsultationRecord,
   fetchAllConsultationRecords,
@@ -13,9 +20,23 @@ import {
   createNarrativeDiv,
   withConsultationConditions,
   getConsultationConditionIds,
+  withConsultationReasons,
 } from '@/src/utils/fhirUtils';
 
+export interface ConsultationDiagnosisInput {
+  title: string;
+  conditionId?: string;
+  createCondition?: boolean;
+  original?: NonNullable<Encounter['diagnosis']>[number];
+  originalTitle?: string;
+  originalTerminology?: ConditionInput['terminology'];
+  originalConditionId?: string;
+  terminology?: ConditionInput['terminology'];
+}
+
 export interface ConsultationInput {
+  diagnoses?: ConsultationDiagnosisInput[];
+  reasonConditionIds?: string[];
   id?: string;
   patientId?: string;
   conditionIds?: string[];
@@ -31,8 +52,52 @@ export interface ConsultationInput {
  * Builds and persists a FHIR Encounter (Consultation) record.
  */
 export async function createOrUpdateConsultation(
-  input: ConsultationInput
+  input: ConsultationInput,
+  withinTransaction = false
 ): Promise<Encounter> {
+  if (
+    input.diagnoses?.some((diagnosis) => diagnosis.createCondition) &&
+    !withinTransaction
+  ) {
+    const patientId = input.patientId || 'patient-default';
+    const db = await getDb();
+    let saved: Encounter | undefined;
+    await db.withTransactionAsync(async () => {
+      const diagnoses: ConsultationDiagnosisInput[] = [];
+      for (const diagnosis of input.diagnoses || []) {
+        if (!diagnosis.title.trim())
+          throw new Error('Diagnosis name is required');
+        if (!diagnosis.createCondition) {
+          diagnoses.push(diagnosis);
+          continue;
+        }
+        const condition = await createOrUpdateCondition(
+          {
+            patientId,
+            title: diagnosis.title,
+            terminology: diagnosis.terminology,
+            clinicalStatus: 'active',
+            verificationStatus: 'unconfirmed',
+            category: 'encounter-diagnosis',
+          },
+          true
+        );
+        diagnoses.push({
+          ...diagnosis,
+          createCondition: false,
+          conditionId: condition.id,
+        });
+      }
+      saved = await createOrUpdateConsultation({ ...input, diagnoses }, true);
+    });
+    await clearPendingConsultationDeletions([saved!.id!]);
+    notifyDatabaseChanged([
+      'conditions',
+      'consultations',
+      'consultation_conditions',
+    ]);
+    return saved!;
+  }
   const consId = input.id || `cons-${Crypto.randomUUID()}`;
   const trimmedTitle = input.title.trim();
   if (!trimmedTitle) throw new Error('Consultation title is required');
@@ -153,10 +218,60 @@ export async function createOrUpdateConsultation(
       : undefined,
   };
 
-  const result = withConsultationConditions(encounter, conditionIds);
+  let result = withConsultationConditions(encounter, conditionIds);
+  if (input.reasonConditionIds !== undefined)
+    result = withConsultationReasons(result, input.reasonConditionIds);
+  if (input.diagnoses !== undefined) {
+    result.diagnosis = input.diagnoses.map((diagnosis) => {
+      if (!diagnosis.title.trim())
+        throw new Error('Diagnosis name is required');
+      const original = diagnosis.original;
+      const value: CodeableReference = { ...original?.condition?.[0] };
+      if (
+        !original ||
+        diagnosis.title !== diagnosis.originalTitle ||
+        JSON.stringify(diagnosis.terminology || {}) !==
+          JSON.stringify(diagnosis.originalTerminology || {})
+      ) {
+        const coding = { ...value.concept?.coding?.[0] };
+        for (const field of ['system', 'code', 'display'] as const) {
+          const text = diagnosis.terminology?.[field]?.trim();
+          if (text) coding[field] = text;
+          else delete coding[field];
+        }
+        const codings = [
+          ...(coding.system || coding.code || coding.display ? [coding] : []),
+          ...(value.concept?.coding?.slice(1) || []),
+        ];
+        value.concept = {
+          ...value.concept,
+          text: diagnosis.title.trim(),
+          coding: codings.length ? codings : undefined,
+        };
+      }
+      if (
+        !original ||
+        diagnosis.conditionId !== diagnosis.originalConditionId
+      ) {
+        if (diagnosis.conditionId)
+          value.reference = {
+            ...value.reference,
+            reference: `Condition/${diagnosis.conditionId}`,
+          };
+        else delete value.reference;
+      }
+      if (!value.reference && !value.concept)
+        value.concept = { text: diagnosis.title.trim() };
+      return {
+        ...original,
+        condition: [value, ...(original?.condition?.slice(1) || [])],
+      };
+    });
+    if (!result.diagnosis.length) delete result.diagnosis;
+  }
   if (!result.serviceType?.length) delete result.serviceType;
   if (!result.participant?.length) delete result.participant;
-  await insertConsultationRecord(result, patientId);
+  await insertConsultationRecord(result, patientId, false, withinTransaction);
   return result;
 }
 

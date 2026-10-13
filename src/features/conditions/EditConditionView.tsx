@@ -1,3 +1,4 @@
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -5,6 +6,7 @@ import { ConditionForm, ConditionFormValues } from './ConditionForm';
 import {
   getConditionById,
   createOrUpdateCondition,
+  type ConditionInput,
   deleteCondition,
 } from './conditionService';
 import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
@@ -12,6 +14,7 @@ import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function EditConditionView() {
+  const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { triggerSync } = useSync();
@@ -25,18 +28,19 @@ export function EditConditionView() {
   );
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || isPatientLoading || !activePatientId) return;
 
     let isMounted = true;
     (async () => {
       try {
-        const condition = await getConditionById(id);
+        const condition = await getConditionById(id, activePatientId);
         if (!isMounted) return;
         if (!condition) {
           setNotFound(true);
           return;
         }
 
+        setNotFound(false);
         const patientRef = condition.subject?.reference;
         const parsedPatientId = patientRef?.startsWith('Patient/')
           ? patientRef.replace('Patient/', '')
@@ -46,13 +50,16 @@ export function EditConditionView() {
         const dateStr = condition.onsetDateTime;
         let dateObj = new Date();
         if (dateStr) {
-          const [y, m, d] = dateStr.split('-').map(Number);
+          const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
           dateObj = new Date(y, m - 1, d);
         }
 
         let abatementDateObj: Date | undefined = undefined;
         if (condition.abatementDateTime) {
-          const [y, m, d] = condition.abatementDateTime.split('-').map(Number);
+          const [y, m, d] = condition.abatementDateTime
+            .slice(0, 10)
+            .split('-')
+            .map(Number);
           abatementDateObj = new Date(y, m - 1, d);
         }
 
@@ -61,7 +68,7 @@ export function EditConditionView() {
         const clinicalStatus =
           condition.clinicalStatus?.coding?.[0]?.code || 'active';
         const verificationStatus =
-          condition.verificationStatus?.coding?.[0]?.code || 'unconfirmed';
+          condition.verificationStatus?.coding?.[0]?.code || '';
         const severity = condition.severity?.coding?.[0]?.code;
         const bodySite = condition.bodySite?.[0]?.text;
 
@@ -70,6 +77,15 @@ export function EditConditionView() {
           title,
           clinicalStatus,
           verificationStatus,
+          category:
+            condition.category?.[0]?.text ||
+            condition.category?.[0]?.coding?.[0]?.display ||
+            ({
+              'problem-list-item': 'Problem list item',
+              'encounter-diagnosis': 'Encounter diagnosis',
+            }[condition.category?.[0]?.coding?.[0]?.code || ''] ??
+              condition.category?.[0]?.coding?.[0]?.code ??
+              ''),
           onsetDate: dateObj,
           severity,
           bodySite,
@@ -78,18 +94,18 @@ export function EditConditionView() {
         });
       } catch (err) {
         console.error('Failed to load condition for edit:', err);
-        setNotFound(true);
+        if (isMounted) setNotFound(true);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, activePatientId, isPatientLoading]);
 
-  if (isLoading) {
+  if (isLoading || isPatientLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.light.primary} />
@@ -105,21 +121,19 @@ export function EditConditionView() {
     );
   }
 
-  const handleSave = async (values: {
-    id?: string;
-    title: string;
-    clinicalStatus: string;
-    verificationStatus: string;
-    onsetDate: string;
-    severity?: string;
-    bodySite?: string;
-    abatementDate?: string;
-    notes?: string;
-  }) => {
+  if (initialPatientId !== activePatientId) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.light.primary} />
+      </View>
+    );
+  }
+
+  const handleSave = async (values: ConditionInput) => {
     await createOrUpdateCondition({
       ...values,
       id,
-      patientId: initialPatientId,
+      patientId: activePatientId || initialPatientId,
     });
     triggerSync().catch((err) =>
       console.warn('Background sync failed on edit condition:', err)

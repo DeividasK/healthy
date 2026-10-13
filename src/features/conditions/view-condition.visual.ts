@@ -16,6 +16,11 @@ test.describe('View Condition View - Visual Regression', () => {
     const cond = await seedTestCondition(page, {
       id: 'cond-view-visual-test',
       title: 'Left Knee Pain',
+      terminology: {
+        system: 'https://example.org/diagnoses',
+        code: 'KNEE',
+        display: 'Left knee pain',
+      },
       status: 'active',
       notes: 'Persistent ache after running on tarmac.',
       onsetDate: '2026-10-02',

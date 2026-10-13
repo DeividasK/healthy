@@ -4,7 +4,11 @@ import {
   insertConsultationRecord,
   deleteConsultationRecord,
 } from '@/src/features/consultations/consultationsRepository';
-import { deleteConditionRecord } from '@/src/features/conditions/conditionsRepository';
+import {
+  deleteConditionRecord,
+  fetchConditionById,
+  insertConditionRecord,
+} from '@/src/features/conditions/conditionsRepository';
 import {
   exportZipArchive,
   restoreFromZipBytes,
@@ -43,7 +47,11 @@ export function setupTestBridge() {
 
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
     verifyDiagnosisMigration,
+    getCondition: fetchConditionById,
+    saveCondition: insertConditionRecord,
+    updateCondition: createOrUpdateCondition,
     getConsultation: fetchConsultationById,
+    saveConsultation: createOrUpdateConsultation,
     saveEncounter: insertConsultationRecord,
     deleteConsultation: deleteConsultationRecord,
     deleteCondition: deleteConditionRecord,
@@ -81,12 +89,14 @@ export function setupTestBridge() {
       status?: string;
       notes?: string;
       onsetDate?: string;
+      terminology?: { system?: string; code?: string; display?: string };
     }) => {
       const patientId = await resolvePatientId(input.patientId);
       return await createOrUpdateCondition({
         id: input.id,
         patientId,
         title: input.title,
+        terminology: input.terminology,
         clinicalStatus: input.status || 'active',
         verificationStatus: 'confirmed',
         onsetDate: input.onsetDate || new Date().toISOString().split('T')[0],
@@ -149,6 +159,7 @@ export function setupTestBridge() {
       id?: string;
       patientId?: string;
       conditionIds?: string[];
+      reasonConditionIds?: string[];
       title: string;
       doctorName?: string;
       serviceType?: string;
@@ -161,6 +172,7 @@ export function setupTestBridge() {
         id: input.id,
         patientId,
         conditionIds: input.conditionIds,
+        reasonConditionIds: input.reasonConditionIds,
         title: input.title,
         doctorName: input.doctorName,
         serviceType: input.serviceType,

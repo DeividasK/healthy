@@ -298,3 +298,200 @@ test.describe('Edit Condition Flow', () => {
     await expect(page.getByText('Linked Consultation')).not.toBeVisible();
   });
 });
+
+test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page, { id: 'preservation-patient' });
+  const seeded = await seedTestCondition(page, {
+    id: 'preserved-condition',
+    title: 'Original wording',
+  });
+  const original = {
+    ...seeded,
+    meta: {
+      ...seeded.meta,
+      tag: [{ system: 'https://example.org/tags', code: 'synthetic' }],
+    },
+    code: {
+      text: 'Original wording',
+      extension: [
+        { url: 'https://example.org/concept', valueString: 'retained' },
+      ],
+      coding: [
+        {
+          code: 'L21',
+          version: 'synthetic',
+          extension: [
+            { url: 'https://example.org/coding', valueString: 'retained' },
+          ],
+        },
+        { system: 'https://example.org/other', code: 'SECOND' },
+      ],
+    },
+    onsetDateTime: '2026-10-01T14:30:00+03:00',
+    clinicalStatus: {
+      ...seeded.clinicalStatus,
+      extension: [
+        { url: 'https://example.org/status', valueString: 'retained' },
+      ],
+    },
+    category: [
+      {
+        text: 'ESI kontekstas',
+        coding: [{ system: 'https://example.org/category', code: 'source' }],
+      },
+      { text: 'Additional category' },
+    ],
+    evidence: [{ concept: { text: 'Unexposed evidence' } }],
+  };
+  await page.evaluate(
+    (resource) =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.saveCondition(
+        resource,
+        'preservation-patient'
+      ),
+    original
+  );
+  await page.goto('/condition/preserved-condition/edit');
+  await page.getByTestId('condition-title-input').fill('Updated wording');
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  const edited = await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.getCondition('preserved-condition')
+  );
+  expect(edited).toEqual({
+    ...original,
+    meta: { ...original.meta, lastUpdated: edited.meta.lastUpdated },
+    code: { ...original.code, text: 'Updated wording' },
+  });
+});
+
+test('edits verification independently and roundtrips source and standard categories', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page);
+  const condition = await seedTestCondition(page, {
+    title: 'Seborėjinis dermatitas',
+    status: 'active',
+  });
+  await page.goto(`/condition/${condition.id}/edit`);
+  await page.getByTestId('verification-picker-button').click();
+  await page.getByTestId('verification-option-confirmed').click();
+  await page.getByTestId('condition-category-input').fill('ESI kontekstas');
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  await page.goto(`/condition/${condition.id}`);
+  await expect(page.getByTestId('condition-category-0')).toHaveText(
+    'Category: ESI kontekstas'
+  );
+  await expect(page.getByTestId('condition-verification-status')).toHaveText(
+    'Verification status: Confirmed'
+  );
+  await page.goto(`/condition/${condition.id}/edit`);
+  await expect(page.getByTestId('condition-category-input')).toHaveValue(
+    'ESI kontekstas'
+  );
+  await page.getByTestId('status-picker-select').selectOption('inactive');
+  await page.getByTestId('condition-category-input').click();
+  await page.getByTestId('category-option-encounter-diagnosis').click();
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  await page.goto(`/condition/${condition.id}`);
+  await expect(page.getByTestId('condition-category-0')).toHaveText(
+    'Category: Encounter diagnosis'
+  );
+  let saved = await page.evaluate(
+    (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
+    condition.id
+  );
+  expect(saved.clinicalStatus.coding[0].code).toBe('inactive');
+  expect(saved.verificationStatus.coding[0].code).toBe('confirmed');
+  expect(saved.category).toEqual([
+    {
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/condition-category',
+          code: 'encounter-diagnosis',
+        },
+      ],
+    },
+  ]);
+  await page.goto(`/condition/${condition.id}/edit`);
+  await page.getByTestId('verification-picker-button').click();
+  await page.getByTestId('verification-option-differential').click();
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  await page.goto(`/condition/${condition.id}`);
+  await expect(page.getByTestId('condition-verification-status')).toHaveText(
+    'Verification status: Differential'
+  );
+  saved = await page.evaluate(
+    (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
+    condition.id
+  );
+  expect(saved.clinicalStatus.coding[0].code).toBe('inactive');
+  expect(saved.verificationStatus.coding[0].code).toBe('differential');
+  await page.goto(`/condition/${condition.id}/edit`);
+  const dock = page.getByTestId('resource-action-dock');
+  const ids = [
+    'delete-condition-button',
+    'save-button',
+    'add-option-button',
+    'cancel-button',
+  ];
+  const positions = await Promise.all(
+    ids.map(async (id) => {
+      await expect(dock.getByTestId(id)).toBeVisible();
+      return (await dock.getByTestId(id).boundingBox())!.x;
+    })
+  );
+  expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  await expect
+    .poll(async () => {
+      const plus = (await dock.getByTestId('add-option-button').boundingBox())!;
+      return Math.abs(plus.x + plus.width / 2 - page.viewportSize()!.width / 2);
+    })
+    .toBeLessThan(1);
+  await expect
+    .poll(async () => {
+      const island = (await page
+        .getByTestId('action-dock-background')
+        .boundingBox())!;
+      return Math.abs(
+        island.x + island.width / 2 - page.viewportSize()!.width / 2
+      );
+    })
+    .toBeLessThan(1);
+  await expect(
+    page
+      .getByTestId('action-dock-primary-slot')
+      .getByTestId('add-option-button')
+  ).toBeVisible();
+  await page.getByTestId('remove-verification-button').click();
+  await page.getByTestId('remove-category-button').click();
+  await expect(page.getByTestId('verification-picker-button')).toHaveCount(0);
+  await expect(page.getByTestId('condition-category-input')).toHaveCount(0);
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-verification').click();
+  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-category').click();
+  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+  await expect(page.getByTestId('verification-picker-button')).toBeVisible();
+  await expect(page.getByTestId('condition-category-input')).toHaveValue('');
+  await page.getByTestId('remove-verification-button').click();
+  await page.getByTestId('remove-category-button').click();
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  await page.goto(`/condition/${condition.id}`);
+  await expect(page.getByTestId('condition-title')).toBeVisible();
+  saved = await page.evaluate(
+    (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
+    condition.id
+  );
+  expect(saved.verificationStatus).toBeUndefined();
+  expect(saved.category).toBeUndefined();
+});

@@ -140,14 +140,9 @@ export async function createReportViaUI(
   }
 
   if (options.notes) {
-    const plusBtn = page.getByTestId('plus-menu-button');
-    if (await plusBtn.isVisible()) {
-      await plusBtn.click();
-      const notesOption = page.getByTestId('menu-add-notes');
-      if (await notesOption.isVisible()) {
-        await notesOption.click();
-      }
-    }
+    await page.getByTestId('plus-menu-button').click();
+    await page.getByTestId('menu-add-notes').click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
     const notesInput = page.getByTestId('notes-input');
     await notesInput.fill(options.notes);
   }

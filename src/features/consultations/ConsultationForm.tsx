@@ -1,3 +1,7 @@
+import type {
+  ConsultationInput,
+  ConsultationDiagnosisInput,
+} from './consultationService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -16,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
+  Stethoscope,
   ChevronDown,
   Clock,
   FileText,
@@ -25,7 +30,7 @@ import {
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   AddOptionsModal,
   AddOptionItem,
@@ -96,6 +101,8 @@ export interface ConsultationFormValues {
   doctorName?: string;
   serviceType?: string;
   conditionIds?: string[];
+  reasonConditionIds?: string[];
+  diagnoses?: ConsultationDiagnosisInput[];
   notes?: string;
 }
 
@@ -104,16 +111,7 @@ export interface ConsultationFormProps {
   initialConditionIds?: string[];
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: {
-    id?: string;
-    title: string;
-    status: string;
-    date: string;
-    doctorName?: string;
-    serviceType?: string;
-    conditionIds?: string[];
-    notes?: string;
-  }) => Promise<void>;
+  onSave: (values: ConsultationInput) => Promise<void>;
 }
 
 function showAlert(title: string, message: string) {
@@ -190,10 +188,10 @@ export function ConsultationForm({
   const [notes, setNotes] = useState(initialValues?.notes || '');
 
   const [selectedConditionIds, setSelectedConditionIds] = useState<string[]>(
-    initialValues?.conditionIds ?? initialConditionIds ?? []
+    initialValues?.reasonConditionIds ?? initialConditionIds ?? []
   );
   const [showCondition, setShowCondition] = useState(
-    Boolean((initialValues?.conditionIds ?? initialConditionIds)?.length)
+    Boolean((initialValues?.reasonConditionIds ?? initialConditionIds)?.length)
   );
   const [conditionQuery, setConditionQuery] = useState('');
   const [isConditionFocused, setIsConditionFocused] = useState(false);
@@ -206,6 +204,13 @@ export function ConsultationForm({
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
   const [isDoctorFocused, setIsDoctorFocused] = useState(false);
   const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
+  const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
+    initialValues?.diagnoses || []
+  );
+  const [diagnosisQueries, setDiagnosisQueries] = useState<
+    Record<number, string>
+  >({});
+  const [focusedDiagnosis, setFocusedDiagnosis] = useState<number | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -291,6 +296,11 @@ export function ConsultationForm({
       return;
     }
 
+    if (diagnoses.some((diagnosis) => !diagnosis.title.trim())) {
+      showAlert('Required Field', 'Please enter a diagnosis name.');
+      return;
+    }
+
     try {
       setIsSaving(true);
       const formattedDate = formatLocalDate(date);
@@ -316,7 +326,8 @@ export function ConsultationForm({
           showServiceType && serviceType.trim()
             ? serviceType.trim()
             : undefined,
-        conditionIds: selectedConditionIds.filter(Boolean),
+        reasonConditionIds: selectedConditionIds.filter(Boolean),
+        diagnoses,
         notes: showNotes && notes.trim() ? notes.trim() : undefined,
       });
 
@@ -344,7 +355,22 @@ export function ConsultationForm({
   };
 
   // Build list of options available in the '+' menu
-  const plusMenuOptions: AddOptionItem[] = [];
+  const plusMenuOptions: AddOptionItem[] = [
+    {
+      id: 'add-diagnosis',
+      label: 'Add Diagnosis',
+      icon: (
+        <Stethoscope
+          color={COLORS.light.primary}
+          size={20}
+          style={{ marginRight: 12 }}
+        />
+      ),
+      testID: 'menu-add-diagnosis',
+      onPress: () =>
+        setDiagnoses((current) => [...current, { title: '', terminology: {} }]),
+    },
+  ];
   if (time === null) {
     plusMenuOptions.push({
       id: 'add-time',
@@ -367,8 +393,8 @@ export function ConsultationForm({
   }
   if (!showCondition) {
     plusMenuOptions.push({
-      id: 'add-condition',
-      label: 'Add Conditions',
+      id: 'add-reason',
+      label: 'Add Reasons for Visit',
       icon: (
         <FolderPlus
           color={COLORS.light.primary}
@@ -518,12 +544,6 @@ export function ConsultationForm({
             )}
 
             {/* Plus Action Button */}
-            {plusMenuOptions.length > 0 && (
-              <PlusCircleButton
-                testID="add-option-button"
-                onPress={() => setShowPlusMenu(true)}
-              />
-            )}
           </View>
 
           {/* Consultation Title Input (Required) */}
@@ -549,11 +569,11 @@ export function ConsultationForm({
               testID="consultation-conditions-section"
             >
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Conditions</Text>
+                <Text style={styles.inputLabel}>Reasons for visit</Text>
                 <TouchableOpacity
                   testID="remove-conditions-section-button"
                   accessibilityRole="button"
-                  accessibilityLabel="Remove conditions section"
+                  accessibilityLabel="Remove reasons for visit"
                   onPress={() => {
                     setShowCondition(false);
                     setSelectedConditionIds([]);
@@ -611,7 +631,7 @@ export function ConsultationForm({
                   id="condition-search-input"
                   nativeID="condition-search-input"
                   name="conditionSearch"
-                  accessibilityLabel="Select conditions"
+                  accessibilityLabel="Select reasons for visit"
                   style={styles.textInput}
                   placeholder="Select..."
                   placeholderTextColor={COLORS.light.mutedForeground}
@@ -643,6 +663,191 @@ export function ConsultationForm({
                   />
                 )}
               </View>
+            </View>
+          )}
+
+          {diagnoses.length > 0 && (
+            <View
+              style={styles.inputSection}
+              testID="consultation-diagnoses-section"
+            >
+              <Text style={styles.inputLabel}>Diagnoses</Text>
+              {diagnoses.map((diagnosis, index) => (
+                <View
+                  key={index}
+                  style={styles.diagnosisItem}
+                  testID={`consultation-diagnosis-${index}`}
+                >
+                  {(['title', 'system', 'code', 'display'] as const).map(
+                    (field) => {
+                      const label =
+                        field === 'title'
+                          ? 'Diagnosis'
+                          : field === 'system'
+                            ? 'Terminology System (optional)'
+                            : field === 'code'
+                              ? 'Diagnosis Code (optional)'
+                              : 'Terminology Display (optional)';
+                      return (
+                        <React.Fragment key={field}>
+                          <View style={styles.inputSection}>
+                            {field === 'title' ? (
+                              <View style={styles.sectionHeaderRow}>
+                                <Text style={styles.inputLabel}>{label}</Text>
+                                <TouchableOpacity
+                                  testID={`remove-diagnosis-${index}`}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Remove diagnosis ${index + 1}`}
+                                  onPress={() =>
+                                    setDiagnoses((current) =>
+                                      current.filter((_, i) => i !== index)
+                                    )
+                                  }
+                                >
+                                  <X color={COLORS.light.iconClear} size={16} />
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <Text style={styles.inputLabel}>{label}</Text>
+                            )}
+                            <TextInput
+                              testID={`diagnosis-${index}-${field}-input`}
+                              id={`diagnosis-${index}-${field}-input`}
+                              nativeID={`diagnosis-${index}-${field}-input`}
+                              name={`diagnosis${index}${field}`}
+                              accessibilityLabel={label}
+                              style={styles.textInput}
+                              autoCapitalize={
+                                field === 'title' || field === 'display'
+                                  ? 'sentences'
+                                  : 'none'
+                              }
+                              autoCorrect={
+                                field === 'title' || field === 'display'
+                              }
+                              value={
+                                field === 'title'
+                                  ? diagnosis.title
+                                  : diagnosis.terminology?.[field] || ''
+                              }
+                              onFocus={() => setFocusedDiagnosis(null)}
+                              onChangeText={(value) =>
+                                setDiagnoses((current) =>
+                                  current.map((item, i) =>
+                                    i !== index
+                                      ? item
+                                      : field === 'title'
+                                        ? { ...item, title: value }
+                                        : {
+                                            ...item,
+                                            terminology: {
+                                              ...item.terminology,
+                                              [field]: value,
+                                            },
+                                          }
+                                  )
+                                )
+                              }
+                            />
+                          </View>
+                          {field === 'title' && (
+                            <View style={styles.inputSection}>
+                              <Text style={styles.inputLabel}>
+                                Referenced Condition (optional)
+                              </Text>
+                              <TextInput
+                                testID={`diagnosis-${index}-condition-input`}
+                                id={`diagnosis-${index}-condition-input`}
+                                nativeID={`diagnosis-${index}-condition-input`}
+                                name={`diagnosis${index}Condition`}
+                                accessibilityLabel="Referenced Condition (optional)"
+                                style={styles.textInput}
+                                value={
+                                  diagnosisQueries[index] ??
+                                  (diagnosis.createCondition
+                                    ? 'Create new condition'
+                                    : availableConditions.find(
+                                        (condition) =>
+                                          condition.id === diagnosis.conditionId
+                                      )?.code?.text || '')
+                                }
+                                onChangeText={(query) => {
+                                  setDiagnosisQueries((current) => ({
+                                    ...current,
+                                    [index]: query,
+                                  }));
+                                  setFocusedDiagnosis(index);
+                                }}
+                                onFocus={() => setFocusedDiagnosis(index)}
+                                onPressIn={() => setFocusedDiagnosis(index)}
+                              />
+                              {focusedDiagnosis === index && (
+                                <AutocompleteDropdown
+                                  testID={`diagnosis-${index}-condition-list`}
+                                  itemTestIDPrefix={`diagnosis-${index}-condition-item-`}
+                                  items={[
+                                    ...availableConditions
+                                      .filter((condition) =>
+                                        getConditionTitle(condition)
+                                          .toLowerCase()
+                                          .includes(
+                                            (
+                                              diagnosisQueries[index] || ''
+                                            ).toLowerCase()
+                                          )
+                                      )
+                                      .map((condition) => ({
+                                        id: condition.id!,
+                                        label: getConditionTitle(condition),
+                                      })),
+                                    {
+                                      id: '__none__',
+                                      label: 'No referenced condition',
+                                    },
+                                    {
+                                      id: '__create__',
+                                      label: 'Create new condition',
+                                    },
+                                  ]}
+                                  onSelect={(item) => {
+                                    setDiagnoses((current) =>
+                                      current.map((entry, i) =>
+                                        i !== index
+                                          ? entry
+                                          : {
+                                              ...entry,
+                                              conditionId: item.id.startsWith(
+                                                '__'
+                                              )
+                                                ? undefined
+                                                : item.id,
+                                              createCondition:
+                                                item.id === '__create__',
+                                              title:
+                                                entry.title ||
+                                                (item.id.startsWith('__')
+                                                  ? ''
+                                                  : item.label),
+                                            }
+                                      )
+                                    );
+                                    setDiagnosisQueries((current) => {
+                                      const next = { ...current };
+                                      delete next[index];
+                                      return next;
+                                    });
+                                    setFocusedDiagnosis(null);
+                                  }}
+                                />
+                              )}
+                            </View>
+                          )}
+                        </React.Fragment>
+                      );
+                    }
+                  )}
+                </View>
+              ))}
             </View>
           )}
 
@@ -790,6 +995,10 @@ export function ConsultationForm({
 
         {/* Bottom Save Action */}
         <FormActionDock
+          onAdd={() => setShowPlusMenu((visible) => !visible)}
+          addExpanded={showPlusMenu}
+          addDisabled={plusMenuOptions.length === 0}
+          addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
           deleteLabel="Delete consultation"
@@ -807,7 +1016,8 @@ export function ConsultationForm({
         />
 
         {/* Plus Menu Modal for adding optional fields */}
-        <AddOptionsModal
+        <FloatingAddMenu
+          testID="form-add-menu"
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
           options={plusMenuOptions}
@@ -902,6 +1112,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  diagnosisItem: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: COLORS.light.border,
+    paddingVertical: 16,
+    marginBottom: 20,
   },
   inputSection: {
     marginBottom: 20,

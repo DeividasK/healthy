@@ -111,7 +111,7 @@ test.describe('View Consultation Flow', () => {
       'Orthopedic Review'
     );
 
-    await page.getByTestId('consultation-related-condition').click();
+    await page.getByTestId('consultation-diagnosis-condition').click();
     await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
     const conditionView = page
       .getByTestId('condition-view')
@@ -165,7 +165,7 @@ test.describe('View Consultation Flow', () => {
     ).toBeVisible();
     await expect(view.getByText('Failed to load consultation.')).toHaveCount(0);
     await expect(
-      page.getByTestId('consultation-related-condition')
+      page.getByTestId('consultation-diagnosis-condition')
     ).toHaveCount(0);
     await expect(page.getByTestId('edit-consultation-button')).toBeEnabled();
   });

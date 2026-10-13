@@ -28,6 +28,8 @@ test.describe('Add Condition Flow', () => {
       await test.step('Select status and enter condition title', async () => {
         const statusSelect = page.getByTestId('status-picker-select');
         await statusSelect.selectOption('active');
+        await page.getByTestId('verification-picker-button').click();
+        await page.getByTestId('verification-option-confirmed').click();
 
         const titleInput = page.getByTestId('condition-title-input');
         await titleInput.fill('Left Knee Pain');

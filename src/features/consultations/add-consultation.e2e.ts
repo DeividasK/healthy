@@ -411,3 +411,296 @@ test.describe('Add Consultation Flow', () => {
     }
   );
 });
+
+for (const terminology of [
+  { code: 'L21' },
+  {
+    system: 'http://hl7.org/fhir/sid/icd-10',
+    code: 'L21',
+    display: 'Seborrhoeic dermatitis',
+  },
+]) {
+  test(`keeps reasons and independently entered diagnoses separate: ${terminology.system || 'code only'}`, async ({
+    page,
+  }) => {
+    await clearAppStorage(page);
+    await seedTestPatient(page, { id: 'separate-patient' });
+    const reason = await seedTestCondition(page, {
+      id: 'reason-condition',
+      title: 'Scalp irritation',
+    });
+    await page.goto(`/consultation/add?conditionId=${reason.id}`);
+    await page
+      .getByTestId('consultation-title-input')
+      .fill('Dermatology review');
+    await expect(
+      page.getByTestId('consultation-conditions-section')
+    ).toContainText('Reasons for visit');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-diagnosis').click();
+    await page
+      .getByTestId('diagnosis-0-title-input')
+      .fill('Seborrhoeic dermatitis');
+    for (const [field, value] of Object.entries(terminology))
+      await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
+    await checkA11y(page, { disableRules: ['color-contrast'] });
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/consultation\/add/);
+    const stored = await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        encounter: JSON.parse(
+          (await bridge.querySql('SELECT fhir_json FROM consultations;'))[0]
+            .fhir_json
+        ),
+        conditions: await bridge.querySql('SELECT id FROM conditions;'),
+      };
+    });
+    expect(stored.conditions).toEqual([{ id: reason.id }]);
+    expect(stored.encounter.reason).toEqual([
+      { value: [{ reference: { reference: `Condition/${reason.id}` } }] },
+    ]);
+    expect(stored.encounter.diagnosis).toEqual([
+      {
+        condition: [
+          {
+            concept: { text: 'Seborrhoeic dermatitis', coding: [terminology] },
+          },
+        ],
+      },
+    ]);
+    expect(stored.encounter.reasonReference).toBeUndefined();
+    await page.goto(`/consultation/${stored.encounter.id}`);
+    await expect(page.getByTestId('consultation-reasons')).toContainText(
+      'Reasons for visit'
+    );
+    await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+      'Diagnoses'
+    );
+    await page.reload();
+    await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+      'Seborrhoeic dermatitis'
+    );
+    await page.getByTestId('edit-consultation-button').click();
+    await expect(page.getByTestId('diagnosis-0-code-input')).toHaveValue('L21');
+    await page.getByTestId('diagnosis-0-condition-input').click();
+    await page.getByTestId(`diagnosis-0-condition-item-${reason.id}`).click();
+    await page
+      .getByTestId('diagnosis-0-title-input')
+      .fill('Updated diagnosis wording');
+    await page.getByTestId('save-button').click();
+    await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+      'Updated diagnosis wording'
+    );
+    const linked = await page.evaluate(
+      (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getConsultation(id),
+      stored.encounter.id
+    );
+    expect(linked.reason).toEqual(stored.encounter.reason);
+    expect(linked.diagnosis[0].condition[0].reference.reference).toBe(
+      `Condition/${reason.id}`
+    );
+    expect(linked.diagnosis[0].condition[0].concept.coding).toEqual([
+      terminology,
+    ]);
+    await page.getByTestId('edit-consultation-button').click();
+    await page.getByTestId('remove-conditions-section-button').click();
+    await page.getByTestId('save-button').click();
+    await expect(page.getByTestId('consultation-reasons')).toHaveCount(0);
+    await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+      'Updated diagnosis wording'
+    );
+    await page.getByTestId('edit-consultation-button').click();
+    await page.getByTestId('remove-diagnosis-0').click();
+    await page.getByTestId('save-button').click();
+    await expect(page.getByTestId('consultation-diagnoses')).toHaveCount(0);
+  });
+}
+
+test('blank diagnoses prevent saving; removed drafts create no Conditions', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page);
+  await page.goto('/consultation/add');
+  await page.getByTestId('consultation-title-input').fill('Review');
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-diagnosis').click();
+  const item = page.getByTestId('consultation-diagnosis-0');
+  await expect(item.getByText('Diagnosis', { exact: true })).toHaveCount(1);
+  await expect(item.getByText('Diagnosis Name', { exact: true })).toHaveCount(
+    0
+  );
+  await expect(
+    item.getByText('Referenced Condition (optional)', { exact: true })
+  ).toBeVisible();
+  for (const label of [
+    'Terminology System (optional)',
+    'Diagnosis Code (optional)',
+    'Terminology Display (optional)',
+  ]) {
+    await expect(item.getByText(label, { exact: true })).toBeVisible();
+  }
+  await expect(item).toHaveCSS('border-top-width', '1px');
+  await expect(item).toHaveCSS('border-bottom-width', '1px');
+  const titleBox = await item
+    .getByTestId('diagnosis-0-title-input')
+    .boundingBox();
+  const referenceBox = await item
+    .getByTestId('diagnosis-0-condition-input')
+    .boundingBox();
+  expect(titleBox!.y).toBeLessThan(referenceBox!.y);
+  const labelBox = await item
+    .getByText('Diagnosis', { exact: true })
+    .boundingBox();
+  const removeBox = await item.getByTestId('remove-diagnosis-0').boundingBox();
+  expect(
+    Math.abs(
+      labelBox!.y + labelBox!.height / 2 - removeBox!.y - removeBox!.height / 2
+    )
+  ).toBeLessThanOrEqual(2);
+  const dialogPromise = page.waitForEvent('dialog');
+  const save = page.getByTestId('save-button').click();
+  const dialog = await dialogPromise;
+  expect(dialog.message()).toContain('Please enter a diagnosis name.');
+  await dialog.accept();
+  await save;
+  await page.getByTestId('remove-diagnosis-0').click();
+  await page.getByTestId('save-button').click();
+  await expect(page).not.toHaveURL(/consultation\/add/);
+  expect(
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM conditions;'
+      )
+    )
+  ).toEqual([]);
+});
+
+test('a diagnosis may create a Condition atomically, and failed links roll back both resources', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page, { id: 'atomic-patient' });
+  await page.goto('/consultation/add');
+  await page.getByTestId('consultation-title-input').fill('Review');
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-diagnosis').click();
+  await page.getByTestId('diagnosis-0-title-input').fill('New diagnosis');
+  await page.getByTestId('diagnosis-0-condition-input').click();
+  await page.getByTestId('diagnosis-0-condition-item-__create__').click();
+  await page.getByTestId('save-button').click();
+  await expect(page).not.toHaveURL(/consultation\/add/);
+  const result = await page.evaluate(async () => {
+    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+    const original = {
+      encounters: await bridge.querySql('SELECT fhir_json FROM consultations;'),
+      conditions: await bridge.querySql('SELECT fhir_json FROM conditions;'),
+    };
+    const encounter = JSON.parse(original.encounters[0].fhir_json);
+    const condition = JSON.parse(original.conditions[0].fhir_json);
+    await bridge.executeSql(
+      "CREATE TEMP TRIGGER reject_new_diagnosis BEFORE INSERT ON consultation_conditions BEGIN SELECT RAISE(ABORT, 'Injected linking failure'); END;"
+    );
+    let rejected = false;
+    try {
+      await bridge.saveConsultation({
+        patientId: 'atomic-patient',
+        title: 'Failed review',
+        date: '2026-10-13',
+        diagnoses: [{ title: 'Roll back', createCondition: true }],
+      });
+    } catch {
+      rejected = true;
+    }
+    return {
+      rejected,
+      encounter,
+      condition,
+      retained: {
+        encounters: await bridge.querySql(
+          'SELECT fhir_json FROM consultations;'
+        ),
+        conditions: await bridge.querySql('SELECT fhir_json FROM conditions;'),
+      },
+      original,
+    };
+  });
+  expect(result.encounter.diagnosis[0].condition[0].reference.reference).toBe(
+    `Condition/${result.condition.id}`
+  );
+  expect(result.condition.code.text).toBe('New diagnosis');
+  expect(result.condition.onsetDateTime).toBeUndefined();
+  expect(result.rejected).toBe(true);
+  expect(result.retained).toEqual(result.original);
+});
+
+test('rejects foreign references for either list and retains diagnosis text when its Condition is deleted', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page, { id: 'foreign-patient' });
+  await seedTestCondition(page, {
+    id: 'foreign-condition',
+    title: 'Foreign condition',
+  });
+  await seedTestPatient(page, { id: 'owner-patient' });
+  await seedTestCondition(page, {
+    id: 'owned-condition',
+    title: 'Reason condition',
+  });
+  const result = await page.evaluate(async () => {
+    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+    const rejected: boolean[] = [];
+    for (const extra of [
+      { reasonConditionIds: ['foreign-condition'] },
+      { diagnoses: [{ title: 'Outcome', conditionId: 'foreign-condition' }] },
+    ]) {
+      try {
+        await bridge.saveConsultation({
+          patientId: 'owner-patient',
+          title: 'Denied',
+          date: '2026-10-13',
+          ...extra,
+        });
+        rejected.push(false);
+      } catch {
+        rejected.push(true);
+      }
+    }
+    const encounter = await bridge.saveConsultation({
+      id: 'separate-owned',
+      patientId: 'owner-patient',
+      title: 'Review',
+      date: '2026-10-13',
+      reasonConditionIds: ['owned-condition'],
+      diagnoses: [
+        {
+          title: 'Separate outcome',
+          conditionId: 'owned-condition',
+          terminology: { code: 'L21' },
+        },
+      ],
+    });
+    await bridge.deleteCondition('owned-condition');
+    return {
+      rejected,
+      encounter,
+      cleaned: await bridge.getConsultation(encounter.id),
+    };
+  });
+  expect(result.rejected).toEqual([true, true]);
+  expect(result.cleaned.reason).toBeUndefined();
+  expect(result.cleaned.diagnosis).toEqual([
+    {
+      condition: [
+        { concept: { text: 'Separate outcome', coding: [{ code: 'L21' }] } },
+      ],
+    },
+  ]);
+  await page.goto('/consultation/separate-owned');
+  await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+    'Separate outcome'
+  );
+  await expect(page.getByTestId('consultation-reasons')).toHaveCount(0);
+});
