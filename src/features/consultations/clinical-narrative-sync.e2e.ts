@@ -1,4 +1,5 @@
 import { mockGoogleDrive } from '@/src/features/testing/mockGoogleDrive';
+import { readFile } from 'node:fs/promises';
 /// <reference types="node" />
 import {
   test,
@@ -8,7 +9,7 @@ import {
   seedTestConsultation,
   getTestClinicalDocument,
 } from '@/src/features/testing/testStorage';
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
 test.describe('Clinical Narrative and Composition Sync', () => {
   test.beforeEach(async ({ page }) => {
@@ -138,25 +139,69 @@ test.describe('Clinical Narrative and Composition Sync', () => {
 
     const compBefore = await getTestClinicalDocument(page, cons.id);
     expect(compBefore).not.toBeNull();
+    const subjectless = { ...compBefore };
+    delete subjectless.subject;
+    await page.evaluate(
+      (doc) =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.saveClinicalDocument(
+          doc,
+          'patient-narrative-test'
+        ),
+      subjectless
+    );
 
-    // Export archive via test bridge
+    const downloadPromise = page.waitForEvent('download');
     const summary = await page.evaluate(async () => {
       return await (window as any).__HEALTHY_TEST_BRIDGE__.exportArchive();
     });
     expect(summary.consultationCount).toBe(1);
     expect(summary.clinicalDocumentCount).toBe(1);
 
-    // Re-read exported zip bytes from bridge
-    const exportResult = await page.evaluate(async (docId) => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      // Fetch stored documents
-      const docs = await bridge.querySql(
-        'SELECT fhir_json FROM clinical_documents WHERE id = ?',
-        [docId]
-      );
-      return docs;
-    }, compBefore.id);
-    expect(exportResult.length).toBe(1);
+    const bytes = await readFile((await (await downloadPromise).path())!);
+    const exportedFiles = unzipSync(bytes);
+    const documentPath = `records/clinical_document_${compBefore.id}.json`;
+    expect(JSON.parse(strFromU8(exportedFiles['manifest.json']))).toMatchObject(
+      {
+        version: 2,
+        fhirVersion: '5.0.0',
+        clinicalDocumentCount: 1,
+      }
+    );
+    expect(JSON.parse(strFromU8(exportedFiles[documentPath]))).toEqual({
+      resource: subjectless,
+      patientId: 'patient-narrative-test',
+    });
+    const roundTrip = await page.evaluate(
+      async ({ archive, consultationId }) => {
+        const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+        await b.clearDatabase();
+        const restored = await b.restoreArchive(archive);
+        return {
+          restored,
+          doc: await b.getClinicalDocumentByConsultationId(consultationId),
+        };
+      },
+      { archive: Array.from(bytes), consultationId: cons.id }
+    );
+    expect(roundTrip.restored.clinicalDocuments).toBe(1);
+    expect(roundTrip.doc).toEqual(subjectless);
+
+    // Existing v2 archives used raw Compositions with subject-derived ownership.
+    exportedFiles[documentPath] = strToU8(JSON.stringify(compBefore));
+    const legacy = await page.evaluate(
+      async ({ archive, consultationId }) => {
+        const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+        await b.clearDatabase();
+        const restored = await b.restoreArchive(archive);
+        return {
+          restored,
+          doc: await b.getClinicalDocumentByConsultationId(consultationId),
+        };
+      },
+      { archive: Array.from(zipSync(exportedFiles)), consultationId: cons.id }
+    );
+    expect(legacy.restored.clinicalDocuments).toBe(1);
+    expect(legacy.doc).toEqual(compBefore);
 
     // Test restoring from a v1 archive (backward compatibility)
     const v1ZipFiles: Record<string, Uint8Array> = {

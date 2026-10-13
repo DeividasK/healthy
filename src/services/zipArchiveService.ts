@@ -86,8 +86,8 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
   }
 
   // Export Clinical Documents (Compositions) as plain JSON
-  for (const { document: doc } of clinicalDocs) {
-    const jsonStr = JSON.stringify(doc, null, 2);
+  for (const { document: doc, patientId } of clinicalDocs) {
+    const jsonStr = JSON.stringify({ resource: doc, patientId }, null, 2);
     zipFiles[`records/clinical_document_${doc.id}.json`] = strToU8(jsonStr);
   }
 
@@ -199,7 +199,15 @@ export async function restoreFromZipBytes(
     if (!jsonText) continue;
 
     try {
-      const resource = JSON.parse(jsonText);
+      const parsed = JSON.parse(jsonText);
+      const isClinicalEnvelope =
+        path.startsWith('records/clinical_document_') &&
+        parsed.resource?.resourceType === 'Composition';
+      const resource = isClinicalEnvelope ? parsed.resource : parsed;
+      const archivedPatientId =
+        isClinicalEnvelope && typeof parsed.patientId === 'string'
+          ? parsed.patientId
+          : undefined;
 
       if (resource.resourceType === 'Patient') {
         patientResources.push(resource as Patient);
@@ -225,6 +233,7 @@ export async function restoreFromZipBytes(
       } else if (resource.resourceType === 'Composition') {
         const doc = resource as Composition;
         const patientId =
+          archivedPatientId ||
           doc.subject?.[0]?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         compositionResources.push({ doc, patientId });
