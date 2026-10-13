@@ -135,12 +135,24 @@ export async function createOrUpdateCondition(
       if (!changed(field)) continue;
       const value = updated[field];
       if (value) {
+        const previous = existing[field];
+        const previousCoding = { ...previous?.coding?.[0] };
+        const nextCoding = value.coding?.[0];
+        const codingChanged =
+          previousCoding.system !== nextCoding?.system ||
+          previousCoding.code !== nextCoding?.code;
+        // Labels and terminology versions describe the old coding, not its replacement.
+        if (codingChanged) {
+          delete previousCoding.display;
+          delete previousCoding.version;
+        }
         condition[field] = {
-          ...existing[field],
+          ...previous,
           ...value,
+          ...(codingChanged ? { text: undefined } : {}),
           coding: [
-            { ...existing[field]?.coding?.[0], ...value.coding?.[0] },
-            ...(existing[field]?.coding?.slice(1) || []),
+            { ...previousCoding, ...nextCoding },
+            ...(previous?.coding?.slice(1) || []),
           ],
         };
       } else if (field !== 'clinicalStatus') {

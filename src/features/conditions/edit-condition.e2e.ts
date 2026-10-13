@@ -333,8 +333,44 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
     onsetDateTime: '2026-10-01T14:30:00+03:00',
     clinicalStatus: {
       ...seeded.clinicalStatus,
+      text: 'Active',
+      coding: [
+        {
+          ...seeded.clinicalStatus.coding[0],
+          display: 'Active',
+          version: 'imported-version',
+          extension: [
+            {
+              url: 'https://example.org/status-coding',
+              valueString: 'retained',
+            },
+          ],
+        },
+      ],
       extension: [
         { url: 'https://example.org/status', valueString: 'retained' },
+      ],
+    },
+    verificationStatus: {
+      text: 'Unconfirmed',
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/condition-ver-status',
+          code: 'unconfirmed',
+          display: 'Unconfirmed',
+          version: 'imported-version',
+        },
+      ],
+    },
+    severity: {
+      text: 'Mild',
+      coding: [
+        {
+          system: 'http://hl7.org/fhir/ValueSet/condition-severity',
+          code: 'mild',
+          display: 'Mild',
+          version: 'imported-version',
+        },
       ],
     },
     category: [
@@ -365,6 +401,45 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
     ...original,
     meta: { ...original.meta, lastUpdated: edited.meta.lastUpdated },
     code: { ...original.code, text: 'Updated wording' },
+  });
+
+  await page.goto('/condition/preserved-condition/edit');
+  await page.getByTestId('status-picker-select').selectOption('inactive');
+  await page
+    .getByTestId('verification-picker-button')
+    .selectOption('confirmed');
+  await page.getByTestId('severity-option-severe').click();
+  await page.getByTestId('save-button').click();
+  await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
+  const updated = await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.getCondition('preserved-condition')
+  );
+  expect(updated.clinicalStatus).toEqual({
+    extension: original.clinicalStatus.extension,
+    coding: [
+      {
+        system: original.clinicalStatus.coding[0].system,
+        code: 'inactive',
+        extension: original.clinicalStatus.coding[0].extension,
+      },
+    ],
+  });
+  expect(updated.verificationStatus).toEqual({
+    coding: [
+      {
+        system: original.verificationStatus.coding[0].system,
+        code: 'confirmed',
+      },
+    ],
+  });
+  expect(updated.severity).toEqual({
+    coding: [
+      {
+        system: original.severity.coding[0].system,
+        code: 'severe',
+        display: 'Severe',
+      },
+    ],
   });
 });
 
