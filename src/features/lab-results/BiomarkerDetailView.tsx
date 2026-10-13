@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronDown } from 'lucide-react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ChevronDown, FileText } from 'lucide-react-native';
 import Svg, {
   Circle,
   Line,
@@ -11,6 +11,8 @@ import Svg, {
 } from 'react-native-svg';
 import type { Observation } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
@@ -38,8 +40,10 @@ function getObservationName(observation: Observation) {
 }
 
 export function BiomarkerDetailView() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId } = useActivePatient();
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [reports, setReports] = useState<
     Awaited<ReturnType<typeof getAllReports>>
   >([]);
@@ -157,6 +161,35 @@ export function BiomarkerDetailView() {
       testID="biomarker-view"
       title={title}
       titleTestID="biomarker-title"
+      actions={
+        <ResourceActionDock
+          onAdd={() => setShowAddMenu((visible) => !visible)}
+          addLabel="Add record"
+          addTestID="floating-add-button"
+          addMenuExpanded={showAddMenu}
+        />
+      }
+      modal={
+        <FloatingAddMenu
+          visible={showAddMenu}
+          onClose={() => setShowAddMenu(false)}
+          options={[
+            {
+              id: 'lab-results',
+              label: 'Add Lab Results',
+              testID: 'menu-add-lab-results',
+              icon: (
+                <FileText
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/lab-result/add'),
+            },
+          ]}
+        />
+      }
     >
       {marker?.description && (
         <View style={styles.section}>

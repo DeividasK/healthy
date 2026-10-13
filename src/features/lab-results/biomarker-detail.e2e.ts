@@ -43,6 +43,11 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-title')).toHaveText(
       'Red Blood Cells (RBC)'
     );
+    await page.getByTestId('floating-add-button').click();
+    await expect(page.getByTestId('menu-add-lab-results')).toHaveText(
+      'Add Lab Results'
+    );
+    await page.getByTestId('floating-add-menu-backdrop').click();
     await expect(
       page.getByText(
         'Number of oxygen-carrying red blood cells per volume of blood.'
