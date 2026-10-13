@@ -312,8 +312,8 @@ function BiomarkerChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const width = Math.max(360, measurements.length * 84);
   const height = 160;
-  const paddingLeft = 122;
-  const paddingRight = 64;
+  const paddingLeft = 16;
+  const paddingRight = 32;
   const paddingTop = 16;
   const paddingBottom = 30;
   const values = measurements.map((item) => item.value);
@@ -344,7 +344,11 @@ function BiomarkerChart({
       testID="biomarker-chart"
       accessibilityLabel="Biomarker values over time"
     >
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chartContent}
+      >
         <View style={{ width: width * 2, height: height * 2 }}>
           <Svg
             width={width * 2}
@@ -412,24 +416,44 @@ function BiomarkerChart({
               strokeWidth="1"
             />
             <SvgText
-              x={paddingLeft - 8}
-              y={yFor(highValue) + 4}
+              x={paddingLeft - 2}
+              y={yFor(highValue) - 2}
               fill="#EF4444"
               fontSize="6"
               textAnchor="end"
               fillOpacity={1}
             >
-              High: {highValue}
+              High
             </SvgText>
             <SvgText
-              x={paddingLeft - 8}
-              y={yFor(lowValue) + 4}
+              x={paddingLeft - 2}
+              y={yFor(highValue) + 6}
+              fill="#EF4444"
+              fontSize="6"
+              textAnchor="end"
+              fillOpacity={1}
+            >
+              {highValue}
+            </SvgText>
+            <SvgText
+              x={paddingLeft - 2}
+              y={yFor(lowValue) - 2}
               fill="#3B82F6"
               fontSize="6"
               textAnchor="end"
               fillOpacity={1}
             >
-              Low: {lowValue}
+              Low
+            </SvgText>
+            <SvgText
+              x={paddingLeft - 2}
+              y={yFor(lowValue) + 6}
+              fill="#3B82F6"
+              fontSize="6"
+              textAnchor="end"
+              fillOpacity={1}
+            >
+              {lowValue}
             </SvgText>
             <Polyline
               points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
@@ -594,6 +618,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.card,
     marginBottom: 16,
   },
+  chartContent: { alignItems: 'flex-start' },
   history: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.light.border,
