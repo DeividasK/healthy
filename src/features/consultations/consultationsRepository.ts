@@ -243,18 +243,24 @@ export async function fetchConsultationById(
  */
 export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
-  const doc = await db.getFirstAsync<{ id: string; patient_id: string }>(
-    `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
-    [id]
-  );
-  if (doc) {
-    await recordPendingClinicalResourceDeletion(
-      'Composition',
-      doc.id,
-      doc.patient_id
+  await db.withTransactionAsync(async () => {
+    const doc = await db.getFirstAsync<{ id: string; patient_id: string }>(
+      `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
+      [id]
     );
-  }
-  await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
+    const deleted = await db.runAsync(
+      `DELETE FROM consultations WHERE id = ?;`,
+      [id]
+    );
+    if (doc && deleted.changes) {
+      await recordPendingClinicalResourceDeletion(
+        'Composition',
+        doc.id,
+        doc.patient_id,
+        true
+      );
+    }
+  });
   await recordPendingConsultationDeletion(id);
   notifyDatabaseChanged([
     'consultations',

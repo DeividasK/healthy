@@ -349,14 +349,15 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
   }
 
   // Upload/Update Clinical Documents (Compositions)
-  for (const { document: doc } of eligibleClinicalDocs) {
+  for (const { document: doc, patientId } of eligibleClinicalDocs) {
     const fileName = `composition_${doc.id}.json.enc`;
     const encBytes = await encryptText(JSON.stringify(doc), key);
     const existing = remoteFileMap.get(fileName);
     const localLastUpdated = doc.meta?.lastUpdated;
-    const appProperties = localLastUpdated
-      ? { lastUpdated: localLastUpdated }
-      : undefined;
+    const appProperties = {
+      patientId,
+      ...(localLastUpdated ? { lastUpdated: localLastUpdated } : {}),
+    };
 
     if (existing) {
       const remoteLastUpdated = existing.appProperties?.lastUpdated;
@@ -580,6 +581,7 @@ export async function restoreFromGoogleDrive(
           };
         }
         const patientId =
+          file.appProperties?.patientId ||
           doc.subject?.[0]?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
@@ -809,8 +811,14 @@ export async function deletePatientFromGoogleDrive(
         const decryptedText = await decryptText(encryptedBytes, key);
         const resource = JSON.parse(decryptedText);
 
+        const subjectRef = Array.isArray(resource.subject)
+          ? resource.subject[0]?.reference
+          : resource.subject?.reference;
         const resourcePatientId =
-          resource.subject?.reference?.replace(/^Patient\//, '') ||
+          (resource.resourceType === 'Composition'
+            ? file.appProperties?.patientId
+            : undefined) ||
+          subjectRef?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
 
         if (resourcePatientId === patientId) {

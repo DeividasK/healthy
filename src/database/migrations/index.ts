@@ -7,6 +7,7 @@ import { migrationV6 } from './v6';
 import { migrationV7 } from './v7';
 import { migrationV8 } from './v8';
 import { migrationV9 } from './v9';
+import { migrationV10 } from './v10';
 
 export * from './types';
 export * from './v1';
@@ -17,6 +18,7 @@ export * from './v6';
 export * from './v7';
 export * from './v8';
 export * from './v9';
+export * from './v10';
 
 export const DATABASE_MIGRATIONS: DatabaseMigration[] = [
   migrationV1,
@@ -27,4 +29,5 @@ export const DATABASE_MIGRATIONS: DatabaseMigration[] = [
   migrationV7,
   migrationV8,
   migrationV9,
+  migrationV10,
 ];

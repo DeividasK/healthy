@@ -135,6 +135,10 @@ export async function insertClinicalDocumentRecord(
         incomingTimestamp,
       ]
     );
+    await clearPendingClinicalResourceDeletions(
+      [{ resourceType: 'Composition', id: docId, patientId }],
+      true
+    );
     didUpdate = true;
   };
 
@@ -145,9 +149,6 @@ export async function insertClinicalDocumentRecord(
   }
 
   if (didUpdate) {
-    await clearPendingClinicalResourceDeletions([
-      { resourceType: 'Composition', id: docId, patientId },
-    ]);
     if (!withinTransaction) {
       notifyDatabaseChanged(['clinical_documents']);
     }
@@ -246,33 +247,32 @@ export async function deleteClinicalDocumentRecord(
   withinTransaction: boolean = false
 ): Promise<void> {
   const db = await getDb();
-  const existing = await db.getFirstAsync<{ patient_id: string }>(
-    `SELECT patient_id FROM clinical_documents WHERE id = ?;`,
-    [id]
-  );
-  if (existing) {
+  let didDelete = false;
+  const runDelete = async () => {
+    const existing = await db.getFirstAsync<{ patient_id: string }>(
+      `SELECT patient_id FROM clinical_documents WHERE id = ?
+       AND (? IS NULL OR patient_id = ?);`,
+      [id, patientId ?? null, patientId ?? null]
+    );
+    if (!existing) return;
+    const result = await db.runAsync(
+      `DELETE FROM clinical_documents WHERE id = ? AND patient_id = ?;`,
+      [id, existing.patient_id]
+    );
+    if (!result.changes) return;
     await recordPendingClinicalResourceDeletion(
       'Composition',
       id,
-      existing.patient_id
+      existing.patient_id,
+      true
     );
-  }
-
-  const runDelete = async () => {
-    if (patientId) {
-      await db.runAsync(
-        `DELETE FROM clinical_documents WHERE id = ? AND patient_id = ?;`,
-        [id, patientId]
-      );
-    } else {
-      await db.runAsync(`DELETE FROM clinical_documents WHERE id = ?;`, [id]);
-    }
+    didDelete = true;
   };
 
   if (withinTransaction) {
     await runDelete();
   } else {
     await db.withTransactionAsync(runDelete);
-    notifyDatabaseChanged(['clinical_documents']);
+    if (didDelete) notifyDatabaseChanged(['clinical_documents']);
   }
 }

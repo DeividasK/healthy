@@ -21,7 +21,13 @@ import {
 import {
   backupToGoogleDrive,
   restoreFromGoogleDrive,
+  deletePatientFromGoogleDrive,
+  syncWithGoogleDrive,
 } from '@/src/services/syncManager';
+import {
+  getPendingDeletedClinicalResources,
+  clearPendingClinicalResourceDeletions,
+} from '@/src/services/syncDeletions';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
 import { createOrUpdatePatient } from '@/src/features/profile/patientService';
@@ -68,6 +74,17 @@ export function setupTestBridge() {
       restoreFromZipBytes(new Uint8Array(bytes)),
     backupToGoogleDrive,
     restoreFromGoogleDrive,
+    deletePatientFromGoogleDrive,
+    syncWithGoogleDrive,
+    getPendingDeletedClinicalResources,
+    clearPendingClinicalResourceDeletions,
+    rollbackClinicalDocumentDeletion: async (id: string, patientId: string) => {
+      const db = await getDb();
+      await db.withTransactionAsync(async () => {
+        await deleteClinicalDocumentRecord(id, patientId, true);
+        throw new Error('Intentional deletion rollback');
+      });
+    },
     querySql: async (sql: string, params: string[] = []) =>
       (await getDb()).getAllAsync(sql, params),
     // Prepare database failure scenarios without changing production behavior.

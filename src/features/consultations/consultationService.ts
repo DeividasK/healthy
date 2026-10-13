@@ -291,6 +291,15 @@ export async function createOrUpdateConsultation(
     consId,
     patientId
   );
+  const existingSections = existingDoc?.section || [];
+  const notesSectionIndex = existingSections.findIndex(
+    (section) =>
+      section.title === 'Notes' ||
+      section.code?.coding?.some(
+        (coding) =>
+          coding.system === 'http://loinc.org' && coding.code === '48767-8'
+      )
+  );
 
   if (trimmedNotes) {
     const docId = existingDoc?.id || `comp-${Crypto.randomUUID()}`;
@@ -322,29 +331,35 @@ export async function createOrUpdateConsultation(
       author: trimmedDoctor
         ? [{ display: trimmedDoctor }]
         : [{ reference: `Patient/${patientId}` }],
-      section: [
-        {
-          title: 'Notes',
-          code: {
-            coding: [
-              {
-                system: 'http://loinc.org',
-                code: '48767-8',
-                display: 'Annotation comment',
-              },
-            ],
-            text: 'Notes',
-          },
+      section: (() => {
+        const notesSection: NonNullable<Composition['section']>[number] = {
+          ...(notesSectionIndex >= 0
+            ? existingSections[notesSectionIndex]
+            : {
+                title: 'Notes',
+                code: {
+                  coding: [
+                    {
+                      system: 'http://loinc.org',
+                      code: '48767-8',
+                      display: 'Annotation comment',
+                    },
+                  ],
+                  text: 'Notes',
+                },
+              }),
           text: {
+            ...existingSections[notesSectionIndex]?.text,
             status: 'generated',
             div: createNarrativeDiv(trimmedNotes),
           },
-          ...(existingDoc?.section?.[0]?.entry
-            ? { entry: existingDoc.section[0].entry }
-            : {}),
-        },
-        ...(existingDoc?.section?.slice(1) || []),
-      ],
+        };
+        return notesSectionIndex >= 0
+          ? existingSections.map((section, index) =>
+              index === notesSectionIndex ? notesSection : section
+            )
+          : [...existingSections, notesSection];
+      })(),
     };
     await insertClinicalDocumentRecord(
       composition,
@@ -352,10 +367,15 @@ export async function createOrUpdateConsultation(
       false,
       withinTransaction
     );
-  } else if (existingDoc) {
-    const hasOtherSections = (existingDoc.section?.length || 0) > 1;
-    const hasEntries = Boolean(existingDoc.section?.[0]?.entry?.length);
-    if (!hasOtherSections && !hasEntries && existingDoc.id) {
+  } else if (existingDoc && notesSectionIndex >= 0) {
+    const remainingSections = existingSections.flatMap((section, index) => {
+      if (index !== notesSectionIndex) return [section];
+      if (!section.entry?.length && !section.section?.length) return [];
+      const nextSection = { ...section };
+      delete nextSection.text;
+      return [nextSection];
+    });
+    if (!remainingSections.length && existingDoc.id) {
       await deleteClinicalDocumentRecord(
         existingDoc.id,
         patientId,
@@ -368,14 +388,7 @@ export async function createOrUpdateConsultation(
           ...existingDoc.meta,
           lastUpdated: now,
         },
-        section: existingDoc.section?.map((sec, idx) => {
-          if (idx === 0) {
-            const nextSec = { ...sec };
-            delete nextSec.text;
-            return nextSec;
-          }
-          return sec;
-        }),
+        section: remainingSections,
       };
       await insertClinicalDocumentRecord(
         updatedComposition,
