@@ -34,6 +34,7 @@ import {
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
+import { convertBiomarkerValue } from './biomarkerMeasurements';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -286,8 +287,24 @@ export function LabResultForm({
         value: parseFloat(item.valueStr),
         unit: item.selectedUnit,
         ucumCode: item.selectedUcum,
-        referenceLow: item.definition.referenceRange?.low,
-        referenceHigh: item.definition.referenceRange?.high,
+        referenceLow:
+          item.definition.referenceRange?.low === undefined
+            ? undefined
+            : convertBiomarkerValue(
+                item.definition.referenceRange.low,
+                item.definition.ucumCode,
+                item.selectedUcum,
+                item.definition
+              ),
+        referenceHigh:
+          item.definition.referenceRange?.high === undefined
+            ? undefined
+            : convertBiomarkerValue(
+                item.definition.referenceRange.high,
+                item.definition.ucumCode,
+                item.selectedUcum,
+                item.definition
+              ),
       }));
 
       await createAndSaveDiagnosticReport({

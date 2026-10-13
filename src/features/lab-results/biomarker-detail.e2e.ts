@@ -74,19 +74,19 @@ test.describe('Biomarker detail', () => {
     await whyItMattersToggle.click();
     await expect(whyItMatters).toBeHidden();
     await expect(page.getByTestId('biomarker-chart')).toBeVisible();
-    await expect(page.getByText('4.8')).toBeVisible();
-    await expect(page.getByText('4.5')).toBeVisible();
-    await expect(page.getByText('Low', { exact: true })).toBeVisible();
+    const historyList = page.getByTestId('biomarker-history-list');
+    await expect(historyList.getByText('4.8')).toBeVisible();
+    await expect(historyList.getByText('4.5')).toBeVisible();
+    await expect(historyList.getByText('Low', { exact: true })).toBeVisible();
     await expect(
-      page.getByText('Normal', { exact: true }).first()
+      historyList.getByText('Normal', { exact: true }).first()
     ).toBeVisible();
-    await expect(page.getByText('High', { exact: true })).toBeVisible();
+    await expect(historyList.getByText('High', { exact: true })).toBeVisible();
     await expect(
       page.locator('[data-testid^="biomarker-history-range-"]').first()
     ).toBeVisible();
 
     const historyListToggle = page.getByTestId('biomarker-history-list-toggle');
-    const historyList = page.getByTestId('biomarker-history-list');
     await expect(historyListToggle).toHaveText('List');
     await expect(historyListToggle).toHaveAttribute('aria-expanded', 'true');
     await historyListToggle.click();

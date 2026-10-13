@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -29,7 +28,14 @@ import { CBC_MARKERS } from '@/src/data/cbcMarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
-type MeasurementStatus = 'Low' | 'Normal' | 'High';
+import {
+  convertBiomarkerValue,
+  getObservationReferenceRange,
+  getObservationStatus,
+  getObservationUnitCode,
+  type MeasurementReferenceRange,
+  type MeasurementStatus,
+} from './biomarkerMeasurements';
 
 type Measurement = {
   date: string;
@@ -38,6 +44,8 @@ type Measurement = {
   id: string;
   name: string;
   status?: MeasurementStatus;
+  unitCode: string;
+  range?: MeasurementReferenceRange;
 };
 
 function getObservationName(observation: Observation) {
@@ -101,33 +109,6 @@ export function BiomarkerDetailView() {
           : code === id || name === decodeURIComponent(id || '').toLowerCase();
         const value = observation.valueQuantity?.value;
         if (isMatch && typeof value === 'number') {
-          const interpretationCodes =
-            observation.interpretation?.flatMap(
-              (interpretation) =>
-                interpretation.coding?.map((coding) => coding.code) || []
-            ) || [];
-          const interpretationCode = interpretationCodes.find((candidate) =>
-            ['L', 'LL', 'N', 'H', 'HH'].includes(candidate || '')
-          );
-          let status: MeasurementStatus | undefined;
-          if (interpretationCode === 'L' || interpretationCode === 'LL') {
-            status = 'Low';
-          } else if (
-            interpretationCode === 'H' ||
-            interpretationCode === 'HH'
-          ) {
-            status = 'High';
-          } else if (interpretationCode === 'N') {
-            status = 'Normal';
-          } else if (marker?.referenceRange) {
-            const { low, high } = marker.referenceRange;
-            status =
-              low !== undefined && value < low
-                ? 'Low'
-                : high !== undefined && value > high
-                  ? 'High'
-                  : 'Normal';
-          }
           matches.push({
             date: observation.effectiveDateTime || reportDate,
             value,
@@ -137,13 +118,34 @@ export function BiomarkerDetailView() {
               '',
             id: observation.id || `${record.report.id}-${matches.length}`,
             name,
-            status,
+            status: getObservationStatus(observation, marker),
+            unitCode: getObservationUnitCode(observation),
+            range: getObservationReferenceRange(observation, marker),
           });
         }
       }
     }
     return matches.sort((a, b) => a.date.localeCompare(b.date));
   }, [id, marker, reports]);
+
+  const latestMeasurement = measurements[measurements.length - 1];
+  const chartMeasurements = useMemo(
+    () =>
+      latestMeasurement
+        ? measurements.flatMap((measurement) => {
+            const value = convertBiomarkerValue(
+              measurement.value,
+              measurement.unitCode,
+              latestMeasurement.unitCode,
+              marker
+            );
+            return value === undefined
+              ? []
+              : [{ ...measurement, value, unit: latestMeasurement.unit }];
+          })
+        : [],
+    [measurements, latestMeasurement, marker]
+  );
 
   if (isLoading)
     return <ResourceViewLayout testID="biomarker-view" isLoading />;
@@ -163,8 +165,6 @@ export function BiomarkerDetailView() {
     );
 
   const title = marker?.name || measurements[0].name;
-  const latestMeasurement = measurements[measurements.length - 1];
-
   return (
     <ResourceViewLayout
       testID="biomarker-view"
@@ -223,17 +223,17 @@ export function BiomarkerDetailView() {
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Value history</Text>
-        {measurements.length > 1 && (
+        {chartMeasurements.length > 1 && (
           <BiomarkerChart
-            measurements={measurements}
-            low={marker?.referenceRange?.low}
-            high={marker?.referenceRange?.high}
+            measurements={chartMeasurements}
+            low={latestMeasurement.range?.low}
+            high={latestMeasurement.range?.high}
           />
         )}
         <View style={styles.historyListContainer}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ expanded: isHistoryListExpanded }}
+            aria-expanded={isHistoryListExpanded}
             onPress={() => setIsHistoryListExpanded((expanded) => !expanded)}
             style={styles.historyListToggle}
             testID="biomarker-history-list-toggle"
@@ -268,8 +268,8 @@ export function BiomarkerDetailView() {
                     </View>
                     <BiomarkerRangeLine
                       value={measurement.value}
-                      low={marker?.referenceRange?.low}
-                      high={marker?.referenceRange?.high}
+                      low={measurement.range?.low}
+                      high={measurement.range?.high}
                       testID={`biomarker-history-range-${measurement.id}`}
                     />
                   </View>
@@ -308,6 +308,7 @@ export function BiomarkerDetailView() {
 
 function LearnItem({ title, children }: { title: string; children: string }) {
   const [expanded, setExpanded] = useState(false);
+  if (!children.trim()) return null;
 
   return (
     <View
@@ -318,7 +319,7 @@ function LearnItem({ title, children }: { title: string; children: string }) {
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
         accessibilityLabel={title}
         testID={`learn-toggle-${title.toLowerCase().replaceAll(' ', '-')}`}
         onPress={() => setExpanded((current) => !current)}
@@ -435,6 +436,7 @@ function BiomarkerChart({
       }
     >
       <View style={{ width, height }}>
+        {/* eslint-disable @typescript-eslint/no-deprecated -- These x/y props position SVG geometry, not deprecated View transforms. */}
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
           <Rect
             x={paddingLeft}
@@ -573,6 +575,7 @@ function BiomarkerChart({
             </React.Fragment>
           ))}
         </Svg>
+        {/* eslint-enable @typescript-eslint/no-deprecated */}
         {points.map((point, index) => (
           <Pressable
             key={measurements[index].id}

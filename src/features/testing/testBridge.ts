@@ -25,6 +25,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { convertBiomarkerValue } from '@/src/features/lab-results/biomarkerMeasurements';
 
 async function resolvePatientId(
   explicitId?: string
@@ -116,15 +117,25 @@ export function setupTestBridge() {
 
         const val = typeof b.value === 'string' ? parseFloat(b.value) : b.value;
         if (def) {
+          const selectedUnit = def.units.find(
+            (unit) => unit.ucum === b.unit || unit.label === b.unit
+          );
+          const ucumCode = selectedUnit?.ucum || b.unit || def.ucumCode;
           return {
             id: def.id,
             name: def.name,
             loinc: def.loinc,
             value: val,
             unit: b.unit || def.primaryUnit,
-            ucumCode: def.ucumCode,
-            referenceLow: def.referenceRange?.low,
-            referenceHigh: def.referenceRange?.high,
+            ucumCode,
+            referenceLow:
+              def.referenceRange?.low === undefined
+                ? undefined
+                : convertBiomarkerValue(def.referenceRange.low, def.ucumCode, ucumCode, def),
+            referenceHigh:
+              def.referenceRange?.high === undefined
+                ? undefined
+                : convertBiomarkerValue(def.referenceRange.high, def.ucumCode, ucumCode, def),
           };
         }
         return {

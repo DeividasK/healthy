@@ -47,40 +47,11 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
 import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import {
+  getObservationReferenceRange,
+  getObservationStatus,
+} from '@/src/features/lab-results/biomarkerMeasurements';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
-
-function getObservationReferenceRange(observation: Observation) {
-  const coding = observation.code?.coding?.[0];
-  const loinc = coding?.code;
-  const name = (coding?.display || observation.code?.text || '').toLowerCase();
-  const marker = CBC_MARKERS.find(
-    (candidate) =>
-      candidate.loinc === loinc ||
-      candidate.name.toLowerCase() === name ||
-      candidate.aliases.some((alias) => alias.toLowerCase() === name)
-  );
-  const unitCode = observation.valueQuantity?.code;
-  const unitFactor =
-    marker?.units.find((unit) => unit.ucum === unitCode)?.factor ?? 1;
-  const observationRange = observation.referenceRange?.find(
-    (range) => range.low?.value !== undefined || range.high?.value !== undefined
-  );
-  const low =
-    observationRange?.low?.value ??
-    (marker?.referenceRange?.low !== undefined
-      ? marker.referenceRange.low * unitFactor
-      : undefined);
-  const high =
-    observationRange?.high?.value ??
-    (marker?.referenceRange?.high !== undefined
-      ? marker.referenceRange.high * unitFactor
-      : undefined);
-
-  return low !== undefined && high !== undefined && high > low
-    ? { low, high }
-    : undefined;
-}
 
 export function HomeView() {
   const router = useRouter();
@@ -252,19 +223,19 @@ export function HomeView() {
   };
 
   const getStatusBadge = (obs: Observation) => {
-    const interpretationCode = obs.interpretation?.[0]?.coding?.[0]?.code;
+    const status = getObservationStatus(obs);
 
-    if (!interpretationCode) return null;
+    if (!status) return null;
 
     let badgeText = 'Normal';
     let badgeStyle: any = styles.badgeNormal;
     let textStyle: any = styles.badgeTextNormal;
 
-    if (interpretationCode === 'L') {
+    if (status === 'Low') {
       badgeText = 'Low';
       badgeStyle = styles.badgeLow;
       textStyle = styles.badgeTextLow;
-    } else if (interpretationCode === 'H') {
+    } else if (status === 'High') {
       badgeText = 'High';
       badgeStyle = styles.badgeHigh;
       textStyle = styles.badgeTextHigh;
