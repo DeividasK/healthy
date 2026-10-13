@@ -63,13 +63,13 @@ export function FormActionDock({
       onPress: onDelete ?? (() => setDeleteVisible(true)),
       disabled: isSaving,
     });
-  else if (showCancel && !onAdd) actions.push(cancelAction);
+  if (showCancel) actions.push(cancelAction);
   actions.push({
     label: isSaving ? 'Saving...' : saveLabel,
     testID: saveTestID,
     icon: Check,
     onPress: onSave,
-    primary: !onAdd,
+    primary: true,
     disabled: isSaving || saveDisabled,
     busy: isSaving,
   });
@@ -79,11 +79,9 @@ export function FormActionDock({
       testID: addTestID,
       icon: Plus,
       onPress: onAdd,
-      primary: true,
       disabled: isSaving || addDisabled,
       expanded: addExpanded,
     });
-  if ((hasDelete || onAdd) && showCancel) actions.push(cancelAction);
   return (
     <>
       <ResourceActionDock actions={actions} showBack={false} />

@@ -1,3 +1,4 @@
+import { getConditionCategoryLabel } from './conditionCategories';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
@@ -77,15 +78,7 @@ export function EditConditionView() {
           title,
           clinicalStatus,
           verificationStatus,
-          category:
-            condition.category?.[0]?.text ||
-            condition.category?.[0]?.coding?.[0]?.display ||
-            ({
-              'problem-list-item': 'Problem list item',
-              'encounter-diagnosis': 'Encounter diagnosis',
-            }[condition.category?.[0]?.coding?.[0]?.code || ''] ??
-              condition.category?.[0]?.coding?.[0]?.code ??
-              ''),
+          category: getConditionCategoryLabel(condition.category?.[0]),
           onsetDate: dateObj,
           severity,
           bodySite,

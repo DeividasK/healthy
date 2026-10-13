@@ -23,13 +23,34 @@ test.describe('Add Condition Flow', () => {
         await expect(page).toHaveURL(/.*condition\/add/);
         await expect(page.getByText('New Condition')).toBeVisible();
         await checkA11y(page, { disableRules: ['color-contrast'] });
+        const titleBounds = (await page
+          .getByTestId('condition-title-input')
+          .boundingBox())!;
+        for (const id of [
+          'verification-picker-button',
+          'condition-category-input',
+        ]) {
+          const field = page.getByTestId(id);
+          await expect(field).toHaveRole('combobox');
+          const bounds = (await field.boundingBox())!;
+          const caret = (await page.getByTestId(`${id}-caret`).boundingBox())!;
+          expect(bounds.x).toBeCloseTo(titleBounds.x);
+          expect(bounds.width).toBeCloseTo(titleBounds.width);
+          expect(caret.y + caret.height / 2).toBeCloseTo(
+            bounds.y + bounds.height / 2
+          );
+          expect(bounds.x + bounds.width - caret.x - caret.width).toBeCloseTo(
+            14
+          );
+        }
       });
 
       await test.step('Select status and enter condition title', async () => {
         const statusSelect = page.getByTestId('status-picker-select');
         await statusSelect.selectOption('active');
-        await page.getByTestId('verification-picker-button').click();
-        await page.getByTestId('verification-option-confirmed').click();
+        await page
+          .getByTestId('verification-picker-button')
+          .selectOption('confirmed');
 
         const titleInput = page.getByTestId('condition-title-input');
         await titleInput.fill('Left Knee Pain');

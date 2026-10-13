@@ -39,10 +39,15 @@ migration, new storage keys or data conversion; existing text-only records remai
 valid. The existing backup and restore process remains the recovery path.
 
 Condition forms edit clinical status and verification status independently. Category
-accepts the standard problem-list-item / encounter-diagnosis codes or source text
-(such as ESI kontekstas) in CodeableConcept.text without inventing a coding system.
+offers Ongoing and Temporary using the standard problem-list-item / encounter-diagnosis
+codes. Imported source text (such as ESI kontekstas) remains selectable and preserved
+without inventing a coding system. Both category and verification use native dropdowns.
 The editor changes the first category; additional categories and unchanged imported
 category metadata are preserved. Verification and category can be left unspecified.
 Encounter.diagnosis.use is preserved on edits but is not exposed by the form.
 An encounter document can describe referenced Conditions: onset, clinical status,
 verification and category remain Condition elements, not diagnosis backbone fields.
+
+Category labels are Ongoing (problem-list-item) and Temporary (encounter-diagnosis).
+Both use the HL7 condition-category system. These are presentation labels, not
+inferred durations or automatic reclassification.

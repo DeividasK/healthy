@@ -1,7 +1,7 @@
+import { getConditionCategoryLabel } from './conditionCategories';
 import {
   CONDITION_STATUS_OPTIONS,
   VERIFICATION_OPTIONS,
-  CATEGORY_OPTIONS,
 } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
@@ -183,13 +183,7 @@ export function ViewConditionView() {
             style={styles.notes}
             testID={`condition-category-${index}`}
           >
-            Category:{' '}
-            {category.text ||
-              category.coding?.[0]?.display ||
-              CATEGORY_OPTIONS.find(
-                (item) => item.id === category.coding?.[0]?.code
-              )?.label ||
-              category.coding?.[0]?.code}
+            Category: {getConditionCategoryLabel(category)}
           </Text>
         ))}
       </View>

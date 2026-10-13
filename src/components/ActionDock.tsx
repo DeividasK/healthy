@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   background: {
     pointerEvents: 'none',
     position: 'absolute',
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: COLORS.light.card,
     borderWidth: 1,
     borderColor: COLORS.light.cardBorder,
     borderRadius: 999,

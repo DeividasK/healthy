@@ -1,3 +1,4 @@
+import { encodeConditionCategory } from './conditionCategories';
 import * as Crypto from 'expo-crypto';
 import type { Condition, Coding } from 'fhir/r5';
 import {
@@ -11,8 +12,7 @@ export const CLINICAL_STATUS_SYSTEM =
   'http://terminology.hl7.org/CodeSystem/condition-clinical';
 export const VERIFICATION_STATUS_SYSTEM =
   'http://terminology.hl7.org/CodeSystem/condition-ver-status';
-export const CONDITION_CATEGORY_SYSTEM =
-  'http://terminology.hl7.org/CodeSystem/condition-category';
+export { CONDITION_CATEGORY_SYSTEM } from './conditionCategories';
 export const CONDITION_SEVERITY_SYSTEM =
   'http://hl7.org/fhir/ValueSet/condition-severity';
 
@@ -77,28 +77,7 @@ export async function createOrUpdateCondition(
     category:
       input.category?.trim() === ''
         ? undefined
-        : [
-            [
-              'problem-list-item',
-              'Problem list item',
-              'encounter-diagnosis',
-              'Encounter diagnosis',
-            ].includes(input.category || 'problem-list-item')
-              ? {
-                  coding: [
-                    {
-                      system: CONDITION_CATEGORY_SYSTEM,
-                      code:
-                        input.category === 'Encounter diagnosis'
-                          ? 'encounter-diagnosis'
-                          : input.category === 'Problem list item'
-                            ? 'problem-list-item'
-                            : input.category || 'problem-list-item',
-                    },
-                  ],
-                }
-              : { text: input.category?.trim() },
-          ],
+        : [encodeConditionCategory(input.category ?? 'problem-list-item')],
     code: {
       text: trimmedTitle,
     },

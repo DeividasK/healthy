@@ -1,4 +1,5 @@
-import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
+import { CATEGORY_OPTIONS } from './conditionCategories';
+import { ConditionDropdown } from './ConditionDropdown';
 import type { ConditionInput } from './conditionService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
@@ -93,10 +94,6 @@ export const VERIFICATION_OPTIONS = [
   { id: 'refuted', label: 'Refuted' },
   { id: 'entered-in-error', label: 'Entered in error' },
 ];
-export const CATEGORY_OPTIONS = [
-  { id: 'problem-list-item', label: 'Problem list item' },
-  { id: 'encounter-diagnosis', label: 'Encounter diagnosis' },
-];
 
 export interface SeverityOption {
   value: 'mild' | 'moderate' | 'severe';
@@ -158,15 +155,12 @@ export function ConditionForm({
     initialValues?.verificationStatus ?? (isEdit ? '' : 'unconfirmed');
   const [verificationStatus, setVerificationStatus] =
     useState(initialVerification);
-  const [showVerificationMenu, setShowVerificationMenu] = useState(false);
-  const initialCategory =
-    initialValues?.category ?? (isEdit ? '' : 'Problem list item');
+  const initialCategory = initialValues?.category ?? (isEdit ? '' : 'Ongoing');
   const [category, setCategory] = useState(initialCategory);
   const [showVerification, setShowVerification] = useState(
     Boolean(initialVerification)
   );
   const [showCategory, setShowCategory] = useState(Boolean(initialCategory));
-  const [showCategories, setShowCategories] = useState(false);
 
   const [selectedStatus, setSelectedStatus] =
     useState<ConditionStatusOption>(initialStatus);
@@ -516,19 +510,14 @@ export function ConditionForm({
                   <X color={COLORS.light.iconClear} size={16} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity
+              <ConditionDropdown
                 testID="verification-picker-button"
-                accessibilityRole="button"
-                accessibilityLabel="Verification status"
-                style={styles.textInput}
-                onPress={() => setShowVerificationMenu(true)}
-              >
-                <Text>
-                  {VERIFICATION_OPTIONS.find(
-                    (option) => option.id === verificationStatus
-                  )?.label || verificationStatus}
-                </Text>
-              </TouchableOpacity>
+                name="verificationStatus"
+                label="Verification status"
+                value={verificationStatus}
+                options={VERIFICATION_OPTIONS}
+                onChange={setVerificationStatus}
+              />
             </View>
           )}
           {showCategory && (
@@ -542,33 +531,29 @@ export function ConditionForm({
                   onPress={() => {
                     setShowCategory(false);
                     setCategory('');
-                    setShowCategories(false);
                   }}
                 >
                   <X color={COLORS.light.iconClear} size={16} />
                 </TouchableOpacity>
               </View>
-              <TextInput
+              <ConditionDropdown
                 testID="condition-category-input"
-                id="condition-category-input"
-                nativeID="condition-category-input"
                 name="category"
-                accessibilityLabel="Category"
-                style={styles.textInput}
+                label="Category"
                 value={category}
-                onChangeText={setCategory}
-                onFocus={() => setShowCategories(true)}
+                options={[
+                  { id: '', label: 'Not specified' },
+                  ...CATEGORY_OPTIONS.map((option) => ({
+                    id: option.label,
+                    label: option.label,
+                  })),
+                  ...(category &&
+                  !CATEGORY_OPTIONS.some((option) => option.label === category)
+                    ? [{ id: category, label: category }]
+                    : []),
+                ]}
+                onChange={setCategory}
               />
-              {showCategories && (
-                <AutocompleteDropdown
-                  items={CATEGORY_OPTIONS}
-                  itemTestIDPrefix="category-option-"
-                  onSelect={(item) => {
-                    setCategory(item.label);
-                    setShowCategories(false);
-                  }}
-                />
-              )}
             </View>
           )}
 
@@ -742,17 +727,6 @@ export function ConditionForm({
           options={plusMenuOptions}
         />
 
-        <AddOptionsModal
-          visible={showVerificationMenu}
-          onClose={() => setShowVerificationMenu(false)}
-          options={VERIFICATION_OPTIONS.map((option) => ({
-            id: option.id || 'unspecified',
-            icon: null,
-            label: option.label,
-            testID: `verification-option-${option.id || 'unspecified'}`,
-            onPress: () => setVerificationStatus(option.id),
-          }))}
-        />
         {/* Status Selection Modal for Android */}
         <AddOptionsModal
           visible={showStatusModal}

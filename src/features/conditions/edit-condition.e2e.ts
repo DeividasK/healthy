@@ -377,10 +377,23 @@ test('edits verification independently and roundtrips source and standard catego
     title: 'Seborėjinis dermatitas',
     status: 'active',
   });
+  await page.evaluate(async (resource) => {
+    await (window as any).__HEALTHY_TEST_BRIDGE__.saveCondition(
+      { ...resource, category: [{ text: 'ESI kontekstas' }] },
+      resource.subject.reference.split('/')[1]
+    );
+  }, condition);
   await page.goto(`/condition/${condition.id}/edit`);
-  await page.getByTestId('verification-picker-button').click();
-  await page.getByTestId('verification-option-confirmed').click();
-  await page.getByTestId('condition-category-input').fill('ESI kontekstas');
+  await expect(
+    page.getByRole('combobox', { name: 'Category', exact: true })
+  ).toHaveValue('ESI kontekstas');
+  await expect(
+    page.getByRole('combobox', { name: 'Verification status', exact: true })
+  ).toBeVisible();
+  await page
+    .getByTestId('verification-picker-button')
+    .selectOption('confirmed');
+
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await page.goto(`/condition/${condition.id}`);
@@ -395,13 +408,12 @@ test('edits verification independently and roundtrips source and standard catego
     'ESI kontekstas'
   );
   await page.getByTestId('status-picker-select').selectOption('inactive');
-  await page.getByTestId('condition-category-input').click();
-  await page.getByTestId('category-option-encounter-diagnosis').click();
+  await page.getByTestId('condition-category-input').selectOption('Temporary');
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await page.goto(`/condition/${condition.id}`);
   await expect(page.getByTestId('condition-category-0')).toHaveText(
-    'Category: Encounter diagnosis'
+    'Category: Temporary'
   );
   let saved = await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
@@ -420,8 +432,10 @@ test('edits verification independently and roundtrips source and standard catego
     },
   ]);
   await page.goto(`/condition/${condition.id}/edit`);
-  await page.getByTestId('verification-picker-button').click();
-  await page.getByTestId('verification-option-differential').click();
+  await page
+    .getByTestId('verification-picker-button')
+    .selectOption('differential');
+
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await page.goto(`/condition/${condition.id}`);
@@ -438,9 +452,9 @@ test('edits verification independently and roundtrips source and standard catego
   const dock = page.getByTestId('resource-action-dock');
   const ids = [
     'delete-condition-button',
+    'cancel-button',
     'save-button',
     'add-option-button',
-    'cancel-button',
   ];
   const positions = await Promise.all(
     ids.map(async (id) => {
@@ -451,8 +465,8 @@ test('edits verification independently and roundtrips source and standard catego
   expect(positions).toEqual([...positions].sort((a, b) => a - b));
   await expect
     .poll(async () => {
-      const plus = (await dock.getByTestId('add-option-button').boundingBox())!;
-      return Math.abs(plus.x + plus.width / 2 - page.viewportSize()!.width / 2);
+      const save = (await dock.getByTestId('save-button').boundingBox())!;
+      return Math.abs(save.x + save.width / 2 - page.viewportSize()!.width / 2);
     })
     .toBeLessThan(1);
   await expect
@@ -466,15 +480,17 @@ test('edits verification independently and roundtrips source and standard catego
     })
     .toBeLessThan(1);
   await expect(
-    page
-      .getByTestId('action-dock-primary-slot')
-      .getByTestId('add-option-button')
+    page.getByTestId('action-dock-primary-slot').getByTestId('save-button')
   ).toBeVisible();
   await page.getByTestId('remove-verification-button').click();
   await page.getByTestId('remove-category-button').click();
   await expect(page.getByTestId('verification-picker-button')).toHaveCount(0);
   await expect(page.getByTestId('condition-category-input')).toHaveCount(0);
   await page.getByTestId('add-option-button').click();
+  await expect(page.getByTestId('action-dock-background')).toHaveCSS(
+    'background-color',
+    'rgb(255, 255, 255)'
+  );
   await page.getByTestId('menu-add-verification').click();
   await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   await page.getByTestId('add-option-button').click();

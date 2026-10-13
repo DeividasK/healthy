@@ -69,11 +69,13 @@ test.describe('Add Consultation Flow', () => {
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-doctor').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
         const doctorInput = page.getByTestId('consultation-doctor-input');
         await doctorInput.fill('Dr. Marcus Welby');
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-notes').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
         const notesInput = page.getByTestId('consultation-notes-input');
         await notesInput.fill('Follow-up in 6 months. Blood pressure stable.');
       });
@@ -152,6 +154,7 @@ test.describe('Add Consultation Flow', () => {
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-doctor').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
 
         const doctorInput = page.getByTestId('consultation-doctor-input');
         await doctorInput.click();
@@ -259,11 +262,13 @@ test.describe('Add Consultation Flow', () => {
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-doctor').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
         const doctorInput = page.getByTestId('consultation-doctor-input');
         await doctorInput.fill('Dr. Beverly Crusher');
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-notes').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
         const notesInput = page.getByTestId('consultation-notes-input');
         await notesInput.fill('All vital signs optimal. Recommended vitamins.');
 
@@ -355,6 +360,7 @@ test.describe('Add Consultation Flow', () => {
       await test.step('Add consultation time via + menu', async () => {
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-time').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
 
         const timePicker = page.getByTestId('time-picker-button');
         await expect(timePicker).toBeVisible();
@@ -367,6 +373,7 @@ test.describe('Add Consultation Flow', () => {
       await test.step('Add serviceType via + menu and select autocomplete', async () => {
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-service-type').click();
+        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
 
         const serviceTypeInput = page.getByTestId(
           'consultation-service-type-input'
@@ -438,6 +445,7 @@ for (const terminology of [
     ).toContainText('Reasons for visit');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
     await page
       .getByTestId('diagnosis-0-title-input')
       .fill('Seborrhoeic dermatitis');
@@ -526,6 +534,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   await page.getByTestId('consultation-title-input').fill('Review');
   await page.getByTestId('add-option-button').click();
   await page.getByTestId('menu-add-diagnosis').click();
+  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   const item = page.getByTestId('consultation-diagnosis-0');
   await expect(item.getByText('Diagnosis', { exact: true })).toHaveCount(1);
   await expect(item.getByText('Diagnosis Name', { exact: true })).toHaveCount(
@@ -586,6 +595,7 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
   await page.getByTestId('consultation-title-input').fill('Review');
   await page.getByTestId('add-option-button').click();
   await page.getByTestId('menu-add-diagnosis').click();
+  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   await page.getByTestId('diagnosis-0-title-input').fill('New diagnosis');
   await page.getByTestId('diagnosis-0-condition-input').click();
   await page.getByTestId('diagnosis-0-condition-item-__create__').click();
