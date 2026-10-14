@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  waitForSyncIdle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
@@ -45,6 +46,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await connectTestSync(page, { userEmail: 'alice@gmail.com' });
     await page.goto('/profile');
     await page.getByTestId('up-to-date-button').waitFor();
+    await waitForSyncIdle(page);
 
     await takeSnapshot(
       page,

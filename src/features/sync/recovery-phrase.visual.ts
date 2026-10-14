@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 import {
   test,
   takeSnapshot,
+  waitForSyncIdle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
@@ -17,5 +18,6 @@ test('Sync - Recovery Phrase', async ({ page }, testInfo) => {
   await page.goto('/sync/recovery-phrase');
   await expect(page.getByTestId('recovery-phrase-value')).not.toHaveText('');
 
+  await waitForSyncIdle(page);
   await takeSnapshot(page, 'Sync - Recovery Phrase', testInfo);
 });

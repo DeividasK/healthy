@@ -8,6 +8,7 @@ import {
   driveContents,
   bootstrapApp,
   openSecondDevice,
+  syncAllTestProfiles,
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
@@ -106,7 +107,7 @@ test.describe('Sync between devices', () => {
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);
     await connectTestSync(second.page, { store, phrase });
-    await syncTestDevice(second.page);
+    await syncAllTestProfiles(second.page);
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
 
     // Nothing new costs one request to the Drive changes feed.
@@ -149,7 +150,7 @@ test.describe('Sync between devices', () => {
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);
     await connectTestSync(second.page, { store, phrase });
-    await syncTestDevice(second.page);
+    await syncAllTestProfiles(second.page);
 
     const rename = (title: string) => async (b: any, t: string) => {
       const condition = await b.getCondition('eczema');
@@ -179,7 +180,7 @@ test.describe('Sync between devices', () => {
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);
     await connectTestSync(second.page, { store, phrase });
-    await syncTestDevice(second.page);
+    await syncAllTestProfiles(second.page);
 
     for (const note of ['one', 'two', 'three'])
       await bridge(
@@ -210,7 +211,7 @@ test.describe('Sync between devices', () => {
     // A brand-new device restores everything from the snapshot as well.
     await bridge(second.page, async (b) => {
       await b.clearDatabase();
-      await b.syncNow();
+      await b.syncAllProfiles();
     });
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
     await second.close();
@@ -227,7 +228,7 @@ test.describe('Sync between devices', () => {
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);
     await connectTestSync(second.page, { store, phrase });
-    await syncTestDevice(second.page);
+    await syncAllTestProfiles(second.page);
 
     await bridge(second.page, async (b) => {
       await b.deletePatient('shared-patient', true);
@@ -250,18 +251,16 @@ test.describe('Sync between devices', () => {
         )
       )
     ).toEqual([]);
-    expect(await bridge(second.page, (b) => b.listExcludedPatients())).toEqual([
-      { patientId: 'shared-patient', displayName: 'Alice Doe' },
-    ]);
+    expect(
+      await bridge(second.page, (b) => b.listRestorableProfiles())
+    ).toEqual([{ patientId: 'shared-patient', displayName: 'Alice Doe' }]);
     expect(
       await bridge(page, (b) =>
         b.querySql("SELECT id FROM patients WHERE id = 'shared-patient'")
       )
     ).toHaveLength(1);
 
-    await bridge(second.page, (b) =>
-      b.restoreExcludedPatient('shared-patient')
-    );
+    await bridge(second.page, (b) => b.syncProfile('shared-patient'));
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
 
     // Deleting everywhere removes it from the other device too.

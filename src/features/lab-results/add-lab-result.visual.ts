@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  waitForMenuToggle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 
@@ -59,6 +60,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     const plusBtn = page.getByTestId('plus-menu-button');
     await plusBtn.click();
     await page.getByTestId('menu-add-time').click();
+    await waitForMenuToggle(page, 'plus-menu-button', false);
 
     // Set custom time
     const timeInput = page
@@ -69,6 +71,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     // Open plus menu and add Notes
     await plusBtn.click();
     await page.getByTestId('menu-add-notes').click();
+    await waitForMenuToggle(page, 'plus-menu-button', false);
     await page
       .getByTestId('notes-input')
       .fill('Fasting morning blood sample taken at clinic');

@@ -17,6 +17,8 @@ import {
   KeyRound,
 } from 'lucide-react-native';
 import { useSync } from '@/src/context/SyncContext';
+import { useActivePatient } from './ActivePatientContext';
+import { getPatientDisplayName } from './patientNames';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { exportZipArchive } from '@/src/services/zipArchiveService';
@@ -34,7 +36,11 @@ export function GoogleSyncCard() {
     syncNow,
     connectWithGoogle,
     disconnect,
+    syncedProfileIds,
+    setProfileSynced,
   } = useSync();
+  const { activePatient } = useActivePatient();
+  const activeId = activePatient?.id;
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -45,16 +51,21 @@ export function GoogleSyncCard() {
     useGoogleAuthSignIn(async (authData: GoogleAuthPayload) => {
       setActionLoading('connecting');
       try {
-        const outcome = await connectWithGoogle({
-          accessToken: authData.accessToken,
-          refreshToken: authData.refreshToken,
-          tokenExpiresAt: authData.tokenExpiresAt,
-          userSub: authData.userSub,
-          userEmail: authData.userEmail,
-          userName: authData.userName,
-        });
+        const outcome = await connectWithGoogle(
+          {
+            accessToken: authData.accessToken,
+            refreshToken: authData.refreshToken,
+            tokenExpiresAt: authData.tokenExpiresAt,
+            userSub: authData.userSub,
+            userEmail: authData.userEmail,
+            userName: authData.userName,
+          },
+          { syncPatientId: activeId }
+        );
         router.push(
-          outcome === 'created' ? '/sync/recovery-phrase' : '/sync/restore'
+          outcome === 'created'
+            ? '/sync/recovery-phrase'
+            : `/sync/restore?profile=${activeId}`
         );
       } catch (err) {
         console.error('Google Drive connect failed:', err);
@@ -64,29 +75,63 @@ export function GoogleSyncCard() {
       }
     });
 
-  const isConnected = vaultState === 'unlocked';
+  // Sync is chosen per profile; the account may already sync other profiles.
+  const isConnected =
+    vaultState === 'unlocked' &&
+    Boolean(activeId && syncedProfileIds.includes(activeId));
 
-  const handleConnectGoogleDrive = () => {
-    // Already signed in to Google: only the recovery phrase is missing.
-    if (vaultState === 'locked') router.push('/sync/restore');
-    else promptGoogleSignIn();
+  const handleConnectGoogleDrive = async () => {
+    if (!activeId) return;
+    if (vaultState === 'locked') {
+      // Signed in to Google, but the recovery phrase was not entered yet.
+      router.push(`/sync/restore?profile=${activeId}`);
+      return;
+    }
+    if (vaultState === 'disconnected') {
+      promptGoogleSignIn();
+      return;
+    }
+    setActionLoading('connecting');
+    try {
+      await setProfileSynced(activeId, true);
+      setFeedbackMessage(
+        'Google Drive connected to this profile and sync started!'
+      );
+    } catch (err) {
+      console.error('Failed to sync profile:', err);
+      Alert.alert('Error', 'Failed to connect this profile to Google Drive.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleConfirmDisconnect = async (options?: {
     deleteFromCloud?: boolean;
   }) => {
     setShowDisconnectModal(false);
+    if (!activeId) return;
     setActionLoading('disconnecting');
     try {
-      await disconnect({ deleteCloudData: options?.deleteFromCloud });
+      await setProfileSynced(activeId, false, {
+        deleteFromCloud: options?.deleteFromCloud,
+      });
       setFeedbackMessage(
         options?.deleteFromCloud
-          ? 'Disconnected from Google Drive and cloud data deleted. Local records remain saved.'
-          : 'Disconnected from Google Drive. Local records remain saved.'
+          ? 'Stopped syncing this profile and deleted it from Google Drive. Local records remain saved.'
+          : 'Stopped syncing this profile. Local records remain saved.'
       );
     } catch (err) {
       console.error('Failed to disconnect:', err);
       Alert.alert('Disconnect Failed', 'Failed to disconnect Google Drive.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLeaveAccount = async () => {
+    setActionLoading('disconnecting');
+    try {
+      await disconnect();
     } finally {
       setActionLoading(null);
     }
@@ -142,7 +187,7 @@ export function GoogleSyncCard() {
           testID="google-sync-disconnected"
         >
           <Text style={styles.description}>
-            Sync all profiles across your devices through your Google Drive.
+            Sync this profile across your devices through your Google Drive.
             Records are end-to-end encrypted with a recovery phrase that only
             you hold.
           </Text>
@@ -166,6 +211,22 @@ export function GoogleSyncCard() {
               </>
             )}
           </TouchableOpacity>
+
+          {/* Signed in, but the recovery phrase was never entered: allow
+              leaving, e.g. to use a different Google account. */}
+          {vaultState === 'locked' && (
+            <TouchableOpacity
+              testID="disconnect-locked-sync-button"
+              style={[styles.disconnectBtn, styles.lockedDisconnectBtn]}
+              onPress={handleLeaveAccount}
+              activeOpacity={0.7}
+            >
+              <LogOut size={15} color={COLORS.light.destructive} />
+              <Text style={styles.disconnectBtnText}>
+                Use a different Google account
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         // State B: Syncing on this device
@@ -282,11 +343,11 @@ export function GoogleSyncCard() {
       <DeleteConfirmationModal
         visible={showDisconnectModal}
         title="Disconnect Google Drive"
-        message="Are you sure you want to disconnect Google Drive? Your profiles and health records will remain safely on this device."
+        message={`Stop syncing ${getPatientDisplayName(activePatient)} with Google Drive? The profile and its health records will remain safely on this device.`}
         confirmLabel="Disconnect"
         requireCountdown={false}
         showCloudDeleteOption={true}
-        cloudDeleteLabel="Delete all synced data from Google Drive"
+        cloudDeleteLabel="Delete this profile from Google Drive"
         onConfirm={handleConfirmDisconnect}
         onCancel={() => setShowDisconnectModal(false)}
         testID="disconnect-confirmation-modal"
@@ -403,6 +464,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FECACA',
     marginBottom: 4,
+  },
+  lockedDisconnectBtn: {
+    marginTop: 10,
+    marginBottom: 0,
   },
   disconnectBtnText: {
     fontSize: 13,

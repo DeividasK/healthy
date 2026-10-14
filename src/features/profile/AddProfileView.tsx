@@ -1,6 +1,6 @@
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { UserPlus, Archive, Cloud, Check } from 'lucide-react-native';
 import type { Patient } from 'fhir/r5';
 import { ProfileForm } from './ProfileForm';
@@ -25,7 +25,7 @@ import {
 import { useActivePatient } from './ActivePatientContext';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
 import { useSync } from '@/src/context/SyncContext';
-import { listExcludedPatients } from '@/src/features/sync/engine';
+import { listRestorableProfiles } from '@/src/features/sync/engine';
 import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
 
@@ -38,7 +38,7 @@ export function AddProfileView({
 }: AddProfileViewProps = {}) {
   const router = useRouter();
   const { patients, setActivePatientId, refreshPatients } = useActivePatient();
-  const { connectWithGoogle, vaultState, restoreExcludedProfile } = useSync();
+  const { connectWithGoogle, vaultState, setProfileSynced } = useSync();
 
   const [activeTab, setActiveTab] = useState<'create' | 'file' | 'gdrive'>(
     initialTab
@@ -51,12 +51,15 @@ export function AddProfileView({
   const [noProfilesEmail, setNoProfilesEmail] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Arriving right after the recovery phrase was entered: choose profiles.
+  const { pick } = useLocalSearchParams<{ pick?: string }>();
+  const pickShownRef = useRef(false);
 
   const hasExistingPatients = patients.length > 0;
 
-  // Profiles that sync keeps in Google Drive but were removed from this device.
-  const showRestorableProfiles = async () => {
-    const excluded = await listExcludedPatients();
+  // Profiles in Google Drive that are not on this device.
+  const showRestorableProfiles = useCallback(async () => {
+    const excluded = await listRestorableProfiles();
     if (excluded.length === 0) {
       setNoProfilesEmail('');
       setShowNoProfilesModal(true);
@@ -79,7 +82,7 @@ export function AddProfileView({
     setRemotePatients(remotes);
     setSelectedPatientIds(remotes.map((remote) => remote.id!));
     setShowPickerModal(true);
-  };
+  }, []);
 
   // Google OAuth Hook
   const { signIn: promptGoogleSignIn, isReady: isGoogleReady } =
@@ -102,7 +105,7 @@ export function AddProfileView({
           setShowNoProfilesModal(true);
           return;
         }
-        router.push('/sync/restore');
+        router.push('/sync/restore?next=pick');
       } catch (err) {
         console.error('Google restore failed:', err);
         Alert.alert(
@@ -121,15 +124,31 @@ export function AddProfileView({
       setActionLoading('gdrive');
       try {
         await showRestorableProfiles();
+      } catch (err) {
+        console.error('Failed to list restorable profiles:', err);
+        Alert.alert(
+          'Restore Failed',
+          err instanceof Error
+            ? err.message
+            : 'Could not restore from Google Drive.'
+        );
       } finally {
         setActionLoading(null);
       }
     } else if (vaultState === 'locked') {
-      router.push('/sync/restore');
+      router.push('/sync/restore?next=pick');
     } else {
       promptGoogleSignIn();
     }
   };
+
+  useEffect(() => {
+    if (!pick || vaultState !== 'unlocked' || pickShownRef.current) return;
+    pickShownRef.current = true;
+    showRestorableProfiles().catch((err) =>
+      console.error('Failed to list restorable profiles:', err)
+    );
+  }, [pick, vaultState, showRestorableProfiles]);
 
   const toggleSelectPatient = (targetId: string) => {
     setSelectedPatientIds((prev) =>
@@ -156,7 +175,7 @@ export function AddProfileView({
     setActionLoading('restoring-selected');
     try {
       for (const patientId of selectedPatientIds) {
-        await restoreExcludedProfile(patientId);
+        await setProfileSynced(patientId, true);
       }
       await refreshPatients();
       const updatedPatients = await getAllPatients();

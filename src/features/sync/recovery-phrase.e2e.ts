@@ -8,6 +8,7 @@ import {
   syncTestDevice,
   driveContents,
   openSecondDevice,
+  syncAllTestProfiles,
   bootstrapApp,
 } from '@/src/features/testing/testStorage';
 import { readFile } from 'node:fs/promises';
@@ -65,15 +66,41 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     expect(await readFile((await file.path())!, 'utf8')).toContain(phrase);
     await page.getByTestId('recovery-phrase-confirm-button').click();
 
-    await page.getByTestId('disconnect-sync-button').click();
-    const modal = page.getByTestId('disconnect-confirmation-modal');
-    await modal.getByTestId('delete-from-cloud-checkbox').click();
-    await modal.getByTestId('delete-modal-confirm-button').click();
-    await expect(page.getByTestId('google-signin-button')).toBeVisible();
+    // Sync is chosen per profile: a new profile is not synced until connected.
+    const chunks = () =>
+      [...store.files.values()].filter((f) => f.name.startsWith('chunk_'))
+        .length;
+    const syncedChunks = chunks();
+    await page.getByTestId('add-new-profile-button').click();
+    await page.getByTestId('patient-given-name-input').fill('Bob');
+    await page.getByTestId('save-profile-button').click();
+    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+      'Bob'
+    );
+    await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
+    await page.getByTestId('google-signin-button').click();
+    await expect(page.getByTestId('up-to-date-button')).toBeVisible();
+    expect(chunks()).toBeGreaterThan(syncedChunks);
+
+    // Disconnecting the last synced profile also leaves the account.
+    for (const name of ['Bob', 'John Doe']) {
+      await page
+        .getByTestId(/^profile-item-/)
+        .filter({ hasText: name })
+        .first()
+        .click();
+      await page.getByTestId('disconnect-sync-button').click();
+      const modal = page.getByTestId('disconnect-confirmation-modal');
+      await modal.getByTestId('delete-from-cloud-checkbox').click();
+      await modal.getByTestId('delete-modal-confirm-button').click();
+      await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
+    }
+    expect(
+      await page.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
+    ).toBeNull();
     await expect(
       page.getByTestId('profile-display-name').first()
     ).toBeVisible();
-    expect(store.files.size).toBe(0);
   });
 
   test('restores records on another device and keeps removed profiles restorable', async ({
@@ -107,6 +134,12 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     ).toBeVisible();
     await input.fill(phrase);
     await restore.click();
+    // The new device chooses which cloud profiles to sync.
+    const firstPicker = device.getByTestId('google-profile-picker-modal');
+    await expect(
+      firstPicker.getByTestId('remote-profile-item-alice')
+    ).toContainText('Alice Doe');
+    await firstPicker.getByTestId('restore-selected-profiles-button').click();
     await expect(device.getByTestId('floating-add-button')).toBeVisible();
     await device.goto('/profile');
     await expect(device.getByTestId('profile-display-name').first()).toHaveText(
@@ -173,7 +206,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const restored = await openSecondDevice(browser, testInfo);
     await bootstrapApp(restored.page);
     await connectTestSync(restored.page, { store, phrase: newPhrase });
-    await syncTestDevice(restored.page);
+    await syncAllTestProfiles(restored.page);
     expect(
       await restored.page.evaluate(() =>
         (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
@@ -184,6 +217,35 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     // The device holding the old phrase learns that the data was reset.
     await expect(syncTestDevice(page)).rejects.toThrow('removed or reset');
     await restored.close();
+    await close();
+  });
+
+  test('leaves a Google account whose phrase is not known', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    await seedTestPatient(page);
+    const { store } = await connectTestSync(page);
+
+    const { page: device, close } = await openSecondDevice(browser, testInfo);
+    await mockGoogleDrive(device, store);
+    await mockGoogleAuthRoutes(device);
+    await seedTestPatient(device);
+    await device.goto('/profile');
+    await device.getByTestId('google-signin-button').click();
+    await expect(device).toHaveURL(/\/sync\/restore/);
+    await device.getByTestId('back-button').click();
+    await device.getByTestId('disconnect-locked-sync-button').click();
+    await expect(
+      device.getByTestId('disconnect-locked-sync-button')
+    ).toHaveCount(0);
+    expect(
+      await device.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
+    ).toBeNull();
+    // Leaving never touches the other account's synced data.
+    expect([...store.files.values()].some((f) => f.name === 'vault.json')).toBe(
+      true
+    );
     await close();
   });
 

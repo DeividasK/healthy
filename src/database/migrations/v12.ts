@@ -60,25 +60,7 @@ const backfill = replicatedTables
   )
   .join('\n');
 
-/**
- * Adds the local-first sync change log (ADR 0001).
- *
- * Breaking: the `repair` step drops `pending_clinical_resource_deletions`
- * after converting its entries into change-log tombstones, so older app
- * versions lose their deletion outbox. It also re-creates the capture
- * triggers on every start, because rebuilding a table drops them, and creates
- * the tables if a database marked v12 lacks them. All clinical tables and
- * their data are untouched, and
- * `patients.sync_account` stays but is no longer read.
- *
- * Every existing resource is backfilled as changed (timestamped from
- * `updated_at`), so the first sync uploads the complete local record.
- */
-export const migrationV12: DatabaseMigration = {
-  version: 12,
-  description: 'Add the HLC sync change log, capture triggers and backfill',
-  isBreaking: true,
-  sql: `
+const schema = `
     CREATE TABLE IF NOT EXISTS sync_device (
       singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
       device_id TEXT NOT NULL,
@@ -130,10 +112,15 @@ export const migrationV12: DatabaseMigration = {
       last_seq INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS sync_excluded_patients (
+    -- Profiles known to sync on this device: whether this device syncs it
+    -- (opt-in per profile), whether another device keeps it in the cloud, and
+    -- whether this device deleted its cloud copy while keeping it locally.
+    CREATE TABLE IF NOT EXISTS sync_profiles (
       patient_id TEXT PRIMARY KEY,
       display_name TEXT,
-      excluded_at TEXT NOT NULL
+      synced INTEGER NOT NULL DEFAULT 0,
+      in_cloud INTEGER NOT NULL DEFAULT 0,
+      cloud_deleted INTEGER NOT NULL DEFAULT 0
     );
 
     -- Remote changes whose references did not resolve yet; retried each sync.
@@ -142,7 +129,28 @@ export const migrationV12: DatabaseMigration = {
       change_json TEXT NOT NULL,
       error TEXT
     );
+`;
 
+/**
+ * Adds the local-first sync change log (ADR 0001).
+ *
+ * Breaking: the `repair` step drops `pending_clinical_resource_deletions`
+ * after converting its entries into change-log tombstones, so older app
+ * versions lose their deletion outbox. It also re-creates the capture
+ * triggers on every start, because rebuilding a table drops them, and creates
+ * the tables if a database marked v12 lacks them. All clinical tables and
+ * their data are untouched, and
+ * `patients.sync_account` stays but is no longer read.
+ *
+ * Every existing resource is backfilled as changed (timestamped from
+ * `updated_at`), so the first sync uploads the complete local record.
+ */
+export const migrationV12: DatabaseMigration = {
+  version: 12,
+  description: 'Add the HLC sync change log, capture triggers and backfill',
+  isBreaking: true,
+  sql: `
+    ${schema}
     ${backfill}
 
     DELETE FROM app_settings WHERE key = 'clinical_deletion_outbox_v10_imported';
@@ -154,6 +162,9 @@ export const migrationV12: DatabaseMigration = {
       "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_dirty';"
     );
     if (!hasChangeLog) await db.execAsync(migrationV12.sql);
+    // Idempotent: also adds tables introduced while v12 was unreleased.
+    await db.execAsync(schema);
+    await db.execAsync('DROP TABLE IF EXISTS sync_excluded_patients;');
     // Rebuilding a table (as older repairs do) drops its triggers; restore them.
     await db.execAsync(triggers);
     const outbox = await db.getFirstAsync(

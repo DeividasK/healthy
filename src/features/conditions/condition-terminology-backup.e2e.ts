@@ -65,7 +65,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
         await bridge.clearDatabase();
         if (transport === 'ZIP') await bridge.restoreArchive(archive);
-        else await bridge.syncNow();
+        else await bridge.syncAllProfiles();
         return await bridge.getCondition('coded-backup');
       },
       { transport, archive }
@@ -80,7 +80,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         await bridge.saveCondition(condition, 'terminology-backup');
         await bridge.syncNow();
         await bridge.clearDatabase();
-        await bridge.syncNow();
+        await bridge.syncAllProfiles();
         return await bridge.getCondition('coded-backup');
       });
       expect(retained.code.coding[0].code).toBe('NEWER');

@@ -39,7 +39,7 @@ Each FHIR resource is uploaded to Google Drive's hidden `appDataFolder` as its o
 Replace the per-resource Drive files with an **append-only, encrypted change log**. Each device writes its own change log into the user's Google Drive `appDataFolder`.
 
 1. **Change log.** SQLite triggers on every clinical table mark each written or deleted resource in `sync_dirty`, in the same transaction as the write. That includes cascades and raw SQL, so no write path can be missed. Before each sync, marked resources are stamped with an HLC and appended to `sync_changes` as a `put` (the resource's current, complete FHIR JSON) or a `delete` (a tombstone). Remote changes are applied with capture suppressed.
-2. **Ordering.** Changes are ordered by a **Hybrid Logical Clock (HLC)**. Each timestamp is a sortable string `<ms>-<counter>-<deviceId>`. HLC ordering tolerates clock skew and breaks ties deterministically.
+2. **Ordering.** Changes are ordered by a **Hybrid Logical Clock (HLC)**. Each timestamp is a sortable string `<ms>-<counter>-<deviceId>`. HLC ordering preserves causality (a change made after seeing another always wins over it) and breaks ties deterministically. For edits made concurrently, for example on two offline devices, the order still follows each device's wall clock, so a device whose clock runs fast wins those conflicts.
 3. **Merge.** Each FHIR resource is a **last-write-wins register** keyed by `(resourceType, id)`. The highest HLC wins, and deletes are tombstones that win over older puts. This makes the dataset a last-write-wins map (a CRDT), so merging is commutative and idempotent: devices converge whatever order changes arrive in, and retries are always safe.
    - Granularity is the whole resource, not individual fields. FHIR resources are documents whose arrays (`code.coding`, `contained`, `reason`) don't merge field by field.
 4. **Storage layout.** Each device writes only its own files to `appDataFolder`:
@@ -60,10 +60,14 @@ Replace the per-resource Drive files with an **append-only, encrypted change log
    - Pull when the app regains focus and every 60 seconds in the foreground.
    - Manual "Sync now".
    - Saves no longer start a full sync.
-9. **Deleting profiles.**
-   - **Delete everywhere** writes tombstones for the patient and all of their resources.
-   - **Remove from this device only** deletes local rows without tombstones and adds the patient to a per-device exclusion list. Pulls skip that patient's changes, so it doesn't come back. The profile can be restored later from the change log.
-   - While sync is disconnected, every delete is local-only, so disconnecting and then deleting can never remove data from Drive.
+9. **Choosing profiles.** Each device chooses which profiles it syncs (`sync_profiles`), as with the previous per-profile Google Drive connection. Connecting Google Drive syncs the active profile only; other profiles are connected from their own sync card, and profiles already in the cloud are picked from "Restore from Google Drive". Changes to profiles a device does not sync are neither uploaded nor applied there; Patient changes still update a catalog of cloud profiles for that list.
+   - **Starting to sync a profile** merges its history from every device, then uploads local changes.
+   - **Stopping** keeps the profile on the device. With "Delete this profile from Google Drive" ticked, its records are deleted from the cloud and other devices (as tombstones) but kept locally; connecting it again uploads them anew. Stopping the last synced profile also disconnects the account, as before.
+10. **Deleting profiles.**
+
+- **Delete everywhere** (option ticked, profile synced) writes tombstones for the patient and all of their resources.
+- **Remove from this device only** uploads pending edits, then deletes local rows without tombstones and stops syncing the profile, so it doesn't come back. It stays available under "Restore from Google Drive".
+- A profile that isn't synced is removed from this device only, so a later reconnect can never delete it from the cloud.
 
 ### Design rules that keep later options open
 
@@ -207,7 +211,7 @@ Remote changes that fail repository validation (for example a reference whose ta
 - **Real E2EE.** Google sees only file names, sizes and timestamps.
 - **Cheap when idle.** A sync with no new data costs one Drive request, and a save uploads one small chunk.
 - **Deletes stick.** Deletes propagate to every device, which fixes the resurrection bug.
-- **No clock-skew bugs.** Conflict resolution is deterministic and independent of device clocks.
+- **Deterministic, causal conflict resolution.** Every device picks the same winner, and a change made after seeing another always wins over it. Wall-clock skew can still decide which of two concurrent offline edits wins, and remote clocks more than 24 hours ahead are rejected.
 - **One write path.** Every resource type syncs through one mechanism. A new resource type only needs a registry entry.
 
 **Negative**
@@ -221,5 +225,5 @@ Remote changes that fail repository validation (for example a reference whose ta
 **Breaking changes (accepted; there are no users yet)**
 
 - The old per-resource `*.json.enc` Drive files and the key derived from the Google account are no longer read. There is no importer. Disconnecting with "Delete all synced data from Google Drive" ticked removes them.
-- Per-profile sync opt-in (`patients.sync_account`) is replaced by per-device exclusion. The column stays but is unused.
-- The local database migration (v12) is additive: it adds `sync_*` tables, backfills one `put` per existing resource, and converts the old tombstone outbox.
+- Per-profile sync opt-in moves from `patients.sync_account` (one Google account per profile) to `sync_profiles` (per device, under one vault). The column stays but is unused.
+- The local database migration (v12) adds the `sync_*` tables and capture triggers and backfills one `put` per existing resource. It converts the old tombstone outbox into change-log tombstones and drops `pending_clinical_resource_deletions`, so older app versions lose that outbox.

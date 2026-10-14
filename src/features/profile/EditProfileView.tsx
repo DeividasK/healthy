@@ -17,7 +17,7 @@ export function EditProfileView() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refreshPatients, setActivePatientId } = useActivePatient();
-  const { vaultState } = useSync();
+  const { vaultState, syncedProfileIds, syncNow } = useSync();
   const [initialValues, setInitialValues] = useState<{
     id: string;
     givenName: string;
@@ -96,7 +96,8 @@ export function EditProfileView() {
     await refreshPatients();
   };
 
-  const isSyncConnected = vaultState === 'unlocked';
+  const isSyncConnected =
+    vaultState === 'unlocked' && Boolean(id && syncedProfileIds.includes(id));
 
   const handleConfirmDelete = async (options?: {
     deleteFromCloud?: boolean;
@@ -106,8 +107,11 @@ export function EditProfileView() {
 
       // Without the cloud option ticked the profile stays in Google Drive and
       // on other devices; ticked, the deletion syncs everywhere.
+      const deleteEverywhere = isSyncConnected && options?.deleteFromCloud;
+      // Upload recent edits before the profile leaves this device.
+      if (isSyncConnected && !deleteEverywhere) await syncNow();
       const { remainingCount, newActiveId } = await deletePatient(id, {
-        deviceOnly: !(isSyncConnected && options?.deleteFromCloud),
+        deviceOnly: !deleteEverywhere,
       });
       await refreshPatients();
       if (newActiveId) {

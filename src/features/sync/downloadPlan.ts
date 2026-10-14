@@ -8,9 +8,18 @@ export interface SyncFileRef {
   seq: number;
 }
 
-export function describeSyncFile(file: RemoteFile): SyncFileRef | null {
-  const { kind, device, seq } = file.appProperties;
+/**
+ * Reads a sync file's routing metadata from its listing. With `spaceId`,
+ * files from any other sync space (such as leftovers of a replaced vault)
+ * are ignored instead of failing decryption.
+ */
+export function describeSyncFile(
+  file: RemoteFile,
+  spaceId?: string
+): SyncFileRef | null {
+  const { kind, device, seq, space } = file.appProperties;
   if ((kind !== 'chunk' && kind !== 'snapshot') || !device || !seq) return null;
+  if (spaceId !== undefined && space !== spaceId) return null;
   return { file, kind, deviceId: device, seq: Number(seq) };
 }
 
@@ -20,6 +29,7 @@ export function describeSyncFile(file: RemoteFile): SyncFileRef | null {
  */
 export function planDownloads(
   files: RemoteFile[],
+  spaceId: string,
   ownDeviceId: string,
   cursors: Map<string, number>,
   includeAll = false
@@ -28,7 +38,7 @@ export function planDownloads(
     string,
     { chunks: SyncFileRef[]; snapshot?: SyncFileRef }
   >();
-  for (const ref of files.map(describeSyncFile)) {
+  for (const ref of files.map((file) => describeSyncFile(file, spaceId))) {
     if (!ref || (!includeAll && ref.deviceId === ownDeviceId)) continue;
     const entry = byDevice.get(ref.deviceId) ?? { chunks: [] };
     if (ref.kind === 'chunk') entry.chunks.push(ref);

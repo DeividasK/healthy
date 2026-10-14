@@ -34,9 +34,10 @@ import {
   compactNow,
   createVault,
   deleteCloudData,
-  listExcludedPatients,
+  listRestorableProfiles,
   loadVaultKeys,
-  restoreExcludedPatient,
+  startSyncingPatient,
+  stopSyncingPatient,
   syncOnce,
   unlockVault,
 } from '@/src/features/sync/engine';
@@ -125,20 +126,23 @@ export function setupTestBridge() {
         userEmail: options.userEmail,
       });
       const provider = await connectedProvider();
-      if (options.phrase) {
-        await unlockVault(provider, options.phrase);
-        return options.phrase;
-      }
-      return await createVault(
-        provider,
-        ...(options.secretHex
-          ? [
-              Uint8Array.from(options.secretHex.match(/../g)!, (b) =>
-                parseInt(b, 16)
-              ),
-            ]
-          : [])
-      );
+      const phrase = options.phrase
+        ? (await unlockVault(provider, options.phrase), options.phrase)
+        : await createVault(
+            provider,
+            ...(options.secretHex
+              ? [
+                  Uint8Array.from(options.secretHex.match(/../g)!, (b) =>
+                    parseInt(b, 16)
+                  ),
+                ]
+              : [])
+          );
+      // Like connecting from each profile's sync card.
+      const keys = await vaultKeys();
+      for (const patient of await fetchAllPatients())
+        await startSyncingPatient(provider, keys, patient.id!);
+      return phrase;
     },
     syncNow: async () => syncOnce(await connectedProvider(), await vaultKeys()),
     compactNow: async () =>
@@ -154,13 +158,34 @@ export function setupTestBridge() {
     },
     deletePatient: (id: string, deviceOnly = false) =>
       deletePatient(id, { deviceOnly }),
-    listExcludedPatients,
-    restoreExcludedPatient: async (patientId: string) =>
-      restoreExcludedPatient(
+    listRestorableProfiles,
+    syncProfile: async (patientId: string) =>
+      startSyncingPatient(
         await connectedProvider(),
         await vaultKeys(),
         patientId
       ),
+    stopSyncingProfile: async (patientId: string, deleteFromCloud = false) =>
+      stopSyncingPatient(
+        await connectedProvider(),
+        await vaultKeys(),
+        patientId,
+        {
+          deleteFromCloud,
+        }
+      ),
+    /** A device choosing every local and cloud profile, then syncing. */
+    syncAllProfiles: async () => {
+      const provider = await connectedProvider();
+      const keys = await vaultKeys();
+      await syncOnce(provider, keys);
+      const ids = [
+        ...(await fetchAllPatients()).map((patient) => patient.id!),
+        ...(await listRestorableProfiles()).map((p) => p.patientId),
+      ];
+      for (const id of ids) await startSyncingPatient(provider, keys, id);
+      return await syncOnce(provider, keys);
+    },
     rollbackClinicalDocumentDeletion: async (id: string, patientId: string) => {
       const db = await getDb();
       await db.withTransactionAsync(async () => {

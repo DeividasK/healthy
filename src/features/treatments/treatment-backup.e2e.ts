@@ -57,7 +57,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         const b = (window as any).__HEALTHY_TEST_BRIDGE__;
         await b.clearDatabase();
         if (transport === 'ZIP') await b.restoreArchive(archive);
-        else await b.syncNow();
+        else await b.syncAllProfiles();
         return {
           request: await b.getTreatment('backed-up-treatment'),
           document: await b.getClinicalDocumentByConsultationId(
@@ -81,7 +81,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         await b.saveTreatment(request, 'treatment-backup-patient');
         await b.syncNow();
         await b.clearDatabase();
-        await b.syncNow();
+        await b.syncAllProfiles();
         return await b.getTreatment('backed-up-treatment');
       });
       expect(newer.note[0].text).toBe('Newer local note');

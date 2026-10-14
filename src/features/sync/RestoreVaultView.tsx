@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { KeyRound } from 'lucide-react-native';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -13,7 +13,14 @@ import { COLORS } from '@/src/theme/colors';
 /** Unlocks the synced records in Google Drive with the 24-word phrase. */
 export function RestoreVaultView() {
   const router = useRouter();
-  const { unlockWithPhrase, startOverWithNewPhrase } = useSync();
+  const { unlockWithPhrase, startOverWithNewPhrase, setProfileSynced } =
+    useSync();
+  // `next=pick` comes from "Restore from Google Drive" (choose profiles next);
+  // `profile` from a profile's sync card (start syncing that profile).
+  const { next, profile } = useLocalSearchParams<{
+    next?: string;
+    profile?: string;
+  }>();
   const [showStartOver, setShowStartOver] = useState(false);
   const [phrase, setPhrase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +31,11 @@ export function RestoreVaultView() {
     setError(null);
     try {
       await unlockWithPhrase(phrase);
-      router.replace('/');
+      if (profile) await setProfileSynced(profile, true);
+      if (next === 'pick')
+        router.replace('/profile/restore-from-google-drive?pick=1');
+      else if (router.canGoBack()) router.back();
+      else router.replace('/profile');
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not restore your records.'
@@ -40,6 +51,7 @@ export function RestoreVaultView() {
     setError(null);
     try {
       await startOverWithNewPhrase();
+      if (profile) await setProfileSynced(profile, true);
       router.replace('/sync/recovery-phrase');
     } catch (err) {
       setError(

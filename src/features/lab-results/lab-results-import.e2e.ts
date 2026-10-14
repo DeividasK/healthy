@@ -73,7 +73,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
           let error = '';
           try {
             if (transport === 'ZIP') await bridge.restoreArchive(archive);
-            else await bridge.syncNow();
+            else await bridge.syncAllProfiles();
           } catch (failure) {
             error = (failure as Error).message;
           }

@@ -46,7 +46,28 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     }
   }
 
+  serializeTransactions(db);
   dbInstance = db;
+}
+
+/**
+ * Makes transactions on the shared connection run one at a time.
+ * expo-sqlite's `withTransactionAsync` is not exclusive: another caller's
+ * statements could otherwise run inside an open transaction, for example
+ * while sync applies remote changes with change capture suppressed.
+ * `withExclusiveTransactionAsync` would isolate it, but is not available on web.
+ */
+function serializeTransactions(db: SQLiteDatabase): void {
+  const patched = db as SQLiteDatabase & { transactionsSerialized?: boolean };
+  if (patched.transactionsSerialized) return;
+  const run = db.withTransactionAsync.bind(db);
+  let queue: Promise<unknown> = Promise.resolve();
+  db.withTransactionAsync = (task) => {
+    const next = queue.then(() => run(task));
+    queue = next.catch(() => undefined);
+    return next;
+  };
+  patched.transactionsSerialized = true;
 }
 
 export interface DatabaseProviderProps {
@@ -143,7 +164,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM sync_changes;
     DELETE FROM sync_row_versions;
     DELETE FROM sync_remote_devices;
-    DELETE FROM sync_excluded_patients;
+    DELETE FROM sync_profiles;
     DELETE FROM sync_pending_apply;
     UPDATE sync_device SET device_id = lower(hex(randomblob(8))),
       hlc_last = NULL, last_seq = 0, snapshot_seq = 0, space_id = NULL,

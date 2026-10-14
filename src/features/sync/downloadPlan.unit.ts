@@ -10,7 +10,7 @@ const file = (
   id: `${kind}-${device}-${seq}`,
   name:
     kind === 'chunk' ? `chunk_${device}_${seq}.bin` : `snapshot_${device}.bin`,
-  appProperties: { kind, device, seq: String(seq) },
+  appProperties: { kind, device, seq: String(seq), space: 'space' },
 });
 
 const ids = (plan: ReturnType<typeof planDownloads>) =>
@@ -24,26 +24,32 @@ test('downloads only unseen chunks of other devices', () => {
     file('chunk', 'other', 3),
     { id: 'vault', name: 'vault.json', appProperties: { kind: 'vault' } },
   ];
-  const plan = planDownloads(files, 'mine', new Map([['other', 1]]));
+  const plan = planDownloads(files, 'space', 'mine', new Map([['other', 1]]));
   expect(ids(plan)).toEqual(['chunk-other-2', 'chunk-other-3']);
   expect(plan.cursors.get('other')).toBe(3);
-  expect(ids(planDownloads(files, 'mine', plan.cursors))).toEqual([]);
+  expect(ids(planDownloads(files, 'space', 'mine', plan.cursors))).toEqual([]);
 });
 
 test('reads the snapshot first when compaction removed unseen chunks', () => {
   const files = [file('snapshot', 'other', 50), file('chunk', 'other', 51)];
-  const lagging = planDownloads(files, 'mine', new Map([['other', 10]]));
+  const lagging = planDownloads(
+    files,
+    'space',
+    'mine',
+    new Map([['other', 10]])
+  );
   expect(ids(lagging)).toEqual(['snapshot-other-50', 'chunk-other-51']);
   expect(lagging.cursors.get('other')).toBe(51);
   // A device that is up to date skips the snapshot.
-  expect(ids(planDownloads(files, 'mine', new Map([['other', 50]])))).toEqual([
-    'chunk-other-51',
-  ]);
+  expect(
+    ids(planDownloads(files, 'space', 'mine', new Map([['other', 50]])))
+  ).toEqual(['chunk-other-51']);
   // A device whose next chunk still exists does not need the snapshot.
   expect(
     ids(
       planDownloads(
         [...files, file('chunk', 'other', 11)],
+        'space',
         'mine',
         new Map([['other', 10]])
       )
@@ -58,6 +64,24 @@ test('replays every device, including this one, when asked to', () => {
     file('chunk', 'other', 1),
   ];
   expect(
-    ids(planDownloads(files, 'mine', new Map([['other', 1]]), true))
+    ids(planDownloads(files, 'space', 'mine', new Map([['other', 1]]), true))
   ).toEqual(['snapshot-mine-5', 'chunk-mine-6', 'chunk-other-1']);
+});
+
+test('ignores files from another sync space', () => {
+  const foreign = {
+    ...file('chunk', 'other', 2),
+    id: 'old-space-chunk',
+    appProperties: { kind: 'chunk', device: 'other', seq: '2', space: 'old' },
+  };
+  expect(
+    ids(
+      planDownloads(
+        [file('chunk', 'other', 1), foreign],
+        'space',
+        'mine',
+        new Map()
+      )
+    )
+  ).toEqual(['chunk-other-1']);
 });

@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  waitForMenuToggle,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
@@ -19,6 +20,7 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await takeSnapshot(page, 'Consultation View - Add New Form', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
+    await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('diagnosis-0-title-input').fill('Scalp irritation');
     await page.getByTestId('diagnosis-0-code-input').fill('L21');
     await page
@@ -30,6 +32,7 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await takeSnapshot(page, 'Consultation View - Add Diagnosis', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
+    await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('diagnosis-1-title-input').fill('Second diagnosis');
     await takeSnapshot(
       page,

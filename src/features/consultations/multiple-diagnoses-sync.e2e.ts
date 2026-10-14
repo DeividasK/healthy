@@ -44,7 +44,7 @@ test('encrypted Drive sync rebuilds diagnoses and keeps the newer Encounter', as
   const restored = await page.evaluate(async () => {
     const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
     await bridge.clearDatabase();
-    await bridge.syncNow();
+    await bridge.syncAllProfiles();
     return {
       encounter: await bridge.getConsultation('synced'),
       links: await bridge.querySql(
@@ -66,7 +66,7 @@ test('encrypted Drive sync rebuilds diagnoses and keeps the newer Encounter', as
     await bridge.saveEncounter(encounter, 'sync-diagnoses');
     await bridge.syncNow();
     await bridge.clearDatabase();
-    await bridge.syncNow();
+    await bridge.syncAllProfiles();
     return {
       encounter: await bridge.getConsultation('synced'),
       links: await bridge.querySql(

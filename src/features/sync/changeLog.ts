@@ -142,6 +142,8 @@ export async function flushLocalChanges(db: SQLiteDatabase): Promise<number> {
       hlc,
       deleted: !resource,
     });
+    if (row.resource_type === 'Patient')
+      await updateLocalProfile(db, row.resource_id, resource);
   }
   await db.runAsync('DELETE FROM sync_dirty;');
   await updateDeviceState(db, { hlcLast: clock ? formatHlc(clock) : null });
@@ -209,21 +211,22 @@ export interface ApplyResult {
 export async function applyRemoteChanges(
   db: SQLiteDatabase,
   incoming: SyncChange[],
-  options: { includeExcluded?: string } = {}
+  options: { alsoPatientId?: string } = {}
 ): Promise<ApplyResult> {
   await flushLocalChanges(db);
   const state = await getDeviceState(db);
   const pending = await db.getAllAsync<{ change_json: string }>(
     'SELECT change_json FROM sync_pending_apply;'
   );
-  const excluded = new Map(
+  // Includes profiles deleted here, so a newer remote change can still win.
+  const synced = new Set(
     (
       await db.getAllAsync<{ patient_id: string }>(
-        'SELECT patient_id FROM sync_excluded_patients;'
+        'SELECT patient_id FROM sync_profiles WHERE synced = 1;'
       )
-    ).map((row) => [row.patient_id, true])
+    ).map((row) => row.patient_id)
   );
-  if (options.includeExcluded) excluded.delete(options.includeExcluded);
+  if (options.alsoPatientId) synced.add(options.alsoPatientId);
 
   // Timestamps from a badly wrong clock would win every future conflict.
   const accepted = incoming.filter((change) => {
@@ -233,27 +236,22 @@ export async function applyRemoteChanges(
     return !tooFarAhead;
   });
   const candidates: SyncChange[] = [];
-  for (const change of selectWinners([
-    ...accepted,
-    ...pending.map((row) => JSON.parse(row.change_json) as SyncChange),
-  ])) {
-    if (change.patientId && excluded.has(change.patientId)) {
-      // A profile deleted everywhere can no longer be restored here.
-      if (change.resourceType === 'Patient' && change.op === 'delete')
-        await db.runAsync(
-          'DELETE FROM sync_excluded_patients WHERE patient_id = ?;',
-          [change.patientId]
-        );
-      if (change.resourceType === 'Patient' && change.op === 'put')
-        await db.runAsync(
-          'UPDATE sync_excluded_patients SET display_name = ? WHERE patient_id = ?;',
-          [
-            getPatientDisplayName(change.resource as unknown as Patient),
-            change.patientId,
-          ]
-        );
-      continue;
-    }
+  const pendingChanges = pending.map(
+    (row) => JSON.parse(row.change_json) as SyncChange
+  );
+  const winners = selectWinners([...accepted, ...pendingChanges]);
+  // A deferred change that a newer one superseded will never be applied.
+  const winningHlcs = new Set(winners.map((change) => change.hlc));
+  for (const change of pendingChanges)
+    if (!winningHlcs.has(change.hlc))
+      await db.runAsync('DELETE FROM sync_pending_apply WHERE hlc = ?;', [
+        change.hlc,
+      ]);
+  for (const change of winners) {
+    // Every profile in the cloud is listed, so it can be chosen for sync.
+    if (change.resourceType === 'Patient') await recordCloudProfile(db, change);
+    // Profiles this device does not sync are skipped, not stored.
+    if (change.patientId && !synced.has(change.patientId)) continue;
     const current = await db.getFirstAsync<{ hlc: string }>(
       'SELECT hlc FROM sync_row_versions WHERE resource_type = ? AND resource_id = ?;',
       [change.resourceType, change.id]
@@ -331,4 +329,53 @@ export async function applyRemoteChanges(
     await updateDeviceState(db, { hlcLast: formatHlc(clock) });
   }
   return { applied, deferred, tables: [...tables] };
+}
+
+export async function listSyncedPatientIds(
+  db: SQLiteDatabase
+): Promise<string[]> {
+  return (
+    await db.getAllAsync<{ patient_id: string }>(
+      `SELECT patient_id FROM sync_profiles
+       WHERE synced = 1 AND patient_id IN (SELECT id FROM patients);`
+    )
+  ).map((row) => row.patient_id);
+}
+
+/** Keeps the catalog of cloud profiles current from Patient changes. */
+async function recordCloudProfile(db: SQLiteDatabase, change: SyncChange) {
+  if (change.op === 'delete') {
+    await db.runAsync(
+      'UPDATE sync_profiles SET in_cloud = 0, synced = 0 WHERE patient_id = ?;',
+      [change.id]
+    );
+    return;
+  }
+  await db.runAsync(
+    `INSERT INTO sync_profiles (patient_id, display_name, in_cloud) VALUES (?, ?, 1)
+     ON CONFLICT (patient_id) DO UPDATE SET
+       display_name = excluded.display_name, in_cloud = 1;`,
+    [change.id, getPatientDisplayName(change.resource as unknown as Patient)]
+  );
+}
+
+async function updateLocalProfile(
+  db: SQLiteDatabase,
+  patientId: string,
+  resource: Record<string, unknown> | null
+) {
+  if (!resource) {
+    // Deleted everywhere: no longer restorable. It stays marked as synced so
+    // its tombstones still upload; listings only show profiles still here.
+    await db.runAsync(
+      'UPDATE sync_profiles SET in_cloud = 0 WHERE patient_id = ?;',
+      [patientId]
+    );
+    return;
+  }
+  await db.runAsync(
+    `INSERT INTO sync_profiles (patient_id, display_name) VALUES (?, ?)
+     ON CONFLICT (patient_id) DO UPDATE SET display_name = excluded.display_name;`,
+    [patientId, getPatientDisplayName(resource as unknown as Patient)]
+  );
 }

@@ -278,6 +278,13 @@ export async function syncTestDevice(page: Page) {
   );
 }
 
+/** Chooses every local and cloud profile on this device, then syncs. */
+export async function syncAllTestProfiles(page: Page) {
+  return await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.syncAllProfiles()
+  );
+}
+
 /** Concatenated bytes of every file in the fake Drive, for plaintext checks. */
 export function driveContents(store: MockDriveStore): string {
   return [...store.files.values()]

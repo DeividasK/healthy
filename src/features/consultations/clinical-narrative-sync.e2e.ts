@@ -279,7 +279,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
     const restoredComp = await page.evaluate(async () => {
       const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
       await bridge.clearDatabase();
-      await bridge.syncNow();
+      await bridge.syncAllProfiles();
       return await bridge.getClinicalDocumentByConsultationId(
         'cons-drive-sync'
       );
@@ -495,7 +495,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
     const restored = await page.evaluate(async (id) => {
       const b = (window as any).__HEALTHY_TEST_BRIDGE__;
       await b.clearDatabase();
-      await b.syncNow();
+      await b.syncAllProfiles();
       return {
         doc: await b.getClinicalDocumentByConsultationId(id),
         owners: await b.querySql(
@@ -514,7 +514,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
       await b.deletePatient('patient-other');
       await b.syncNow();
       await b.clearDatabase();
-      await b.syncNow();
+      await b.syncAllProfiles();
       return await b.querySql(
         'SELECT patient_id FROM clinical_documents ORDER BY patient_id'
       );

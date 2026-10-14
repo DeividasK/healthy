@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { secureTokenStore } from './tokenStore';
 
 export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
 
@@ -47,22 +48,40 @@ export async function refreshGoogleAccessToken(
 export async function loadGoogleDriveConfig(): Promise<GoogleDriveConfig | null> {
   try {
     const raw = await AsyncStorage.getItem(GOOGLE_DRIVE_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as GoogleDriveConfig) : null;
+    if (!raw) return null;
+    const config = JSON.parse(raw) as GoogleDriveConfig;
+    // Configs saved before tokens moved to secure storage still carry them.
+    const tokens = await secureTokenStore?.load();
+    return tokens ? { ...config, ...tokens } : config;
   } catch (err) {
     console.warn('Failed to load Google Drive sync config:', err);
     return null;
   }
 }
 
+/**
+ * Saves the connection. On iOS/Android the access and refresh tokens go to
+ * the OS key store and only non-secret settings stay in AsyncStorage.
+ */
 export async function saveGoogleDriveConfig(
   config: GoogleDriveConfig | null
 ): Promise<void> {
   if (!config) {
     await AsyncStorage.removeItem(GOOGLE_DRIVE_STORAGE_KEY);
-  } else {
+    await secureTokenStore?.clear();
+    return;
+  }
+  if (!secureTokenStore) {
     await AsyncStorage.setItem(
       GOOGLE_DRIVE_STORAGE_KEY,
       JSON.stringify(config)
     );
+    return;
   }
+  const { accessToken, refreshToken, ...settings } = config;
+  await secureTokenStore.save({ accessToken, refreshToken });
+  await AsyncStorage.setItem(
+    GOOGLE_DRIVE_STORAGE_KEY,
+    JSON.stringify(settings)
+  );
 }

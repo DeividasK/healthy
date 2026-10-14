@@ -111,7 +111,9 @@ export async function fetchPatientById(id: string): Promise<Patient | null> {
  */
 export async function deletePatientRecord(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM patients WHERE id = ?;`, [id]);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM patients WHERE id = ?;`, [id]);
+  });
   notifyDatabaseChanged([
     'patients',
     'conditions',

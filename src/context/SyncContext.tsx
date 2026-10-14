@@ -30,7 +30,9 @@ import {
   hasUnsyncedLocalChanges,
   importLegacyTombstones,
   loadVaultKeys,
-  restoreExcludedPatient,
+  listSyncedProfileIds,
+  startSyncingPatient,
+  stopSyncingPatient,
   syncOnce,
   unlockVault,
 } from '@/src/features/sync/engine';
@@ -62,14 +64,23 @@ interface SyncContextValue {
   config: GoogleDriveConfig | null;
   vaultState: VaultState;
   syncNow: () => Promise<void>;
+  /** Profiles this device syncs; each profile is opted in separately. */
+  syncedProfileIds: string[];
   /**
    * Connects Google Drive. A new vault needs its phrase shown, an existing one
-   * needs it entered; without `createIfMissing` an empty Drive stays unconnected.
+   * needs it entered; without `createIfMissing` an empty Drive stays
+   * unconnected. `syncPatientId` starts syncing that profile in a new vault.
    */
   connectWithGoogle: (
     authData: GoogleAuthData,
-    options?: { createIfMissing?: boolean }
+    options?: { createIfMissing?: boolean; syncPatientId?: string }
   ) => Promise<'created' | 'needs-phrase' | 'missing'>;
+  /** Opts a profile in or out; leaving the last one disconnects the account. */
+  setProfileSynced: (
+    patientId: string,
+    synced: boolean,
+    options?: { deleteFromCloud?: boolean }
+  ) => Promise<void>;
   unlockWithPhrase: (phrase: string) => Promise<void>;
   /**
    * For a forgotten phrase: deletes the unreadable cloud data and sets up a
@@ -77,7 +88,6 @@ interface SyncContextValue {
    */
   startOverWithNewPhrase: () => Promise<void>;
   disconnect: (options?: { deleteCloudData?: boolean }) => Promise<void>;
-  restoreExcludedProfile: (patientId: string) => Promise<void>;
   clearError: () => void;
   refreshConfig: () => Promise<void>;
 }
@@ -129,6 +139,7 @@ async function refreshAccessToken(
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<GoogleDriveConfig | null>(null);
   const [vaultState, setVaultState] = useState<VaultState>('disconnected');
+  const [syncedProfileIds, setSyncedProfileIds] = useState<string[]>([]);
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isUpToDate, setIsUpToDate] = useState<boolean>(true);
@@ -145,6 +156,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     await saveGoogleDriveConfig(next);
     configRef.current = next;
     setConfig(next);
+  }, []);
+
+  const refreshSyncedProfiles = useCallback(async () => {
+    setSyncedProfileIds(await listSyncedProfileIds());
   }, []);
 
   const refreshConfig = useCallback(async () => {
@@ -176,6 +191,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (loaded?.lastSyncTimestamp)
           setLastSyncedAt(new Date(loaded.lastSyncTimestamp));
         setIsUpToDate(!(await hasUnsyncedLocalChanges()));
+        setSyncedProfileIds(await listSyncedProfileIds());
       } catch (err) {
         console.warn('Failed to load sync config:', err);
       }
@@ -302,7 +318,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       'clinical_documents',
       'medication_requests',
     ],
-    () => {
+    (tables) => {
+      // A profile deleted here or remotely no longer syncs.
+      if (tables.includes('patients'))
+        refreshSyncedProfiles().catch((err) =>
+          console.warn('Failed to read synced profiles:', err)
+        );
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(async () => {
         try {
@@ -364,37 +385,46 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const connectWithGoogle = useCallback(
     async (
       authData: GoogleAuthData,
-      options: { createIfMissing?: boolean } = {}
+      options: { createIfMissing?: boolean; syncPatientId?: string } = {}
     ) => {
-      const { createIfMissing = true } = options;
+      const { createIfMissing = true, syncPatientId } = options;
       const provider = createGoogleDriveProvider(authData.accessToken);
       const exists = await hasRemoteVault(provider);
       if (!exists && !createIfMissing) return 'missing' as const;
       await updateConfig({ ...authData, lastSyncTimestamp: undefined });
       setSyncError(null);
       setIsAuthExpired(false);
-      let outcome: 'created' | 'needs-phrase' = 'needs-phrase';
+      let created = false;
       if (!exists) {
         try {
           await createVault(provider);
-          outcome = 'created';
+          created = true;
         } catch (err) {
           if (!(err instanceof VaultAlreadyExistsError)) throw err;
         }
       }
-      setVaultState(outcome === 'created' ? 'unlocked' : 'locked');
-      return outcome;
+      if (!created) {
+        setVaultState('locked');
+        return 'needs-phrase' as const;
+      }
+      const keys = await loadVaultKeys();
+      if (syncPatientId && keys)
+        await startSyncingPatient(provider, keys, syncPatientId);
+      await refreshSyncedProfiles();
+      setVaultState('unlocked');
+      return 'created' as const;
     },
-    [updateConfig]
+    [refreshSyncedProfiles, updateConfig]
   );
 
   const unlockWithPhrase = useCallback(
     async (phrase: string) => {
       await withProvider((provider) => unlockVault(provider, phrase));
+      await refreshSyncedProfiles();
       setVaultState('unlocked');
       await syncNow();
     },
-    [syncNow, withProvider]
+    [refreshSyncedProfiles, syncNow, withProvider]
   );
 
   const startOverWithNewPhrase = useCallback(async () => {
@@ -422,15 +452,26 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     [updateConfig, withProvider]
   );
 
-  const restoreExcludedProfile = useCallback(
-    async (patientId: string) => {
+  const setProfileSynced = useCallback(
+    async (
+      patientId: string,
+      synced: boolean,
+      options: { deleteFromCloud?: boolean } = {}
+    ) => {
       const keys = await loadVaultKeys();
       if (!keys) throw new Error('Enter your recovery phrase first.');
       await withProvider((provider) =>
-        restoreExcludedPatient(provider, keys, patientId)
+        synced
+          ? startSyncingPatient(provider, keys, patientId)
+          : stopSyncingPatient(provider, keys, patientId, options)
       );
+      const remaining = await listSyncedProfileIds();
+      setSyncedProfileIds(remaining);
+      if (synced) await syncNow();
+      // As before per-profile sync, the account goes with the last profile.
+      else if (remaining.length === 0) await disconnect();
     },
-    [withProvider]
+    [disconnect, syncNow, withProvider]
   );
 
   const clearError = useCallback(() => {
@@ -455,7 +496,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         unlockWithPhrase,
         startOverWithNewPhrase,
         disconnect,
-        restoreExcludedProfile,
+        syncedProfileIds,
+        setProfileSynced,
         clearError,
         refreshConfig,
       }}

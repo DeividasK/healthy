@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  waitForMenuToggle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 
@@ -12,9 +13,11 @@ test.describe('Add Treatment - Visual Regression', () => {
     await takeSnapshot(page, 'Treatment - Add Form Empty', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').waitFor();
+    await waitForMenuToggle(page, 'add-option-button', true);
     await takeSnapshot(page, 'Treatment - Optional Fields Menu', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').waitFor({ state: 'hidden' });
+    await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('treatment-title-input').focus();
     await page.keyboard.press('Tab');
     await takeSnapshot(page, 'Treatment - Select Keyboard Focus', testInfo);
