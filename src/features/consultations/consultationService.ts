@@ -26,7 +26,11 @@ import {
   withConsultationConditions,
   getConsultationConditionIds,
   withConsultationReasons,
+  getConsultationReasonConditionIds,
+  getConsultationTitle,
+  withoutEncounterReference,
 } from '@/src/utils/fhirUtils';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
 
 export interface ConsultationDiagnosisInput {
   title: string;
@@ -412,6 +416,27 @@ export async function getAllConsultations(
 }
 
 /**
+ * The patient's consultations as link options. Titles repeat, so the date
+ * is part of the label.
+ */
+export async function getConsultationLinkOptions(
+  patientId: string
+): Promise<{ id: string; label: string }[]> {
+  return (await getAllConsultations(patientId)).flatMap((consultation) => {
+    if (!consultation.id) return [];
+    const date =
+      consultation.actualPeriod?.start || consultation.plannedStartDate;
+    const title = getConsultationTitle(consultation);
+    return [
+      {
+        id: consultation.id,
+        label: date ? `${title} · ${formatDisplayDate(date)}` : title,
+      },
+    ];
+  });
+}
+
+/**
  * Fetches all Consultations linked to a specific Condition.
  */
 export async function getConsultationsByConditionId(
@@ -435,6 +460,64 @@ export async function getConsultationById(
  */
 export async function deleteConsultation(id: string): Promise<void> {
   await deleteConsultationRecord(id);
+}
+
+/** How a consultation refers to a condition. */
+export type ConsultationConditionRole = 'reason' | 'diagnosis';
+
+export const CONSULTATION_CONDITION_ROLE_OPTIONS: {
+  id: ConsultationConditionRole;
+  label: string;
+}[] = [
+  { id: 'reason', label: 'Reason for visit' },
+  { id: 'diagnosis', label: 'Diagnosis' },
+];
+
+/** The condition's role in the consultation, or null when not linked. */
+export function getConsultationConditionRole(
+  consultation: Encounter,
+  conditionId: string
+): ConsultationConditionRole | null {
+  if (getConsultationReasonConditionIds(consultation).includes(conditionId))
+    return 'reason';
+  if (getConsultationConditionIds(consultation).includes(conditionId))
+    return 'diagnosis';
+  return null;
+}
+
+/**
+ * Links a condition to a consultation as a reason for visit or diagnosis, or
+ * unlinks it (role null). Unlinking keeps any wording on the entry.
+ */
+export async function setConsultationConditionRole(
+  consultationId: string,
+  conditionId: string,
+  patientId: string,
+  role: ConsultationConditionRole | null
+): Promise<void> {
+  const consultation = await fetchConsultationById(consultationId, patientId);
+  if (!consultation)
+    throw new Error(`Consultation ${consultationId} not found`);
+  if (getConsultationConditionRole(consultation, conditionId) === role) return;
+  let updated = withoutEncounterReference(
+    consultation,
+    `Condition/${conditionId}`
+  );
+  if (role === 'reason')
+    updated = withConsultationReasons(updated, [
+      ...getConsultationReasonConditionIds(updated),
+      conditionId,
+    ]);
+  if (role === 'diagnosis')
+    updated = withConsultationConditions(updated, [
+      ...getConsultationConditionIds(updated),
+      conditionId,
+    ]);
+  updated.meta = {
+    ...consultation.meta,
+    lastUpdated: new Date().toISOString(),
+  };
+  await insertConsultationRecord(updated, patientId);
 }
 
 /**

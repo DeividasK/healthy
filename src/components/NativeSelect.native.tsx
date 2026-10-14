@@ -10,20 +10,22 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { ChevronDown } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
-import type { ConditionDropdownProps } from './ConditionDropdown.types';
+import type { NativeSelectProps } from './NativeSelect.types';
 
-export function ConditionDropdown({
+export function NativeSelect({
   value,
   options,
   onChange,
   label,
   testID,
   name,
-}: ConditionDropdownProps) {
-  if (Platform.OS === 'ios')
+  disabled,
+}: NativeSelectProps) {
+  if (Platform.OS === 'ios') {
     return (
       <TouchableOpacity
         testID={testID}
+        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityValue={{
@@ -49,11 +51,14 @@ export function ConditionDropdown({
         <ChevronDown size={18} color={COLORS.light.iconMuted} />
       </TouchableOpacity>
     );
+  }
+
   return (
     <View style={styles.container}>
       <Picker
         testID={testID}
         nativeID={testID}
+        enabled={!disabled}
         accessibilityLabel={label}
         {...{ name }}
         mode="dropdown"
@@ -69,6 +74,7 @@ export function ConditionDropdown({
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     borderWidth: 1,

@@ -1,4 +1,4 @@
-import type { Encounter } from 'fhir/r5';
+import type { Encounter, MedicationRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import {
   getConsultationTitle,
@@ -248,6 +248,33 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
       `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
       [id]
     );
+
+    // Retain independent requests and clear their originating encounter in
+    // both FHIR and SQL. Failures abort the whole deletion so the projection
+    // never diverges from the canonical resource.
+    const originatingTreatments = await db.getAllAsync<{
+      id: string;
+      fhir_json: string;
+    }>(
+      `SELECT id, fhir_json FROM medication_requests WHERE consultation_id = ?;`,
+      [id]
+    );
+
+    const now = new Date().toISOString();
+    for (const treatRow of originatingTreatments) {
+      const req: MedicationRequest = JSON.parse(treatRow.fhir_json);
+      delete req.encounter;
+      req.meta = { ...req.meta, lastUpdated: now };
+      await db.runAsync(
+        `UPDATE medication_requests
+         SET consultation_id = NULL,
+             fhir_json = ?,
+             updated_at = ?
+         WHERE id = ?;`,
+        [JSON.stringify(req), now, treatRow.id]
+      );
+    }
+
     const deleted = await db.runAsync(
       `DELETE FROM consultations WHERE id = ?;`,
       [id]
@@ -266,6 +293,7 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
     'consultations',
     'consultation_conditions',
     'clinical_documents',
+    'medication_requests',
   ]);
 }
 

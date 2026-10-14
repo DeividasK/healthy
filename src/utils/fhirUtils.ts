@@ -1,4 +1,10 @@
-import type { Condition, Encounter } from 'fhir/r5';
+import type {
+  CodeableReference,
+  Condition,
+  Encounter,
+  MedicationRequest,
+  Composition,
+} from 'fhir/r5';
 
 /**
  * Escapes plain text for inclusion in a FHIR Narrative XHTML div.
@@ -114,6 +120,36 @@ export function getConsultationConditionIds(encounter: Encounter): string[] {
   ];
 }
 
+/**
+ * Removes a reference from an Encounter's diagnoses and reasons. Wording on
+ * an entry is kept; entries left empty are dropped.
+ */
+export function withoutEncounterReference(
+  encounter: Encounter,
+  reference: string
+): Encounter {
+  const strip = (values: CodeableReference[] = []) =>
+    values.flatMap((value) => {
+      if (value.reference?.reference !== reference) return [value];
+      const retained = { ...value };
+      delete retained.reference;
+      return retained.concept ? [retained] : [];
+    });
+  const updated: Encounter = { ...encounter };
+  updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
+    const condition = strip(entry.condition);
+    return condition.length ? [{ ...entry, condition }] : [];
+  });
+  if (!updated.diagnosis?.length) delete updated.diagnosis;
+  updated.reason = encounter.reason?.flatMap((entry) => {
+    if (!entry.value) return [entry];
+    const value = strip(entry.value);
+    return value.length ? [{ ...entry, value }] : [];
+  });
+  if (!updated.reason?.length) delete updated.reason;
+  return updated;
+}
+
 /** Updates diagnosis links while preserving backbone metadata and unexposed concepts/references. */
 export function withConsultationConditions(
   encounter: Encounter,
@@ -184,4 +220,115 @@ export function withConsultationReasons(
     if (!retained.has(id))
       reason.push({ value: [{ reference: { reference: `Condition/${id}` } }] });
   return { ...encounter, reason: reason.length ? reason : undefined };
+}
+
+/** Safely extracts the medication / treatment title from a MedicationRequest. */
+export function getTreatmentTitle(request: MedicationRequest): string {
+  return (
+    request.medication?.concept?.text ||
+    request.medication?.concept?.coding?.[0]?.display ||
+    'Treatment'
+  );
+}
+
+/** Safely extracts dosage / regimen instructions from a MedicationRequest. */
+export function getTreatmentInstructions(
+  request: MedicationRequest
+): string | null {
+  return request.dosageInstruction?.[0]?.text || null;
+}
+
+/** Safely extracts notes from a MedicationRequest. */
+export function getTreatmentNotes(request: MedicationRequest): string | null {
+  if (request.note?.[0]?.text) return request.note[0].text;
+  return null;
+}
+
+/** Safely extracts reason text from a MedicationRequest. */
+export function getTreatmentReason(request: MedicationRequest): string | null {
+  return request.reason?.[0]?.concept?.text || null;
+}
+
+/** IDs of every Condition a MedicationRequest's reasons reference. */
+export function getTreatmentReasonConditionIds(
+  request: MedicationRequest
+): string[] {
+  const ids = (request.reason || []).flatMap((reason) => {
+    const ref = reason.reference?.reference;
+    return ref?.startsWith('Condition/') ? [ref.slice(10)] : [];
+  });
+  return [...new Set(ids)];
+}
+
+/** Exact resource references in every document section, including nested sections. */
+export function getCompositionEntryReferences(document: Composition): string[] {
+  const collect = (sections: NonNullable<Composition['section']>): string[] =>
+    sections.flatMap((section) => [
+      ...(section.entry || []).flatMap((entry) =>
+        entry.reference ? [entry.reference] : []
+      ),
+      ...collect(section.section || []),
+    ]);
+  return collect(document.section || []);
+}
+
+/**
+ * Remove only matching entries; preserve narrative and unrelated metadata.
+ * A section left without text, entries or sub-sections is dropped, because
+ * FHIR R5 (cmp-1) does not allow empty sections.
+ */
+export function withoutCompositionEntry(
+  document: Composition,
+  reference: string
+): Composition {
+  let changed = false;
+  const clean = (
+    sections: NonNullable<Composition['section']>
+  ): NonNullable<Composition['section']> =>
+    sections.flatMap((section) => {
+      if (
+        !section.entry?.some((entry) => entry.reference === reference) &&
+        !section.section
+      )
+        return [section];
+      const result = { ...section };
+      if (section.entry?.some((entry) => entry.reference === reference)) {
+        changed = true;
+        const entries = section.entry.filter(
+          (entry) => entry.reference !== reference
+        );
+        if (entries.length) result.entry = entries;
+        else delete result.entry;
+      }
+      if (section.section) {
+        const nested = clean(section.section);
+        if (nested.length) result.section = nested;
+        else delete result.section;
+      }
+      const isEmpty = !result.text && !result.entry && !result.section;
+      return isEmpty ? [] : [result];
+    });
+  const sections = clean(document.section || []);
+  if (!changed) return document;
+  const cleaned: Composition = { ...document, section: sections };
+  if (!sections.length) delete cleaned.section;
+  return cleaned;
+}
+
+/** Removes one reason reference while keeping any indication wording. */
+export function withoutTreatmentReasonReference(
+  request: MedicationRequest,
+  reference: string
+): MedicationRequest {
+  if (!request.reason?.some((r) => r.reference?.reference === reference))
+    return request;
+  const reason = request.reason.flatMap((entry) => {
+    if (entry.reference?.reference !== reference) return [entry];
+    const retained = { ...entry };
+    delete retained.reference;
+    return retained.concept ? [retained] : [];
+  });
+  const updated: MedicationRequest = { ...request, reason };
+  if (!reason.length) delete updated.reason;
+  return updated;
 }

@@ -20,4 +20,9 @@ config.resolver.assetExts = [...(config.resolver.assetExts || []), 'wasm'];
 module.exports = withNativeWind(config, {
   input: './global.css',
   inlineRem: 16,
+  // NativeWind's default ("last 1 version") still targets IE 11, so
+  // autoprefixer emits `input:-ms-input-placeholder`. Expo's CSS pipeline
+  // normalises that to `input:placeholder-shown`, which gives every empty
+  // web input Tailwind's gray-400 placeholder colour as its text colour.
+  browserslist: 'last 1 version, not dead',
 });

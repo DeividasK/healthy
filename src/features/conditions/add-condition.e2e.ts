@@ -22,7 +22,9 @@ test.describe('Add Condition Flow', () => {
 
         await expect(page).toHaveURL(/.*condition\/add/);
         await expect(page.getByText('New Condition')).toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        // Audit once Home's closing menu has faded out completely
+        await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
+        await checkA11y(page);
         const titleBounds = (await page
           .getByTestId('condition-title-input')
           .boundingBox())!;

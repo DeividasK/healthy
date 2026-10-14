@@ -21,6 +21,18 @@ import {
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
+import { Pill } from 'lucide-react-native';
+import {
+  diffLinkIds,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
+import {
+  getLinkedTreatmentsForConsultation,
+  getTreatmentLinkOptions,
+  linkTreatmentToConsultation,
+  unlinkTreatmentFromConsultation,
+} from '@/src/features/treatments/treatmentService';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +44,7 @@ export function EditConsultationView() {
   const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
     undefined
   );
+  const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
 
@@ -41,8 +54,22 @@ export function EditConsultationView() {
     let isMounted = true;
     (async () => {
       try {
-        const encounter = await getConsultationById(id, activePatientId);
+        const [encounter, treatmentOptions, linkedTreatments] =
+          await Promise.all([
+            getConsultationById(id, activePatientId),
+            getTreatmentLinkOptions(activePatientId),
+            getLinkedTreatmentsForConsultation(id, activePatientId),
+          ]);
         if (!isMounted) return;
+        setLinkFields([
+          {
+            type: 'treatment',
+            label: 'Treatments',
+            icon: Pill,
+            options: treatmentOptions,
+            initialIds: linkedTreatments.map((item) => item.id!),
+          },
+        ]);
         if (!encounter) {
           setNotFound(true);
           return;
@@ -146,18 +173,27 @@ export function EditConsultationView() {
     );
   }
 
-  const handleSave = async (values: ConsultationInput) => {
+  const handleSave = async (
+    values: ConsultationInput,
+    links: Record<string, LinkSelection>
+  ) => {
     await createOrUpdateConsultation({
       ...values,
       id,
       patientId: initialPatientId,
     });
+    const changes = diffLinkIds(linkFields[0].initialIds, links.treatment.ids);
+    for (const treatmentId of changes.added)
+      await linkTreatmentToConsultation(treatmentId, id, initialPatientId);
+    for (const treatmentId of changes.removed)
+      await unlinkTreatmentFromConsultation(treatmentId, id, initialPatientId);
   };
 
   return (
     <ConsultationForm
       isEdit
       initialValues={initialValues}
+      linkFields={linkFields}
       onSave={handleSave}
       onDelete={async () => {
         if (!id) return;

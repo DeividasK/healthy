@@ -1,4 +1,5 @@
 import { type Page } from '@playwright/test';
+import type { MedicationRequest } from 'fhir/r5';
 
 export interface SeedPatientOptions {
   id?: string;
@@ -42,6 +43,21 @@ export interface SeedConsultationOptions {
   date?: string;
   notes?: string;
   status?: string;
+}
+
+export interface SeedTreatmentOptions {
+  id?: string;
+  patientId?: string;
+  consultationId?: string;
+  title: string;
+  intent?: MedicationRequest['intent'];
+  status?: MedicationRequest['status'];
+  authoredOn?: string;
+  dosageInstructions?: string;
+  reason?: string;
+  reasonConditionIds?: string[];
+  notes?: string;
+  requesterName?: string;
 }
 
 /**
@@ -122,4 +138,49 @@ export async function getTestClinicalDocument(
       window as any
     ).__HEALTHY_TEST_BRIDGE__.getClinicalDocumentByConsultationId(id);
   }, consultationId);
+}
+
+/**
+ * Seeds a Treatment (MedicationRequest) directly into SQLite via the test bridge.
+ */
+export async function seedTestTreatment(
+  page: Page,
+  options: SeedTreatmentOptions
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(async (opts) => {
+    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedTreatment(opts);
+  }, options);
+}
+
+/**
+ * Fetches a Treatment (MedicationRequest) directly via the test bridge.
+ */
+export async function getTestTreatment(
+  page: Page,
+  id: string,
+  patientId?: string
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    async ({ treatId, patId }) => {
+      return await (window as any).__HEALTHY_TEST_BRIDGE__.getTreatment(
+        treatId,
+        patId
+      );
+    },
+    { treatId: id, patId: patientId }
+  );
+}
+
+/** LOINC code of the consultation document section that lists treatments. */
+export const TREATMENTS_SECTION_CODE = '10160-0';
+
+/** Returns the treatments section of a consultation Composition, if any. */
+export function findTreatmentsSection(document: any): any {
+  return document?.section?.find((section: any) =>
+    section.code?.coding?.some(
+      (coding: any) => coding.code === TREATMENTS_SECTION_CODE
+    )
+  );
 }

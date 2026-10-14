@@ -5,6 +5,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Consultation - Visual Regression', () => {
@@ -35,6 +36,12 @@ test.describe('View Consultation - Visual Regression', () => {
       status: 'completed',
     });
 
+    await seedTestTreatment(page, {
+      id: 'linked-visual-treatment',
+      title: 'Treatment recommendation',
+      consultationId: consultation.id,
+      dosageInstructions: 'Complete original instructions.',
+    });
     await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-title').waitFor();
     await takeSnapshot(page, 'Consultation View - Details', testInfo);

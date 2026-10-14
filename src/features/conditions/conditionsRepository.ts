@@ -1,10 +1,11 @@
-import type { Condition, Encounter } from 'fhir/r5';
+import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import {
   getConditionTitle,
   getConditionNotes,
   getConsultationConditionIds,
-  withConsultationConditions,
+  withoutEncounterReference,
+  withoutTreatmentReasonReference,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
@@ -175,41 +176,33 @@ export async function deleteConditionRecord(id: string): Promise<void> {
       );
       if (!getConsultationConditionIds(encounter).includes(id) && !hasReason)
         continue;
-      const updated = withConsultationConditions(
-        encounter,
-        getConsultationConditionIds(encounter).filter(
-          (conditionId) => conditionId !== id
-        )
-      );
-      updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
-        const condition = entry.condition?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return condition?.length ? [{ ...entry, condition }] : [];
-      });
-      if (!updated.diagnosis?.length) delete updated.diagnosis;
-      updated.reason = encounter.reason?.flatMap((reason) => {
-        if (
-          !reason.value?.some(
-            (value) => value.reference?.reference === reference
-          )
-        )
-          return [reason];
-        const value = reason.value?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return value?.length ? [{ ...reason, value }] : [];
-      });
-      if (!updated.reason?.length) delete updated.reason;
+      const updated = withoutEncounterReference(encounter, reference);
       updated.meta = { ...encounter.meta, lastUpdated: now };
       await db.runAsync(
         'UPDATE consultations SET fhir_json = ?, updated_at = ? WHERE id = ?;',
+        [JSON.stringify(updated), now, row.id]
+      );
+    }
+    // Treatments keep their indication wording; only the Condition link goes.
+    const treatmentRows = await db.getAllAsync<{
+      id: string;
+      fhir_json: string;
+    }>(
+      `SELECT id, fhir_json FROM medication_requests
+       WHERE patient_id = (SELECT patient_id FROM conditions WHERE id = ?)
+       AND fhir_json LIKE ?;`,
+      [id, `%Condition/${id}%`]
+    );
+    for (const row of treatmentRows) {
+      const request: MedicationRequest = JSON.parse(row.fhir_json);
+      const updated = withoutTreatmentReasonReference(
+        request,
+        `Condition/${id}`
+      );
+      if (updated === request) continue;
+      updated.meta = { ...request.meta, lastUpdated: now };
+      await db.runAsync(
+        'UPDATE medication_requests SET fhir_json = ?, updated_at = ? WHERE id = ?;',
         [JSON.stringify(updated), now, row.id]
       );
     }
@@ -219,5 +212,6 @@ export async function deleteConditionRecord(id: string): Promise<void> {
     'conditions',
     'consultations',
     'consultation_conditions',
+    'medication_requests',
   ]);
 }

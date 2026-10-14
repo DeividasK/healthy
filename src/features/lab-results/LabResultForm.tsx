@@ -1,5 +1,6 @@
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
+import { FormField } from '@/src/components/FormField';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -423,34 +424,28 @@ export function LabResultForm({
 
           {/* Optional Notes Section if added */}
           {showNotesInput && (
-            <View style={styles.notesSection}>
-              <View style={styles.notesHeader}>
-                <Text style={styles.notesLabel}>Notes</Text>
-                <TouchableOpacity
-                  testID="remove-notes-button"
-                  onPress={() => {
-                    setShowNotesInput(false);
-                    setTestNotes(null);
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="notes-input"
-                id="notes-input"
-                nativeID="notes-input"
-                name="notes"
-                accessibilityLabel="Report Notes"
-                style={styles.notesInput}
-                placeholder="Enter report notes (e.g., fasting, laboratory name)..."
-                placeholderTextColor={COLORS.light.placeholder}
-                multiline
-                numberOfLines={3}
-                value={testNotes || ''}
-                onChangeText={setTestNotes}
-              />
-            </View>
+            <FormField
+              label="Notes"
+              nativeID="notes-input"
+              removeTestID="remove-notes-button"
+              onRemove={() => {
+                setShowNotesInput(false);
+                setTestNotes(null);
+              }}
+              inputProps={{
+                testID: 'notes-input',
+                id: 'notes-input',
+                nativeID: 'notes-input',
+                name: 'notes',
+                accessibilityLabel: 'Report Notes',
+                placeholder:
+                  'Enter report notes (e.g., fasting, laboratory name)...',
+                multiline: true,
+                numberOfLines: 3,
+                value: testNotes || '',
+                onChangeText: setTestNotes,
+              }}
+            />
           )}
 
           {/* Active Tests List */}
@@ -623,7 +618,7 @@ export function LabResultForm({
               ? [
                   {
                     id: 'add-time',
-                    label: 'Add Time',
+                    label: 'Time',
                     icon: (
                       <Clock
                         color={COLORS.light.primary}
@@ -645,7 +640,7 @@ export function LabResultForm({
               ? [
                   {
                     id: 'add-notes',
-                    label: 'Add Notes',
+                    label: 'Notes',
                     icon: (
                       <FileText
                         color={COLORS.light.primary}
@@ -688,32 +683,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
-  },
-  notesSection: {
-    marginBottom: 16,
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  notesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 8,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: COLORS.light.foreground,
-    minHeight: 60,
-    textAlignVertical: 'top',
   },
   activeTestsList: {
     gap: 16,

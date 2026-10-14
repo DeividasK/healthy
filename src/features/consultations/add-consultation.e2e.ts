@@ -20,6 +20,7 @@ async function openAddConsultationForCondition(
     .getByTestId('condition-add-menu')
     .getByTestId('menu-add-consultation')
     .click();
+  await expect(page.getByTestId('condition-add-menu')).not.toBeVisible();
   await expect(
     page.getByTestId(`selected-condition-${conditionId}`)
   ).toBeVisible();
@@ -60,7 +61,7 @@ test.describe('Add Consultation Flow', () => {
       await test.step('Open the Condition’s linked Consultation form', async () => {
         await openAddConsultationForCondition(page, conditionId);
         await expect(page.getByText('New Consultation')).toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        await checkA11y(page);
       });
 
       await test.step('Fill consultation form fields', async () => {
@@ -103,7 +104,7 @@ test.describe('Add Consultation Flow', () => {
         ).toBeVisible();
 
         const consultationRow = page.getByTestId(
-          /^condition-consultation-item-/
+          /^condition-consultation-item-(?!.*-row$)/
         );
         await expect(consultationRow).toBeVisible();
         await consultationRow.click();
@@ -451,7 +452,7 @@ for (const terminology of [
       .fill('Seborrhoeic dermatitis');
     for (const [field, value] of Object.entries(terminology))
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
-    await checkA11y(page, { disableRules: ['color-contrast'] });
+    await checkA11y(page);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/consultation\/add/);
     const stored = await page.evaluate(async () => {

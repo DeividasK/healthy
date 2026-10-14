@@ -1,21 +1,23 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
-import type { ConditionDropdownProps } from './ConditionDropdown.types';
+import type { NativeSelectProps } from './NativeSelect.types';
 
-export function ConditionDropdown({
+export function NativeSelect({
   value,
   options,
   onChange,
   label,
   testID,
   name,
-}: ConditionDropdownProps) {
+  disabled,
+}: NativeSelectProps) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <select
         id={testID}
         name={name}
+        disabled={disabled}
         data-testid={testID}
         aria-label={label}
         value={value}

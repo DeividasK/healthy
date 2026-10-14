@@ -15,6 +15,18 @@ import {
   insertConditionRecord,
 } from '@/src/features/conditions/conditionsRepository';
 import {
+  fetchMedicationRequestById,
+  insertMedicationRequestRecord,
+  deleteMedicationRequestRecord,
+} from '@/src/features/treatments/treatmentsRepository';
+import {
+  createOrUpdateTreatment,
+  deleteTreatment,
+  linkTreatmentToConsultation,
+  unlinkTreatmentFromConsultation,
+  type TreatmentInput,
+} from '@/src/features/treatments/treatmentService';
+import {
   exportZipArchive,
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
@@ -224,6 +236,40 @@ export function setupTestBridge() {
     },
     getClinicalDocumentByConsultationId: async (consultationId: string) => {
       return await fetchClinicalDocumentByConsultationId(consultationId);
+    },
+    getTreatment: fetchMedicationRequestById,
+    updateTreatment: createOrUpdateTreatment,
+    setActivePatient: async (id: string) => {
+      await setActivePatientId(id);
+      const { notifyDatabaseChanged } = await import('@/src/database/dbEvents');
+      notifyDatabaseChanged(['app_settings']);
+    },
+    saveTreatment: insertMedicationRequestRecord,
+    deleteTreatment: deleteTreatment,
+    deleteMedicationRequest: deleteMedicationRequestRecord,
+    linkTreatmentToConsultation,
+    unlinkTreatmentFromConsultation,
+    seedTreatment: async (
+      input: Omit<TreatmentInput, 'authoredDate'> & {
+        authoredOn?: string;
+      }
+    ) => {
+      const patientId = await resolvePatientId(input.patientId);
+      return await createOrUpdateTreatment({
+        id: input.id,
+        patientId,
+        consultationId: input.consultationId,
+        title: input.title,
+        intent: input.intent || 'plan',
+        status: input.status || 'unknown',
+        authoredDate:
+          input.authoredOn || new Date().toISOString().split('T')[0],
+        dosageInstructions: input.dosageInstructions,
+        reason: input.reason,
+        reasonConditionIds: input.reasonConditionIds,
+        notes: input.notes,
+        requesterName: input.requesterName,
+      });
     },
   };
 }

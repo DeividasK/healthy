@@ -1,14 +1,14 @@
 import { CATEGORY_OPTIONS } from './conditionCategories';
-import { ConditionDropdown } from './ConditionDropdown';
 import type { ConditionInput } from './conditionService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
+import { FormField } from '@/src/components/FormField';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Platform,
@@ -25,11 +25,15 @@ import {
   ChevronDown,
   FileText,
   MapPin,
-  X,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { AddOptionsModal } from '@/src/components/AddOptionsModal';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
@@ -125,7 +129,12 @@ export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: ConditionInput) => Promise<void>;
+  onSave: (
+    values: ConditionInput,
+    links: Record<string, LinkSelection>
+  ) => Promise<void>;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 function showAlert(title: string, message: string) {
@@ -141,8 +150,10 @@ export function ConditionForm({
   isEdit = false,
   onSave,
   onDelete,
+  linkFields = [],
 }: ConditionFormProps) {
   const router = useRouter();
+  const links = useLinkFields(linkFields);
   const { triggerSync } = useSync();
 
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -273,7 +284,7 @@ export function ConditionForm({
           Object.keys(baseline) as (keyof ConditionInput)[]
         ).filter((key) => normalize(values[key]) !== normalize(baseline[key]));
       }
-      await onSave(values);
+      await onSave(values, links.values);
 
       // Trigger automatic background sync
       triggerSync().catch((err) =>
@@ -302,7 +313,7 @@ export function ConditionForm({
   if (!showVerification)
     plusMenuOptions.push({
       id: 'add-verification',
-      label: 'Add Verification Status',
+      label: 'Verification Status',
       icon: (
         <BadgeCheck
           color={COLORS.light.primary}
@@ -316,7 +327,7 @@ export function ConditionForm({
   if (!showCategory)
     plusMenuOptions.push({
       id: 'add-category',
-      label: 'Add Category',
+      label: 'Category',
       icon: (
         <Tag
           color={COLORS.light.primary}
@@ -330,7 +341,7 @@ export function ConditionForm({
   if (!showSeverity) {
     plusMenuOptions.push({
       id: 'add-severity',
-      label: 'Add Severity',
+      label: 'Severity',
       icon: (
         <Activity
           color={COLORS.light.primary}
@@ -348,7 +359,7 @@ export function ConditionForm({
   if (!showBodySite) {
     plusMenuOptions.push({
       id: 'add-body-site',
-      label: 'Add Body Site',
+      label: 'Body Site',
       icon: (
         <MapPin
           color={COLORS.light.primary}
@@ -363,7 +374,7 @@ export function ConditionForm({
   if (!showAbatementDate) {
     plusMenuOptions.push({
       id: 'add-abatement-date',
-      label: 'Add Resolution Date',
+      label: 'Resolution Date',
       icon: (
         <Calendar
           color={COLORS.light.primary}
@@ -381,7 +392,7 @@ export function ConditionForm({
   if (!showNotes) {
     plusMenuOptions.push({
       id: 'add-notes',
-      label: 'Add Notes',
+      label: 'Notes',
       icon: (
         <FileText
           color={COLORS.light.primary}
@@ -393,6 +404,7 @@ export function ConditionForm({
       onPress: () => setShowNotes(true),
     });
   }
+  plusMenuOptions.push(...links.menuOptions);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -478,39 +490,33 @@ export function ConditionForm({
           </View>
 
           {/* Condition Name Section (Required) */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Condition</Text>
-            <TextInput
-              testID="condition-title-input"
-              id="condition-title-input"
-              nativeID="condition-title-input"
-              name="title"
-              accessibilityLabel="Condition Name"
-              style={styles.textInput}
-              placeholder="Left Knee Pain"
-              placeholderTextColor={COLORS.light.placeholder}
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
+          <FormField
+            label="Condition"
+            nativeID="condition-title-input"
+            inputProps={{
+              testID: 'condition-title-input',
+              id: 'condition-title-input',
+              nativeID: 'condition-title-input',
+              name: 'title',
+              accessibilityLabel: 'Condition Name',
+              placeholder: 'Left Knee Pain',
+              value: title,
+              onChangeText: setTitle,
+            }}
+          />
 
           {showVerification && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Verification status</Text>
-                <TouchableOpacity
-                  testID="remove-verification-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove verification status"
-                  onPress={() => {
-                    setShowVerification(false);
-                    setVerificationStatus('');
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <ConditionDropdown
+            <FormField
+              label="Verification status"
+              nativeID="verification-picker-button"
+              removeTestID="remove-verification-button"
+              removeLabel="Remove verification status"
+              onRemove={() => {
+                setShowVerification(false);
+                setVerificationStatus('');
+              }}
+            >
+              <NativeSelect
                 testID="verification-picker-button"
                 name="verificationStatus"
                 label="Verification status"
@@ -518,25 +524,20 @@ export function ConditionForm({
                 options={VERIFICATION_OPTIONS}
                 onChange={setVerificationStatus}
               />
-            </View>
+            </FormField>
           )}
           {showCategory && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Category</Text>
-                <TouchableOpacity
-                  testID="remove-category-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove category"
-                  onPress={() => {
-                    setShowCategory(false);
-                    setCategory('');
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <ConditionDropdown
+            <FormField
+              label="Category"
+              nativeID="condition-category-input"
+              removeTestID="remove-category-button"
+              removeLabel="Remove category"
+              onRemove={() => {
+                setShowCategory(false);
+                setCategory('');
+              }}
+            >
+              <NativeSelect
                 testID="condition-category-input"
                 name="category"
                 label="Category"
@@ -554,25 +555,19 @@ export function ConditionForm({
                 ]}
                 onChange={setCategory}
               />
-            </View>
+            </FormField>
           )}
 
           {/* Severity Section if toggled */}
           {showSeverity && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Severity</Text>
-                <TouchableOpacity
-                  testID="remove-severity-button"
-                  onPress={() => {
-                    setShowSeverity(false);
-                    setSeverity(undefined);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
+            <FormField
+              label="Severity"
+              removeTestID="remove-severity-button"
+              onRemove={() => {
+                setShowSeverity(false);
+                setSeverity(undefined);
+              }}
+            >
               <View style={styles.severityRow}>
                 {SEVERITY_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -603,56 +598,42 @@ export function ConditionForm({
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </FormField>
           )}
 
           {/* Body Site Section if toggled */}
           {showBodySite && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Body Site</Text>
-                <TouchableOpacity
-                  testID="remove-body-site-button"
-                  onPress={() => {
-                    setShowBodySite(false);
-                    setBodySite('');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="condition-body-site-input"
-                id="condition-body-site-input"
-                nativeID="condition-body-site-input"
-                name="bodySite"
-                accessibilityLabel="Body Site"
-                style={styles.textInput}
-                placeholder="e.g. Left knee, Lower back"
-                placeholderTextColor={COLORS.light.placeholder}
-                value={bodySite}
-                onChangeText={setBodySite}
-              />
-            </View>
+            <FormField
+              label="Body Site"
+              nativeID="condition-body-site-input"
+              removeTestID="remove-body-site-button"
+              onRemove={() => {
+                setShowBodySite(false);
+                setBodySite('');
+              }}
+              inputProps={{
+                testID: 'condition-body-site-input',
+                id: 'condition-body-site-input',
+                nativeID: 'condition-body-site-input',
+                name: 'bodySite',
+                accessibilityLabel: 'Body Site',
+                placeholder: 'e.g. Left knee, Lower back',
+                value: bodySite,
+                onChangeText: setBodySite,
+              }}
+            />
           )}
 
           {/* Resolution Date Section if toggled */}
           {showAbatementDate && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Resolution Date</Text>
-                <TouchableOpacity
-                  testID="remove-abatement-date-button"
-                  onPress={() => {
-                    setShowAbatementDate(false);
-                    setAbatementDate(undefined);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
+            <FormField
+              label="Resolution Date"
+              removeTestID="remove-abatement-date-button"
+              onRemove={() => {
+                setShowAbatementDate(false);
+                setAbatementDate(undefined);
+              }}
+            >
               <View style={styles.datePickerContainer}>
                 <NativeDatePicker
                   value={abatementDate || new Date()}
@@ -660,41 +641,35 @@ export function ConditionForm({
                   testID="abatement-date-picker-button"
                 />
               </View>
-            </View>
+            </FormField>
           )}
 
           {/* Notes Textarea if toggled */}
           {showNotes && (
-            <View style={styles.descriptionContainer}>
-              <View style={styles.descriptionHeader}>
-                <Text style={styles.inputLabel}>Notes</Text>
-                <TouchableOpacity
-                  testID="remove-notes-button"
-                  onPress={() => {
-                    setShowNotes(false);
-                    setNotes('');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="condition-notes-input"
-                id="condition-notes-input"
-                nativeID="condition-notes-input"
-                name="notes"
-                accessibilityLabel="Notes"
-                style={styles.descriptionInput}
-                placeholder="Add notes..."
-                placeholderTextColor={COLORS.light.placeholder}
-                multiline
-                numberOfLines={4}
-                value={notes}
-                onChangeText={setNotes}
-              />
-            </View>
+            <FormField
+              label="Notes"
+              nativeID="condition-notes-input"
+              removeTestID="remove-notes-button"
+              onRemove={() => {
+                setShowNotes(false);
+                setNotes('');
+              }}
+              inputProps={{
+                testID: 'condition-notes-input',
+                id: 'condition-notes-input',
+                nativeID: 'condition-notes-input',
+                name: 'notes',
+                accessibilityLabel: 'Notes',
+                placeholder: 'Add notes...',
+                multiline: true,
+                numberOfLines: 4,
+                value: notes,
+                onChangeText: setNotes,
+              }}
+            />
           )}
+
+          {links.fields}
         </ScrollView>
 
         {/* Bottom Save Action */}
@@ -803,31 +778,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
   },
-  inputSection: {
-    marginBottom: 20,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: COLORS.light.foreground,
-  },
   severityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -860,26 +810,5 @@ const styles = StyleSheet.create({
   datePickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  descriptionContainer: {
-    marginBottom: 20,
-  },
-  descriptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  descriptionInput: {
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-    minHeight: 100,
-    textAlignVertical: 'top',
   },
 });

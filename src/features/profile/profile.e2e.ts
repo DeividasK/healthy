@@ -33,6 +33,8 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         await expect(page.getByTestId('profile-display-name')).toHaveText(
           'John Doe'
         );
+        // Muted #717973 text (4.48:1) and the Google sign-in button still
+        // fall just short of 4.5:1.
         await checkA11y(page, { disableRules: ['color-contrast'] });
       });
     }

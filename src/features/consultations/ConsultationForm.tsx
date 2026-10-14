@@ -4,12 +4,12 @@ import type {
 } from './consultationService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { FormField } from '@/src/components/FormField';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Platform,
@@ -26,7 +26,6 @@ import {
   FileText,
   FolderPlus,
   User,
-  X,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
@@ -36,6 +35,13 @@ import {
   AddOptionItem,
 } from '@/src/components/AddOptionsModal';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
+import { SpecialistField } from '@/src/components/SpecialistField';
+import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
@@ -111,7 +117,12 @@ export interface ConsultationFormProps {
   initialConditionIds?: string[];
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: ConsultationInput) => Promise<void>;
+  onSave: (
+    values: ConsultationInput,
+    links: Record<string, LinkSelection>
+  ) => Promise<void>;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 function showAlert(title: string, message: string) {
@@ -128,7 +139,9 @@ export function ConsultationForm({
   isEdit = false,
   onSave,
   onDelete,
+  linkFields = [],
 }: ConsultationFormProps) {
+  const links = useLinkFields(linkFields);
   const router = useRouter();
   const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
@@ -193,16 +206,12 @@ export function ConsultationForm({
   const [showCondition, setShowCondition] = useState(
     Boolean((initialValues?.reasonConditionIds ?? initialConditionIds)?.length)
   );
-  const [conditionQuery, setConditionQuery] = useState('');
-  const [isConditionFocused, setIsConditionFocused] = useState(false);
-  const conditionSearchRef = useRef<View>(null);
 
   const [availableConditions, setAvailableConditions] = useState<Condition[]>(
     []
   );
   const [knownDoctors, setKnownDoctors] = useState<string[]>([]);
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
-  const [isDoctorFocused, setIsDoctorFocused] = useState(false);
   const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
     initialValues?.diagnoses || []
@@ -238,15 +247,6 @@ export function ConsultationForm({
     };
   }, [activePatientId]);
 
-  // Autocomplete matching doctors
-  const matchingDoctors = useMemo(() => {
-    const trimmed = doctorName.trim().toLowerCase();
-    if (!trimmed) {
-      return knownDoctors;
-    }
-    return knownDoctors.filter((doc) => doc.toLowerCase().includes(trimmed));
-  }, [doctorName, knownDoctors]);
-
   // Autocomplete matching service types
   const matchingServiceTypes = useMemo(() => {
     const all = Array.from(
@@ -280,13 +280,10 @@ export function ConsultationForm({
     }
   };
 
-  const conditionOptions = availableConditions.filter(
-    (condition) =>
-      condition.id &&
-      !selectedConditionIds.includes(condition.id) &&
-      getConditionTitle(condition)
-        .toLowerCase()
-        .includes(conditionQuery.trim().toLowerCase())
+  const conditionOptions = availableConditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
   );
 
   const handleSubmit = async () => {
@@ -315,21 +312,24 @@ export function ConsultationForm({
         ? `${formattedDate}T${time}:00${zone}`
         : formattedDate;
 
-      await onSave({
-        id: initialValues?.id,
-        title: trimmedTitle,
-        status: selectedStatus.status,
-        date: fullDate,
-        doctorName:
-          showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
-        serviceType:
-          showServiceType && serviceType.trim()
-            ? serviceType.trim()
-            : undefined,
-        reasonConditionIds: selectedConditionIds.filter(Boolean),
-        diagnoses,
-        notes: showNotes && notes.trim() ? notes.trim() : undefined,
-      });
+      await onSave(
+        {
+          id: initialValues?.id,
+          title: trimmedTitle,
+          status: selectedStatus.status,
+          date: fullDate,
+          doctorName:
+            showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
+          serviceType:
+            showServiceType && serviceType.trim()
+              ? serviceType.trim()
+              : undefined,
+          reasonConditionIds: selectedConditionIds.filter(Boolean),
+          diagnoses,
+          notes: showNotes && notes.trim() ? notes.trim() : undefined,
+        },
+        links.values
+      );
 
       triggerSync().catch((err) =>
         console.warn('Background sync failed on consultation change:', err)
@@ -358,7 +358,7 @@ export function ConsultationForm({
   const plusMenuOptions: AddOptionItem[] = [
     {
       id: 'add-diagnosis',
-      label: 'Add Diagnosis',
+      label: 'Diagnosis',
       icon: (
         <Stethoscope
           color={COLORS.light.primary}
@@ -374,7 +374,7 @@ export function ConsultationForm({
   if (time === null) {
     plusMenuOptions.push({
       id: 'add-time',
-      label: 'Add Time',
+      label: 'Time',
       icon: (
         <Clock
           color={COLORS.light.primary}
@@ -394,7 +394,7 @@ export function ConsultationForm({
   if (!showCondition) {
     plusMenuOptions.push({
       id: 'add-reason',
-      label: 'Add Reasons for Visit',
+      label: 'Reasons for Visit',
       icon: (
         <FolderPlus
           color={COLORS.light.primary}
@@ -409,7 +409,7 @@ export function ConsultationForm({
   if (!showDoctor) {
     plusMenuOptions.push({
       id: 'add-doctor',
-      label: 'Add Doctor',
+      label: 'Specialist',
       icon: (
         <User
           color={COLORS.light.primary}
@@ -424,7 +424,7 @@ export function ConsultationForm({
   if (!showServiceType) {
     plusMenuOptions.push({
       id: 'add-service-type',
-      label: 'Add Service Type',
+      label: 'Service Type',
       icon: (
         <Activity
           color={COLORS.light.primary}
@@ -439,7 +439,7 @@ export function ConsultationForm({
   if (!showNotes) {
     plusMenuOptions.push({
       id: 'add-notes',
-      label: 'Add Notes',
+      label: 'Notes',
       icon: (
         <FileText
           color={COLORS.light.primary}
@@ -451,6 +451,8 @@ export function ConsultationForm({
       onPress: () => setShowNotes(true),
     });
   }
+
+  const menuOptions = [...plusMenuOptions, ...links.menuOptions];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -547,135 +549,50 @@ export function ConsultationForm({
           </View>
 
           {/* Consultation Title Input (Required) */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Consultation / Service</Text>
-            <TextInput
-              testID="consultation-title-input"
-              id="consultation-title-input"
-              nativeID="consultation-title-input"
-              name="title"
-              accessibilityLabel="Consultation Title"
-              style={styles.textInput}
-              placeholder="e.g. Cardiology Follow-up, Annual Checkup"
-              placeholderTextColor={COLORS.light.placeholder}
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
+          <FormField
+            label="Consultation / Service"
+            nativeID="consultation-title-input"
+            inputProps={{
+              testID: 'consultation-title-input',
+              id: 'consultation-title-input',
+              nativeID: 'consultation-title-input',
+              name: 'title',
+              accessibilityLabel: 'Consultation Title',
+              placeholder: 'e.g. Cardiology Follow-up, Annual Checkup',
+              value: title,
+              onChangeText: setTitle,
+            }}
+          />
 
           {showCondition && (
-            <View
-              style={styles.inputSection}
+            <LinkedResourcesField
+              label="Reasons for visit"
+              searchLabel="Select reasons for visit"
+              options={conditionOptions}
+              selectedIds={selectedConditionIds}
+              onChange={setSelectedConditionIds}
               testID="consultation-conditions-section"
-            >
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Reasons for visit</Text>
-                <TouchableOpacity
-                  testID="remove-conditions-section-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove reasons for visit"
-                  onPress={() => {
-                    setShowCondition(false);
-                    setSelectedConditionIds([]);
-                    setConditionQuery('');
-                    setIsConditionFocused(false);
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              {selectedConditionIds.map((conditionId, index) => (
-                <View
-                  key={conditionId}
-                  style={styles.selectedConditionRow}
-                  testID={`selected-condition-${conditionId}`}
-                >
-                  <Text style={styles.selectedConditionText}>
-                    {availableConditions
-                      .filter((condition) => condition.id === conditionId)
-                      .map(getConditionTitle)[0] || conditionId}
-                  </Text>
-                  <TouchableOpacity
-                    testID={
-                      index === 0
-                        ? 'remove-condition-button'
-                        : `remove-condition-button-${index}`
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove condition ${availableConditions.filter((condition) => condition.id === conditionId).map(getConditionTitle)[0] || conditionId}`}
-                    onPress={() =>
-                      setSelectedConditionIds((current) =>
-                        current.filter((id) => id !== conditionId)
-                      )
-                    }
-                  >
-                    <X color={COLORS.light.iconClear} size={16} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View
-                ref={conditionSearchRef}
-                onFocus={() => setIsConditionFocused(true)}
-                onBlur={(event: any) => {
-                  const next = event.relatedTarget;
-                  if (
-                    next &&
-                    (conditionSearchRef.current as any)?.contains?.(next)
-                  )
-                    return;
-                  setIsConditionFocused(false);
-                }}
-              >
-                <TextInput
-                  testID="condition-search-input"
-                  id="condition-search-input"
-                  nativeID="condition-search-input"
-                  name="conditionSearch"
-                  accessibilityLabel="Select reasons for visit"
-                  style={styles.textInput}
-                  placeholder="Select..."
-                  placeholderTextColor={COLORS.light.mutedForeground}
-                  value={conditionQuery}
-                  onChangeText={(value) => {
-                    setConditionQuery(value);
-                    setIsConditionFocused(true);
-                  }}
-                  onFocus={() => setIsConditionFocused(true)}
-                  onPressIn={() => setIsConditionFocused(true)}
-                />
-                {isConditionFocused && (
-                  <AutocompleteDropdown
-                    testID="condition-autocomplete-list"
-                    itemTestIDPrefix="condition-autocomplete-item-"
-                    items={conditionOptions.map((condition) => ({
-                      id: condition.id!,
-                      label: getConditionTitle(condition),
-                    }))}
-                    onSelect={(item) => {
-                      setSelectedConditionIds((current) =>
-                        current.includes(item.id)
-                          ? current
-                          : [...current, item.id]
-                      );
-                      setConditionQuery('');
-                      setIsConditionFocused(false);
-                    }}
-                  />
-                )}
-              </View>
-            </View>
+              removeTestID="remove-conditions-section-button"
+              onRemove={() => {
+                setShowCondition(false);
+                setSelectedConditionIds([]);
+              }}
+            />
           )}
 
           {diagnoses.length > 0 && (
-            <View
-              style={styles.inputSection}
+            <FormField
+              label="Diagnoses"
               testID="consultation-diagnoses-section"
+              style={focusedDiagnosis !== null && styles.raised}
             >
-              <Text style={styles.inputLabel}>Diagnoses</Text>
               {diagnoses.map((diagnosis, index) => (
                 <View
                   key={index}
-                  style={styles.diagnosisItem}
+                  style={[
+                    styles.diagnosisItem,
+                    focusedDiagnosis === index && styles.raised,
+                  ]}
                   testID={`consultation-diagnosis-${index}`}
                 >
                   {(['title', 'system', 'code', 'display'] as const).map(
@@ -690,48 +607,37 @@ export function ConsultationForm({
                               : 'Terminology Display (optional)';
                       return (
                         <React.Fragment key={field}>
-                          <View style={styles.inputSection}>
-                            {field === 'title' ? (
-                              <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.inputLabel}>{label}</Text>
-                                <TouchableOpacity
-                                  testID={`remove-diagnosis-${index}`}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Remove diagnosis ${index + 1}`}
-                                  onPress={() =>
+                          <FormField
+                            label={label}
+                            nativeID={`diagnosis-${index}-${field}-input`}
+                            removeTestID={`remove-diagnosis-${index}`}
+                            removeLabel={`Remove diagnosis ${index + 1}`}
+                            onRemove={
+                              field === 'title'
+                                ? () =>
                                     setDiagnoses((current) =>
                                       current.filter((_, i) => i !== index)
                                     )
-                                  }
-                                >
-                                  <X color={COLORS.light.iconClear} size={16} />
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <Text style={styles.inputLabel}>{label}</Text>
-                            )}
-                            <TextInput
-                              testID={`diagnosis-${index}-${field}-input`}
-                              id={`diagnosis-${index}-${field}-input`}
-                              nativeID={`diagnosis-${index}-${field}-input`}
-                              name={`diagnosis${index}${field}`}
-                              accessibilityLabel={label}
-                              style={styles.textInput}
-                              autoCapitalize={
+                                : undefined
+                            }
+                            inputProps={{
+                              testID: `diagnosis-${index}-${field}-input`,
+                              id: `diagnosis-${index}-${field}-input`,
+                              nativeID: `diagnosis-${index}-${field}-input`,
+                              name: `diagnosis${index}${field}`,
+                              accessibilityLabel: label,
+                              autoCapitalize:
                                 field === 'title' || field === 'display'
                                   ? 'sentences'
-                                  : 'none'
-                              }
-                              autoCorrect={
-                                field === 'title' || field === 'display'
-                              }
-                              value={
+                                  : 'none',
+                              autoCorrect:
+                                field === 'title' || field === 'display',
+                              value:
                                 field === 'title'
                                   ? diagnosis.title
-                                  : diagnosis.terminology?.[field] || ''
-                              }
-                              onFocus={() => setFocusedDiagnosis(null)}
-                              onChangeText={(value) =>
+                                  : diagnosis.terminology?.[field] || '',
+                              onFocus: () => setFocusedDiagnosis(null),
+                              onChangeText: (value) =>
                                 setDiagnoses((current) =>
                                   current.map((item, i) =>
                                     i !== index
@@ -746,41 +652,42 @@ export function ConsultationForm({
                                             },
                                           }
                                   )
-                                )
-                              }
-                            />
-                          </View>
+                                ),
+                            }}
+                          />
                           {field === 'title' && (
-                            <View style={styles.inputSection}>
-                              <Text style={styles.inputLabel}>
-                                Referenced Condition (optional)
-                              </Text>
-                              <TextInput
-                                testID={`diagnosis-${index}-condition-input`}
-                                id={`diagnosis-${index}-condition-input`}
-                                nativeID={`diagnosis-${index}-condition-input`}
-                                name={`diagnosis${index}Condition`}
-                                accessibilityLabel="Referenced Condition (optional)"
-                                style={styles.textInput}
-                                value={
+                            <FormField
+                              label="Referenced Condition (optional)"
+                              style={
+                                focusedDiagnosis === index && styles.raised
+                              }
+                              nativeID={`diagnosis-${index}-condition-input`}
+                              inputProps={{
+                                testID: `diagnosis-${index}-condition-input`,
+                                id: `diagnosis-${index}-condition-input`,
+                                nativeID: `diagnosis-${index}-condition-input`,
+                                name: `diagnosis${index}Condition`,
+                                accessibilityLabel:
+                                  'Referenced Condition (optional)',
+                                value:
                                   diagnosisQueries[index] ??
                                   (diagnosis.createCondition
                                     ? 'Create new condition'
                                     : availableConditions.find(
                                         (condition) =>
                                           condition.id === diagnosis.conditionId
-                                      )?.code?.text || '')
-                                }
-                                onChangeText={(query) => {
+                                      )?.code?.text || ''),
+                                onChangeText: (query) => {
                                   setDiagnosisQueries((current) => ({
                                     ...current,
                                     [index]: query,
                                   }));
                                   setFocusedDiagnosis(index);
-                                }}
-                                onFocus={() => setFocusedDiagnosis(index)}
-                                onPressIn={() => setFocusedDiagnosis(index)}
-                              />
+                                },
+                                onFocus: () => setFocusedDiagnosis(index),
+                                onPressIn: () => setFocusedDiagnosis(index),
+                              }}
+                            >
                               {focusedDiagnosis === index && (
                                 <AutocompleteDropdown
                                   testID={`diagnosis-${index}-condition-list`}
@@ -840,7 +747,7 @@ export function ConsultationForm({
                                   }}
                                 />
                               )}
-                            </View>
+                            </FormField>
                           )}
                         </React.Fragment>
                       );
@@ -848,44 +755,36 @@ export function ConsultationForm({
                   )}
                 </View>
               ))}
-            </View>
+            </FormField>
           )}
 
           {/* Service Type / Specialty Section (Optional) */}
           {showServiceType && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Specialty / Service Type</Text>
-                <TouchableOpacity
-                  testID="remove-service-type-button"
-                  onPress={() => {
-                    setShowServiceType(false);
-                    setServiceType('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove service type"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-service-type-input"
-                id="consultation-service-type-input"
-                nativeID="consultation-service-type-input"
-                name="serviceType"
-                accessibilityLabel="Specialty or Service Type"
-                style={styles.textInput}
-                placeholder="e.g. Cardiology, General practice"
-                placeholderTextColor={COLORS.light.placeholder}
-                value={serviceType}
-                onChangeText={(text) => {
+            <FormField
+              label="Specialty / Service Type"
+              style={isServiceTypeFocused && styles.raised}
+              nativeID="consultation-service-type-input"
+              removeTestID="remove-service-type-button"
+              removeLabel="Remove service type"
+              onRemove={() => {
+                setShowServiceType(false);
+                setServiceType('');
+              }}
+              inputProps={{
+                testID: 'consultation-service-type-input',
+                id: 'consultation-service-type-input',
+                nativeID: 'consultation-service-type-input',
+                name: 'serviceType',
+                accessibilityLabel: 'Specialty or Service Type',
+                placeholder: 'e.g. Cardiology, General practice',
+                value: serviceType,
+                onChangeText: (text) => {
                   setServiceType(text);
                   setIsServiceTypeFocused(true);
-                }}
-                onFocus={() => setIsServiceTypeFocused(true)}
-              />
-
+                },
+                onFocus: () => setIsServiceTypeFocused(true),
+              }}
+            >
               {/* Service Type Autocomplete Suggestions */}
               {isServiceTypeFocused && matchingServiceTypes.length > 0 && (
                 <AutocompleteDropdown
@@ -901,103 +800,57 @@ export function ConsultationForm({
                   }}
                 />
               )}
-            </View>
+            </FormField>
           )}
 
-          {/* Doctor / Specialist Input with Autocomplete (Optional) */}
           {showDoctor && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Doctor or Specialist</Text>
-                <TouchableOpacity
-                  testID="remove-doctor-button"
-                  onPress={() => {
-                    setShowDoctor(false);
-                    setDoctorName('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove doctor"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-doctor-input"
-                id="consultation-doctor-input"
-                nativeID="consultation-doctor-input"
-                name="doctorName"
-                accessibilityLabel="Doctor or Specialist"
-                style={styles.textInput}
-                placeholder="e.g. Dr. Sarah Adams"
-                placeholderTextColor={COLORS.light.placeholder}
-                value={doctorName}
-                onChangeText={(text) => {
-                  setDoctorName(text);
-                  setIsDoctorFocused(true);
-                }}
-                onFocus={() => setIsDoctorFocused(true)}
-              />
-
-              {/* Doctor Autocomplete Suggestions */}
-              {isDoctorFocused && matchingDoctors.length > 0 && (
-                <AutocompleteDropdown
-                  testID="doctor-autocomplete-list"
-                  itemTestIDPrefix="doctor-autocomplete-item-"
-                  items={matchingDoctors.map((doc, idx) => ({
-                    id: String(idx),
-                    label: doc,
-                  }))}
-                  onSelect={(item) => {
-                    setDoctorName(item.label);
-                    setIsDoctorFocused(false);
-                  }}
-                />
-              )}
-            </View>
+            <SpecialistField
+              inputID="consultation-doctor-input"
+              autocompleteTestID="doctor-autocomplete"
+              value={doctorName}
+              onChangeText={setDoctorName}
+              suggestions={knownDoctors}
+              removeTestID="remove-doctor-button"
+              onRemove={() => {
+                setShowDoctor(false);
+                setDoctorName('');
+              }}
+            />
           )}
 
           {/* Consultation Notes Textarea (Optional) */}
           {showNotes && (
-            <View style={styles.descriptionContainer}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Notes</Text>
-                <TouchableOpacity
-                  testID="remove-notes-button"
-                  onPress={() => {
-                    setShowNotes(false);
-                    setNotes('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove notes"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-notes-input"
-                id="consultation-notes-input"
-                nativeID="consultation-notes-input"
-                name="notes"
-                accessibilityLabel="Notes"
-                style={styles.descriptionInput}
-                placeholder="Add consultation notes, instructions, advice..."
-                placeholderTextColor={COLORS.light.placeholder}
-                multiline
-                numberOfLines={5}
-                value={notes}
-                onChangeText={setNotes}
-              />
-            </View>
+            <FormField
+              label="Notes"
+              nativeID="consultation-notes-input"
+              removeTestID="remove-notes-button"
+              onRemove={() => {
+                setShowNotes(false);
+                setNotes('');
+              }}
+              inputProps={{
+                testID: 'consultation-notes-input',
+                id: 'consultation-notes-input',
+                nativeID: 'consultation-notes-input',
+                name: 'notes',
+                accessibilityLabel: 'Notes',
+                placeholder: 'Add consultation notes, instructions, advice...',
+                multiline: true,
+                numberOfLines: 5,
+                value: notes,
+                onChangeText: setNotes,
+              }}
+            />
           )}
+
+          {links.fields}
         </ScrollView>
 
         {/* Bottom Save Action */}
         <FormActionDock
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
-          addDisabled={plusMenuOptions.length === 0}
+          addDisabled={menuOptions.length === 0}
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
@@ -1020,7 +873,7 @@ export function ConsultationForm({
           testID="form-add-menu"
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
-          options={plusMenuOptions}
+          options={menuOptions}
         />
 
         {/* Status Selection Modal for Android */}
@@ -1096,23 +949,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
   },
-  selectedConditionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  selectedConditionText: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
   diagnosisItem: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -1120,37 +956,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 20,
   },
-  inputSection: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  textInput: {
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
-  descriptionContainer: {
-    marginBottom: 20,
-  },
-  descriptionInput: {
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
+  // Lifts a field above later siblings while its autocomplete overlays them.
+  raised: { zIndex: 10 },
 });

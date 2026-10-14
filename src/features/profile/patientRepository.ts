@@ -183,6 +183,8 @@ export async function deletePatientRecord(id: string): Promise<void> {
     'conditions',
     'consultations',
     'consultation_conditions',
+    'medication_requests',
+    'clinical_documents',
   ]);
 }
 

@@ -3,6 +3,7 @@ import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
+import { getCompositionEntryReferences } from '@/src/utils/fhirUtils';
 import {
   recordPendingClinicalResourceDeletion,
   clearPendingClinicalResourceDeletions,
@@ -178,6 +179,33 @@ export async function fetchClinicalDocumentByConsultationId(
     comp.meta = { ...comp.meta, lastUpdated: row.updated_at };
   }
   return comp;
+}
+
+/**
+ * Returns the IDs of consultations whose document has an entry pointing at
+ * the exact resource reference (e.g. `MedicationRequest/abc`).
+ */
+export async function fetchConsultationIdsReferencingResource(
+  reference: string,
+  patientId: string
+): Promise<string[]> {
+  const db = await getDb();
+  // LIKE narrows the scan; exact matching happens on the parsed document.
+  const rows = await db.getAllAsync<{
+    consultation_id: string;
+    fhir_json: string;
+  }>(
+    `SELECT consultation_id, fhir_json FROM clinical_documents
+     WHERE patient_id = ? AND fhir_json LIKE ?;`,
+    [patientId, `%${reference}%`]
+  );
+  return rows
+    .filter((row) =>
+      getCompositionEntryReferences(
+        JSON.parse(row.fhir_json) as Composition
+      ).includes(reference)
+    )
+    .map((row) => row.consultation_id);
 }
 
 /**

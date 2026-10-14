@@ -66,12 +66,12 @@ test.describe('Multiple consultation diagnoses', () => {
       ).toHaveCount(1);
     }
     await page.goto(`/consultation/${id}`);
-    await expect(page.getByTestId('consultation-related-condition')).toHaveText(
-      'First diagnosis'
-    );
     await expect(
-      page.getByTestId('consultation-related-condition-third')
-    ).toHaveText('Third diagnosis');
+      page.getByTestId('consultation-related-condition-row')
+    ).toContainText('First diagnosis');
+    await expect(
+      page.getByTestId('consultation-related-condition-third-row')
+    ).toContainText('Third diagnosis');
     await page.reload();
     await expect(
       page.getByTestId('consultation-related-condition-third')
@@ -85,9 +85,9 @@ test.describe('Multiple consultation diagnoses', () => {
       'Updated review'
     );
     await page.reload();
-    await expect(page.getByTestId('consultation-related-condition')).toHaveText(
-      'Third diagnosis'
-    );
+    await expect(
+      page.getByTestId('consultation-related-condition-row')
+    ).toContainText('Third diagnosis');
     await page.goto('/condition/first');
     await expect(
       page.getByTestId(`condition-consultation-item-${id}`)

@@ -6,6 +6,7 @@ import {
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
@@ -35,6 +36,11 @@ test.describe('Home View - Visual Regression', () => {
       date: '2026-10-04',
       doctorName: 'Dr. Sarah Connor',
       notes: 'Follow-up next year.',
+    });
+    await seedTestTreatment(page, {
+      id: 'home-treatment',
+      title: 'Lisinopril 10mg',
+      dosageInstructions: 'Take 1 tablet daily.',
     });
     await page.goto('/');
     await page

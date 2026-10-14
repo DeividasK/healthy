@@ -54,3 +54,6 @@ chromatic.log
 
 # Local implementation plans (never commit)
 /.agents/plans/
+
+# Local scratch files (never commit)
+/.agents/tmp/

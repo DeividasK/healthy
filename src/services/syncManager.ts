@@ -7,6 +7,7 @@ import type {
   Condition,
   Encounter,
   Composition,
+  MedicationRequest,
 } from 'fhir/r5';
 import {
   deriveKeyFromGoogleUser,
@@ -42,6 +43,10 @@ import {
   fetchAllClinicalDocumentRecords,
   insertClinicalDocumentRecord,
 } from '@/src/features/consultations/clinicalDocumentsRepository';
+import {
+  fetchAllMedicationRequestRecords,
+  insertMedicationRequestRecord,
+} from '@/src/features/treatments/treatmentsRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import {
@@ -153,6 +158,7 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
   conditions: number;
   consultations: number;
   clinicalDocuments: number;
+  medicationRequests: number;
 }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
@@ -166,12 +172,14 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     allConditions,
     allConsultations,
     allClinicalDocs,
+    allMedicationRequests,
   ] = await Promise.all([
     fetchAllStoredPatients(),
     fetchAllDiagnosticReportRecords(),
     fetchAllConditionRecords(),
     fetchAllConsultationRecords(),
     fetchAllClinicalDocumentRecords(),
+    fetchAllMedicationRequestRecords(),
   ]);
 
   // Filter to patients explicitly connected to this Google account
@@ -203,6 +211,10 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
 
   const eligibleClinicalDocs = allClinicalDocs.filter((cd) =>
     eligiblePatientIds.has(cd.patientId)
+  );
+
+  const eligibleMedicationRequests = allMedicationRequests.filter((mr) =>
+    eligiblePatientIds.has(mr.patientId)
   );
 
   // Upload/Update Eligible Patients
@@ -385,6 +397,42 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     }
   }
 
+  // Upload/Update Medication Requests
+  for (const { request: req, patientId } of eligibleMedicationRequests) {
+    const fileName = `medicationrequest_${req.id}.json.enc`;
+    const encBytes = await encryptText(JSON.stringify(req), key);
+    const existing = remoteFileMap.get(fileName);
+    const localLastUpdated = req.meta?.lastUpdated;
+    const appProperties = {
+      patientId,
+      ...(localLastUpdated ? { lastUpdated: localLastUpdated } : {}),
+    };
+
+    if (existing) {
+      const remoteLastUpdated = existing.appProperties?.lastUpdated;
+      if (
+        remoteLastUpdated &&
+        localLastUpdated &&
+        isExistingNewerOrEqual(remoteLastUpdated, localLastUpdated)
+      ) {
+        continue;
+      }
+      await updateAppDataFile(
+        config.accessToken,
+        existing.id,
+        encBytes,
+        appProperties
+      );
+    } else {
+      await uploadAppDataFile(
+        config.accessToken,
+        fileName,
+        encBytes,
+        appProperties
+      );
+    }
+  }
+
   // Update last sync timestamp
   const updatedConfig: GoogleDriveConfig = {
     ...config,
@@ -398,6 +446,7 @@ export async function backupToGoogleDrive(config: GoogleDriveConfig): Promise<{
     conditions: eligibleConditions.length,
     consultations: eligibleConsultations.length,
     clinicalDocuments: eligibleClinicalDocs.length,
+    medicationRequests: eligibleMedicationRequests.length,
   };
 }
 
@@ -445,6 +494,7 @@ export async function restoreFromGoogleDrive(
   conditions: number;
   consultations: number;
   clinicalDocuments: number;
+  medicationRequests: number;
 }> {
   const key = await deriveKeyFromGoogleUser(config.userSub);
   const remoteFiles = await listAppDataFiles(config.accessToken);
@@ -454,9 +504,14 @@ export async function restoreFromGoogleDrive(
   const pendingDeletedConsultations = await getPendingDeletedConsultationIds();
   const pendingDeletedSet = new Set(pendingDeletedConsultations);
   const pendingDeletedClinical = await getPendingDeletedClinicalResources();
-  const pendingDeletedClinicalSet = new Set(
+  const pendingDeletedClinicalCompositionSet = new Set(
     pendingDeletedClinical
       .filter((p) => p.resourceType === 'Composition')
+      .map((p) => p.id)
+  );
+  const pendingDeletedClinicalMedicationSet = new Set(
+    pendingDeletedClinical
+      .filter((p) => p.resourceType === 'MedicationRequest')
       .map((p) => p.id)
   );
 
@@ -465,6 +520,7 @@ export async function restoreFromGoogleDrive(
   let restoredConditions = 0;
   let restoredConsultations = 0;
   let restoredClinicalDocuments = 0;
+  let restoredMedicationRequests = 0;
 
   const patientResources: Patient[] = [];
   const conditionResources: { cond: Condition; patientId: string }[] = [];
@@ -474,6 +530,10 @@ export async function restoreFromGoogleDrive(
     patientId: string;
   }[] = [];
   const consultationResources: { cons: Encounter; patientId: string }[] = [];
+  const medicationRequestResources: {
+    req: MedicationRequest;
+    patientId: string;
+  }[] = [];
   const compositionResources: { doc: Composition; patientId: string }[] = [];
 
   for (const file of remoteFiles) {
@@ -567,9 +627,30 @@ export async function restoreFromGoogleDrive(
         if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
           consultationResources.push({ cons, patientId });
         }
+      } else if (resource.resourceType === 'MedicationRequest') {
+        const req = resource as MedicationRequest;
+        if (req.id && pendingDeletedClinicalMedicationSet.has(req.id)) {
+          continue;
+        }
+        if (!req.meta?.lastUpdated) {
+          req.meta = {
+            ...req.meta,
+            lastUpdated:
+              file.appProperties?.lastUpdated ||
+              file.modifiedTime ||
+              '1970-01-01T00:00:00.000Z',
+          };
+        }
+        const patientId =
+          file.appProperties?.patientId ||
+          req.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        if (!allowedPatientIdSet || allowedPatientIdSet.has(patientId)) {
+          medicationRequestResources.push({ req, patientId });
+        }
       } else if (resource.resourceType === 'Composition') {
         const doc = resource as Composition;
-        if (doc.id && pendingDeletedClinicalSet.has(doc.id)) {
+        if (doc.id && pendingDeletedClinicalCompositionSet.has(doc.id)) {
           continue;
         }
         if (!doc.meta?.lastUpdated) {
@@ -639,6 +720,18 @@ export async function restoreFromGoogleDrive(
     }
   }
 
+  for (const { req, patientId } of medicationRequestResources) {
+    try {
+      await insertMedicationRequestRecord(req, patientId, true);
+      restoredMedicationRequests++;
+    } catch (err) {
+      console.warn(
+        'Failed to insert medication request record from Google Drive:',
+        err
+      );
+    }
+  }
+
   for (const { doc, patientId } of compositionResources) {
     try {
       await insertClinicalDocumentRecord(doc, patientId, true);
@@ -656,7 +749,8 @@ export async function restoreFromGoogleDrive(
     restoredReports > 0 ||
     restoredConditions > 0 ||
     restoredConsultations > 0 ||
-    restoredClinicalDocuments > 0
+    restoredClinicalDocuments > 0 ||
+    restoredMedicationRequests > 0
   ) {
     notifyDatabaseChanged([
       'patients',
@@ -664,6 +758,7 @@ export async function restoreFromGoogleDrive(
       'diagnostic_reports',
       'consultations',
       'clinical_documents',
+      'medication_requests',
     ]);
   }
 
@@ -679,6 +774,7 @@ export async function restoreFromGoogleDrive(
     conditions: restoredConditions,
     consultations: restoredConsultations,
     clinicalDocuments: restoredClinicalDocuments,
+    medicationRequests: restoredMedicationRequests,
   };
 }
 
@@ -692,6 +788,7 @@ export async function syncWithGoogleDrive(config: GoogleDriveConfig): Promise<{
   conditions: number;
   consultations: number;
   clinicalDocuments: number;
+  medicationRequests: number;
 }> {
   const allStoredPatients = await fetchAllStoredPatients();
   const eligiblePatients = allStoredPatients.filter(
@@ -802,12 +899,13 @@ export async function deletePatientFromGoogleDrive(
       continue;
     }
 
-    // Check report, condition, consultation, or composition files belonging to this patient
+    // Check report, condition, consultation, composition, or medicationrequest files belonging to this patient
     if (
       file.name.startsWith('report_') ||
       file.name.startsWith('condition_') ||
       file.name.startsWith('consultation_') ||
-      file.name.startsWith('composition_')
+      file.name.startsWith('composition_') ||
+      file.name.startsWith('medicationrequest_')
     ) {
       try {
         const encryptedBytes = await downloadAppDataFile(

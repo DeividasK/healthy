@@ -153,7 +153,7 @@ test.describe('Edit Condition Flow', () => {
       });
     }
   );
-  test('opens the one-item add menu and creates a linked Consultation', async ({
+  test('opens the add menu and creates a linked Consultation', async ({
     page,
   }) => {
     const initial = await seedTestCondition(page, {
@@ -173,9 +173,12 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole('button')).toHaveCount(1);
+    await expect(menu.getByRole('button')).toHaveCount(2);
     await expect(
-      menu.getByRole('button', { name: 'Add Consultation', exact: true })
+      menu.getByRole('button', { name: 'Consultation', exact: true })
+    ).toBeVisible();
+    await expect(
+      menu.getByRole('button', { name: 'Treatment', exact: true })
     ).toBeVisible();
     await expect(addButton).toHaveAttribute('aria-expanded', 'true');
     await expect(addButton).toHaveAccessibleName('Close add menu');
@@ -235,7 +238,7 @@ test.describe('Edit Condition Flow', () => {
       )
     ).toBe(true);
     await expect(addButton).toHaveAttribute('aria-expanded', 'false');
-    await expect(addButton).toHaveAccessibleName('Add consultation');
+    await expect(addButton).toHaveAccessibleName('Add record');
     await expect(addButton).toHaveCSS('background-color', 'rgb(61, 100, 80)');
     await expect(page.getByTestId('condition-add-button-icon')).toHaveCSS(
       'transform',
@@ -249,7 +252,7 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await menu
-      .getByRole('button', { name: 'Add Consultation', exact: true })
+      .getByRole('button', { name: 'Consultation', exact: true })
       .click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation/add\\?conditionId=${initial.id}$`)
@@ -277,11 +280,20 @@ test.describe('Edit Condition Flow', () => {
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
 
-    const consultationRow = view.getByTestId(/^condition-consultation-item-/);
+    const consultationRow = view.getByTestId(
+      /^condition-consultation-item-.*-row$/
+    );
     expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
       viewportWidth
     );
-    await consultationRow.click();
+    // Only the 48x48 chevron opens the consultation
+    const openButton = view.getByTestId(
+      /^condition-consultation-item-(?!.*-row$)/
+    );
+    const openBox = (await openButton.boundingBox())!;
+    expect(openBox.width).toBe(48);
+    expect(openBox.height).toBe(48);
+    await openButton.click();
     const consultationView = page.getByTestId('consultation-view');
     await expect(consultationView.getByTestId('consultation-title')).toHaveText(
       'Linked Consultation'

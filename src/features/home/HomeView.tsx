@@ -1,9 +1,11 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
+  Tablets,
   FileText,
   FolderPlus,
   Pencil,
+  Pill,
   Stethoscope,
   Trash2,
   User,
@@ -26,8 +28,18 @@ import {
 } from '@/src/features/lab-results/diagnosticReportService';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { getAllConsultations } from '@/src/features/consultations/consultationService';
+import { getAllTreatments } from '@/src/features/treatments/treatmentService';
+import {
+  getTreatmentIntentLabel,
+  getTreatmentStatusLabel,
+} from '@/src/features/treatments/treatmentLabels';
 
-import type { Observation, Condition, Encounter } from 'fhir/r5';
+import type {
+  Observation,
+  Condition,
+  Encounter,
+  MedicationRequest,
+} from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConditionTitle,
@@ -38,6 +50,8 @@ import {
   getConsultationNotes,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
+  getTreatmentTitle,
+  getTreatmentInstructions,
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
@@ -69,6 +83,7 @@ export function HomeView() {
   const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
+  const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -121,6 +136,7 @@ export function HomeView() {
     setRecords([]);
     setConditions([]);
     setConsultations([]);
+    setTreatments([]);
     setIsLoading(true);
   }
 
@@ -134,11 +150,12 @@ export function HomeView() {
 
     try {
       setIsLoading(true);
-      const [reportsData, conditionsData, consultationsData] =
+      const [reportsData, conditionsData, consultationsData, treatmentsData] =
         await Promise.all([
           getAllReports(requestedPatientId),
           getAllConditions(requestedPatientId),
           getAllConsultations(requestedPatientId),
+          getAllTreatments(requestedPatientId),
         ]);
 
       // Only apply results if this request is still the latest generation and for current patient
@@ -151,6 +168,7 @@ export function HomeView() {
       setRecords(reportsData);
       setConditions(conditionsData);
       setConsultations(consultationsData);
+      setTreatments(treatmentsData);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -161,6 +179,7 @@ export function HomeView() {
         setRecords([]);
         setConditions([]);
         setConsultations([]);
+        setTreatments([]);
       }
     } finally {
       if (
@@ -179,7 +198,13 @@ export function HomeView() {
   );
 
   useDatabaseSubscription(
-    ['conditions', 'diagnostic_reports', 'observations', 'consultations'],
+    [
+      'conditions',
+      'diagnostic_reports',
+      'observations',
+      'consultations',
+      'medication_requests',
+    ],
     () => {
       loadData();
     }
@@ -295,7 +320,8 @@ export function HomeView() {
   const hasAnyData =
     records.length > 0 ||
     conditions.length > 0 ||
-    standaloneConsultations.length > 0;
+    standaloneConsultations.length > 0 ||
+    treatments.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -381,10 +407,104 @@ export function HomeView() {
               </View>
             )}
 
+            {/* Treatments Section */}
+            {treatments.length > 0 && (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Treatments</Text>
+                {treatments.map((treatment) => {
+                  const treatId = treatment.id || '';
+                  const treatTitle = getTreatmentTitle(treatment);
+                  const treatInstructions = getTreatmentInstructions(treatment);
+                  const treatDate = treatment.authoredOn || '';
+                  const treatStatus = getTreatmentStatusLabel(treatment.status);
+                  const treatIntent = getTreatmentIntentLabel(
+                    treatment.intent,
+                    'short'
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={treatId || 'treatment'}
+                      style={styles.reportCard}
+                      testID={`treatment-card-${treatId}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View treatment: ${treatTitle}`}
+                      onPress={() => {
+                        if (
+                          Platform.OS === 'web' &&
+                          typeof document !== 'undefined'
+                        ) {
+                          (document.activeElement as HTMLElement)?.blur?.();
+                        }
+                        router.push({
+                          pathname: '/treatment/[id]',
+                          params: { id: treatId },
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={styles.cardHeaderLeft}>
+                          <View style={styles.treatmentBadgesRow}>
+                            <View style={styles.conditionStatusBadge}>
+                              <Text style={styles.conditionStatusText}>
+                                {treatStatus}
+                              </Text>
+                            </View>
+                            <View style={styles.intentBadge}>
+                              <Text style={styles.intentBadgeText}>
+                                {treatIntent}
+                              </Text>
+                            </View>
+                          </View>
+                          {treatDate ? (
+                            <>
+                              <Calendar
+                                color={COLORS.light.iconMuted}
+                                size={16}
+                                style={{ marginLeft: 8, marginRight: 6 }}
+                              />
+                              <Text style={styles.cardDate}>
+                                {formatDate(treatDate)}
+                              </Text>
+                            </>
+                          ) : null}
+                        </View>
+                      </View>
+
+                      <Text style={styles.treatmentTitleText}>
+                        {treatTitle}
+                      </Text>
+
+                      {treatInstructions ? (
+                        <View
+                          style={styles.instructionsRow}
+                          testID={`treatment-card-instructions-${treatId}`}
+                        >
+                          <Tablets
+                            color={COLORS.light.iconMuted}
+                            size={14}
+                            accessibilityLabel="Dosage"
+                            style={styles.instructionsIcon}
+                          />
+                          <Text
+                            style={styles.cardInstructionsText}
+                            numberOfLines={2}
+                          >
+                            {treatInstructions}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                {conditions.length > 0 && (
+                {(conditions.length > 0 || treatments.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
                 {records.map((record) => {
@@ -603,7 +723,7 @@ export function HomeView() {
           options={[
             {
               id: 'condition',
-              label: 'Add Condition',
+              label: 'Condition',
               testID: 'menu-add-condition',
               icon: (
                 <FolderPlus
@@ -615,8 +735,21 @@ export function HomeView() {
               onPress: () => router.push('/condition/add'),
             },
             {
+              id: 'treatment',
+              label: 'Treatment',
+              testID: 'menu-add-treatment',
+              icon: (
+                <Pill
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/treatment/add'),
+            },
+            {
               id: 'consultation',
-              label: 'Add Consultation',
+              label: 'Consultation',
               testID: 'menu-add-consultation',
               icon: (
                 <Stethoscope
@@ -629,7 +762,7 @@ export function HomeView() {
             },
             {
               id: 'lab-results',
-              label: 'Add Lab Results',
+              label: 'Lab Results',
               testID: 'menu-add-lab-results',
               icon: (
                 <FileText
@@ -927,5 +1060,45 @@ const styles = StyleSheet.create({
   },
   badgeTextHigh: {
     color: COLORS.light.badgeHighText,
+  },
+  treatmentBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  intentBadge: {
+    backgroundColor: COLORS.light.pillBackground,
+    borderWidth: 1,
+    borderColor: COLORS.light.pillBorder,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  intentBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.light.primary,
+  },
+  treatmentTitleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.light.foreground,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  instructionsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 6,
+  },
+  instructionsIcon: {
+    marginTop: 2,
+  },
+  cardInstructionsText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.light.foreground,
+    lineHeight: 18,
   },
 });

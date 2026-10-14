@@ -21,4 +21,6 @@ export {
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
+  getTestTreatment,
 } from './testStorage';

@@ -34,12 +34,15 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
 
   // Sequentially apply missing migrations
   for (const migration of DATABASE_MIGRATIONS) {
-    if (currentVersion < migration.version) {
+    const pending = currentVersion < migration.version;
+    if (pending || migration.repair) {
       await db.withTransactionAsync(async () => {
-        await db.execAsync(migration.sql);
-        await db.execAsync(`PRAGMA user_version = ${migration.version};`);
+        if (pending) await db.execAsync(migration.sql);
+        await migration.repair?.(db);
+        if (pending)
+          await db.execAsync(`PRAGMA user_version = ${migration.version};`);
       });
-      currentVersion = migration.version;
+      if (pending) currentVersion = migration.version;
     }
   }
 
@@ -130,6 +133,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM pending_clinical_resource_deletions;
     DELETE FROM diagnostic_reports;
     DELETE FROM clinical_documents;
+    DELETE FROM medication_requests;
     DELETE FROM consultation_conditions;
     DELETE FROM consultations;
     DELETE FROM conditions;
@@ -143,6 +147,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     'observations',
     'diagnostic_reports',
     'clinical_documents',
+    'medication_requests',
     'consultations',
     'consultation_conditions',
     'conditions',
