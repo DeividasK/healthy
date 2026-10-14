@@ -1,3 +1,6 @@
+/// <reference types="expo/types" />
+// Types Metro's `require.context` here too: `expo-env.d.ts` is generated and
+// not committed, so CI typechecks without it.
 import type { DatabaseMigration } from './types';
 
 export * from './types';
