@@ -43,6 +43,7 @@ export interface ActiveMarkerItem {
   selectedUcum: string;
 }
 
+/** Checks the selected local date and optional time against the current time. */
 export function isDateTimeInFuture(
   date: Date,
   timeStr: string | null
@@ -66,6 +67,7 @@ export function isDateTimeInFuture(
   return target.getTime() > todayEnd.getTime();
 }
 
+/** Displays form feedback using the platform's alert implementation. */
 function showAlert(title: string, message: string) {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.alert(`${title}\n${message}`);
@@ -79,6 +81,7 @@ export interface LabResultFormProps {
   isEdit?: boolean;
 }
 
+/** Creates or edits lab observations with reference bounds in their selected units. */
 export function LabResultForm({
   initialReportId,
   isEdit = false,

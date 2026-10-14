@@ -9,6 +9,81 @@ import {
 } from '@/src/features/testing/testSeed';
 
 test.describe('Biomarker detail', () => {
+  test('rejects seed biomarkers and units outside the CBC catalog', async ({
+    page,
+  }) => {
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+    await expect(
+      seedTestReport(page, {
+        id: 'invalid-unit',
+        biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/l-typo' }],
+      })
+    ).rejects.toThrow('Unknown unit "g/l-typo" for Hemoglobin (Hgb)');
+    const record = await seedTestReport(page, {
+      biomarkers: [
+        { name: 'Hemoglobin', value: 150, unit: 'g/L' },
+        { name: 'Red Blood Cells', value: 4.5 },
+      ],
+    });
+    expect(record.observations[0].valueQuantity.code).toBe('g/L');
+    expect(record.observations[0].referenceRange[0].low.value).toBe(135);
+    expect(record.observations[1].valueQuantity.code).toBe('10*6/uL');
+    await expect(
+      seedTestReport(page, {
+        biomarkers: [{ name: 'Custom Marker', value: 42, unit: 'custom-unit' }],
+      })
+    ).rejects.toThrow('is not in the CBC catalog');
+    const rejectedReports = await page.evaluate(async () =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM diagnostic_reports WHERE id = ?',
+        ['invalid-unit']
+      )
+    );
+    expect(rejectedReports).toHaveLength(0);
+  });
+
+  test('shows only the active patient on direct entry and patient changes', async ({
+    page,
+  }) => {
+    await clearAppStorage(page);
+    await seedTestPatient(page, {
+      id: 'history-patient-a',
+      givenName: 'First',
+    });
+    await seedTestReport(page, {
+      biomarkers: [{ name: 'Red Blood Cells', value: 4.5 }],
+    });
+    await seedTestPatient(page, {
+      id: 'history-patient-b',
+      givenName: 'Second',
+    });
+    await seedTestReport(page, {
+      biomarkers: [{ name: 'Red Blood Cells', value: 6.1 }],
+    });
+    await page.goto('/biomarker/789-8');
+    const latest = page.getByTestId('biomarker-latest-value');
+    const history = page.getByTestId('biomarker-history-list');
+    await expect(latest).toHaveText('6.1');
+    await expect(history.getByText('4.5', { exact: true })).toHaveCount(0);
+    await page.evaluate(async () =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
+        id: 'history-patient-a',
+        givenName: 'First',
+      })
+    );
+    await expect(latest).toHaveText('4.5');
+    await expect(history.getByText('6.1', { exact: true })).toHaveCount(0);
+    await page.evaluate(async () =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
+        id: 'history-patient-b',
+        givenName: 'Second',
+      })
+    );
+    await expect(latest).toHaveText('6.1');
+    await expect(history.getByText('4.5', { exact: true })).toHaveCount(0);
+  });
+
   test('uses matching reference units and normalizes mixed-unit history', async ({
     page,
   }) => {
@@ -140,7 +215,7 @@ test.describe('Biomarker detail', () => {
       history.getByTestId(`biomarker-status-${latestObservation.id}`)
     ).toHaveText('High');
 
-    // Unrecognized units stay in List but are not mixed into the trend.
+    // Unsupported stored measurements are excluded from history and trends.
     await page.evaluate(async () => {
       const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
       const rows = await bridge.querySql(
@@ -159,9 +234,38 @@ test.describe('Biomarker detail', () => {
       );
     });
     await page.reload();
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
     await expect(
       history.getByText('unknown-unit', { exact: true })
+    ).toHaveCount(0);
+    await expect(chart).toBeHidden();
+
+    // Equal unsupported units must not appear in history or a known-marker trend.
+    await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      const rows = await bridge.querySql(
+        'SELECT id, fhir_json FROM observations'
+      );
+      for (const row of rows) {
+        const observation = JSON.parse(row.fhir_json);
+        observation.valueQuantity.unit = 'unknown-unit';
+        observation.valueQuantity.code = 'unknown-unit';
+        await bridge.executeSql(
+          'UPDATE observations SET fhir_json = ?, unit = ? WHERE id = ?',
+          [JSON.stringify(observation), 'unknown-unit', row.id]
+        );
+      }
+    });
+    await page.reload();
+    await expect(
+      history.getByText('unknown-unit', { exact: true })
+    ).toHaveCount(0);
+    await expect(
+      page.getByText('Biomarker not found.', { exact: true })
     ).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByTestId(/^report-card-/).first()).toBeVisible();
+    await expect(page.getByTestId('biomarker-row-718-7')).toHaveCount(0);
     await expect(chart).toBeHidden();
   });
 

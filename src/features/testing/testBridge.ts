@@ -154,7 +154,10 @@ export function setupTestBridge() {
           const selectedUnit = def.units.find(
             (unit) => unit.ucum === b.unit || unit.label === b.unit
           );
-          const ucumCode = selectedUnit?.ucum || b.unit || def.ucumCode;
+          if (b.unit && !selectedUnit) {
+            throw new Error(`Unknown unit "${b.unit}" for ${def.name}`);
+          }
+          const ucumCode = selectedUnit?.ucum || def.ucumCode;
           return {
             id: def.id,
             name: def.name,
@@ -182,14 +185,7 @@ export function setupTestBridge() {
                   ),
           };
         }
-        return {
-          id: `custom_${b.name.toLowerCase().replace(/\s+/g, '_')}`,
-          name: b.name,
-          loinc: 'custom',
-          value: val,
-          unit: b.unit || '',
-          ucumCode: '',
-        };
+        throw new Error(`Biomarker "${b.name}" is not in the CBC catalog.`);
       });
 
       return await createAndSaveDiagnosticReport({

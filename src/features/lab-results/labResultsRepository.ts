@@ -4,6 +4,7 @@ import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
+import { assertCBCObservation } from './biomarkerMeasurements';
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
@@ -22,6 +23,7 @@ export async function insertDiagnosticReportRecord(
     if (!obs.id) {
       throw new Error('Observation requires an id to be persisted');
     }
+    assertCBCObservation(obs);
   }
   const reportId = report.id;
   const db = await getDb();

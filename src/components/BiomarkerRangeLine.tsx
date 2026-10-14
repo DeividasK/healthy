@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
+/** Places a numeric result on a compact track with low, normal and high regions. */
 export function BiomarkerRangeLine({
   value,
   low,

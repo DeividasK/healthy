@@ -11,6 +11,7 @@ import type {
   Composition,
 } from 'fhir/r5';
 import { deriveKeyFromPassphrase, decryptText } from './cryptoService';
+import { assertCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import {
   fetchAllPatients,
   insertPatientRecord,
@@ -241,6 +242,11 @@ export async function restoreFromZipBytes(
     } catch (err) {
       console.warn('Failed to parse record from zip:', path, err);
     }
+  }
+
+  // Validate every lab result before writing any archive resources.
+  for (const { observations } of reportResources) {
+    observations.forEach(assertCBCObservation);
   }
 
   // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters -> Compositions

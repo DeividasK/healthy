@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -33,6 +33,7 @@ import {
   getObservationReferenceRange,
   getObservationStatus,
   getObservationUnitCode,
+  isSupportedCBCObservation,
   type MeasurementReferenceRange,
   type MeasurementStatus,
 } from './biomarkerMeasurements';
@@ -48,6 +49,7 @@ type Measurement = {
   range?: MeasurementReferenceRange;
 };
 
+/** Resolves a readable name from the observation's coding or text. */
 function getObservationName(observation: Observation) {
   return (
     observation.code?.coding?.[0]?.display ||
@@ -56,42 +58,66 @@ function getObservationName(observation: Observation) {
   );
 }
 
+/** Shows patient-scoped biomarker history with compatible units and education. */
 export function BiomarkerDetailView() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { activePatientId } = useActivePatient();
+  const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [reports, setReports] = useState<
-    Awaited<ReturnType<typeof getAllReports>>
-  >([]);
+  const [history, setHistory] = useState({
+    patientId: '',
+    reports: [] as Awaited<ReturnType<typeof getAllReports>>,
+    isLoading: true,
+    hasError: false,
+  });
   const [isHistoryListExpanded, setIsHistoryListExpanded] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const loadGeneration = useRef(0);
+  const isCurrentPatient = history.patientId === activePatientId;
+  const reports = isCurrentPatient && activePatientId ? history.reports : [];
+  const isLoading =
+    isPatientLoading ||
+    (!!activePatientId && (!isCurrentPatient || history.isLoading));
+  const hasError = isCurrentPatient && history.hasError;
 
+  /** Loads only an initialized patient scope and ignores obsolete completions. */
   const load = useCallback(async () => {
+    if (isPatientLoading || !activePatientId) return;
+    const generation = ++loadGeneration.current;
+    const patientId = activePatientId;
+    setHistory({ patientId, reports: [], isLoading: true, hasError: false });
     try {
-      setReports(await getAllReports(activePatientId));
-      setHasError(false);
+      const loadedReports = await getAllReports(patientId);
+      if (generation !== loadGeneration.current) return;
+      setHistory({
+        patientId,
+        reports: loadedReports,
+        isLoading: false,
+        hasError: false,
+      });
     } catch (error) {
+      if (generation !== loadGeneration.current) return;
       console.error('Failed to load biomarker history:', error);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+      setHistory({ patientId, reports: [], isLoading: false, hasError: true });
     }
-  }, [activePatientId]);
+  }, [activePatientId, isPatientLoading]);
 
-  useFocusEffect(useCallback(() => void load(), [load]));
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      return () => {
+        ++loadGeneration.current;
+      };
+    }, [load])
+  );
   useDatabaseSubscription(['diagnostic_reports', 'observations'], load);
 
   const marker = CBC_MARKERS.find(
     (candidate) =>
       candidate.id === id ||
       candidate.loinc === id ||
-      candidate.name.toLowerCase() ===
-        decodeURIComponent(id || '').toLowerCase() ||
+      candidate.name.toLowerCase() === (id || '').toLowerCase() ||
       candidate.aliases.some(
-        (alias) =>
-          alias.toLowerCase() === decodeURIComponent(id || '').toLowerCase()
+        (alias) => alias.toLowerCase() === (id || '').toLowerCase()
       )
   );
 
@@ -100,13 +126,16 @@ export function BiomarkerDetailView() {
     for (const record of reports) {
       const reportDate = record.report.effectiveDateTime || '';
       for (const observation of record.observations) {
+        if (!isSupportedCBCObservation(observation)) continue;
         const code = observation.code?.coding?.[0]?.code;
-        const name = getObservationName(observation).toLowerCase();
+        const displayName = getObservationName(observation);
+        const name = displayName.toLowerCase();
         const isMatch = marker
           ? code === marker.loinc ||
             marker.aliases.some((alias) => name === alias.toLowerCase()) ||
             name === marker.name.toLowerCase()
-          : code === id || name === decodeURIComponent(id || '').toLowerCase();
+          : (code !== 'custom' && code === id) ||
+            name === (id || '').toLowerCase();
         const value = observation.valueQuantity?.value;
         if (isMatch && typeof value === 'number') {
           matches.push({
@@ -117,7 +146,7 @@ export function BiomarkerDetailView() {
               observation.valueQuantity?.code ||
               '',
             id: observation.id || `${record.report.id}-${matches.length}`,
-            name,
+            name: displayName,
             status: getObservationStatus(observation, marker),
             unitCode: getObservationUnitCode(observation),
             range: getObservationReferenceRange(observation, marker),
@@ -306,6 +335,7 @@ export function BiomarkerDetailView() {
   );
 }
 
+/** Renders populated educational content as an initially collapsed accordion. */
 function LearnItem({ title, children }: { title: string; children: string }) {
   const [expanded, setExpanded] = useState(false);
   if (!children.trim()) return null;
@@ -342,6 +372,7 @@ function LearnItem({ title, children }: { title: string; children: string }) {
   );
 }
 
+/** Displays the observation's interpreted or range-derived status. */
 function MeasurementStatusBadge({
   status,
   testID,
@@ -375,6 +406,7 @@ function MeasurementStatusBadge({
   );
 }
 
+/** Plots compatible measurements against the latest result's reference bounds. */
 function BiomarkerChart({
   measurements,
   low,
@@ -407,10 +439,12 @@ function BiomarkerChart({
   const min = Math.min(lowValue, ...values) - referenceSpan * 0.15;
   const max = Math.max(highValue, ...values) + referenceSpan * 0.15;
   const spread = max - min;
+  /** Maps a measurement to the chart's vertical coordinate. */
   const yFor = (value: number) =>
     height -
     paddingBottom -
     ((value - min) / spread) * (height - paddingTop - paddingBottom);
+  /** Selects the point color for its position relative to the displayed bounds. */
   const colorFor = (value: number) =>
     value < lowValue ? '#3B82F6' : value > highValue ? '#EF4444' : '#10B981';
   const points = measurements.map((item, index) => {

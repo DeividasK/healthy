@@ -51,9 +51,11 @@ import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
   getObservationReferenceRange,
   getObservationStatus,
+  isSupportedCBCObservation,
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 
+/** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
   const router = useRouter();
   const pathname = usePathname();
@@ -223,6 +225,7 @@ export function HomeView() {
     }
   };
 
+  /** Renders a consistent interpreted or reference-range status for a result. */
   const getStatusBadge = (obs: Observation) => {
     const status = getObservationStatus(obs);
 
@@ -444,64 +447,70 @@ export function HomeView() {
 
                       {/* Observations List */}
                       <View style={styles.obsList}>
-                        {record.observations.map((obs) => {
-                          const name =
-                            obs.code?.coding?.[0]?.display ||
-                            obs.code?.text ||
-                            'Observation';
-                          const value = obs.valueQuantity?.value ?? '-';
-                          const unit =
-                            obs.valueQuantity?.unit ||
-                            obs.valueQuantity?.code ||
-                            '';
+                        {record.observations
+                          .filter(isSupportedCBCObservation)
+                          .map((obs) => {
+                            const name =
+                              obs.code?.coding?.[0]?.display ||
+                              obs.code?.text ||
+                              'Observation';
+                            const value = obs.valueQuantity?.value ?? '-';
+                            const unit =
+                              obs.valueQuantity?.unit ||
+                              obs.valueQuantity?.code ||
+                              '';
 
-                          return (
-                            <TouchableOpacity
-                              key={obs.id}
-                              style={styles.obsItem}
-                              testID={`biomarker-row-${obs.code?.coding?.[0]?.code || obs.id}`}
-                              accessibilityRole="button"
-                              accessibilityLabel={`View biomarker: ${name}`}
-                              onPress={() =>
-                                router.push({
-                                  pathname: '/biomarker/[id]',
-                                  params: {
-                                    id: obs.code?.coding?.[0]?.code || name,
-                                  },
-                                })
-                              }
-                              activeOpacity={0.75}
-                            >
-                              <View style={styles.obsLeft}>
-                                <Text style={styles.obsName}>{name}</Text>
-                                {obs.code?.coding?.[0]?.code &&
-                                  obs.code?.coding?.[0]?.code !== 'custom' && (
-                                    <Text style={styles.obsLoinc}>
-                                      LOINC: {obs.code.coding[0].code}
-                                    </Text>
-                                  )}
-                              </View>
+                            return (
+                              <TouchableOpacity
+                                key={obs.id}
+                                style={styles.obsItem}
+                                testID={`biomarker-row-${obs.code?.coding?.[0]?.code || obs.id}`}
+                                accessibilityRole="button"
+                                accessibilityLabel={`View biomarker: ${name}`}
+                                onPress={() =>
+                                  router.push({
+                                    pathname: '/biomarker/[id]',
+                                    params: {
+                                      id:
+                                        obs.code?.coding?.[0]?.code === 'custom'
+                                          ? name
+                                          : obs.code?.coding?.[0]?.code || name,
+                                    },
+                                  })
+                                }
+                                activeOpacity={0.75}
+                              >
+                                <View style={styles.obsLeft}>
+                                  <Text style={styles.obsName}>{name}</Text>
+                                  {obs.code?.coding?.[0]?.code &&
+                                    obs.code?.coding?.[0]?.code !==
+                                      'custom' && (
+                                      <Text style={styles.obsLoinc}>
+                                        LOINC: {obs.code.coding[0].code}
+                                      </Text>
+                                    )}
+                                </View>
 
-                              <View style={styles.obsRight}>
-                                <View style={styles.valueGroup}>
-                                  <Text style={styles.obsValue}>{value}</Text>
-                                  <Text style={styles.obsUnit}>{unit}</Text>
+                                <View style={styles.obsRight}>
+                                  <View style={styles.valueGroup}>
+                                    <Text style={styles.obsValue}>{value}</Text>
+                                    <Text style={styles.obsUnit}>{unit}</Text>
+                                  </View>
+                                  <View style={styles.obsStatusRangeRow}>
+                                    {getStatusBadge(obs)}
+                                    {typeof obs.valueQuantity?.value ===
+                                      'number' && (
+                                      <BiomarkerRangeLine
+                                        value={obs.valueQuantity.value}
+                                        {...getObservationReferenceRange(obs)}
+                                        testID={`biomarker-range-line-${obs.code?.coding?.[0]?.code || obs.id || 'unknown'}`}
+                                      />
+                                    )}
+                                  </View>
                                 </View>
-                                <View style={styles.obsStatusRangeRow}>
-                                  {getStatusBadge(obs)}
-                                  {typeof obs.valueQuantity?.value ===
-                                    'number' && (
-                                    <BiomarkerRangeLine
-                                      value={obs.valueQuantity.value}
-                                      {...getObservationReferenceRange(obs)}
-                                      testID={`biomarker-range-line-${obs.code?.coding?.[0]?.code || obs.id || 'unknown'}`}
-                                    />
-                                  )}
-                                </View>
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
+                              </TouchableOpacity>
+                            );
+                          })}
                       </View>
                     </View>
                   );
