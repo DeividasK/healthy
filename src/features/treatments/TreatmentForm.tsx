@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
@@ -52,7 +53,6 @@ export interface TreatmentFormProps {
   /** The active patient's conditions, offered as the indication. */
   conditions?: Condition[];
   onSubmit: (values: TreatmentFormValues) => Promise<void>;
-  onDelete?: () => Promise<void>;
   isEditing?: boolean;
   /** Known specialists offered as requester suggestions. */
   specialistSuggestions?: string[];
@@ -64,7 +64,6 @@ export function TreatmentForm({
   initialValues,
   conditions = [],
   onSubmit,
-  onDelete,
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
@@ -98,6 +97,19 @@ export function TreatmentForm({
     reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
     notes: Boolean(initialValues?.notes),
   });
+  const hasChanges = useHasChanges({
+    title,
+    intent,
+    status,
+    authoredDate,
+    dosageInstructions,
+    reason,
+    reasonConditionIds,
+    notes,
+    requesterName,
+    links: links.values,
+  });
+
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const optionalFields = [
     { id: 'requester' as const, label: 'Requester (Specialist)', icon: User },
@@ -121,7 +133,12 @@ export function TreatmentForm({
   );
   const options = [
     ...optionalFields
-      .filter(({ id }) => !visibleFields[id])
+      .filter(
+        ({ id }) =>
+          !visibleFields[id] &&
+          // Linking needs at least one existing condition.
+          (id !== 'reasonCondition' || conditionOptions.length > 0)
+      )
       .map(({ id, label, icon: Icon }) => ({
         id,
         label,
@@ -221,6 +238,7 @@ export function TreatmentForm({
             nativeID: 'treatment-title-input',
             name: 'title',
             testID: 'treatment-title-input',
+            autoFocus: !isEditing,
             accessibilityLabel: 'Treatment Name',
             placeholder: 'e.g. Amoxicillin 500mg',
             value: title,
@@ -345,19 +363,8 @@ export function TreatmentForm({
         saveLabel={isEditing ? 'Save changes' : 'Save treatment'}
         onSave={handleSubmit}
         isSaving={isSubmitting}
+        hasChanges={hasChanges}
         saveTestID="save-treatment-button"
-        deleteLabel="Delete treatment"
-        deleteTestID="delete-treatment-button"
-        deleteConfirmation={
-          isEditing && onDelete
-            ? {
-                title: 'Delete Treatment',
-                message:
-                  'Are you sure you want to delete this treatment? This action cannot be undone.',
-                onConfirm: onDelete,
-              }
-            : undefined
-        }
       />
     </SafeAreaView>
   );

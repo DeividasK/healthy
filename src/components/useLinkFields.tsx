@@ -47,7 +47,7 @@ export function useLinkFields(configs: LinkFieldConfig[]) {
   );
 
   const menuOptions: AddOptionItem[] = configs
-    .filter((config) => !visible[config.type])
+    .filter((config) => !visible[config.type] && config.options.length > 0)
     .map(({ type, label, icon: Icon }) => ({
       id: `link-${type}`,
       label,

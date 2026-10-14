@@ -1,14 +1,12 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
-  Tablets,
   FileText,
   FolderPlus,
   Pencil,
   Pill,
   Stethoscope,
   Trash2,
-  User,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -28,11 +26,19 @@ import {
 } from '@/src/features/lab-results/diagnosticReportService';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { getAllConsultations } from '@/src/features/consultations/consultationService';
-import { getAllTreatments } from '@/src/features/treatments/treatmentService';
 import {
-  getTreatmentIntentLabel,
-  getTreatmentStatusLabel,
-} from '@/src/features/treatments/treatmentLabels';
+  getAllTreatments,
+  getConsultationIdsLinkingTreatment,
+} from '@/src/features/treatments/treatmentService';
+import { CollapsibleList } from './CollapsibleList';
+import {
+  ResourceSection,
+  type ResourceMeta,
+} from '@/src/components/ResourceSection';
+import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
+import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
+import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import type { LucideIcon } from 'lucide-react-native';
 
 import type {
   Observation,
@@ -42,16 +48,9 @@ import type {
 } from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
-  getConditionTitle,
-  getConditionNotes,
-  getConsultationTitle,
-  getConsultationDoctor,
-  getConsultationServiceType,
-  getConsultationNotes,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
-  getTreatmentTitle,
-  getTreatmentInstructions,
+  getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
@@ -69,6 +68,30 @@ import {
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 
+const blurActiveElement = () => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    (document.activeElement as HTMLElement)?.blur?.();
+  }
+};
+
+/** Rows only show counts for associated resource types they actually have. */
+const withoutZeroCounts = (counts: (ResourceMeta & { count: number })[]) =>
+  counts.filter(({ count }) => count > 0);
+
+/** Meta item showing how many associated resources of one type a row has. */
+const countMeta = (
+  icon: LucideIcon,
+  count: number,
+  label: string,
+  testID: string
+): ResourceMeta & { count: number } => ({
+  count,
+  icon,
+  text: String(count),
+  accessibilityLabel: `${count} ${label}`,
+  testID,
+});
+
 /** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
   const router = useRouter();
@@ -84,6 +107,8 @@ export function HomeView() {
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
+  const [consultationTreatmentCounts, setConsultationTreatmentCounts] =
+    useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -137,6 +162,7 @@ export function HomeView() {
     setConditions([]);
     setConsultations([]);
     setTreatments([]);
+    setConsultationTreatmentCounts({});
     setIsLoading(true);
   }
 
@@ -158,6 +184,28 @@ export function HomeView() {
           getAllTreatments(requestedPatientId),
         ]);
 
+      const treatmentConsultationIds = await Promise.all(
+        treatmentsData.map((treatment) =>
+          treatment.id
+            ? getConsultationIdsLinkingTreatment(
+                treatment.id,
+                requestedPatientId
+              ).catch((error) => {
+                // A failed link lookup only loses that treatment's count.
+                console.warn('Failed to load treatment links:', error);
+                return [] as string[];
+              })
+            : Promise.resolve([])
+        )
+      );
+      const treatmentCounts: Record<string, number> = {};
+      for (const consultationIds of treatmentConsultationIds) {
+        for (const consultationId of new Set(consultationIds)) {
+          treatmentCounts[consultationId] =
+            (treatmentCounts[consultationId] || 0) + 1;
+        }
+      }
+
       // Only apply results if this request is still the latest generation and for current patient
       if (
         activePatientIdRef.current !== requestedPatientId ||
@@ -169,6 +217,7 @@ export function HomeView() {
       setConditions(conditionsData);
       setConsultations(consultationsData);
       setTreatments(treatmentsData);
+      setConsultationTreatmentCounts(treatmentCounts);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -277,50 +326,32 @@ export function HomeView() {
     );
   };
 
-  const getConditionStatusBadge = (condition: Condition) => {
-    const clinicalStatus =
-      condition.clinicalStatus?.coding?.[0]?.code || 'active';
-    const verificationStatus =
-      condition.verificationStatus?.coding?.[0]?.code || 'unconfirmed';
-
-    let label = 'Active';
-    let dot = '#10B981';
-
-    if (verificationStatus === 'unconfirmed') {
-      label = 'Unconfirmed';
-      dot = '#F59E0B';
-    } else if (verificationStatus === 'provisional') {
-      label = 'Provisional';
-      dot = '#3B82F6';
-    } else if (clinicalStatus === 'inactive') {
-      label = 'Inactive';
-      dot = '#6B7280';
-    } else if (clinicalStatus === 'remission') {
-      label = 'Remission';
-      dot = '#8B5CF6';
-    } else if (clinicalStatus === 'resolved') {
-      label = 'Resolved';
-      dot = '#717973';
-    }
-
-    return (
-      <View style={styles.conditionStatusBadge}>
-        <View style={[styles.statusDot, { backgroundColor: dot }]} />
-        <Text style={styles.conditionStatusText}>{label}</Text>
-      </View>
-    );
-  };
-
-  const standaloneConsultations = consultations.filter(
-    (c) =>
-      getConsultationConditionIds(c).length === 0 &&
-      getConsultationReasonConditionIds(c).length === 0
+  const getConsultationDate = (consultation: Encounter) =>
+    consultation.actualPeriod?.start || consultation.plannedStartDate || '';
+  const recentConsultations = [...consultations].sort((a, b) =>
+    getConsultationDate(b).localeCompare(getConsultationDate(a))
   );
+
+  const countConditionConsultations = (conditionId: string) =>
+    consultations.filter(
+      (consultation) =>
+        getConsultationConditionIds(consultation).includes(conditionId) ||
+        getConsultationReasonConditionIds(consultation).includes(conditionId)
+    ).length;
+  const countConditionTreatments = (conditionId: string) =>
+    treatments.filter((treatment) =>
+      getTreatmentReasonConditionIds(treatment).includes(conditionId)
+    ).length;
+  const countConsultationConditions = (consultation: Encounter) =>
+    new Set([
+      ...getConsultationConditionIds(consultation),
+      ...getConsultationReasonConditionIds(consultation),
+    ]).size;
 
   const hasAnyData =
     records.length > 0 ||
     conditions.length > 0 ||
-    standaloneConsultations.length > 0 ||
+    consultations.length > 0 ||
     treatments.length > 0;
 
   return (
@@ -350,161 +381,135 @@ export function HomeView() {
           >
             {/* Conditions Section */}
             {conditions.length > 0 && (
-              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                <Text style={styles.sectionTitle}>Conditions</Text>
-                {conditions.map((conditionItem) => {
-                  const title = getConditionTitle(conditionItem);
-                  const noteText = getConditionNotes(conditionItem);
-                  const condId = conditionItem.id || '';
-
-                  return (
-                    <TouchableOpacity
-                      key={condId || 'condition'}
-                      style={styles.reportCard}
-                      testID={`condition-card-${condId}`}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        if (
-                          Platform.OS === 'web' &&
-                          typeof document !== 'undefined'
-                        ) {
-                          (document.activeElement as HTMLElement)?.blur?.();
-                        }
-                        router.push(`/condition/${condId}`);
-                      }}
-                    >
-                      {/* Card Header: Status and Date */}
-                      <View style={styles.cardHeader}>
-                        <View style={styles.cardHeaderLeft}>
-                          {getConditionStatusBadge(conditionItem)}
-                          <Calendar
-                            color={COLORS.light.iconMuted}
-                            size={16}
-                            style={{ marginLeft: 8, marginRight: 6 }}
-                          />
-                          <Text style={styles.cardDate}>
-                            {formatDate(conditionItem.onsetDateTime || '')}
-                          </Text>
-                        </View>
+              <ResourceSection
+                icon={FolderPlus}
+                title="Conditions"
+                testID="home-conditions-section"
+              >
+                <CollapsibleList
+                  items={conditions}
+                  testID="conditions-list"
+                  renderItem={(condition) => {
+                    const condId = condition.id || '';
+                    return (
+                      <View key={condId} testID={`condition-card-${condId}`}>
+                        <ConditionRelatedRow
+                          condition={condition}
+                          testID={`condition-open-${condId}`}
+                          onPress={() => {
+                            blurActiveElement();
+                            router.push(`/condition/${condId}`);
+                          }}
+                          extraMeta={withoutZeroCounts([
+                            countMeta(
+                              Stethoscope,
+                              countConditionConsultations(condId),
+                              'consultations',
+                              `condition-consultations-count-${condId}`
+                            ),
+                            countMeta(
+                              Pill,
+                              countConditionTreatments(condId),
+                              'treatments',
+                              `condition-treatments-count-${condId}`
+                            ),
+                          ])}
+                        />
                       </View>
-
-                      {/* Condition Title */}
-                      <View style={styles.conditionTitleContainer}>
-                        <Text style={styles.conditionTitleText}>{title}</Text>
-                      </View>
-
-                      {/* Notes / Description if available */}
-                      {noteText && (
-                        <View style={styles.cardNoteContainer}>
-                          <Text style={styles.cardNoteText}>
-                            &quot;{noteText}&quot;
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    );
+                  }}
+                />
+              </ResourceSection>
             )}
 
             {/* Treatments Section */}
             {treatments.length > 0 && (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Treatments</Text>
+              <ResourceSection
+                icon={Pill}
+                title="Treatments"
+                testID="home-treatments-section"
+              >
                 {treatments.map((treatment) => {
                   const treatId = treatment.id || '';
-                  const treatTitle = getTreatmentTitle(treatment);
-                  const treatInstructions = getTreatmentInstructions(treatment);
-                  const treatDate = treatment.authoredOn || '';
-                  const treatStatus = getTreatmentStatusLabel(treatment.status);
-                  const treatIntent = getTreatmentIntentLabel(
-                    treatment.intent,
-                    'short'
-                  );
-
                   return (
-                    <TouchableOpacity
-                      key={treatId || 'treatment'}
-                      style={styles.reportCard}
-                      testID={`treatment-card-${treatId}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`View treatment: ${treatTitle}`}
-                      onPress={() => {
-                        if (
-                          Platform.OS === 'web' &&
-                          typeof document !== 'undefined'
-                        ) {
-                          (document.activeElement as HTMLElement)?.blur?.();
-                        }
-                        router.push({
-                          pathname: '/treatment/[id]',
-                          params: { id: treatId },
-                        });
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.cardHeader}>
-                        <View style={styles.cardHeaderLeft}>
-                          <View style={styles.treatmentBadgesRow}>
-                            <View style={styles.conditionStatusBadge}>
-                              <Text style={styles.conditionStatusText}>
-                                {treatStatus}
-                              </Text>
-                            </View>
-                            <View style={styles.intentBadge}>
-                              <Text style={styles.intentBadgeText}>
-                                {treatIntent}
-                              </Text>
-                            </View>
-                          </View>
-                          {treatDate ? (
-                            <>
-                              <Calendar
-                                color={COLORS.light.iconMuted}
-                                size={16}
-                                style={{ marginLeft: 8, marginRight: 6 }}
-                              />
-                              <Text style={styles.cardDate}>
-                                {formatDate(treatDate)}
-                              </Text>
-                            </>
-                          ) : null}
-                        </View>
-                      </View>
-
-                      <Text style={styles.treatmentTitleText}>
-                        {treatTitle}
-                      </Text>
-
-                      {treatInstructions ? (
-                        <View
-                          style={styles.instructionsRow}
-                          testID={`treatment-card-instructions-${treatId}`}
-                        >
-                          <Tablets
-                            color={COLORS.light.iconMuted}
-                            size={14}
-                            accessibilityLabel="Dosage"
-                            style={styles.instructionsIcon}
-                          />
-                          <Text
-                            style={styles.cardInstructionsText}
-                            numberOfLines={2}
-                          >
-                            {treatInstructions}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </TouchableOpacity>
+                    <View key={treatId} testID={`treatment-card-${treatId}`}>
+                      <TreatmentRelatedRow
+                        treatment={treatment}
+                        testID={`treatment-open-${treatId}`}
+                        onPress={() => {
+                          blurActiveElement();
+                          router.push({
+                            pathname: '/treatment/[id]',
+                            params: { id: treatId },
+                          });
+                        }}
+                        extraMeta={withoutZeroCounts([
+                          countMeta(
+                            FolderPlus,
+                            getTreatmentReasonConditionIds(treatment).length,
+                            'conditions',
+                            `treatment-conditions-count-${treatId}`
+                          ),
+                        ])}
+                      />
+                    </View>
                   );
                 })}
-              </View>
+              </ResourceSection>
+            )}
+
+            {/* Consultations Section */}
+            {recentConsultations.length > 0 && (
+              <ResourceSection
+                icon={Stethoscope}
+                title="Consultations"
+                testID="home-consultations-section"
+              >
+                <CollapsibleList
+                  items={recentConsultations}
+                  testID="consultations-list"
+                  renderItem={(consultation) => {
+                    const consId = consultation.id || '';
+                    return (
+                      <View key={consId} testID={`consultation-card-${consId}`}>
+                        <ConsultationRelatedRow
+                          consultation={consultation}
+                          testID={`consultation-open-${consId}`}
+                          onPress={() => {
+                            blurActiveElement();
+                            router.push({
+                              pathname: '/consultation/[id]',
+                              params: { id: consId },
+                            });
+                          }}
+                          extraMeta={withoutZeroCounts([
+                            countMeta(
+                              FolderPlus,
+                              countConsultationConditions(consultation),
+                              'conditions',
+                              `consultation-conditions-count-${consId}`
+                            ),
+                            countMeta(
+                              Pill,
+                              consultationTreatmentCounts[consId] || 0,
+                              'treatments',
+                              `consultation-treatments-count-${consId}`
+                            ),
+                          ])}
+                        />
+                      </View>
+                    );
+                  }}
+                />
+              </ResourceSection>
             )}
 
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                {(conditions.length > 0 || treatments.length > 0) && (
+                {(conditions.length > 0 ||
+                  treatments.length > 0 ||
+                  consultations.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
                 {records.map((record) => {
@@ -633,83 +638,6 @@ export function HomeView() {
                           })}
                       </View>
                     </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Standalone Consultations Section */}
-            {standaloneConsultations.length > 0 && (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>Consultations</Text>
-                {standaloneConsultations.map((cons) => {
-                  const consId = cons.id || '';
-                  const consTitle = getConsultationTitle(cons);
-                  const consDoctor = getConsultationDoctor(cons);
-                  const consServiceType = getConsultationServiceType(cons);
-                  const consNotes = getConsultationNotes(cons);
-                  const consDate =
-                    cons.actualPeriod?.start || cons.plannedStartDate || '';
-
-                  return (
-                    <TouchableOpacity
-                      key={consId || 'consultation'}
-                      style={styles.reportCard}
-                      testID={`consultation-card-${consId}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`View consultation: ${consTitle}`}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/consultation/[id]',
-                          params: { id: consId },
-                        })
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.cardHeader}>
-                        <View style={styles.cardHeaderLeft}>
-                          <Calendar
-                            color={COLORS.light.iconMuted}
-                            size={16}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.cardDate}>
-                            {formatDate(consDate)}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={styles.consultationTitleText}>
-                        {consTitle}
-                      </Text>
-
-                      {consServiceType && (
-                        <View style={styles.serviceTypeBadge}>
-                          <Text style={styles.serviceTypeText}>
-                            {consServiceType}
-                          </Text>
-                        </View>
-                      )}
-
-                      {consDoctor && (
-                        <View style={styles.doctorRow}>
-                          <User
-                            color={COLORS.light.iconMuted}
-                            size={13}
-                            style={{ marginRight: 4 }}
-                          />
-                          <Text style={styles.doctorText}>{consDoctor}</Text>
-                        </View>
-                      )}
-
-                      {consNotes && (
-                        <View style={styles.cardNoteContainer}>
-                          <Text style={styles.cardNoteText}>
-                            &quot;{consNotes}&quot;
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -844,7 +772,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollListContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 132,
   },
   sectionContainer: {
@@ -909,67 +837,6 @@ const styles = StyleSheet.create({
   deleteReportButton: {
     padding: 6,
     borderRadius: 6,
-  },
-  conditionStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.light.pillBackground,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  conditionStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  conditionTitleContainer: {
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  conditionTitleText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  consultationTitleText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  serviceTypeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.light.pillBackground,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 6,
-  },
-  serviceTypeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.light.primary,
-  },
-  doctorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  doctorText: {
-    fontSize: 13,
-    color: COLORS.light.muted,
   },
   cardNoteContainer: {
     backgroundColor: COLORS.light.pillBackground,
@@ -1060,45 +927,5 @@ const styles = StyleSheet.create({
   },
   badgeTextHigh: {
     color: COLORS.light.badgeHighText,
-  },
-  treatmentBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  intentBadge: {
-    backgroundColor: COLORS.light.pillBackground,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  intentBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.light.primary,
-  },
-  treatmentTitleText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  instructionsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 6,
-  },
-  instructionsIcon: {
-    marginTop: 2,
-  },
-  cardInstructionsText: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.light.foreground,
-    lineHeight: 18,
   },
 });

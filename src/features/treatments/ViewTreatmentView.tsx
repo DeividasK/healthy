@@ -3,10 +3,11 @@ import { StyleSheet, Text, View, Alert, Platform } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FolderPlus, Pencil, Stethoscope, Trash2 } from 'lucide-react-native';
 import type { MedicationRequest, Encounter, Condition } from 'fhir/r5';
+import { getTreatmentMeta } from './TreatmentRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ResourceSection } from '@/src/components/ResourceSection';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
@@ -15,16 +16,8 @@ import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { fetchConsultationIdsReferencingResource } from '@/src/features/consultations/clinicalDocumentsRepository';
 import { getTreatmentById, deleteTreatment } from './treatmentService';
-import {
-  getTreatmentIntentLabel,
-  getTreatmentStatusLabel,
-} from './treatmentLabels';
 import { getConsultationById } from '@/src/features/consultations/consultationService';
 import { getConditionById } from '@/src/features/conditions/conditionService';
-import {
-  formatDisplayDate,
-  formatDisplayDateTime,
-} from '@/src/utils/dateUtils';
 import {
   getTreatmentTitle,
   getTreatmentInstructions,
@@ -196,9 +189,6 @@ function TreatmentForPatient({
   const instructions = getTreatmentInstructions(treatment);
   const notes = getTreatmentNotes(treatment);
   const reasonText = getTreatmentReason(treatment);
-  const statusStr = getTreatmentStatusLabel(treatment.status);
-  const intentStr = getTreatmentIntentLabel(treatment.intent);
-  const authoredDate = treatment.authoredOn;
 
   return (
     <>
@@ -206,14 +196,7 @@ function TreatmentForPatient({
         testID="treatment-view"
         title={title}
         titleTestID="treatment-title"
-        date={
-          authoredDate
-            ? authoredDate.includes('T')
-              ? formatDisplayDateTime(authoredDate)
-              : formatDisplayDate(authoredDate)
-            : undefined
-        }
-        status={{ label: statusStr }}
+        meta={getTreatmentMeta(treatment, { withTestIDs: true })}
         actions={
           <ResourceActionDock
             actions={[
@@ -235,14 +218,6 @@ function TreatmentForPatient({
         }
       >
         <View style={styles.details}>
-          <InfoRow label="Intent" value={intentStr} testID="treatment-intent" />
-          {Boolean(treatment.requester?.display) && (
-            <InfoRow
-              label="Requester (Specialist)"
-              value={treatment.requester!.display!}
-              testID="treatment-requester"
-            />
-          )}
           {Boolean(reasonText) && (
             <InfoRow
               label="Reason"
@@ -269,7 +244,7 @@ function TreatmentForPatient({
         </View>
 
         {reasonConditions.length > 0 && (
-          <RelatedResourceSection
+          <ResourceSection
             icon={FolderPlus}
             title="Associated Conditions"
             testID="treatment-reason-conditions-section"
@@ -279,14 +254,14 @@ function TreatmentForPatient({
                 key={condition.id}
                 condition={condition}
                 testID={`treatment-condition-${condition.id}`}
-                onPress={() => router.dismissTo(`/condition/${condition.id}`)}
+                onPress={() => router.push(`/condition/${condition.id}`)}
               />
             ))}
-          </RelatedResourceSection>
+          </ResourceSection>
         )}
 
         {originConsultation && (
-          <RelatedResourceSection
+          <ResourceSection
             icon={Stethoscope}
             title="Originating Consultation"
             testID="treatment-origin-consultation"
@@ -295,14 +270,14 @@ function TreatmentForPatient({
               consultation={originConsultation}
               testID="origin-consultation-link"
               onPress={() =>
-                router.dismissTo(`/consultation/${originConsultation.id}`)
+                router.push(`/consultation/${originConsultation.id}`)
               }
             />
-          </RelatedResourceSection>
+          </ResourceSection>
         )}
 
         {linkedConsultations.length > 0 && (
-          <RelatedResourceSection
+          <ResourceSection
             icon={Stethoscope}
             title="Linked Consultations"
             testID="treatment-linked-consultations"
@@ -312,12 +287,10 @@ function TreatmentForPatient({
                 key={consultation.id}
                 consultation={consultation}
                 testID={`linked-consultation-${consultation.id}`}
-                onPress={() =>
-                  router.dismissTo(`/consultation/${consultation.id}`)
-                }
+                onPress={() => router.push(`/consultation/${consultation.id}`)}
               />
             ))}
-          </RelatedResourceSection>
+          </ResourceSection>
         )}
       </ResourceViewLayout>
 

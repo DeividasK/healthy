@@ -1,31 +1,31 @@
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Plus } from 'lucide-react-native';
+import { FolderPlus, Hash, Plus } from 'lucide-react-native';
 import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import {
-  RelatedResourceRow,
-  RelatedResourceSection,
-} from '@/src/components/RelatedResourceSection';
+import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import { getConsultationById } from '@/src/features/consultations/consultationService';
+import {
+  deleteConsultation,
+  getConsultationById,
+} from '@/src/features/consultations/consultationService';
+import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
 import { RelatedResourceList } from './RelatedResourceList';
-import { formatDisplayDateTime } from '@/src/utils/dateUtils';
+import { getConsultationMeta } from './ConsultationRelatedRow';
 import {
   getConditionTitle,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
-  getConsultationDoctor,
   getConsultationNotes,
-  getConsultationServiceType,
   getConsultationTitle,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -33,6 +33,7 @@ import { COLORS } from '@/src/theme/colors';
 export function ViewConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
   const loadGeneration = useRef(0);
   const [consultation, setConsultation] = useState<Encounter | null>(null);
@@ -127,22 +128,14 @@ export function ViewConsultationView() {
   }
 
   const title = getConsultationTitle(consultation);
-  const date =
-    consultation.actualPeriod?.start || consultation.plannedStartDate || '';
-  const doctor = getConsultationDoctor(consultation);
-  const serviceType = getConsultationServiceType(consultation);
   const notes = getConsultationNotes(consultation);
-  const status = consultation.status
-    ? consultation.status.charAt(0).toUpperCase() + consultation.status.slice(1)
-    : 'Unknown';
 
   return (
     <ResourceViewLayout
       testID="consultation-view"
       title={title}
       titleTestID="consultation-title"
-      date={date ? formatDisplayDateTime(date) : undefined}
-      status={{ label: status }}
+      meta={getConsultationMeta(consultation, { withTestIDs: true })}
       actions={
         <>
           <FloatingAddMenu
@@ -180,26 +173,39 @@ export function ViewConsultationView() {
             addLabel="Add treatment"
             addMenuExpanded={showAddMenu}
             addTestID="consultation-add-treatment"
+            deleteLabel="Delete consultation"
+            deleteTestID="delete-consultation-button"
+            deleteConfirmation={{
+              title: 'Delete Consultation',
+              message:
+                'Are you sure you want to delete this consultation? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteConsultation(consultation.id!);
+                triggerSync().catch((error) =>
+                  console.warn(
+                    'Background sync failed on delete consultation:',
+                    error
+                  )
+                );
+                goBackOr(router, '/');
+              },
+            }}
           />
         </>
       }
     >
-      {(doctor || serviceType || notes) && (
+      {notes && (
         <View style={styles.details}>
-          {doctor && <InfoRow label="Specialist" value={doctor} />}
-          {serviceType && <InfoRow label="Service" value={serviceType} />}
-          {notes && (
-            <ResourceTextSection
-              title="Notes"
-              text={notes}
-              testID="consultation-notes"
-            />
-          )}
+          <ResourceTextSection
+            title="Notes"
+            text={notes}
+            testID="consultation-notes"
+          />
         </View>
       )}
 
       {getConsultationReasonConditionIds(consultation).length > 0 && (
-        <RelatedResourceSection
+        <ResourceSection
           icon={FolderPlus}
           title="Reasons for visit"
           testID="consultation-reasons"
@@ -219,13 +225,13 @@ export function ViewConsultationView() {
                     ? 'consultation-related-condition'
                     : `consultation-related-condition-${condition.id}`
                 }
-                onPress={() => router.dismissTo(`/condition/${condition.id}`)}
+                onPress={() => router.push(`/condition/${condition.id}`)}
               />
             ))}
-        </RelatedResourceSection>
+        </ResourceSection>
       )}
       {Boolean(consultation.diagnosis?.length) && (
-        <RelatedResourceSection
+        <ResourceSection
           icon={FolderPlus}
           title="Diagnoses"
           testID="consultation-diagnoses"
@@ -246,10 +252,11 @@ export function ViewConsultationView() {
                   : value.reference?.display);
               if (!label) return null;
               return (
-                <RelatedResourceRow
+                <ResourceRow
                   key={`${index}-${valueIndex}`}
                   title={label}
                   meta={(value.concept?.coding || []).map((coding) => ({
+                    icon: Hash,
                     text: [coding.system, coding.code, coding.display]
                       .filter(Boolean)
                       .join(' · '),
@@ -261,14 +268,14 @@ export function ViewConsultationView() {
                             ? 'consultation-diagnosis-condition'
                             : `consultation-diagnosis-condition-${id}`,
                         accessibilityLabel: `View condition: ${getConditionTitle(condition)}`,
-                        onPress: () => router.dismissTo(`/condition/${id}`),
+                        onPress: () => router.push(`/condition/${id}`),
                       }
                     : { testID: `consultation-diagnosis-${index}` })}
                 />
               );
             })
           )}
-        </RelatedResourceSection>
+        </ResourceSection>
       )}
 
       <RelatedResourceList linkedTreatments={linkedTreatments} />
@@ -276,38 +283,9 @@ export function ViewConsultationView() {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   details: {
     gap: 12,
     marginBottom: 28,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 20,
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: COLORS.light.mutedForeground,
-  },
-  infoValue: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-    textAlign: 'right',
   },
 });

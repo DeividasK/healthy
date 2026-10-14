@@ -38,7 +38,7 @@ test.describe('Edit Consultation Flow', () => {
       });
 
       await test.step('Open the consultation view from Condition and edit it', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -81,7 +81,7 @@ test.describe('Edit Consultation Flow', () => {
   );
 
   test(
-    'should delete a linked Consultation from edit mode with confirmation modal',
+    'should delete a linked Consultation from its view page with confirmation modal',
     { tag: ['@critical'] },
     async ({ page }) => {
       let conditionId = '';
@@ -104,7 +104,7 @@ test.describe('Edit Consultation Flow', () => {
       });
 
       await test.step('Open the consultation view and test delete cancellation', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -116,10 +116,6 @@ test.describe('Edit Consultation Flow', () => {
           new RegExp(`.*consultation\\/${consultationId}$`)
         );
 
-        await expect(
-          page.getByTestId('delete-consultation-button')
-        ).toHaveCount(0);
-        await page.getByTestId('edit-consultation-button').click();
         const deleteBtn = page.getByTestId('delete-consultation-button');
         await deleteBtn.click();
 
@@ -130,7 +126,7 @@ test.describe('Edit Consultation Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('consultation-title-input')).toHaveValue(
+        await expect(page.getByTestId('consultation-title')).toHaveText(
           'Consultation To Delete'
         );
       });
@@ -156,7 +152,9 @@ test.describe('Edit Consultation Flow', () => {
         await expect(
           page.getByText('Consultation To Delete')
         ).not.toBeVisible();
-        await expect(page.getByTestId('empty-consultations')).toBeVisible();
+        await expect(
+          page.getByTestId('condition-consultations-section')
+        ).toHaveCount(0);
 
         const pendingDeletions = await page.evaluate(() => {
           return localStorage.getItem('@healthy_pending_deleted_consultations');

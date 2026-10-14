@@ -1,8 +1,5 @@
 import { getConditionCategoryLabel } from './conditionCategories';
-import {
-  CONDITION_STATUS_OPTIONS,
-  VERIFICATION_OPTIONS,
-} from './ConditionForm';
+import { VERIFICATION_OPTIONS } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -10,9 +7,10 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ResourceSection } from '@/src/components/ResourceSection';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
@@ -21,13 +19,16 @@ import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentS
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { getConditionById } from './conditionService';
+import { deleteCondition, getConditionById } from './conditionService';
+import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 
 export function ViewConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { triggerSync } = useSync();
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
@@ -75,17 +76,6 @@ export function ViewConditionView() {
     loadData
   );
 
-  const getStatus = (value: Condition) => {
-    const clinicalStatus = value.clinicalStatus?.coding?.[0]?.code;
-    const option = CONDITION_STATUS_OPTIONS.find(
-      (item) => item.id === clinicalStatus
-    );
-    return {
-      label: option?.label || clinicalStatus || 'Unknown',
-      color: option?.dotColor || '#6B7280',
-    };
-  };
-
   if (
     isLoading ||
     isPatientLoading ||
@@ -107,8 +97,6 @@ export function ViewConditionView() {
 
   const title = getConditionTitle(condition);
   const notes = getConditionNotes(condition);
-  const status = getStatus(condition);
-  const onsetDate = condition.onsetDateTime;
   const abatementDate = condition.abatementDateTime;
   const severity = condition.severity?.coding?.[0]?.code;
   const bodySite = condition.bodySite?.[0]?.text;
@@ -118,8 +106,7 @@ export function ViewConditionView() {
       testID="condition-view"
       title={title}
       titleTestID="condition-title"
-      date={onsetDate ? formatDisplayDate(onsetDate) : undefined}
-      status={status}
+      meta={getConditionMeta(condition)}
       actions={
         <>
           <FloatingAddMenu
@@ -174,6 +161,23 @@ export function ViewConditionView() {
             addMenuExpanded={showAddMenu}
             editTestID="edit-condition-button"
             addTestID="condition-add-button"
+            deleteLabel="Delete condition"
+            deleteTestID="delete-condition-button"
+            deleteConfirmation={{
+              title: 'Delete Condition',
+              message:
+                'Are you sure you want to delete this condition? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteCondition(condition.id!);
+                triggerSync().catch((error) =>
+                  console.warn(
+                    'Background sync failed on delete condition:',
+                    error
+                  )
+                );
+                goBackOr(router, '/');
+              },
+            }}
           />
         </>
       }
@@ -255,12 +259,10 @@ export function ViewConditionView() {
         </View>
       )}
 
-      <RelatedResourceSection
+      <ResourceSection
         icon={Stethoscope}
         title="Recent Consultations"
         testID="condition-consultations-section"
-        emptyText="No consultations associated with this condition yet."
-        emptyTestID="empty-consultations"
       >
         {consultations.map((consultation) => (
           <ConsultationRelatedRow
@@ -276,10 +278,10 @@ export function ViewConditionView() {
             }
           />
         ))}
-      </RelatedResourceSection>
+      </ResourceSection>
 
       {treatments.length > 0 && (
-        <RelatedResourceSection
+        <ResourceSection
           icon={Pill}
           title="Treatments"
           testID="condition-treatments-section"
@@ -297,7 +299,7 @@ export function ViewConditionView() {
               }
             />
           ))}
-        </RelatedResourceSection>
+        </ResourceSection>
       )}
     </ResourceViewLayout>
   );

@@ -14,7 +14,7 @@ async function openAddConsultationForCondition(
   conditionId: string
 ) {
   await page.goto('/');
-  await page.getByTestId(`condition-card-${conditionId}`).click();
+  await page.getByTestId(`condition-open-${conditionId}`).click();
   await page.getByTestId('condition-add-button').click();
   await page
     .getByTestId('condition-add-menu')
@@ -48,7 +48,7 @@ test.describe('Add Consultation Flow', () => {
 
         const condCard = page.getByTestId(`condition-card-${conditionId}`);
         await expect(condCard).toBeVisible();
-        await condCard.click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
 
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
@@ -114,18 +114,16 @@ test.describe('Add Consultation Flow', () => {
         );
       });
 
-      await test.step('Verify consultation is not on Home view', async () => {
+      await test.step('Verify consultation is listed on Home view', async () => {
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
         );
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
-        // Home view should NOT have consultations
-        await expect(
-          page.getByText('General Cardiology Review')
-        ).not.toBeVisible();
-        await expect(page.getByText('Dr. Marcus Welby')).not.toBeVisible();
+        // Home lists recent consultations, including linked ones.
+        await expect(page.getByText('General Cardiology Review')).toBeVisible();
+        await expect(page.getByText('Dr. Marcus Welby')).toBeVisible();
       });
     }
   );
@@ -192,7 +190,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Open Condition View and navigate to Condition Edit', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -281,13 +279,10 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByText('Consultations')).toBeVisible();
         await expect(page.getByText('Annual Physical Exam')).toBeVisible();
         await expect(page.getByText('Dr. Beverly Crusher')).toBeVisible();
-        await expect(
-          page.getByText('"All vital signs optimal. Recommended vitamins."')
-        ).toBeVisible();
       });
 
       await test.step('Open the new standalone consultation view from Home', async () => {
-        await page.getByTestId(/^consultation-card-/).click();
+        await page.getByRole('button', { name: /^View consultation:/ }).click();
         await expect(page).toHaveURL(/.*consultation\/.*$/);
         const view = page.getByTestId('consultation-view');
         await expect(view.getByTestId('consultation-title')).toHaveText(
@@ -351,7 +346,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Set future consultation date without validation restriction', async () => {
-        const dateInput = page.locator('#date-picker-button-native-input');
+        const dateInput = page.locator('#consultation-date');
         await dateInput.fill('2028-11-20');
         await expect(page.getByTestId('date-picker-button')).toContainText(
           '2028'
@@ -366,7 +361,7 @@ test.describe('Add Consultation Flow', () => {
         const timePicker = page.getByTestId('time-picker-button');
         await expect(timePicker).toBeVisible();
 
-        const timeInput = page.locator('#time-picker-button-native-input');
+        const timeInput = page.locator('#consultation-time');
         await timeInput.fill('15:45');
         await expect(timePicker).toContainText('15:45');
       });
@@ -537,7 +532,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   await page.getByTestId('menu-add-diagnosis').click();
   await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   const item = page.getByTestId('consultation-diagnosis-0');
-  await expect(item.getByText('Diagnosis', { exact: true })).toHaveCount(1);
+  await expect(item.getByText('Diagnosis *', { exact: true })).toHaveCount(1);
   await expect(item.getByText('Diagnosis Name', { exact: true })).toHaveCount(
     0
   );
@@ -561,7 +556,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
     .boundingBox();
   expect(titleBox!.y).toBeLessThan(referenceBox!.y);
   const labelBox = await item
-    .getByText('Diagnosis', { exact: true })
+    .getByText('Diagnosis *', { exact: true })
     .boundingBox();
   const removeBox = await item.getByTestId('remove-diagnosis-0').boundingBox();
   expect(

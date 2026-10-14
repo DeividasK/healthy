@@ -20,6 +20,8 @@ test.beforeEach(async ({ page }) => {
 test('optional fields can be added, removed, re-added, and cleared after reload', async ({
   page,
 }) => {
+  // Associated conditions are only offered when a condition exists.
+  await seedTestCondition(page, { title: 'Integrity condition' });
   await page.goto('/treatment/add');
   await expect(page.getByTestId('treatment-status-select')).toHaveValue(
     'unknown'

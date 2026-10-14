@@ -13,6 +13,8 @@ test.describe('Add Consultation View - Visual Regression', () => {
   });
 
   test('Consultation View - Add New Form', async ({ page }, testInfo) => {
+    // Reasons for visit are only offered when a condition exists.
+    await seedTestCondition(page, { title: 'Scalp condition' });
     await page.goto('/consultation/add');
     await page.getByTestId('consultation-title-input').waitFor();
 

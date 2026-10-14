@@ -1,25 +1,26 @@
-import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Clock, X } from 'lucide-react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Clock } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 
 export interface NativeTimePickerProps {
   value: string; // "HH:mm"
   onChange: (time: string) => void;
-  onRemove: () => void;
   maxTime?: string;
   testID?: string;
+  id?: string;
+  name?: string;
 }
 
+/** Bordered time field; the browser's time input sits invisibly on top. */
 export function NativeTimePicker({
   value,
   onChange,
-  onRemove,
   maxTime,
   testID = 'time-picker-button',
+  id,
+  name,
 }: NativeTimePickerProps) {
-  const inputRef = useRef<any>(null);
-
   const handleNativeChange = (e: any) => {
     const val = e.target?.value;
     if (val) {
@@ -39,14 +40,13 @@ export function NativeTimePicker({
   };
 
   return (
-    <View style={styles.timePill} testID={testID}>
-      <Clock color={COLORS.light.iconMuted} size={16} style={styles.pillIcon} />
-      <Text style={styles.pillText}>{value}</Text>
+    <View style={styles.timeInputContainer} testID={testID}>
+      <Clock color={COLORS.light.iconMuted} size={18} style={styles.icon} />
+      <Text style={styles.timeText}>{value}</Text>
       {React.createElement('input', {
-        ref: inputRef,
         type: 'time',
-        id: `${testID}-native-input`,
-        name: `${testID}-time`,
+        id: id || `${testID}-native-input`,
+        name: name || `${testID}-time`,
         'aria-label': 'Time',
         max: maxTime,
         value: value,
@@ -56,49 +56,37 @@ export function NativeTimePicker({
           position: 'absolute',
           top: 0,
           left: 0,
-          right: 28,
+          right: 0,
           bottom: 0,
           opacity: 0,
-          width: 'calc(100% - 28px)',
+          width: '100%',
           height: '100%',
           cursor: 'pointer',
           zIndex: 10,
         },
       })}
-      <TouchableOpacity
-        testID="remove-time-button"
-        onPress={onRemove}
-        style={styles.removeButton}
-      >
-        <X color={COLORS.light.iconClear} size={14} />
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  timePill: {
+  timeInputContainer: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    width: '100%',
   },
-  pillIcon: {
-    marginRight: 6,
+  icon: {
+    marginRight: 8,
   },
-  pillText: {
+  timeText: {
+    fontSize: 16,
     color: COLORS.light.foreground,
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 6,
-  },
-  removeButton: {
-    zIndex: 20,
-    padding: 2,
   },
 });

@@ -1,3 +1,4 @@
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -105,6 +106,20 @@ export function LabResultForm({
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
+  const [isReportLoaded, setIsReportLoaded] = useState(!reportId);
+  const hasChanges = useHasChanges(
+    {
+      selectedDate,
+      testTime,
+      testNotes,
+      activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
+        id,
+        valueStr,
+        selectedUnit,
+      })),
+    },
+    isReportLoaded
+  );
 
   // Add Test search query
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,6 +205,8 @@ export function LabResultForm({
         setActiveItems(loadedItems);
       } catch (err) {
         console.error('Failed to load report for editing:', err);
+      } finally {
+        if (isMounted) setIsReportLoaded(true);
       }
     })();
 
@@ -393,34 +410,41 @@ export function LabResultForm({
           keyboardShouldPersistTaps="handled"
         >
           <ScreenHeading>{titleText}</ScreenHeading>
-          {/* Top Pill Row: Date, Optional Time, Plus Action */}
-          <View style={styles.pillRow}>
-            {/* Native Date Picker */}
+          <FormField label="Date" nativeID="lab-result-date" required>
             <NativeDatePicker
               value={selectedDate}
               onChange={(date) => {
                 if (date) handleDateChange(date);
               }}
               testID="date-picker-button"
+              id="lab-result-date"
+              name="date"
+              variant="input"
             />
+          </FormField>
 
-            {/* Optional Time Pill */}
-            {hasTime && (
+          {hasTime && (
+            <FormField
+              label="Time"
+              nativeID="lab-result-time"
+              removeTestID="remove-time-button"
+              removeLabel="Remove time"
+              onRemove={() => setTestTime(null)}
+            >
               <NativeTimePicker
                 value={testTime}
                 onChange={setTestTime}
-                onRemove={() => setTestTime(null)}
                 maxTime={
                   formatLocalDate(selectedDate) === formatLocalDate(new Date())
                     ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`
                     : undefined
                 }
                 testID="time-picker-button"
+                id="lab-result-time"
+                name="time"
               />
-            )}
-
-            {/* Plus Action Button */}
-          </View>
+            </FormField>
+          )}
 
           {/* Optional Notes Section if added */}
           {showNotesInput && (
@@ -513,6 +537,9 @@ export function LabResultForm({
                 id="test-search-input"
                 nativeID="test-search-input"
                 name="test-search"
+                // New-resource forms start with their first field focused.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus={!isEdit && !reportId}
                 accessibilityLabel="Select Test"
                 style={styles.searchInput}
                 placeholder="Enter test, e.g., HbA1c, ASP..."
@@ -585,6 +612,7 @@ export function LabResultForm({
           onSave={handleSave}
           isSaving={isSaving}
           saveDisabled={activeItems.length === 0}
+          hasChanges={hasChanges}
           deleteLabel="Delete lab result"
           deleteTestID="delete-report-button"
           deleteConfirmation={
@@ -676,13 +704,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     padding: 16,
     paddingBottom: 132,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
   },
   activeTestsList: {
     gap: 16,

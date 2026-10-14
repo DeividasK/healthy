@@ -20,6 +20,7 @@ import { getConsultationDoctor } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
 import { COLORS } from '@/src/theme/colors';
+import { goBackOr } from '@/src/utils/navigation';
 
 export function AddTreatmentView() {
   const { consultationId, conditionId } = useLocalSearchParams<{
@@ -123,10 +124,8 @@ function AddTreatmentForPatient({
       router.dismissTo(`/consultation/${consultationId}`);
     } else if (conditionId) {
       router.dismissTo(`/condition/${conditionId}`);
-    } else if (router.canGoBack()) {
-      router.back();
     } else {
-      router.replace(`/treatment/${created.id}`);
+      goBackOr(router, `/treatment/${created.id}`);
     }
   };
 

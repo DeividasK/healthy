@@ -58,7 +58,7 @@ test.describe('Multiple consultation diagnoses', () => {
     );
     const id = rows[0].id;
     await page.goto('/');
-    await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(0);
+    await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
     for (const conditionId of ['first', 'third']) {
       await page.goto(`/condition/${conditionId}`);
       await expect(

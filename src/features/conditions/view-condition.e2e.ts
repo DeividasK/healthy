@@ -55,3 +55,56 @@ test.describe('View Condition', () => {
     );
   });
 });
+
+test.describe('Condition view island', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+  });
+
+  test('tabs through actions left to right and shrinks the open + to a close button', async ({
+    page,
+  }) => {
+    await seedTestCondition(page, { id: 'island-condition', title: 'Island' });
+    await page.goto('/condition/island-condition');
+    const dock = page.getByTestId('resource-action-dock');
+    const back = dock.getByTestId('back-button');
+    await expect(back).toBeVisible();
+    await back.focus();
+    for (const id of [
+      'delete-condition-button',
+      'condition-add-button',
+      'edit-condition-button',
+    ]) {
+      await page.keyboard.press('Tab');
+      await expect(dock.getByTestId(id)).toBeFocused();
+    }
+
+    const add = dock.getByTestId('condition-add-button');
+    await add.click();
+    await expect
+      .poll(async () => Math.round((await add.boundingBox())!.width))
+      .toBe(44);
+  });
+
+  test('Escape cancels editing, asking first when data was entered', async ({
+    page,
+  }) => {
+    await seedTestCondition(page, { id: 'escape-condition', title: 'Escape' });
+    await page.goto('/condition/escape-condition');
+    await page.getByTestId('edit-condition-button').click();
+    await expect(page.getByTestId('condition-title-input')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/\/condition\/escape-condition$/);
+
+    await page.getByTestId('edit-condition-button').click();
+    await page.getByTestId('condition-title-input').fill('Changed');
+    await page.keyboard.press('Escape');
+    const modal = page.getByTestId('discard-changes-modal');
+    await expect(modal.getByRole('button', { name: 'No' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/condition\/escape-condition$/);
+    await expect(page.getByTestId('condition-title')).toHaveText('Escape');
+  });
+});

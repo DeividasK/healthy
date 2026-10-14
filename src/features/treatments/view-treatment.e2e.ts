@@ -103,3 +103,22 @@ test.describe('View Treatment Flow', () => {
     await expect(page.getByText('Nothing to show yet')).toBeVisible();
   });
 });
+
+test('the island ends at the primary edit button with nothing beyond it', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page);
+  const treatment = await seedTestTreatment(page, { title: 'Island edge' });
+  await page.goto(`/treatment/${treatment.id}`);
+  const edit = page.getByTestId('edit-treatment-button');
+  await expect(edit).toBeVisible();
+  const background = page.getByTestId('action-dock-background');
+  await expect
+    .poll(async () => {
+      const island = (await background.boundingBox())!;
+      const box = (await edit.boundingBox())!;
+      return Math.abs(island.x + island.width - (box.x + box.width));
+    })
+    .toBeLessThan(1);
+});

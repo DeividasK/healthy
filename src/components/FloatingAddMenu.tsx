@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -16,10 +16,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppOverlay } from './AppChrome';
+import { AppOverlay, useDockMenuAnchor } from './AppChrome';
 import { getActionDockMenuOffset } from './ResourceActionDock';
 import type { AddOptionItem } from './AddOptionsModal';
 import { COLORS } from '@/src/theme/colors';
+import { isKeyboardInput } from '@/src/utils/inputModality';
+import { focusWhenReady } from '@/src/utils/focus';
+import { useEscapeKey } from '@/src/utils/escapeKey';
 
 const backdropEntry = FadeIn.duration(180).reduceMotion(ReduceMotion.System);
 const menuEntry = FadeInDown.duration(200)
@@ -48,7 +51,60 @@ export function FloatingAddMenu({
 }: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  if (!visible || options.length === 0) return null;
+  const itemRefs = useRef<(View | null)[]>([]);
+  // Center the menu on the + that opened it, keeping a 16px screen gutter.
+  const anchor = useDockMenuAnchor();
+  const [menuWidth, setMenuWidth] = useState(0);
+  const maxShift = Math.max(0, (screenWidth - menuWidth) / 2 - 16);
+  const shift = Math.max(-maxShift, Math.min(maxShift, anchor));
+  // The options mount later through AppOverlay, so focus waits for them.
+  const focusFirstPending = useRef(false);
+  const focusFirst = () => {
+    const first = itemRefs.current[0] as unknown as HTMLElement | null;
+    if (!focusFirstPending.current || !first) return;
+    focusFirstPending.current = false;
+    focusWhenReady(first);
+  };
+  const isOpen = visible && options.length > 0;
+
+  // Web keyboard support: opening from the keyboard focuses the first option;
+  // arrows and Tab/Shift+Tab cycle through the options.
+  useEffect(() => {
+    if (!isOpen || Platform.OS !== 'web' || typeof document === 'undefined')
+      return;
+    const items = () =>
+      itemRefs.current.filter(Boolean) as unknown as HTMLElement[];
+    focusFirstPending.current = isKeyboardInput();
+    focusFirst();
+    const onKeyDown = (event: KeyboardEvent) => {
+      const step =
+        event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey)
+          ? 1
+          : event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)
+            ? -1
+            : 0;
+      const list = items();
+      if (!step || !list.length) return;
+      event.preventDefault();
+      const current = list.indexOf(document.activeElement as HTMLElement);
+      const next =
+        current < 0
+          ? step > 0
+            ? 0
+            : list.length - 1
+          : (current + step + list.length) % list.length;
+      list[next].focus();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      focusFirstPending.current = false;
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [isOpen]);
+
+  useEscapeKey(onClose, isOpen);
+
+  if (!isOpen) return null;
 
   return (
     <AppOverlay>
@@ -74,14 +130,23 @@ export function FloatingAddMenu({
             bottom: bottomOffset ?? getActionDockMenuOffset(insets.bottom),
             // Grow with the longest label, but keep a gutter to the screen edges.
             maxWidth: screenWidth - 32,
+            // Margins rather than a transform: the entering and exiting
+            // animations own the transform.
+            marginLeft: Math.max(0, shift) * 2,
+            marginRight: Math.max(0, -shift) * 2,
           },
         ]}
+        onLayout={(event) => setMenuWidth(event.nativeEvent.layout.width)}
         testID={testID}
       >
         {options.map((option, index) => (
           <React.Fragment key={option.id}>
             {index > 0 && <View style={styles.divider} />}
             <TouchableOpacity
+              ref={(node) => {
+                itemRefs.current[index] = node;
+                if (index === 0) focusFirst();
+              }}
               testID={option.testID}
               accessibilityRole="button"
               style={styles.item}

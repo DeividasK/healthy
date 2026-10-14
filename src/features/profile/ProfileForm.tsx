@@ -1,3 +1,4 @@
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -64,6 +65,12 @@ export function ProfileForm({
       return new Date(y, m - 1, d);
     }
     return null;
+  });
+  const hasChanges = useHasChanges({
+    givenName,
+    familyName,
+    gender,
+    birthDate,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -144,6 +151,7 @@ export function ProfileForm({
             id: 'patient-given-name-input',
             nativeID: 'patient-given-name-input',
             name: 'patientGivenName',
+            autoFocus: !isEdit,
             accessibilityLabel: 'Given Name',
             placeholder: 'e.g. Jane',
             value: givenName,
@@ -202,6 +210,7 @@ export function ProfileForm({
         saveLabel="Save Profile"
         saveTestID="save-profile-button"
         showCancel={showBackButton}
+        hasChanges={hasChanges}
         onDelete={isEdit ? onDelete : undefined}
         deleteLabel="Delete Profile"
         deleteTestID="delete-profile-button"

@@ -32,7 +32,7 @@ test.describe('View Consultation Flow', () => {
     });
     await page.reload();
 
-    await page.getByTestId(`consultation-card-${consultation.id}`).click();
+    await page.getByTestId(`consultation-open-${consultation.id}`).click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
     );
@@ -58,14 +58,12 @@ test.describe('View Consultation Flow', () => {
       'Updated Physical'
     );
 
-    await expect(page.getByTestId('delete-consultation-button')).toHaveCount(0);
-    await page.getByTestId('edit-consultation-button').click();
     await page.getByTestId('delete-consultation-button').click();
     const modal = page.getByTestId('delete-confirmation-modal');
     await expect(modal).toBeVisible();
     await page.getByTestId('delete-modal-cancel-button').click();
     await expect(modal).not.toBeVisible();
-    await expect(page.getByTestId('consultation-title-input')).toHaveValue(
+    await expect(page.getByTestId('consultation-title')).toHaveText(
       'Updated Physical'
     );
 
@@ -104,7 +102,7 @@ test.describe('View Consultation Flow', () => {
     });
     await page.reload();
 
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await page
       .getByTestId(`condition-consultation-item-${consultation.id}`)
       .click();
@@ -123,6 +121,13 @@ test.describe('View Consultation Flow', () => {
     await expect(conditionView.getByTestId('condition-title')).toHaveText(
       'Knee Osteoarthritis'
     );
+    // Back retraces the visited screens: consultation, condition, then home.
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(
+      new RegExp(`.*consultation\\/${consultation.id}$`)
+    );
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
     await page.getByTestId('back-button').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
   });
@@ -143,7 +148,7 @@ test.describe('View Consultation Flow', () => {
       notes: 'Consultation notes remain available.',
     });
     await page.reload();
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await expect(
       page.getByTestId(`condition-consultation-item-${consultation.id}`)
     ).toBeVisible();
@@ -193,7 +198,7 @@ test.describe('View Consultation Flow', () => {
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Cardiology Follow-up'
     );
-    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
+    await expect(page.getByTestId('consultation-treatments')).toHaveCount(0);
 
     // + only creates; linking happens in the edit form
     await page.getByTestId('consultation-add-treatment').click();
@@ -232,7 +237,7 @@ test.describe('View Consultation Flow', () => {
     ).toBeVisible();
     await page.getByTestId('link-remove-treatment-button').click();
     await page.getByTestId('save-button').click();
-    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
+    await expect(page.getByTestId('consultation-treatments')).toHaveCount(0);
 
     // The last entry is gone, so the empty section is removed too
     const docAfterUnlink = await getTestClinicalDocument(page, consultation.id);

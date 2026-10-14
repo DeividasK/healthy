@@ -160,7 +160,7 @@ for (const scenario of [
     await expect(
       page.getByText('Treatment after repair', { exact: true })
     ).toBeVisible();
-    await page.getByTestId('treatment-card-existing-treatment').click();
+    await page.getByTestId('treatment-open-existing-treatment').click();
     await page.goto('/treatment/existing-treatment/edit');
     await page.getByTestId('treatment-title-input').fill('Edited after repair');
     await page.getByTestId('save-treatment-button').click();

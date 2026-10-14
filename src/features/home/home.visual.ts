@@ -123,4 +123,32 @@ test.describe('Home View - Visual Regression', () => {
       testInfo
     );
   });
+
+  test('Home View - Collapsed and expanded sections', async ({
+    page,
+  }, testInfo) => {
+    for (const n of [1, 2, 3, 4]) {
+      await seedTestCondition(page, {
+        id: `collapse-condition-${n}`,
+        title: `Condition ${n}`,
+        onsetDate: `2026-0${n}-01`,
+      });
+    }
+    for (const n of [1, 2, 3, 4]) {
+      await seedTestConsultation(page, {
+        id: `collapse-consultation-${n}`,
+        title: `Consultation ${n}`,
+        date: `2026-0${n}-15`,
+        doctorName: `Specialist ${n}`,
+        conditionIds: [`collapse-condition-${n}`],
+      });
+    }
+    await page.goto('/');
+    await page.getByTestId('conditions-list-toggle').waitFor();
+    await takeSnapshot(page, 'Home View - Collapsed sections', testInfo);
+    await page.getByTestId('conditions-list-toggle').click();
+    await page.getByTestId('consultations-list-toggle').click();
+    await page.getByTestId('condition-card-collapse-condition-1').waitFor();
+    await takeSnapshot(page, 'Home View - Expanded sections', testInfo);
+  });
 });

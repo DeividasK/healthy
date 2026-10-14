@@ -2,7 +2,7 @@ import React from 'react';
 import { useRouter } from 'expo-router';
 import { Pill } from 'lucide-react-native';
 import type { MedicationRequest } from 'fhir/r5';
-import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ResourceSection } from '@/src/components/ResourceSection';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
 
 export interface RelatedResourceListProps {
@@ -15,21 +15,19 @@ export function RelatedResourceList({
 }: RelatedResourceListProps) {
   const router = useRouter();
   return (
-    <RelatedResourceSection
+    <ResourceSection
       icon={Pill}
       title="Treatments"
       testID="consultation-treatments"
-      emptyText="No treatments linked to this consultation."
-      emptyTestID="consultation-no-treatments"
     >
       {linkedTreatments.map((treatment) => (
         <TreatmentRelatedRow
           key={treatment.id}
           treatment={treatment}
           testID={`consultation-treatment-${treatment.id}`}
-          onPress={() => router.dismissTo(`/treatment/${treatment.id}`)}
+          onPress={() => router.push(`/treatment/${treatment.id}`)}
         />
       ))}
-    </RelatedResourceSection>
+    </ResourceSection>
   );
 }

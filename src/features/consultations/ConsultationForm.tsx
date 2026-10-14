@@ -2,26 +2,17 @@ import type {
   ConsultationInput,
   ConsultationDiagnosisInput,
 } from './consultationService';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  Alert,
-  ActionSheetIOS,
-} from 'react-native';
+import { StyleSheet, View, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
   Stethoscope,
-  ChevronDown,
   Clock,
   FileText,
   FolderPlus,
@@ -30,10 +21,8 @@ import {
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
-import {
-  AddOptionsModal,
-  AddOptionItem,
-} from '@/src/components/AddOptionsModal';
+import type { AddOptionItem } from '@/src/components/AddOptionsModal';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
 import { SpecialistField } from '@/src/components/SpecialistField';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
@@ -53,6 +42,7 @@ import {
 } from './consultationService';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import type { Condition } from 'fhir/r5';
+import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConsultationStatusOption {
   id: string;
@@ -116,7 +106,6 @@ export interface ConsultationFormProps {
   initialValues?: Partial<ConsultationFormValues>;
   initialConditionIds?: string[];
   isEdit?: boolean;
-  onDelete?: () => Promise<void>;
   onSave: (
     values: ConsultationInput,
     links: Record<string, LinkSelection>
@@ -138,7 +127,6 @@ export function ConsultationForm({
   initialConditionIds,
   isEdit = false,
   onSave,
-  onDelete,
   linkFields = [],
 }: ConsultationFormProps) {
   const links = useLinkFields(linkFields);
@@ -219,9 +207,20 @@ export function ConsultationForm({
   const [diagnosisQueries, setDiagnosisQueries] = useState<
     Record<number, string>
   >({});
+  const hasChanges = useHasChanges({
+    title,
+    status: selectedStatus.id,
+    date,
+    time,
+    doctorName,
+    serviceType,
+    notes,
+    selectedConditionIds,
+    diagnoses,
+    links: links.values,
+  });
   const [focusedDiagnosis, setFocusedDiagnosis] = useState<number | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load patient conditions, doctors, and service types
@@ -258,27 +257,6 @@ export function ConsultationForm({
     }
     return all.filter((st) => st.toLowerCase().includes(trimmed));
   }, [serviceType, knownServiceTypes]);
-
-  const handleStatusPress = () => {
-    if (Platform.OS === 'ios') {
-      const options = [...statusOptions.map((s) => s.label), 'Cancel'];
-      const cancelButtonIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Select Status',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            setSelectedStatus(statusOptions[buttonIndex]);
-          }
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowStatusModal(true);
-    }
-  };
 
   const conditionOptions = availableConditions.flatMap((condition) =>
     condition.id
@@ -339,13 +317,12 @@ export function ConsultationForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else if (showCondition && selectedConditionIds[0]) {
-        router.replace(`/condition/${selectedConditionIds[0]}` as any);
-      } else {
-        router.replace('/');
-      }
+      goBackOr(
+        router,
+        showCondition && selectedConditionIds[0]
+          ? `/condition/${selectedConditionIds[0]}`
+          : '/'
+      );
     } catch (err) {
       console.error('Failed to save consultation:', err);
       showAlert('Error', 'Failed to save consultation. Please try again.');
@@ -391,7 +368,7 @@ export function ConsultationForm({
       },
     });
   }
-  if (!showCondition) {
+  if (!showCondition && conditionOptions.length > 0) {
     plusMenuOptions.push({
       id: 'add-reason',
       label: 'Reasons for Visit',
@@ -465,67 +442,42 @@ export function ConsultationForm({
           <ScreenHeading testID="header-title">
             {isEdit ? 'Edit Consultation' : 'New Consultation'}
           </ScreenHeading>
-          {/* Top Pill Row: Status, Date, Time, Plus Button */}
-          <View style={styles.pillRow}>
-            {/* Status Pill */}
-            <TouchableOpacity
-              testID="status-picker-button"
-              style={styles.statusPill}
-              onPress={handleStatusPress}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: selectedStatus.dotColor },
-                ]}
-              />
-              <Text style={styles.statusPillText}>{selectedStatus.label}</Text>
-              <ChevronDown
-                color={COLORS.light.iconClear}
-                size={16}
-                style={{ marginLeft: 4 }}
-              />
+          {/* Consultation Title Input (Required) */}
+          <FormField
+            label="Consultation / Service"
+            required
+            nativeID="consultation-title-input"
+            inputProps={{
+              testID: 'consultation-title-input',
+              id: 'consultation-title-input',
+              nativeID: 'consultation-title-input',
+              name: 'title',
+              autoFocus: !isEdit,
+              accessibilityLabel: 'Consultation Title',
+              placeholder: 'e.g. Cardiology Follow-up, Annual Checkup',
+              value: title,
+              onChangeText: setTitle,
+            }}
+          />
 
-              {Platform.OS === 'web' &&
-                React.createElement(
-                  'select',
-                  {
-                    id: 'consultation-status-select',
-                    name: 'status',
-                    'aria-label': 'Consultation status',
-                    value: selectedStatus.id,
-                    onChange: (e: any) => {
-                      const found = statusOptions.find(
-                        (s) => s.id === e.target.value
-                      );
-                      if (found) setSelectedStatus(found);
-                    },
-                    style: {
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      opacity: 0,
-                      width: '100%',
-                      height: '100%',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                    },
-                    'data-testid': 'status-picker-select',
-                  },
-                  statusOptions.map((opt) =>
-                    React.createElement(
-                      'option',
-                      { key: opt.id, value: opt.id },
-                      opt.label
-                    )
-                  )
-                )}
-            </TouchableOpacity>
+          <FormField label="Status" nativeID="status-picker-select" required>
+            <NativeSelect
+              testID="status-picker-select"
+              name="status"
+              label="Consultation status"
+              value={selectedStatus.id}
+              options={statusOptions.map(({ id, label }) => ({ id, label }))}
+              onChange={(value) => {
+                const found = statusOptions.find(
+                  (option) => option.id === value
+                );
+                if (found) setSelectedStatus(found);
+              }}
+            />
+          </FormField>
 
-            {/* Date Pill (can be in future, no validation on date) */}
+          {/* The date can be in the future (planned consultations). */}
+          <FormField label="Date" nativeID="consultation-date" required>
             <NativeDatePicker
               value={date}
               onChange={(newDate) => {
@@ -533,36 +485,29 @@ export function ConsultationForm({
               }}
               allowFuture={true}
               testID="date-picker-button"
+              id="consultation-date"
+              name="date"
+              variant="input"
             />
+          </FormField>
 
-            {/* Optional Time Pill */}
-            {time !== null && (
+          {time !== null && (
+            <FormField
+              label="Time"
+              nativeID="consultation-time"
+              removeTestID="remove-time-button"
+              removeLabel="Remove time"
+              onRemove={() => setTime(null)}
+            >
               <NativeTimePicker
                 value={time}
                 onChange={setTime}
-                onRemove={() => setTime(null)}
                 testID="time-picker-button"
+                id="consultation-time"
+                name="time"
               />
-            )}
-
-            {/* Plus Action Button */}
-          </View>
-
-          {/* Consultation Title Input (Required) */}
-          <FormField
-            label="Consultation / Service"
-            nativeID="consultation-title-input"
-            inputProps={{
-              testID: 'consultation-title-input',
-              id: 'consultation-title-input',
-              nativeID: 'consultation-title-input',
-              name: 'title',
-              accessibilityLabel: 'Consultation Title',
-              placeholder: 'e.g. Cardiology Follow-up, Annual Checkup',
-              value: title,
-              onChangeText: setTitle,
-            }}
-          />
+            </FormField>
+          )}
 
           {showCondition && (
             <LinkedResourcesField
@@ -609,6 +554,7 @@ export function ConsultationForm({
                         <React.Fragment key={field}>
                           <FormField
                             label={label}
+                            required={field === 'title'}
                             nativeID={`diagnosis-${index}-${field}-input`}
                             removeTestID={`remove-diagnosis-${index}`}
                             removeLabel={`Remove diagnosis ${index + 1}`}
@@ -854,18 +800,7 @@ export function ConsultationForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
-          deleteLabel="Delete consultation"
-          deleteTestID="delete-consultation-button"
-          deleteConfirmation={
-            isEdit && onDelete
-              ? {
-                  title: 'Delete Consultation',
-                  message:
-                    'Are you sure you want to delete this consultation? This action cannot be undone.',
-                  onConfirm: onDelete,
-                }
-              : undefined
-          }
+          hasChanges={hasChanges}
         />
 
         {/* Plus Menu Modal for adding optional fields */}
@@ -874,31 +809,6 @@ export function ConsultationForm({
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
           options={menuOptions}
-        />
-
-        {/* Status Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          overlayTestID="status-menu-overlay"
-          cardTestID="status-menu-card"
-          options={statusOptions.map((opt) => ({
-            id: opt.id,
-            label: opt.label,
-            icon: (
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: opt.dotColor,
-                  marginRight: 12,
-                }}
-              />
-            ),
-            testID: `status-option-${opt.id}`,
-            onPress: () => setSelectedStatus(opt),
-          }))}
         />
       </View>
     </SafeAreaView>
@@ -919,35 +829,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     padding: 16,
     paddingBottom: 132,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  statusPill: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
   },
   diagnosisItem: {
     borderTopWidth: 1,

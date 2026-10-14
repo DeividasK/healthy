@@ -1,5 +1,6 @@
 import { CATEGORY_OPTIONS } from './conditionCategories';
 import type { ConditionInput } from './conditionService';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -13,7 +14,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,13 +22,11 @@ import {
   BadgeCheck,
   Tag,
   Calendar,
-  ChevronDown,
   FileText,
   MapPin,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
-import { AddOptionsModal } from '@/src/components/AddOptionsModal';
 import {
   useLinkFields,
   type LinkFieldConfig,
@@ -37,6 +35,7 @@ import {
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConditionStatusOption {
   id: string;
@@ -128,7 +127,6 @@ export interface ConditionFormValues {
 export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
-  onDelete?: () => Promise<void>;
   onSave: (
     values: ConditionInput,
     links: Record<string, LinkSelection>
@@ -149,7 +147,6 @@ export function ConditionForm({
   initialValues,
   isEdit = false,
   onSave,
-  onDelete,
   linkFields = [],
 }: ConditionFormProps) {
   const router = useRouter();
@@ -201,38 +198,21 @@ export function ConditionForm({
 
   const [notes, setNotes] = useState(initialValues?.notes || '');
   const [showNotes, setShowNotes] = useState(Boolean(initialValues?.notes));
+  const hasChanges = useHasChanges({
+    title,
+    verificationStatus,
+    category,
+    status: selectedStatus.id,
+    onsetDate,
+    severity,
+    bodySite,
+    abatementDate,
+    notes,
+    links: links.values,
+  });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  const handleStatusSelect = (opt: ConditionStatusOption) => {
-    setSelectedStatus(opt);
-  };
-
-  const handleStatusPress = () => {
-    if (Platform.OS === 'ios') {
-      const options = [
-        ...CONDITION_STATUS_OPTIONS.map((s) => s.label),
-        'Cancel',
-      ];
-      const cancelButtonIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Select Status',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            handleStatusSelect(CONDITION_STATUS_OPTIONS[buttonIndex]);
-          }
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowStatusModal(true);
-    }
-  };
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -295,11 +275,7 @@ export function ConditionForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/');
-      }
+      goBackOr(router, '/');
     } catch (err) {
       console.error('Failed to save condition:', err);
       showAlert('Error', 'Failed to save condition. Please try again.');
@@ -417,93 +393,59 @@ export function ConditionForm({
           <ScreenHeading>
             {isEdit ? 'Edit Condition' : 'New Condition'}
           </ScreenHeading>
-          {/* Top Pill Row: Status, Date, Plus */}
-          <View style={styles.pillRow}>
-            {/* Status Pill */}
-            <TouchableOpacity
-              testID="status-picker-button"
-              style={styles.statusPill}
-              onPress={handleStatusPress}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: selectedStatus.dotColor },
-                ]}
-              />
-              <Text style={styles.statusPillText}>{selectedStatus.label}</Text>
-              <ChevronDown
-                color={COLORS.light.iconClear}
-                size={16}
-                style={{ marginLeft: 4 }}
-              />
-
-              {Platform.OS === 'web' &&
-                React.createElement(
-                  'select',
-                  {
-                    id: 'status-picker-select',
-                    name: 'status',
-                    'aria-label': 'Condition status',
-                    value: selectedStatus.id,
-                    onChange: (e: any) => {
-                      const found = CONDITION_STATUS_OPTIONS.find(
-                        (s) => s.id === e.target.value
-                      );
-                      if (found) handleStatusSelect(found);
-                    },
-                    style: {
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      opacity: 0,
-                      width: '100%',
-                      height: '100%',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                    },
-                    'data-testid': 'status-picker-select',
-                  },
-                  CONDITION_STATUS_OPTIONS.map((opt) =>
-                    React.createElement(
-                      'option',
-                      { key: opt.id, value: opt.id },
-                      opt.label
-                    )
-                  )
-                )}
-            </TouchableOpacity>
-
-            {/* Onset Date Pill */}
-            <NativeDatePicker
-              value={onsetDate}
-              onChange={(date) => {
-                if (date) setOnsetDate(date);
-              }}
-              testID="date-picker-button"
-            />
-
-            {/* Plus Button to add optional fields */}
-          </View>
-
           {/* Condition Name Section (Required) */}
           <FormField
             label="Condition"
+            required
             nativeID="condition-title-input"
             inputProps={{
               testID: 'condition-title-input',
               id: 'condition-title-input',
               nativeID: 'condition-title-input',
               name: 'title',
+              autoFocus: !isEdit,
               accessibilityLabel: 'Condition Name',
               placeholder: 'Left Knee Pain',
               value: title,
               onChangeText: setTitle,
             }}
           />
+
+          <FormField label="Status" nativeID="status-picker-select" required>
+            <NativeSelect
+              testID="status-picker-select"
+              name="status"
+              label="Condition status"
+              value={selectedStatus.id}
+              options={CONDITION_STATUS_OPTIONS.map(({ id, label }) => ({
+                id,
+                label,
+              }))}
+              onChange={(value) => {
+                const found = CONDITION_STATUS_OPTIONS.find(
+                  (option) => option.id === value
+                );
+                if (found) setSelectedStatus(found);
+              }}
+            />
+          </FormField>
+
+          <FormField
+            label="Onset date"
+            nativeID="condition-onset-date"
+            required
+          >
+            <NativeDatePicker
+              value={onsetDate}
+              onChange={(date) => {
+                if (date) setOnsetDate(date);
+              }}
+              testID="date-picker-button"
+              id="condition-onset-date"
+              name="onsetDate"
+              variant="input"
+            />
+          </FormField>
 
           {showVerification && (
             <FormField
@@ -680,18 +622,7 @@ export function ConditionForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
-          deleteLabel="Delete condition"
-          deleteTestID="delete-condition-button"
-          deleteConfirmation={
-            isEdit && onDelete
-              ? {
-                  title: 'Delete Condition',
-                  message:
-                    'Are you sure you want to delete this condition? This action cannot be undone.',
-                  onConfirm: onDelete,
-                }
-              : undefined
-          }
+          hasChanges={hasChanges}
         />
 
         {/* Plus Action Modal */}
@@ -700,33 +631,6 @@ export function ConditionForm({
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
           options={plusMenuOptions}
-        />
-
-        {/* Status Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          overlayTestID="status-menu-overlay"
-          cardTestID="status-menu-card"
-          options={CONDITION_STATUS_OPTIONS.map((opt) => ({
-            id: opt.id,
-            label: opt.label,
-            icon: (
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: opt.dotColor,
-                  marginRight: 12,
-                }}
-              />
-            ),
-            testID: `status-option-${opt.id}`,
-            onPress: () => {
-              handleStatusSelect(opt);
-            },
-          }))}
         />
       </View>
     </SafeAreaView>
@@ -749,34 +653,11 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 132,
   },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  statusPill: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.light.pillBackground,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
   },
   severityRow: {
     flexDirection: 'row',

@@ -103,13 +103,14 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       };
       sample();
     });
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await expect(page.getByTestId('back-button')).toBeVisible();
     await expect(header.getByTestId('back-button')).toHaveCount(0);
     await expect(
       page.getByTestId('resource-action-dock').getByTestId('back-button')
     ).toBeVisible();
-    await expect(page.getByTestId('delete-condition-button')).toHaveCount(0);
+    // View pages delete from their island
+    await expect(page.getByTestId('delete-condition-button')).toBeVisible();
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
       .toBeCloseTo(16);
@@ -200,18 +201,27 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       dock.getByRole('button', { name: 'Save', exact: true })
     ).toBeVisible();
     await expect(dock.getByTestId('back-button')).toHaveCount(0);
+    // Edit forms have no delete; the island hugs back, save and + while
+    // save stays at the screen center.
+    await expect(dock.getByTestId('delete-condition-button')).toHaveCount(0);
+    const viewportWidth = page.viewportSize()!.width;
     await expect
       .poll(
         async () => {
-          const trash = (await dock
-            .getByTestId('delete-condition-button')
-            .boundingBox())!;
-          const save = (await dock.getByTestId('save-button').boundingBox())!;
           const close = (await dock
             .getByTestId('cancel-button')
             .boundingBox())!;
+          const save = (await dock.getByTestId('save-button').boundingBox())!;
+          const add = (await dock
+            .getByTestId('add-option-button')
+            .boundingBox())!;
+          const island = (await background.boundingBox())!;
           return (
-            trash.x + trash.width < save.x && save.x + save.width < close.x
+            close.x + close.width < save.x &&
+            save.x + save.width < add.x &&
+            Math.abs(save.x + save.width / 2 - viewportWidth / 2) < 1 &&
+            Math.abs(island.x - (close.x - 10)) < 1 &&
+            Math.abs(island.x + island.width - (add.x + add.width + 10)) < 1
           );
         },
         { timeout: 15000 }
@@ -219,6 +229,10 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       .toBe(true);
     await page.getByTestId('condition-title-input').fill('Unsaved change');
     await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Entered data is only discarded after confirming
+    const discard = page.getByTestId('discard-changes-modal');
+    await expect(discard.getByText('Are you sure?')).toBeVisible();
+    await discard.getByRole('button', { name: 'Yes' }).click();
     await expect(page.getByTestId('condition-title')).toHaveText(
       'Header navigation'
     );
@@ -369,4 +383,172 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       await expect(page.getByText('Nothing to show yet')).not.toBeVisible();
     });
   });
+});
+
+test.describe('Home sections: collapsing, counts and chevron navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await createPatientViaUI(page);
+    for (const n of [1, 2, 3, 4]) {
+      await seedTestCondition(page, {
+        id: `c${n}`,
+        title: `Condition ${n}`,
+        onsetDate: `2026-0${n}-01`,
+      });
+    }
+    for (const n of [1, 2, 3, 4]) {
+      await seedTestConsultation(page, {
+        id: `k${n}`,
+        title: `Consultation ${n}`,
+        date: `2026-0${n}-15`,
+        conditionIds: n === 1 ? ['c1'] : undefined,
+        reasonConditionIds: n === 1 ? ['c2'] : undefined,
+      });
+    }
+    await seedTestTreatment(page, {
+      id: 't1',
+      title: 'Treatment 1',
+      reasonConditionIds: ['c1'],
+      consultationId: 'k1',
+    });
+    await page.goto('/');
+  });
+
+  test('shows three recent items per section and expands and collapses them', async ({
+    page,
+  }) => {
+    const conditionCards = page.getByTestId(/^condition-card-/);
+    const consultationCards = page.getByTestId(/^consultation-card-/);
+    await expect(conditionCards).toHaveCount(3);
+    await expect(consultationCards).toHaveCount(3);
+    // Newest consultations first; the oldest is hidden until expanded.
+    await expect(page.getByTestId('consultation-card-k4')).toBeVisible();
+    await expect(page.getByTestId('consultation-card-k1')).toHaveCount(0);
+
+    await page.getByTestId('consultations-list-toggle').click();
+    await expect(consultationCards).toHaveCount(4);
+    await expect(page.getByTestId('consultations-list-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await page.getByTestId('consultations-list-toggle').click();
+    await expect(consultationCards).toHaveCount(3);
+
+    await page.getByTestId('conditions-list-toggle').click();
+    await expect(conditionCards).toHaveCount(4);
+    await page.getByTestId('conditions-list-toggle').click();
+    await expect(conditionCards).toHaveCount(3);
+  });
+
+  test('shows associated resource counts on conditions and consultations', async ({
+    page,
+  }) => {
+    await page.getByTestId('conditions-list-toggle').click();
+    await page.getByTestId('consultations-list-toggle').click();
+    await expect(
+      page.getByTestId('condition-consultations-count-c1')
+    ).toHaveText('1');
+    await expect(page.getByTestId('condition-treatments-count-c1')).toHaveText(
+      '1'
+    );
+    await expect(
+      page.getByTestId('condition-consultations-count-c2')
+    ).toHaveText('1');
+    // Resource types with no associations show no count at all
+    await expect(page.getByTestId('condition-treatments-count-c2')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId('consultation-conditions-count-k1')
+    ).toHaveText('2');
+    await expect(
+      page.getByTestId('consultation-treatments-count-k1')
+    ).toHaveText('1');
+    await expect(
+      page.getByTestId('consultation-conditions-count-k2')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('treatment-conditions-count-t1')).toHaveText(
+      '1'
+    );
+  });
+
+  test('opens a condition or consultation by clicking anywhere on its row', async ({
+    page,
+  }) => {
+    await page
+      .getByTestId('condition-card-c4')
+      .getByText('Condition 4')
+      .click();
+    await expect(page).toHaveURL(/\/condition\/c4$/);
+    await page.goBack();
+    await page
+      .getByTestId('consultation-card-k4')
+      .getByText('Consultation 4')
+      .click();
+    await expect(page).toHaveURL(/\/consultation\/k4$/);
+  });
+});
+
+test.describe('Home add menu keyboard navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await createPatientViaUI(page);
+  });
+
+  test('focuses the first option when opened with Cmd/Ctrl+Enter and cycles with arrows and Tab', async ({
+    page,
+  }) => {
+    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    const condition = page.getByTestId('menu-add-condition');
+    const treatment = page.getByTestId('menu-add-treatment');
+    const labResults = page.getByTestId('menu-add-lab-results');
+    await expect(condition).toBeFocused();
+
+    await page.keyboard.press('ArrowDown');
+    await expect(treatment).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(condition).toBeFocused();
+    // Wraps from the first option to the last and back
+    await page.keyboard.press('ArrowUp');
+    await expect(labResults).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(condition).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(treatment).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(condition).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
+
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(condition).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/treatment\/add$/);
+  });
+});
+
+test('lists lab results after every other section', async ({ page }) => {
+  await clearAppStorage(page);
+  await createPatientViaUI(page);
+  await seedTestCondition(page, { title: 'Order condition' });
+  await seedTestConsultation(page, { title: 'Order consultation' });
+  await seedTestTreatment(page, { title: 'Order treatment' });
+  await seedTestReport(page, {
+    date: '2026-10-02',
+    biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+  });
+  await page.goto('/');
+  await page.getByText('Hemoglobin (Hgb)').waitFor();
+  const top = async (text: string) =>
+    (await page.getByText(text, { exact: true }).first().boundingBox())!.y;
+  const order = [
+    await top('Conditions'),
+    await top('Treatments'),
+    await top('Consultations'),
+    await top('Lab Results'),
+  ];
+  expect(order).toEqual([...order].sort((a, b) => a - b));
 });

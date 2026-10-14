@@ -23,9 +23,8 @@ test.describe('Edit Condition Flow', () => {
       title: 'Condition to delete',
     });
     await page.reload();
-    await page.getByTestId(`condition-card-${condition.id}`).click();
-    await page.getByTestId('edit-condition-button').click();
-    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+    await page.getByTestId(`condition-open-${condition.id}`).click();
+    await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
     );
     await page.evaluate(async () => {
@@ -49,8 +48,8 @@ test.describe('Edit Condition Flow', () => {
     await dialog.accept();
     await clickPromise;
     await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}/edit$`));
-    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}$`));
+    await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
     );
 
@@ -79,7 +78,7 @@ test.describe('Edit Condition Flow', () => {
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
-        await page.getByTestId(/^condition-card-/).click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await page.getByTestId('edit-condition-button').click();
         await expect(page).toHaveURL(/.*condition\/.*\/edit/);
         await expect(page.getByText('Edit Condition')).toBeVisible();
@@ -101,7 +100,7 @@ test.describe('Edit Condition Flow', () => {
   );
 
   test(
-    'should open Condition View and delete from edit mode',
+    'should open Condition View and delete from its island',
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create a condition', async () => {
@@ -109,19 +108,21 @@ test.describe('Edit Condition Flow', () => {
       });
 
       await test.step('Click condition card to open Condition View', async () => {
-        const condCard = page.getByTestId(/^condition-card-/);
-        await condCard.click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await expect(page).toHaveURL(/.*condition\/[a-zA-Z0-9_-]+$/);
         await expect(page.getByTestId('condition-title')).toHaveText(
           DEFAULT_CONDITION_TITLE
         );
       });
 
-      await test.step('Delete condition from edit mode', async () => {
+      await test.step('Delete condition from the view page', async () => {
+        // Edit forms no longer delete; the view page's island does.
+        await page.getByTestId('edit-condition-button').click();
+        await expect(page.getByTestId('condition-title-input')).toBeVisible();
         await expect(page.getByTestId('delete-condition-button')).toHaveCount(
           0
         );
-        await page.getByTestId('edit-condition-button').click();
+        await page.getByTestId('cancel-button').click();
         const deleteBtn = page.getByTestId('delete-condition-button');
         await deleteBtn.click();
 
@@ -131,7 +132,7 @@ test.describe('Edit Condition Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('condition-title-input')).toHaveValue(
+        await expect(page.getByTestId('condition-title')).toHaveText(
           DEFAULT_CONDITION_TITLE
         );
 
@@ -286,14 +287,8 @@ test.describe('Edit Condition Flow', () => {
     expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
       viewportWidth
     );
-    // Only the 48x48 chevron opens the consultation
-    const openButton = view.getByTestId(
-      /^condition-consultation-item-(?!.*-row$)/
-    );
-    const openBox = (await openButton.boundingBox())!;
-    expect(openBox.width).toBe(48);
-    expect(openBox.height).toBe(48);
-    await openButton.click();
+    // The whole row opens the consultation
+    await consultationRow.getByText('Linked Consultation').click();
     const consultationView = page.getByTestId('consultation-view');
     await expect(consultationView.getByTestId('consultation-title')).toHaveText(
       'Linked Consultation'
@@ -307,7 +302,8 @@ test.describe('Edit Condition Flow', () => {
 
     await page.getByRole('button', { name: 'Home', exact: true }).click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Linked Consultation')).not.toBeVisible();
+    // Linked consultations are listed on the homepage too.
+    await expect(page.getByText('Linked Consultation')).toBeVisible();
   });
 });
 
@@ -537,12 +533,7 @@ test('edits verification independently and roundtrips source and standard catego
   expect(saved.verificationStatus.coding[0].code).toBe('differential');
   await page.goto(`/condition/${condition.id}/edit`);
   const dock = page.getByTestId('resource-action-dock');
-  const ids = [
-    'delete-condition-button',
-    'cancel-button',
-    'save-button',
-    'add-option-button',
-  ];
+  const ids = ['cancel-button', 'save-button', 'add-option-button'];
   const positions = await Promise.all(
     ids.map(async (id) => {
       await expect(dock.getByTestId(id)).toBeVisible();
