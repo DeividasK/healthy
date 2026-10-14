@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { AutocompleteDropdown } from './AutocompleteDropdown';
 import { FormField } from './FormField';
+import { useDismissOnBlur } from './useDismissOnBlur';
 
 interface SpecialistFieldProps {
   label?: string;
@@ -32,34 +33,16 @@ export function SpecialistField({
   removeTestID,
   autocompleteTestID = `${inputID}-autocomplete`,
 }: SpecialistFieldProps) {
-  const [isFocused, setIsFocused] = useState(false);
-  const containerRef = useRef<View>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionsState = useDismissOnBlur();
   const matches = useMemo(() => {
     const query = value.trim().toLowerCase();
     return query
       ? suggestions.filter((name) => name.toLowerCase().includes(query))
       : suggestions;
   }, [value, suggestions]);
-  const isOpen = isFocused && matches.length > 0;
+  const isOpen = suggestionsState.isOpen && matches.length > 0;
 
-  useEffect(
-    () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    },
-    []
-  );
-  const open = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    setIsFocused(true);
-  };
-  const handleBlur = (event: any) => {
-    // Focus moving onto a suggestion keeps the list open for its press.
-    const next = event?.nativeEvent?.relatedTarget ?? event?.relatedTarget;
-    if (next && (containerRef.current as any)?.contains?.(next)) return;
-    // Delay so a tap on a suggestion lands before the list unmounts.
-    closeTimer.current = setTimeout(() => setIsFocused(false), 150);
-  };
+  const { open, close, onBlur: handleBlur, containerRef } = suggestionsState;
 
   return (
     <View
@@ -100,7 +83,7 @@ export function SpecialistField({
             }))}
             onSelect={(item) => {
               onChangeText(item.label);
-              setIsFocused(false);
+              close();
             }}
           />
         )}

@@ -47,6 +47,11 @@ export const migrationV11: DatabaseMigration = {
   isBreaking: false,
   sql: `CREATE TABLE IF NOT EXISTS medication_requests ${tableDefinition};`,
   async repair(db) {
+    // Later migrations own the table layout; never rebuild it to this shape.
+    const schema = await db.getFirstAsync<{ user_version: number }>(
+      'PRAGMA user_version;'
+    );
+    if ((schema?.user_version ?? 0) > 11) return;
     const columns = await db.getAllAsync<{
       name: string;
       notnull: number;

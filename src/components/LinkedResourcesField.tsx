@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import {
@@ -6,6 +6,7 @@ import {
   type AutocompleteItem,
 } from './AutocompleteDropdown';
 import { FormField, FormTextInput } from './FormField';
+import { useDismissOnBlur } from './useDismissOnBlur';
 import { COLORS } from '@/src/theme/colors';
 
 interface LinkedResourcesFieldProps {
@@ -42,8 +43,13 @@ export function LinkedResourcesField({
   itemType = 'condition',
 }: LinkedResourcesFieldProps) {
   const [query, setQuery] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-  const searchRef = useRef<View>(null);
+  const {
+    isOpen: isFocused,
+    open,
+    close,
+    onBlur,
+    containerRef: searchRef,
+  } = useDismissOnBlur();
   const searchID = `${idPrefix}${itemType}-search-input`;
   // Keep an unresolved link visible rather than dropping it.
   const labelOf = (id: string) =>
@@ -65,7 +71,7 @@ export function LinkedResourcesField({
         onRemove &&
         (() => {
           setQuery('');
-          setIsFocused(false);
+          close();
           onRemove();
         })
       }
@@ -92,15 +98,7 @@ export function LinkedResourcesField({
           </TouchableOpacity>
         </View>
       ))}
-      <View
-        ref={searchRef}
-        onFocus={() => setIsFocused(true)}
-        onBlur={(event: any) => {
-          const next = event.relatedTarget;
-          if (next && (searchRef.current as any)?.contains?.(next)) return;
-          setIsFocused(false);
-        }}
-      >
+      <View ref={searchRef} onFocus={open} onBlur={onBlur}>
         <FormTextInput
           testID={searchID}
           id={searchID}
@@ -111,10 +109,11 @@ export function LinkedResourcesField({
           value={query}
           onChangeText={(value) => {
             setQuery(value);
-            setIsFocused(true);
+            open();
           }}
-          onFocus={() => setIsFocused(true)}
-          onPressIn={() => setIsFocused(true)}
+          onFocus={open}
+          onBlur={onBlur}
+          onPressIn={open}
         />
         {isFocused && (
           <AutocompleteDropdown
@@ -125,7 +124,7 @@ export function LinkedResourcesField({
               if (!selectedIds.includes(item.id))
                 onChange([...selectedIds, item.id]);
               setQuery('');
-              setIsFocused(false);
+              close();
             }}
           />
         )}
