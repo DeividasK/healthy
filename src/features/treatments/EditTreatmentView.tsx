@@ -11,7 +11,6 @@ import { TreatmentForm, type TreatmentFormValues } from './TreatmentForm';
 import {
   getTreatmentById,
   createOrUpdateTreatment,
-  deleteTreatment,
   getConsultationIdsLinkingTreatment,
   linkTreatmentToConsultation,
   unlinkTreatmentFromConsultation,
@@ -199,15 +198,6 @@ function EditTreatmentForPatient({
     router.dismissTo(`/treatment/${id}`);
   };
 
-  const handleDelete = async () => {
-    if (!id) return;
-    await deleteTreatment(id, activePatientId);
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on delete treatment:', err)
-    );
-    router.dismissTo('/');
-  };
-
   return (
     <TreatmentForm
       initialValues={initialValues}
@@ -215,7 +205,6 @@ function EditTreatmentForPatient({
       specialistSuggestions={specialists}
       linkFields={linkFields}
       onSubmit={handleSubmit}
-      onDelete={handleDelete}
       isEditing
     />
   );

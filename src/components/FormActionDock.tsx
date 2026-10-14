@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { Alert, Keyboard, Platform } from 'react-native';
+import { Keyboard } from 'react-native';
 import { useIsFocused, useRouter } from 'expo-router';
+import { Check, ChevronLeft, Plus } from 'lucide-react-native';
 import { useEscapeKey } from '@/src/utils/escapeKey';
-import { Check, Plus, Trash2, X } from 'lucide-react-native';
-import { ResourceActionDock, type DockAction } from './ResourceActionDock';
+import {
+  ResourceActionDock,
+  type DeleteConfirmation,
+  type DockAction,
+} from './ResourceActionDock';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 export function FormActionDock({
@@ -21,7 +25,6 @@ export function FormActionDock({
   deleteLabel = 'Delete',
   deleteTestID = 'delete-button',
   deleteConfirmation,
-  cancelOnEscape = false,
   hasChanges = false,
 }: {
   onAdd?: () => void;
@@ -37,50 +40,38 @@ export function FormActionDock({
   onDelete?: () => void;
   deleteLabel?: string;
   deleteTestID?: string;
-  deleteConfirmation?: {
-    title: string;
-    message: string;
-    onConfirm: () => Promise<void>;
-  };
-  /** Escape cancels the form (new-resource forms), confirming first when `hasChanges`. */
-  cancelOnEscape?: boolean;
+  deleteConfirmation?: DeleteConfirmation;
+  /** Entered values would be lost, so cancelling asks to confirm first. */
   hasChanges?: boolean;
 }) {
   const router = useRouter();
   const isFocused = useIsFocused();
-  const [deleteVisible, setDeleteVisible] = useState(false);
   const [discardVisible, setDiscardVisible] = useState(false);
-  const cancel = () => {
+  const leave = () => {
     Keyboard.dismiss();
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };
+  const cancel = () => {
+    if (hasChanges) setDiscardVisible(true);
+    else leave();
+  };
   useEscapeKey(
     () => {
       if (discardVisible) setDiscardVisible(false);
-      else if (hasChanges) setDiscardVisible(true);
       else cancel();
     },
-    cancelOnEscape && isFocused && !isSaving
+    showCancel && isFocused && !isSaving
   );
   const actions: DockAction[] = [];
-  const cancelAction: DockAction = {
-    label: 'Cancel',
-    testID: 'cancel-button',
-    icon: X,
-    disabled: isSaving,
-    onPress: cancel,
-  };
-  const hasDelete = Boolean(onDelete || deleteConfirmation);
-  if (hasDelete)
+  if (showCancel)
     actions.push({
-      label: deleteLabel,
-      testID: deleteTestID,
-      icon: Trash2,
-      onPress: onDelete ?? (() => setDeleteVisible(true)),
+      label: 'Cancel',
+      testID: 'cancel-button',
+      icon: ChevronLeft,
       disabled: isSaving,
+      onPress: cancel,
     });
-  if (showCancel) actions.push(cancelAction);
   actions.push({
     label: isSaving ? 'Saving...' : saveLabel,
     testID: saveTestID,
@@ -101,47 +92,30 @@ export function FormActionDock({
     });
   return (
     <>
-      <ResourceActionDock actions={actions} showBack={false} />
-      {cancelOnEscape && (
-        <DeleteConfirmationModal
-          visible={discardVisible}
-          testID="discard-changes-modal"
-          title="Are you sure?"
-          message="You'll lose the data you entered."
-          cancelLabel="No"
-          confirmLabel="Yes"
-          focusCancel
-          requireCountdown={false}
-          onConfirm={() => {
-            setDiscardVisible(false);
-            cancel();
-          }}
-          onCancel={() => setDiscardVisible(false)}
-        />
-      )}
-      {deleteConfirmation && (
-        <DeleteConfirmationModal
-          visible={deleteVisible}
-          title={deleteConfirmation.title}
-          message={deleteConfirmation.message}
-          requireCountdown
-          onConfirm={async () => {
-            try {
-              await deleteConfirmation.onConfirm();
-              setDeleteVisible(false);
-            } catch (error) {
-              console.error('Failed to delete resource:', error);
-              const message = 'Failed to delete. Please try again.';
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                window.alert(`Error\n${message}`);
-              } else {
-                Alert.alert('Error', message);
-              }
-            }
-          }}
-          onCancel={() => setDeleteVisible(false)}
-        />
-      )}
+      <ResourceActionDock
+        actions={actions}
+        showBack={false}
+        onDelete={onDelete}
+        deleteConfirmation={deleteConfirmation}
+        deleteLabel={deleteLabel}
+        deleteTestID={deleteTestID}
+        deleteDisabled={isSaving}
+      />
+      <DeleteConfirmationModal
+        visible={discardVisible}
+        testID="discard-changes-modal"
+        title="Are you sure?"
+        message="You'll lose the data you entered."
+        cancelLabel="No"
+        confirmLabel="Yes"
+        focusCancel
+        requireCountdown={false}
+        onConfirm={() => {
+          setDiscardVisible(false);
+          leave();
+        }}
+        onCancel={() => setDiscardVisible(false)}
+      />
     </>
   );
 }

@@ -9,7 +9,7 @@ import React, {
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { AppHeader } from './AppHeader';
-import { ActionDock, type DockAction } from './ActionDock';
+import { ActionDock, getActionDockLayout, type DockAction } from './ActionDock';
 import { COLORS } from '@/src/theme/colors';
 
 const OverlayContext = createContext<{
@@ -18,6 +18,10 @@ const OverlayContext = createContext<{
   setDock: (id: string, actions: DockAction[]) => void;
   removeDock: (id: string) => void;
 } | null>(null);
+
+/** Horizontal offset from the screen center of the island's menu toggle. */
+const DockMenuAnchorContext = createContext(0);
+export const useDockMenuAnchor = () => useContext(DockMenuAnchorContext);
 
 /** Keeps navigation chrome mounted while screens change. */
 export function AppChrome({ children }: { children: React.ReactNode }) {
@@ -50,6 +54,11 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+  const menuAnchor = useMemo(() => {
+    const actions = dock?.actions ?? [];
+    const index = actions.findIndex((action) => action.expanded !== undefined);
+    return index < 0 ? 0 : getActionDockLayout(actions).offsets[index];
+  }, [dock?.actions]);
   const context = useMemo(
     () => ({ setOverlay, removeOverlay, setDock, removeDock }),
     [setOverlay, removeOverlay, setDock, removeDock]
@@ -57,19 +66,21 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <OverlayContext.Provider value={context}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.container}>
-          <AppHeader />
-          <View style={styles.container}>{children}</View>
-          {Object.entries(overlays).map(([id, content]) => (
-            <React.Fragment key={id}>{content}</React.Fragment>
-          ))}
-          <ActionDock actions={dock?.actions ?? []} enabled={dock?.active} />
-        </View>
-      </KeyboardAvoidingView>
+      <DockMenuAnchorContext.Provider value={menuAnchor}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.container}>
+            <AppHeader />
+            <View style={styles.container}>{children}</View>
+            {Object.entries(overlays).map(([id, content]) => (
+              <React.Fragment key={id}>{content}</React.Fragment>
+            ))}
+            <ActionDock actions={dock?.actions ?? []} enabled={dock?.active} />
+          </View>
+        </KeyboardAvoidingView>
+      </DockMenuAnchorContext.Provider>
     </OverlayContext.Provider>
   );
 }

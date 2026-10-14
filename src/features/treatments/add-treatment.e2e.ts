@@ -166,7 +166,6 @@ test.describe('Add Treatment Flow', () => {
 
     // Deleting the consultation keeps the treatment and clears its origin
     await page.clock.install();
-    await page.getByTestId('edit-consultation-button').click();
     await page.getByTestId('delete-consultation-button').click();
     await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
     await page.clock.runFor(5000);

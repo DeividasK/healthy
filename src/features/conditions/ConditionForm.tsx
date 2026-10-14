@@ -130,7 +130,6 @@ export interface ConditionFormValues {
 export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
-  onDelete?: () => Promise<void>;
   onSave: (
     values: ConditionInput,
     links: Record<string, LinkSelection>
@@ -151,7 +150,6 @@ export function ConditionForm({
   initialValues,
   isEdit = false,
   onSave,
-  onDelete,
   linkFields = [],
 }: ConditionFormProps) {
   const router = useRouter();
@@ -692,20 +690,7 @@ export function ConditionForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
-          cancelOnEscape={!isEdit}
           hasChanges={hasChanges}
-          deleteLabel="Delete condition"
-          deleteTestID="delete-condition-button"
-          deleteConfirmation={
-            isEdit && onDelete
-              ? {
-                  title: 'Delete Condition',
-                  message:
-                    'Are you sure you want to delete this condition? This action cannot be undone.',
-                  onConfirm: onDelete,
-                }
-              : undefined
-          }
         />
 
         {/* Plus Action Modal */}

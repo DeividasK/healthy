@@ -109,7 +109,8 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(
       page.getByTestId('resource-action-dock').getByTestId('back-button')
     ).toBeVisible();
-    await expect(page.getByTestId('delete-condition-button')).toHaveCount(0);
+    // View pages delete from their island
+    await expect(page.getByTestId('delete-condition-button')).toBeVisible();
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
       .toBeCloseTo(16);
@@ -200,18 +201,27 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       dock.getByRole('button', { name: 'Save', exact: true })
     ).toBeVisible();
     await expect(dock.getByTestId('back-button')).toHaveCount(0);
+    // Edit forms have no delete; the island hugs back, save and + while
+    // save stays at the screen center.
+    await expect(dock.getByTestId('delete-condition-button')).toHaveCount(0);
+    const viewportWidth = page.viewportSize()!.width;
     await expect
       .poll(
         async () => {
-          const trash = (await dock
-            .getByTestId('delete-condition-button')
-            .boundingBox())!;
-          const save = (await dock.getByTestId('save-button').boundingBox())!;
           const close = (await dock
             .getByTestId('cancel-button')
             .boundingBox())!;
+          const save = (await dock.getByTestId('save-button').boundingBox())!;
+          const add = (await dock
+            .getByTestId('add-option-button')
+            .boundingBox())!;
+          const island = (await background.boundingBox())!;
           return (
-            trash.x + trash.width < save.x && save.x + save.width < close.x
+            close.x + close.width < save.x &&
+            save.x + save.width < add.x &&
+            Math.abs(save.x + save.width / 2 - viewportWidth / 2) < 1 &&
+            Math.abs(island.x - (close.x - 10)) < 1 &&
+            Math.abs(island.x + island.width - (add.x + add.width + 10)) < 1
           );
         },
         { timeout: 15000 }
@@ -219,6 +229,10 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       .toBe(true);
     await page.getByTestId('condition-title-input').fill('Unsaved change');
     await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Entered data is only discarded after confirming
+    const discard = page.getByTestId('discard-changes-modal');
+    await expect(discard.getByText('Are you sure?')).toBeVisible();
+    await discard.getByRole('button', { name: 'Yes' }).click();
     await expect(page.getByTestId('condition-title')).toHaveText(
       'Header navigation'
     );

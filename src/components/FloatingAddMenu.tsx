@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppOverlay } from './AppChrome';
+import { AppOverlay, useDockMenuAnchor } from './AppChrome';
 import { getActionDockMenuOffset } from './ResourceActionDock';
 import type { AddOptionItem } from './AddOptionsModal';
 import { COLORS } from '@/src/theme/colors';
@@ -52,6 +52,11 @@ export function FloatingAddMenu({
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const itemRefs = useRef<(View | null)[]>([]);
+  // Center the menu on the + that opened it, keeping a 16px screen gutter.
+  const anchor = useDockMenuAnchor();
+  const [menuWidth, setMenuWidth] = useState(0);
+  const maxShift = Math.max(0, (screenWidth - menuWidth) / 2 - 16);
+  const shift = Math.max(-maxShift, Math.min(maxShift, anchor));
   // The options mount later through AppOverlay, so focus waits for them.
   const focusFirstPending = useRef(false);
   const focusFirst = () => {
@@ -125,8 +130,13 @@ export function FloatingAddMenu({
             bottom: bottomOffset ?? getActionDockMenuOffset(insets.bottom),
             // Grow with the longest label, but keep a gutter to the screen edges.
             maxWidth: screenWidth - 32,
+            // Margins rather than a transform: the entering and exiting
+            // animations own the transform.
+            marginLeft: Math.max(0, shift) * 2,
+            marginRight: Math.max(0, -shift) * 2,
           },
         ]}
+        onLayout={(event) => setMenuWidth(event.nativeEvent.layout.width)}
         testID={testID}
       >
         {options.map((option, index) => (

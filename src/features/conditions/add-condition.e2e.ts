@@ -3,6 +3,7 @@ import {
   expect,
   clearAppStorage,
   createPatientViaUI,
+  createTestConditionViaUI,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
@@ -154,5 +155,51 @@ test.describe('New condition form keyboard support', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByText('Unsaved condition')).toHaveCount(0);
+  });
+});
+
+test.describe('Condition form island', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await createPatientViaUI(page);
+  });
+
+  test('centers the add menu on its + and turns the + into a close icon', async ({
+    page,
+  }) => {
+    await page.goto('/condition/add');
+    const add = page.getByTestId('add-option-button');
+    await add.click();
+    const menu = page.getByTestId('form-add-menu');
+    await expect(menu).toBeVisible();
+    await expect(add).toHaveAttribute('aria-label', 'Close add menu');
+    await expect
+      .poll(() =>
+        page
+          .getByTestId('add-option-button-icon')
+          .evaluate((element) => getComputedStyle(element).transform)
+      )
+      .not.toBe('none');
+    await expect
+      .poll(async () => {
+        const menuBox = (await menu.boundingBox())!;
+        const addBox = (await add.boundingBox())!;
+        return Math.abs(
+          menuBox.x + menuBox.width / 2 - (addBox.x + addBox.width / 2)
+        );
+      })
+      .toBeLessThan(1);
+  });
+
+  test('cancelling an unchanged edit form leaves without asking', async ({
+    page,
+  }) => {
+    await createTestConditionViaUI(page);
+    await page.getByRole('button', { name: /^View condition:/ }).click();
+    await page.getByTestId('edit-condition-button').click();
+    await expect(page.getByTestId('condition-title-input')).toBeVisible();
+    await page.getByTestId('cancel-button').click();
+    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
+    await expect(page.getByTestId('condition-title')).toBeVisible();
   });
 });

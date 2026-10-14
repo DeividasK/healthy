@@ -11,7 +11,12 @@ import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import { getConsultationById } from '@/src/features/consultations/consultationService';
+import {
+  deleteConsultation,
+  getConsultationById,
+} from '@/src/features/consultations/consultationService';
+import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
 import { RelatedResourceList } from './RelatedResourceList';
@@ -28,6 +33,7 @@ import { COLORS } from '@/src/theme/colors';
 export function ViewConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
   const loadGeneration = useRef(0);
   const [consultation, setConsultation] = useState<Encounter | null>(null);
@@ -167,6 +173,23 @@ export function ViewConsultationView() {
             addLabel="Add treatment"
             addMenuExpanded={showAddMenu}
             addTestID="consultation-add-treatment"
+            deleteLabel="Delete consultation"
+            deleteTestID="delete-consultation-button"
+            deleteConfirmation={{
+              title: 'Delete Consultation',
+              message:
+                'Are you sure you want to delete this consultation? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteConsultation(consultation.id!);
+                triggerSync().catch((error) =>
+                  console.warn(
+                    'Background sync failed on delete consultation:',
+                    error
+                  )
+                );
+                goBackOr(router, '/');
+              },
+            }}
           />
         </>
       }

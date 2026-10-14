@@ -49,6 +49,9 @@ export function PlusCircleButton({
     });
   }, [expanded, progress]);
   const buttonStyle = useAnimatedStyle(() => ({
+    // An expanded primary becomes a close button the size of a secondary
+    // action (44pt), so it stays inside the island instead of overlapping it.
+    transform: [{ scale: isPrimary ? 1 - (8 / 52) * progress.value : 1 }],
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],

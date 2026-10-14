@@ -118,7 +118,6 @@ export interface ConsultationFormProps {
   initialValues?: Partial<ConsultationFormValues>;
   initialConditionIds?: string[];
   isEdit?: boolean;
-  onDelete?: () => Promise<void>;
   onSave: (
     values: ConsultationInput,
     links: Record<string, LinkSelection>
@@ -140,7 +139,6 @@ export function ConsultationForm({
   initialConditionIds,
   isEdit = false,
   onSave,
-  onDelete,
   linkFields = [],
 }: ConsultationFormProps) {
   const links = useLinkFields(linkFields);
@@ -870,20 +868,7 @@ export function ConsultationForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
-          cancelOnEscape={!isEdit}
           hasChanges={hasChanges}
-          deleteLabel="Delete consultation"
-          deleteTestID="delete-consultation-button"
-          deleteConfirmation={
-            isEdit && onDelete
-              ? {
-                  title: 'Delete Consultation',
-                  message:
-                    'Are you sure you want to delete this consultation? This action cannot be undone.',
-                  onConfirm: onDelete,
-                }
-              : undefined
-          }
         />
 
         {/* Plus Menu Modal for adding optional fields */}

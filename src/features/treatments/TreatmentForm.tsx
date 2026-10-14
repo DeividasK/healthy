@@ -53,7 +53,6 @@ export interface TreatmentFormProps {
   /** The active patient's conditions, offered as the indication. */
   conditions?: Condition[];
   onSubmit: (values: TreatmentFormValues) => Promise<void>;
-  onDelete?: () => Promise<void>;
   isEditing?: boolean;
   /** Known specialists offered as requester suggestions. */
   specialistSuggestions?: string[];
@@ -65,7 +64,6 @@ export function TreatmentForm({
   initialValues,
   conditions = [],
   onSubmit,
-  onDelete,
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
@@ -365,21 +363,8 @@ export function TreatmentForm({
         saveLabel={isEditing ? 'Save changes' : 'Save treatment'}
         onSave={handleSubmit}
         isSaving={isSubmitting}
-        cancelOnEscape={!isEditing}
         hasChanges={hasChanges}
         saveTestID="save-treatment-button"
-        deleteLabel="Delete treatment"
-        deleteTestID="delete-treatment-button"
-        deleteConfirmation={
-          isEditing && onDelete
-            ? {
-                title: 'Delete Treatment',
-                message:
-                  'Are you sure you want to delete this treatment? This action cannot be undone.',
-                onConfirm: onDelete,
-              }
-            : undefined
-        }
       />
     </SafeAreaView>
   );

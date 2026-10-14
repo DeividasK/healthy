@@ -210,7 +210,6 @@ export function ProfileForm({
         saveLabel="Save Profile"
         saveTestID="save-profile-button"
         showCancel={showBackButton}
-        cancelOnEscape={!isEdit && showBackButton}
         hasChanges={hasChanges}
         onDelete={isEdit ? onDelete : undefined}
         deleteLabel="Delete Profile"

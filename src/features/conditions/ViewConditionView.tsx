@@ -19,13 +19,16 @@ import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentS
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { getConditionById } from './conditionService';
+import { deleteCondition, getConditionById } from './conditionService';
+import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 
 export function ViewConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { triggerSync } = useSync();
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
@@ -158,6 +161,23 @@ export function ViewConditionView() {
             addMenuExpanded={showAddMenu}
             editTestID="edit-condition-button"
             addTestID="condition-add-button"
+            deleteLabel="Delete condition"
+            deleteTestID="delete-condition-button"
+            deleteConfirmation={{
+              title: 'Delete Condition',
+              message:
+                'Are you sure you want to delete this condition? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteCondition(condition.id!);
+                triggerSync().catch((error) =>
+                  console.warn(
+                    'Background sync failed on delete condition:',
+                    error
+                  )
+                );
+                goBackOr(router, '/');
+              },
+            }}
           />
         </>
       }

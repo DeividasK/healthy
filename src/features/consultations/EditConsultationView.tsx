@@ -2,13 +2,11 @@ import type { ConsultationInput } from './consultationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSync } from '@/src/context/SyncContext';
+import { useLocalSearchParams } from 'expo-router';
 import { ConsultationForm, ConsultationFormValues } from './ConsultationForm';
 import {
   getConsultationById,
   createOrUpdateConsultation,
-  deleteConsultation,
 } from './consultationService';
 import {
   getConsultationTitle,
@@ -36,9 +34,7 @@ import {
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
-  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConsultationFormValues | null>(null);
   const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
@@ -195,18 +191,6 @@ export function EditConsultationView() {
       initialValues={initialValues}
       linkFields={linkFields}
       onSave={handleSave}
-      onDelete={async () => {
-        if (!id) return;
-        await deleteConsultation(id);
-        triggerSync().catch((error) =>
-          console.warn('Background sync failed on delete consultation:', error)
-        );
-        router.dismissTo(
-          initialValues.conditionIds?.[0]
-            ? `/condition/${initialValues.conditionIds?.[0]}`
-            : '/'
-        );
-      }}
     />
   );
 }

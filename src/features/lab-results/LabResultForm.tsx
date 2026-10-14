@@ -106,16 +106,20 @@ export function LabResultForm({
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
-  const hasChanges = useHasChanges({
-    selectedDate,
-    testTime,
-    testNotes,
-    activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
-      id,
-      valueStr,
-      selectedUnit,
-    })),
-  });
+  const [isReportLoaded, setIsReportLoaded] = useState(!reportId);
+  const hasChanges = useHasChanges(
+    {
+      selectedDate,
+      testTime,
+      testNotes,
+      activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
+        id,
+        valueStr,
+        selectedUnit,
+      })),
+    },
+    isReportLoaded
+  );
 
   // Add Test search query
   const [searchQuery, setSearchQuery] = useState('');
@@ -201,6 +205,8 @@ export function LabResultForm({
         setActiveItems(loadedItems);
       } catch (err) {
         console.error('Failed to load report for editing:', err);
+      } finally {
+        if (isMounted) setIsReportLoaded(true);
       }
     })();
 
@@ -599,7 +605,6 @@ export function LabResultForm({
           onSave={handleSave}
           isSaving={isSaving}
           saveDisabled={activeItems.length === 0}
-          cancelOnEscape={!isEdit && !reportId}
           hasChanges={hasChanges}
           deleteLabel="Delete lab result"
           deleteTestID="delete-report-button"
