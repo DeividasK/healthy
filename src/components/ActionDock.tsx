@@ -63,6 +63,34 @@ export function ActionDock({
   const targetWidth = onlyPrimary
     ? 40
     : 2 * Math.max(primaryCenter, rowWidth - primaryCenter) + 20;
+  const primaryAction = actions[primaryIndex];
+  const primaryPressRef = React.useRef<(() => void) | null>(null);
+  const primaryPress =
+    enabled && primaryAction && !primaryAction.disabled
+      ? primaryAction.onPress
+      : null;
+  useEffect(() => {
+    primaryPressRef.current = primaryPress;
+  }, [primaryPress]);
+
+  // Cmd/Ctrl+Enter runs the island's primary action on web.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return;
+      if (!primaryPressRef.current) return;
+      event.preventDefault();
+      // Defer past pending effects so edits typed just before the shortcut
+      // have reached the dock's latest primary action.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => primaryPressRef.current?.())
+      );
+    };
+    // Capture phase: react-native-web text inputs stop keydown propagation.
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, []);
+
   const width = useSharedValue(targetWidth);
   const height = useSharedValue(onlyPrimary ? 40 : 52);
   const backgroundOpacity = useSharedValue(onlyPrimary ? 0 : 1);

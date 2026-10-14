@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Keyboard, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
+import { useEscapeKey } from '@/src/utils/escapeKey';
 import { Check, Plus, Trash2, X } from 'lucide-react-native';
 import { ResourceActionDock, type DockAction } from './ResourceActionDock';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -20,6 +21,8 @@ export function FormActionDock({
   deleteLabel = 'Delete',
   deleteTestID = 'delete-button',
   deleteConfirmation,
+  cancelOnEscape = false,
+  hasChanges = false,
 }: {
   onAdd?: () => void;
   addDisabled?: boolean;
@@ -39,20 +42,34 @@ export function FormActionDock({
     message: string;
     onConfirm: () => Promise<void>;
   };
+  /** Escape cancels the form (new-resource forms), confirming first when `hasChanges`. */
+  cancelOnEscape?: boolean;
+  hasChanges?: boolean;
 }) {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [discardVisible, setDiscardVisible] = useState(false);
+  const cancel = () => {
+    Keyboard.dismiss();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+  useEscapeKey(
+    () => {
+      if (discardVisible) setDiscardVisible(false);
+      else if (hasChanges) setDiscardVisible(true);
+      else cancel();
+    },
+    cancelOnEscape && isFocused && !isSaving
+  );
   const actions: DockAction[] = [];
   const cancelAction: DockAction = {
     label: 'Cancel',
     testID: 'cancel-button',
     icon: X,
     disabled: isSaving,
-    onPress: () => {
-      Keyboard.dismiss();
-      if (router.canGoBack()) router.back();
-      else router.replace('/');
-    },
+    onPress: cancel,
   };
   const hasDelete = Boolean(onDelete || deleteConfirmation);
   if (hasDelete)
@@ -85,6 +102,23 @@ export function FormActionDock({
   return (
     <>
       <ResourceActionDock actions={actions} showBack={false} />
+      {cancelOnEscape && (
+        <DeleteConfirmationModal
+          visible={discardVisible}
+          testID="discard-changes-modal"
+          title="Are you sure?"
+          message="You'll lose the data you entered."
+          cancelLabel="No"
+          confirmLabel="Yes"
+          focusCancel
+          requireCountdown={false}
+          onConfirm={() => {
+            setDiscardVisible(false);
+            cancel();
+          }}
+          onCancel={() => setDiscardVisible(false)}
+        />
+      )}
       {deleteConfirmation && (
         <DeleteConfirmationModal
           visible={deleteVisible}

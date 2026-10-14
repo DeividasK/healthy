@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 
-interface RelatedResourceSectionProps {
+interface ResourceSectionProps {
   icon: LucideIcon;
   title: string;
   testID?: string;
@@ -14,14 +14,14 @@ interface RelatedResourceSectionProps {
 }
 
 /** Heading plus full-width rows linking to resources related to a view. */
-export function RelatedResourceSection({
+export function ResourceSection({
   icon: Icon,
   title,
   testID,
   emptyText,
   emptyTestID,
   children,
-}: RelatedResourceSectionProps) {
+}: ResourceSectionProps) {
   const hasRows = React.Children.toArray(children).length > 0;
   return (
     <View style={[styles.section, hasRows && styles.list]} testID={testID}>
@@ -42,73 +42,96 @@ export function RelatedResourceSection({
   );
 }
 
-export interface RelatedResourceMeta {
-  icon?: LucideIcon;
+export interface ResourceMeta {
+  icon: LucideIcon;
   text: string;
+  /** Accessible description read instead of the bare text, e.g. "2 treatments". */
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
-interface RelatedResourceRowProps {
+interface ResourceRowProps {
   title: string;
-  meta?: RelatedResourceMeta[];
+  meta?: ResourceMeta[];
   /** Quoted text below the row, e.g. consultation notes. */
   note?: string | null;
   /** Opens the resource; without it the row shows no chevron. */
   onPress?: () => void;
   /** Accessible name of the open button, e.g. "View condition: Migraine". */
   accessibilityLabel?: string;
-  /** Test ID of the open button (or of the row when it cannot be opened). */
+  /** Test ID of the pressable row (or of the plain row when it cannot be opened). */
   testID?: string;
 }
 
 /**
- * One related resource: title, meta line and a chevron. Only the 48x48
- * chevron button opens the resource, so the rest of the row is plain text.
+ * A resource's meta line: date, status, specialist, then type-specific
+ * fields and association counts, each with its concept icon. Shared by
+ * resource rows and view-page headings so both read the same way.
  */
-export function RelatedResourceRow({
+export function ResourceMetaLine({ meta }: { meta: ResourceMeta[] }) {
+  if (!meta.length) return null;
+  return (
+    <View style={styles.meta}>
+      {meta.map(
+        ({ icon: MetaIcon, text, accessibilityLabel, testID }, index) => (
+          <View
+            key={index}
+            style={styles.inlineMeta}
+            testID={testID}
+            accessible={Boolean(accessibilityLabel)}
+            accessibilityLabel={accessibilityLabel}
+          >
+            <MetaIcon color={COLORS.light.muted} size={14} />
+            <Text style={styles.metaText}>{text}</Text>
+          </View>
+        )
+      )}
+    </View>
+  );
+}
+
+/**
+ * One related resource: title, meta line and a chevron. The whole row opens
+ * the resource; without `onPress` it is plain text with no chevron.
+ */
+export function ResourceRow({
   title,
   meta = [],
   note,
   onPress,
   accessibilityLabel,
   testID,
-}: RelatedResourceRowProps) {
-  return (
-    <View style={note ? styles.itemWithNote : undefined}>
+}: ResourceRowProps) {
+  const content = (
+    <>
       <View style={styles.row} testID={onPress ? `${testID}-row` : testID}>
         <View style={styles.main}>
           <Text style={styles.rowTitle}>{title}</Text>
-          {meta.length > 0 && (
-            <View style={styles.meta}>
-              {meta.map(({ icon: MetaIcon, text }, index) =>
-                MetaIcon ? (
-                  <View key={index} style={styles.inlineMeta}>
-                    <MetaIcon color={COLORS.light.muted} size={14} />
-                    <Text style={styles.metaText}>{text}</Text>
-                  </View>
-                ) : (
-                  <Text key={index} style={styles.metaText}>
-                    {text}
-                  </Text>
-                )
-              )}
-            </View>
-          )}
+          <ResourceMetaLine meta={meta} />
         </View>
         {onPress && (
-          <TouchableOpacity
-            testID={testID}
-            accessibilityRole="button"
-            accessibilityLabel={accessibilityLabel}
-            style={styles.openButton}
-            activeOpacity={0.6}
-            onPress={onPress}
-          >
+          <View style={styles.chevron}>
             <ChevronRight color={COLORS.light.muted} size={18} />
-          </TouchableOpacity>
+          </View>
         )}
       </View>
       {note && <Text style={styles.note}>&quot;{note}&quot;</Text>}
-    </View>
+    </>
+  );
+  const style = note ? styles.itemWithNote : undefined;
+  return onPress ? (
+    <TouchableOpacity
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={style}
+      activeOpacity={0.6}
+      onPress={onPress}
+    >
+      {content}
+    </TouchableOpacity>
+  ) : (
+    <View style={style}>{content}</View>
   );
 }
 
@@ -145,8 +168,8 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.light.cardBorder,
     gap: 10,
   },
-  // 48x48 touch target; the negative margin keeps the chevron at the edge.
-  openButton: {
+  // The negative margin keeps the chevron at the edge.
+  chevron: {
     width: 48,
     height: 48,
     marginRight: -15,
@@ -168,7 +191,9 @@ const styles = StyleSheet.create({
   meta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    columnGap: 12,
+    // Wrapped meta lines keep the same spacing as the title and first line.
+    rowGap: 5,
   },
   inlineMeta: {
     flexDirection: 'row',

@@ -38,7 +38,7 @@ test.describe('Edit Consultation Flow', () => {
       });
 
       await test.step('Open the consultation view from Condition and edit it', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -104,7 +104,7 @@ test.describe('Edit Consultation Flow', () => {
       });
 
       await test.step('Open the consultation view and test delete cancellation', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );

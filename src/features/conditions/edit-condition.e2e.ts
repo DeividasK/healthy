@@ -23,7 +23,7 @@ test.describe('Edit Condition Flow', () => {
       title: 'Condition to delete',
     });
     await page.reload();
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await page.getByTestId('edit-condition-button').click();
     await expect(page.getByTestId('condition-title-input')).toHaveValue(
       'Condition to delete'
@@ -79,7 +79,7 @@ test.describe('Edit Condition Flow', () => {
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
-        await page.getByTestId(/^condition-card-/).click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await page.getByTestId('edit-condition-button').click();
         await expect(page).toHaveURL(/.*condition\/.*\/edit/);
         await expect(page.getByText('Edit Condition')).toBeVisible();
@@ -109,8 +109,7 @@ test.describe('Edit Condition Flow', () => {
       });
 
       await test.step('Click condition card to open Condition View', async () => {
-        const condCard = page.getByTestId(/^condition-card-/);
-        await condCard.click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await expect(page).toHaveURL(/.*condition\/[a-zA-Z0-9_-]+$/);
         await expect(page.getByTestId('condition-title')).toHaveText(
           DEFAULT_CONDITION_TITLE
@@ -286,14 +285,8 @@ test.describe('Edit Condition Flow', () => {
     expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
       viewportWidth
     );
-    // Only the 48x48 chevron opens the consultation
-    const openButton = view.getByTestId(
-      /^condition-consultation-item-(?!.*-row$)/
-    );
-    const openBox = (await openButton.boundingBox())!;
-    expect(openBox.width).toBe(48);
-    expect(openBox.height).toBe(48);
-    await openButton.click();
+    // The whole row opens the consultation
+    await consultationRow.getByText('Linked Consultation').click();
     const consultationView = page.getByTestId('consultation-view');
     await expect(consultationView.getByTestId('consultation-title')).toHaveText(
       'Linked Consultation'
@@ -307,7 +300,8 @@ test.describe('Edit Condition Flow', () => {
 
     await page.getByRole('button', { name: 'Home', exact: true }).click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Linked Consultation')).not.toBeVisible();
+    // Linked consultations are listed on the homepage too.
+    await expect(page.getByText('Linked Consultation')).toBeVisible();
   });
 });
 

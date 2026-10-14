@@ -81,9 +81,7 @@ test.describe('Add Condition Flow', () => {
 
         await expect(page).toHaveURL(/.*(\/|#)$/);
         await expect(page.getByText('Left Knee Pain')).toBeVisible();
-        await expect(
-          page.getByText('Mild swelling after jogging 5km.')
-        ).toBeVisible();
+        // Home rows show the meta line; notes stay on the condition view.
         await expect(page.getByText('Active')).toBeVisible();
 
         const conditionCard = page.getByTestId(/^condition-card-/);
@@ -97,4 +95,64 @@ test.describe('Add Condition Flow', () => {
       });
     }
   );
+});
+
+test.describe('New condition form keyboard support', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await createPatientViaUI(page);
+  });
+
+  test('focuses the first field and Escape cancels a pristine form', async ({
+    page,
+  }) => {
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-condition').click();
+    await expect(page.getByTestId('condition-title-input')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
+  });
+
+  test('Escape asks before discarding entered data, defaulting to No', async ({
+    page,
+  }) => {
+    await page.getByTestId('floating-add-button').click();
+    await page.getByTestId('menu-add-condition').click();
+    await page.getByTestId('condition-title-input').fill('Unsaved condition');
+
+    await page.keyboard.press('Escape');
+    const modal = page.getByTestId('discard-changes-modal');
+    await expect(modal.getByText('Are you sure?')).toBeVisible();
+    await expect(
+      modal.getByText("You'll lose the data you entered.")
+    ).toBeVisible();
+    const no = modal.getByRole('button', { name: 'No' });
+    const yes = modal.getByRole('button', { name: 'Yes' });
+    await expect(no).toBeFocused();
+
+    // Enter on the focused No keeps the form and its data
+    await page.keyboard.press('Enter');
+    await expect(modal).toHaveCount(0);
+    await expect(page).toHaveURL(/condition\/add/);
+    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+      'Unsaved condition'
+    );
+
+    // Escape also dismisses the prompt
+    await page.keyboard.press('Escape');
+    await expect(no).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(modal).toHaveCount(0);
+    await expect(page).toHaveURL(/condition\/add/);
+
+    // Tab to Yes and Enter discards the form
+    await page.keyboard.press('Escape');
+    await expect(no).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(yes).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText('Unsaved condition')).toHaveCount(0);
+  });
 });

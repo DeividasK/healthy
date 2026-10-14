@@ -1,8 +1,5 @@
 import { getConditionCategoryLabel } from './conditionCategories';
-import {
-  CONDITION_STATUS_OPTIONS,
-  VERIFICATION_OPTIONS,
-} from './ConditionForm';
+import { VERIFICATION_OPTIONS } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -10,9 +7,10 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ResourceSection } from '@/src/components/ResourceSection';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
@@ -75,17 +73,6 @@ export function ViewConditionView() {
     loadData
   );
 
-  const getStatus = (value: Condition) => {
-    const clinicalStatus = value.clinicalStatus?.coding?.[0]?.code;
-    const option = CONDITION_STATUS_OPTIONS.find(
-      (item) => item.id === clinicalStatus
-    );
-    return {
-      label: option?.label || clinicalStatus || 'Unknown',
-      color: option?.dotColor || '#6B7280',
-    };
-  };
-
   if (
     isLoading ||
     isPatientLoading ||
@@ -107,8 +94,6 @@ export function ViewConditionView() {
 
   const title = getConditionTitle(condition);
   const notes = getConditionNotes(condition);
-  const status = getStatus(condition);
-  const onsetDate = condition.onsetDateTime;
   const abatementDate = condition.abatementDateTime;
   const severity = condition.severity?.coding?.[0]?.code;
   const bodySite = condition.bodySite?.[0]?.text;
@@ -118,8 +103,7 @@ export function ViewConditionView() {
       testID="condition-view"
       title={title}
       titleTestID="condition-title"
-      date={onsetDate ? formatDisplayDate(onsetDate) : undefined}
-      status={status}
+      meta={getConditionMeta(condition)}
       actions={
         <>
           <FloatingAddMenu
@@ -255,7 +239,7 @@ export function ViewConditionView() {
         </View>
       )}
 
-      <RelatedResourceSection
+      <ResourceSection
         icon={Stethoscope}
         title="Recent Consultations"
         testID="condition-consultations-section"
@@ -276,10 +260,10 @@ export function ViewConditionView() {
             }
           />
         ))}
-      </RelatedResourceSection>
+      </ResourceSection>
 
       {treatments.length > 0 && (
-        <RelatedResourceSection
+        <ResourceSection
           icon={Pill}
           title="Treatments"
           testID="condition-treatments-section"
@@ -297,7 +281,7 @@ export function ViewConditionView() {
               }
             />
           ))}
-        </RelatedResourceSection>
+        </ResourceSection>
       )}
     </ResourceViewLayout>
   );

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { focusWhenReady } from '@/src/utils/focus';
 import {
   Modal,
   StyleSheet,
@@ -16,6 +17,9 @@ export interface DeleteConfirmationModalProps {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
+  /** Focus the cancel button on open (web), so Enter keeps the data. */
+  focusCancel?: boolean;
   requireCountdown?: boolean;
   countdownDuration?: number;
   showCloudDeleteOption?: boolean;
@@ -29,6 +33,8 @@ interface DeleteConfirmationModalContentProps {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel: string;
+  focusCancel: boolean;
   requireCountdown: boolean;
   countdownDuration: number;
   showCloudDeleteOption?: boolean;
@@ -42,6 +48,8 @@ function DeleteConfirmationModalContent({
   title,
   message,
   confirmLabel = 'Delete',
+  cancelLabel,
+  focusCancel,
   requireCountdown,
   countdownDuration,
   showCloudDeleteOption = false,
@@ -54,6 +62,12 @@ function DeleteConfirmationModalContent({
     requireCountdown ? countdownDuration : 0
   );
   const [deleteFromCloud, setDeleteFromCloud] = useState(false);
+  const cancelRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (focusCancel && Platform.OS === 'web')
+      focusWhenReady(cancelRef.current as unknown as HTMLElement);
+  }, [focusCancel]);
 
   useEffect(() => {
     if (!requireCountdown) return;
@@ -109,16 +123,19 @@ function DeleteConfirmationModalContent({
 
         <View style={styles.actionsRow}>
           <TouchableOpacity
+            ref={cancelRef}
             testID="delete-modal-cancel-button"
+            accessibilityRole="button"
             style={styles.cancelButton}
             onPress={onCancel}
             activeOpacity={0.7}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{cancelLabel}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             testID="delete-modal-confirm-button"
+            accessibilityRole="button"
             style={[
               styles.deleteButton,
               isDeleteDisabled && styles.deleteButtonDisabled,
@@ -142,6 +159,8 @@ export function DeleteConfirmationModal({
   title,
   message,
   confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
+  focusCancel = false,
   requireCountdown = true,
   countdownDuration = 5,
   showCloudDeleteOption = false,
@@ -164,6 +183,8 @@ export function DeleteConfirmationModal({
         title={title}
         message={message}
         confirmLabel={confirmLabel}
+        cancelLabel={cancelLabel}
+        focusCancel={focusCancel}
         requireCountdown={requireCountdown}
         countdownDuration={countdownDuration}
         showCloudDeleteOption={showCloudDeleteOption}

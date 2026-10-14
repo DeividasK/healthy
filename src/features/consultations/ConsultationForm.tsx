@@ -2,6 +2,7 @@ import type {
   ConsultationInput,
   ConsultationDiagnosisInput,
 } from './consultationService';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -53,6 +54,7 @@ import {
 } from './consultationService';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import type { Condition } from 'fhir/r5';
+import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConsultationStatusOption {
   id: string;
@@ -219,6 +221,18 @@ export function ConsultationForm({
   const [diagnosisQueries, setDiagnosisQueries] = useState<
     Record<number, string>
   >({});
+  const hasChanges = useHasChanges({
+    title,
+    status: selectedStatus.id,
+    date,
+    time,
+    doctorName,
+    serviceType,
+    notes,
+    selectedConditionIds,
+    diagnoses,
+    links: links.values,
+  });
   const [focusedDiagnosis, setFocusedDiagnosis] = useState<number | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -339,13 +353,12 @@ export function ConsultationForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else if (showCondition && selectedConditionIds[0]) {
-        router.replace(`/condition/${selectedConditionIds[0]}` as any);
-      } else {
-        router.replace('/');
-      }
+      goBackOr(
+        router,
+        showCondition && selectedConditionIds[0]
+          ? `/condition/${selectedConditionIds[0]}`
+          : '/'
+      );
     } catch (err) {
       console.error('Failed to save consultation:', err);
       showAlert('Error', 'Failed to save consultation. Please try again.');
@@ -391,7 +404,7 @@ export function ConsultationForm({
       },
     });
   }
-  if (!showCondition) {
+  if (!showCondition && conditionOptions.length > 0) {
     plusMenuOptions.push({
       id: 'add-reason',
       label: 'Reasons for Visit',
@@ -551,12 +564,14 @@ export function ConsultationForm({
           {/* Consultation Title Input (Required) */}
           <FormField
             label="Consultation / Service"
+            required
             nativeID="consultation-title-input"
             inputProps={{
               testID: 'consultation-title-input',
               id: 'consultation-title-input',
               nativeID: 'consultation-title-input',
               name: 'title',
+              autoFocus: !isEdit,
               accessibilityLabel: 'Consultation Title',
               placeholder: 'e.g. Cardiology Follow-up, Annual Checkup',
               value: title,
@@ -609,6 +624,7 @@ export function ConsultationForm({
                         <React.Fragment key={field}>
                           <FormField
                             label={label}
+                            required={field === 'title'}
                             nativeID={`diagnosis-${index}-${field}-input`}
                             removeTestID={`remove-diagnosis-${index}`}
                             removeLabel={`Remove diagnosis ${index + 1}`}
@@ -854,6 +870,8 @@ export function ConsultationForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
+          cancelOnEscape={!isEdit}
+          hasChanges={hasChanges}
           deleteLabel="Delete consultation"
           deleteTestID="delete-consultation-button"
           deleteConfirmation={

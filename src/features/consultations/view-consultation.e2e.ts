@@ -32,7 +32,7 @@ test.describe('View Consultation Flow', () => {
     });
     await page.reload();
 
-    await page.getByTestId(`consultation-card-${consultation.id}`).click();
+    await page.getByTestId(`consultation-open-${consultation.id}`).click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
     );
@@ -104,7 +104,7 @@ test.describe('View Consultation Flow', () => {
     });
     await page.reload();
 
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await page
       .getByTestId(`condition-consultation-item-${consultation.id}`)
       .click();
@@ -123,6 +123,13 @@ test.describe('View Consultation Flow', () => {
     await expect(conditionView.getByTestId('condition-title')).toHaveText(
       'Knee Osteoarthritis'
     );
+    // Back retraces the visited screens: consultation, condition, then home.
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(
+      new RegExp(`.*consultation\\/${consultation.id}$`)
+    );
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
     await page.getByTestId('back-button').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
   });
@@ -143,7 +150,7 @@ test.describe('View Consultation Flow', () => {
       notes: 'Consultation notes remain available.',
     });
     await page.reload();
-    await page.getByTestId(`condition-card-${condition.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
     await expect(
       page.getByTestId(`condition-consultation-item-${consultation.id}`)
     ).toBeVisible();

@@ -1,3 +1,4 @@
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -105,6 +106,16 @@ export function LabResultForm({
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
+  const hasChanges = useHasChanges({
+    selectedDate,
+    testTime,
+    testNotes,
+    activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
+      id,
+      valueStr,
+      selectedUnit,
+    })),
+  });
 
   // Add Test search query
   const [searchQuery, setSearchQuery] = useState('');
@@ -513,6 +524,9 @@ export function LabResultForm({
                 id="test-search-input"
                 nativeID="test-search-input"
                 name="test-search"
+                // New-resource forms start with their first field focused.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus={!isEdit && !reportId}
                 accessibilityLabel="Select Test"
                 style={styles.searchInput}
                 placeholder="Enter test, e.g., HbA1c, ASP..."
@@ -585,6 +599,8 @@ export function LabResultForm({
           onSave={handleSave}
           isSaving={isSaving}
           saveDisabled={activeItems.length === 0}
+          cancelOnEscape={!isEdit && !reportId}
+          hasChanges={hasChanges}
           deleteLabel="Delete lab result"
           deleteTestID="delete-report-button"
           deleteConfirmation={

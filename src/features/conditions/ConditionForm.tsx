@@ -1,5 +1,6 @@
 import { CATEGORY_OPTIONS } from './conditionCategories';
 import type { ConditionInput } from './conditionService';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
@@ -37,6 +38,7 @@ import {
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
+import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConditionStatusOption {
   id: string;
@@ -201,6 +203,18 @@ export function ConditionForm({
 
   const [notes, setNotes] = useState(initialValues?.notes || '');
   const [showNotes, setShowNotes] = useState(Boolean(initialValues?.notes));
+  const hasChanges = useHasChanges({
+    title,
+    verificationStatus,
+    category,
+    status: selectedStatus.id,
+    onsetDate,
+    severity,
+    bodySite,
+    abatementDate,
+    notes,
+    links: links.values,
+  });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -295,11 +309,7 @@ export function ConditionForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/');
-      }
+      goBackOr(router, '/');
     } catch (err) {
       console.error('Failed to save condition:', err);
       showAlert('Error', 'Failed to save condition. Please try again.');
@@ -492,12 +502,14 @@ export function ConditionForm({
           {/* Condition Name Section (Required) */}
           <FormField
             label="Condition"
+            required
             nativeID="condition-title-input"
             inputProps={{
               testID: 'condition-title-input',
               id: 'condition-title-input',
               nativeID: 'condition-title-input',
               name: 'title',
+              autoFocus: !isEdit,
               accessibilityLabel: 'Condition Name',
               placeholder: 'Left Knee Pain',
               value: title,
@@ -680,6 +692,8 @@ export function ConditionForm({
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
+          cancelOnEscape={!isEdit}
+          hasChanges={hasChanges}
           deleteLabel="Delete condition"
           deleteTestID="delete-condition-button"
           deleteConfirmation={

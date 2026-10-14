@@ -71,7 +71,11 @@ test.describe('Add Treatment Flow', () => {
 
     // Returns to Home, which lists the treatment
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await page.getByText('Amoxicillin 500mg Capsule').click();
+    await page
+      .getByRole('button', {
+        name: 'View treatment: Amoxicillin 500mg Capsule',
+      })
+      .click();
     await expect(page.getByTestId('treatment-title')).toHaveText(
       'Amoxicillin 500mg Capsule'
     );
@@ -208,7 +212,9 @@ test.describe('Add Treatment Flow', () => {
     // A specialist not seen before can be entered
     await requester.fill('Dr. New Specialist');
     await page.getByTestId('save-treatment-button').click();
-    await page.getByText('Ibuprofen 400mg').click();
+    await page
+      .getByRole('button', { name: 'View treatment: Ibuprofen 400mg' })
+      .click();
     await expect(page.getByTestId('treatment-requester')).toContainText(
       'Dr. New Specialist'
     );
@@ -227,5 +233,90 @@ test.describe('Add Treatment Flow', () => {
     await page.getByTestId('save-treatment-button').click();
     await expect(page.getByTestId('treatment-requester')).toHaveCount(0);
     expect((await getTestTreatment(page, row.id)).requester).toBeUndefined();
+  });
+});
+
+test.describe('Treatment form keyboard support', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAppStorage(page);
+    await seedTestPatient(page);
+  });
+
+  test('highlights selects and date fields on keyboard focus', async ({
+    page,
+  }) => {
+    await page.goto('/treatment/add');
+    const outline = (testID: string) =>
+      page
+        .getByTestId(testID)
+        .evaluate((element) => getComputedStyle(element).outlineStyle);
+
+    await page.getByTestId('treatment-title-input').focus();
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('treatment-intent-select')).toBeFocused();
+    expect(await outline('treatment-intent-select')).toBe('solid');
+
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('treatment-status-select')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#treatment-date-input')).toBeFocused();
+    // The visible wrapper carries the highlight for the hidden date input.
+    expect(await outline('treatment-date-picker')).toBe('solid');
+    expect(await outline('treatment-intent-select')).toBe('none');
+  });
+
+  test('new-resource forms focus their first field and Escape cancels them when pristine', async ({
+    page,
+  }) => {
+    const forms = [
+      ['/treatment/add', 'treatment-title-input'],
+      ['/consultation/add', 'consultation-title-input'],
+      ['/lab-result/add', 'test-search-input'],
+      ['/profile/new', 'patient-given-name-input'],
+    ];
+    for (const [route, firstField] of forms) {
+      await page.goto('/');
+      await page.goto(route);
+      await expect(page.getByTestId(firstField)).toBeFocused();
+      // Profiles can only be cancelled once existing ones have loaded.
+      await expect(page.getByTestId('cancel-button')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page).toHaveURL(/\/$/);
+    }
+  });
+
+  test('marks required fields with an asterisk', async ({ page }) => {
+    await page.goto('/treatment/add');
+    for (const id of [
+      'treatment-title-input',
+      'treatment-intent-select',
+      'treatment-status-select',
+      'treatment-date-input',
+    ]) {
+      await expect(page.locator(`[id="${id}-label"]`)).toContainText('*');
+    }
+    await page.goto('/condition/add');
+    await expect(page.locator('[id="condition-title-input-label"]')).toHaveText(
+      'Condition *'
+    );
+    await page.goto('/consultation/add');
+    await expect(
+      page.locator('[id="consultation-title-input-label"]')
+    ).toHaveText('Consultation / Service *');
+  });
+
+  test('Cmd/Ctrl+Enter runs the primary island action', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByTestId('floating-add-menu')).toBeVisible();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
+
+    await page.goto('/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Keyboard saved');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page).not.toHaveURL(/treatment\/add/);
+    await expect(page.getByText('Keyboard saved')).toBeVisible();
   });
 });
