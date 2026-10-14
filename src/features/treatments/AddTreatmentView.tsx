@@ -10,7 +10,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TreatmentForm, type TreatmentFormValues } from './TreatmentForm';
 import { createOrUpdateTreatment } from './treatmentService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import {
   getConsultationById,
@@ -82,7 +81,6 @@ function AddTreatmentForPatient({
       cancelled = true;
     };
   }, [consultationId, activePatientId]);
-  const { triggerSync } = useSync();
   const router = useRouter();
 
   if (loadState === 'error') return <Text>Failed to load treatment form.</Text>;
@@ -111,10 +109,6 @@ function AddTreatmentForPatient({
       consultationId: consultationId || undefined,
       requesterName: values.requesterName,
     });
-
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on add treatment:', err)
-    );
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();

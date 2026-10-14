@@ -10,6 +10,6 @@ Create/edit forms present a Conditions section with removable selected rows and 
 
 Create/edit operations validate patient ownership and save Encounter JSON and its projections in one transaction. Removing a diagnosis link preserves the Condition. Deleting a consultation cascades its association rows. Deleting a Condition removes only its Encounter diagnosis and reason references, preserving other diagnoses and unrelated narrative/reasons, and advances the affected Encounter timestamps for sync.
 
-ZIP and encrypted Drive backups contain standard Encounter resources rather than independent relationship records. Restoration rebuilds all links from those resources after patients and conditions are restored; Drive last-write-wins behavior retains newer local records and timestamps. Existing single-diagnosis Encounter backups still import through the plural path.
+ZIP and encrypted Drive backups contain standard Encounter resources rather than independent relationship records. Restoration rebuilds all links from those resources after patients and conditions are restored; encrypted sync keeps the most recent Encounter change on every device ([ADR 0001](adr/0001-local-first-sync.md)). Existing single-diagnosis Encounter backups still import through the plural path.
 
 Before upgrading, export a backup. Older app versions cannot safely use a database upgraded to v8. There is no destructive downgrade: recovery requires the pre-upgrade backup and a compatible application version.

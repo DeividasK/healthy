@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ProfileForm } from './ProfileForm';
 import {
   getPatient,
-  getStoredPatient,
   createOrUpdatePatient,
   deletePatient,
   getPatientDisplayName,
@@ -12,17 +11,13 @@ import {
 import { useActivePatient } from './ActivePatientContext';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useSync } from '@/src/context/SyncContext';
-import {
-  loadGoogleDriveConfig,
-  deletePatientFromGoogleDrive,
-} from '@/src/services/syncManager';
 import { COLORS } from '@/src/theme/colors';
 
 export function EditProfileView() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refreshPatients, setActivePatientId } = useActivePatient();
-  const { triggerSync } = useSync();
+  const { vaultState } = useSync();
   const [initialValues, setInitialValues] = useState<{
     id: string;
     givenName: string;
@@ -31,7 +26,6 @@ export function EditProfileView() {
     birthDate?: string;
   } | null>(null);
   const [patientName, setPatientName] = useState<string>('');
-  const [isGoogleSynced, setIsGoogleSynced] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -42,7 +36,6 @@ export function EditProfileView() {
     (async () => {
       try {
         const patient = await getPatient(id);
-        const stored = await getStoredPatient(id);
         if (!isMounted) return;
         if (!patient) {
           setNotFound(true);
@@ -52,7 +45,6 @@ export function EditProfileView() {
         const givenName = patient.name?.[0]?.given?.[0] || 'Self';
         const familyName = patient.name?.[0]?.family || undefined;
         setPatientName(getPatientDisplayName(patient));
-        setIsGoogleSynced(Boolean(stored?.syncAccount));
 
         setInitialValues({
           id: patient.id!,
@@ -102,10 +94,9 @@ export function EditProfileView() {
       id,
     });
     await refreshPatients();
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on profile edit:', err)
-    );
   };
+
+  const isSyncConnected = vaultState === 'unlocked';
 
   const handleConfirmDelete = async (options?: {
     deleteFromCloud?: boolean;
@@ -113,25 +104,15 @@ export function EditProfileView() {
     try {
       setShowDeleteModal(false);
 
-      if (options?.deleteFromCloud && isGoogleSynced) {
-        try {
-          const googleConfig = await loadGoogleDriveConfig();
-          if (googleConfig) {
-            await deletePatientFromGoogleDrive(googleConfig, id);
-          }
-        } catch (cloudErr) {
-          console.warn('Failed to delete patient from Google Drive:', cloudErr);
-        }
-      }
-
-      const { remainingCount, newActiveId } = await deletePatient(id);
+      // Without the cloud option ticked the profile stays in Google Drive and
+      // on other devices; ticked, the deletion syncs everywhere.
+      const { remainingCount, newActiveId } = await deletePatient(id, {
+        deviceOnly: !(isSyncConnected && options?.deleteFromCloud),
+      });
       await refreshPatients();
       if (newActiveId) {
         await setActivePatientId(newActiveId);
       }
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed after profile deletion:', err)
-      );
 
       if (remainingCount === 0) {
         router.replace('/profile/new');
@@ -155,10 +136,14 @@ export function EditProfileView() {
       <DeleteConfirmationModal
         visible={showDeleteModal}
         title="Delete Profile"
-        message={`Are you sure you want to delete ${patientName || 'this profile'}? All associated lab results and conditions will be permanently removed.`}
+        message={
+          isSyncConnected
+            ? `Are you sure you want to delete ${patientName || 'this profile'} from this device? It stays in Google Drive and on your other devices unless you also delete it from Google Drive.`
+            : `Are you sure you want to delete ${patientName || 'this profile'}? All associated lab results and conditions will be permanently removed.`
+        }
         requireCountdown={true}
         countdownDuration={5}
-        showCloudDeleteOption={isGoogleSynced}
+        showCloudDeleteOption={isSyncConnected}
         cloudDeleteLabel="Delete from Google Drive"
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}

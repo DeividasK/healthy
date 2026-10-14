@@ -34,7 +34,6 @@ import {
   deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { convertBiomarkerValue } from './biomarkerMeasurements';
 
 export interface ActiveMarkerItem {
@@ -90,7 +89,6 @@ export function LabResultForm({
 }: LabResultFormProps) {
   const router = useRouter();
   const { activePatientId } = useActivePatient();
-  const { triggerSync } = useSync();
   const reportId = initialReportId;
 
   // Test Date (defaults to today)
@@ -335,10 +333,6 @@ export function LabResultForm({
         notes: testNotes ? testNotes.trim() : undefined,
         items: biomarkers,
       });
-
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on lab result save:', err)
-      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();
@@ -623,12 +617,6 @@ export function LabResultForm({
                     'Are you sure you want to delete this lab result? This action cannot be undone.',
                   onConfirm: async () => {
                     await deleteReport(reportId);
-                    triggerSync().catch((error) =>
-                      console.warn(
-                        'Background sync failed on delete report:',
-                        error
-                      )
-                    );
                     router.dismissTo('/');
                   },
                 }

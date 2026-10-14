@@ -3,7 +3,7 @@ import {
   takeSnapshot,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
-import { mockGoogleDriveRoutes } from '@/src/features/testing/mockGoogleDrive';
+import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
@@ -41,22 +41,10 @@ test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Connected Google Sync State', async ({
     page,
   }, testInfo) => {
-    await mockGoogleDriveRoutes(page);
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        '@healthy_device_google_sync_config',
-        JSON.stringify({
-          accessToken: 'mock-google-access-token',
-          userEmail: 'alice@gmail.com',
-          userName: 'Alice Health',
-          userSub: 'google-sub-12345',
-          lastSyncTimestamp: '2026-10-02T10:00:00Z',
-        })
-      );
-    });
-    await seedTestPatient(page, { syncAccount: 'google-sub-12345' });
+    await seedTestPatient(page);
+    await connectTestSync(page, { userEmail: 'alice@gmail.com' });
     await page.goto('/profile');
-    await page.getByTestId('connected-user-email').waitFor();
+    await page.getByTestId('up-to-date-button').waitFor();
 
     await takeSnapshot(
       page,

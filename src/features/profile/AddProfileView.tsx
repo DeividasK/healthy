@@ -25,11 +25,7 @@ import {
 import { useActivePatient } from './ActivePatientContext';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
 import { useSync } from '@/src/context/SyncContext';
-import {
-  listRemoteGooglePatients,
-  restoreFromGoogleDrive,
-  GoogleDriveConfig,
-} from '@/src/services/syncManager';
+import { listExcludedPatients } from '@/src/features/sync/engine';
 import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
 
@@ -42,7 +38,7 @@ export function AddProfileView({
 }: AddProfileViewProps = {}) {
   const router = useRouter();
   const { patients, setActivePatientId, refreshPatients } = useActivePatient();
-  const { connectWithGoogle, triggerSync } = useSync();
+  const { connectWithGoogle, vaultState, restoreExcludedProfile } = useSync();
 
   const [activeTab, setActiveTab] = useState<'create' | 'file' | 'gdrive'>(
     initialTab
@@ -50,8 +46,6 @@ export function AddProfileView({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [remotePatients, setRemotePatients] = useState<Patient[]>([]);
   const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
-  const [pendingGoogleConfig, setPendingGoogleConfig] =
-    useState<GoogleDriveConfig | null>(null);
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [showNoProfilesModal, setShowNoProfilesModal] = useState(false);
   const [noProfilesEmail, setNoProfilesEmail] = useState<string>('');
@@ -60,38 +54,55 @@ export function AddProfileView({
 
   const hasExistingPatients = patients.length > 0;
 
+  // Profiles that sync keeps in Google Drive but were removed from this device.
+  const showRestorableProfiles = async () => {
+    const excluded = await listExcludedPatients();
+    if (excluded.length === 0) {
+      setNoProfilesEmail('');
+      setShowNoProfilesModal(true);
+      return;
+    }
+    const remotes: Patient[] = excluded.map(({ patientId, displayName }) => {
+      const [given, ...family] = (displayName || '').split(' ');
+      return {
+        resourceType: 'Patient',
+        id: patientId,
+        name: [
+          {
+            given: given ? [given] : undefined,
+            family: family.join(' ') || undefined,
+            text: displayName || undefined,
+          },
+        ],
+      };
+    });
+    setRemotePatients(remotes);
+    setSelectedPatientIds(remotes.map((remote) => remote.id!));
+    setShowPickerModal(true);
+  };
+
   // Google OAuth Hook
   const { signIn: promptGoogleSignIn, isReady: isGoogleReady } =
     useGoogleAuthSignIn(async (authData: GoogleAuthPayload) => {
       setActionLoading('gdrive');
       try {
-        const config: GoogleDriveConfig = {
-          accessToken: authData.accessToken,
-          refreshToken: authData.refreshToken,
-          tokenExpiresAt: authData.tokenExpiresAt,
-          userSub: authData.userSub,
-          userEmail: authData.userEmail,
-          userName: authData.userName,
-        };
-
-        // Fetch remote patients list
-        const remotes = await listRemoteGooglePatients(config);
-
-        if (remotes.length === 0) {
-          setPendingGoogleConfig(null);
+        const outcome = await connectWithGoogle(
+          {
+            accessToken: authData.accessToken,
+            refreshToken: authData.refreshToken,
+            tokenExpiresAt: authData.tokenExpiresAt,
+            userSub: authData.userSub,
+            userEmail: authData.userEmail,
+            userName: authData.userName,
+          },
+          { createIfMissing: false }
+        );
+        if (outcome === 'missing') {
           setNoProfilesEmail(authData.userEmail || '');
           setShowNoProfilesModal(true);
-          setActionLoading(null);
           return;
         }
-
-        // Show picker modal with all remote profiles selected by default
-        setPendingGoogleConfig(config);
-        setRemotePatients(remotes);
-        setSelectedPatientIds(
-          remotes.map((r) => r.id!).filter((id): id is string => Boolean(id))
-        );
-        setShowPickerModal(true);
+        router.push('/sync/restore');
       } catch (err) {
         console.error('Google restore failed:', err);
         Alert.alert(
@@ -104,6 +115,21 @@ export function AddProfileView({
         setActionLoading(null);
       }
     });
+
+  const handleRestoreFromGoogleDrive = async () => {
+    if (vaultState === 'unlocked') {
+      setActionLoading('gdrive');
+      try {
+        await showRestorableProfiles();
+      } finally {
+        setActionLoading(null);
+      }
+    } else if (vaultState === 'locked') {
+      router.push('/sync/restore');
+    } else {
+      promptGoogleSignIn();
+    }
+  };
 
   const toggleSelectPatient = (targetId: string) => {
     setSelectedPatientIds((prev) =>
@@ -126,16 +152,11 @@ export function AddProfileView({
   };
 
   const handleRestoreSelectedRemotePatients = async () => {
-    if (!pendingGoogleConfig || selectedPatientIds.length === 0) return;
+    if (selectedPatientIds.length === 0) return;
     setActionLoading('restoring-selected');
     try {
-      const res = await restoreFromGoogleDrive(
-        pendingGoogleConfig,
-        selectedPatientIds
-      );
-      if (!res || res.patients === 0) {
-        Alert.alert('Restore Failed', 'No profiles were restored.');
-        return;
+      for (const patientId of selectedPatientIds) {
+        await restoreExcludedProfile(patientId);
       }
       await refreshPatients();
       const updatedPatients = await getAllPatients();
@@ -149,14 +170,6 @@ export function AddProfileView({
         );
         return;
       }
-      await connectWithGoogle({
-        accessToken: pendingGoogleConfig.accessToken,
-        refreshToken: pendingGoogleConfig.refreshToken,
-        tokenExpiresAt: pendingGoogleConfig.tokenExpiresAt,
-        userSub: pendingGoogleConfig.userSub,
-        userEmail: pendingGoogleConfig.userEmail,
-        userName: pendingGoogleConfig.userName,
-      });
       await setActivePatientId(targetId);
       setShowPickerModal(false);
       router.replace('/');
@@ -187,7 +200,6 @@ export function AddProfileView({
         await setActivePatientId(updatedPatients[0].id);
       }
 
-      triggerSync().catch(() => {});
       Alert.alert(
         'Restore Complete',
         `Restored ${res.patients} profile(s), ${res.reports} report(s), and ${res.conditions} condition(s).`,
@@ -224,7 +236,6 @@ export function AddProfileView({
     if (created.id) {
       await setActivePatientId(created.id);
     }
-    triggerSync().catch(() => {});
     const all = await getAllPatients();
     if (all.length > 1) {
       if (router.canGoBack()) {
@@ -435,10 +446,12 @@ export function AddProfileView({
               primary: true,
               disabled:
                 actionLoading !== null ||
-                (activeTab === 'gdrive' && !isGoogleReady),
+                (activeTab === 'gdrive' &&
+                  vaultState === 'disconnected' &&
+                  !isGoogleReady),
               busy: actionLoading !== null,
               onPress: () => {
-                if (activeTab === 'gdrive') promptGoogleSignIn();
+                if (activeTab === 'gdrive') handleRestoreFromGoogleDrive();
                 else if (Platform.OS === 'web' && fileInputRef.current)
                   fileInputRef.current.click();
                 else
@@ -569,7 +582,9 @@ export function AddProfileView({
           <View style={styles.modalCard} testID="no-profiles-found-modal">
             <Text style={styles.modalTitle}>No Profiles Found</Text>
             <Text style={styles.modalSubtitle} testID="no-profiles-message">
-              {`No profiles found in ${noProfilesEmail ? `${noProfilesEmail} ` : ''}Google Drive.`}
+              {noProfilesEmail
+                ? `No profiles found in ${noProfilesEmail} Google Drive.`
+                : 'All profiles from Google Drive are already on this device.'}
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity

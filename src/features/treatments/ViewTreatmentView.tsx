@@ -12,7 +12,6 @@ import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedR
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { fetchConsultationIdsReferencingResource } from '@/src/features/consultations/clinicalDocumentsRepository';
 import { getTreatmentById, deleteTreatment } from './treatmentService';
@@ -49,7 +48,6 @@ function TreatmentForPatient({
   activePatientId: string;
 }) {
   const router = useRouter();
-  const { triggerSync } = useSync();
 
   const [treatment, setTreatment] = useState<MedicationRequest | null>(null);
   const [originConsultation, setOriginConsultation] =
@@ -154,9 +152,6 @@ function TreatmentForPatient({
     try {
       await deleteTreatment(id, activePatientId);
       setShowDeleteModal(false);
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on delete treatment:', err)
-      );
       router.dismissTo('/');
     } catch (err) {
       console.error('Failed to delete treatment:', err);

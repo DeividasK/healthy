@@ -134,51 +134,108 @@ export async function mockGoogleIdentityServices(
   );
 }
 
+export interface MockDriveFile {
+  id: string;
+  name: string;
+  createdTime: string;
+  appProperties?: Record<string, string>;
+  bytes: Buffer;
+}
+
+/**
+ * In-memory Google Drive appDataFolder shared by every page it is attached
+ * to, so two browser contexts behave like two devices on one account.
+ */
+export interface MockDriveStore {
+  files: Map<string, MockDriveFile>;
+  changes: { fileId: string; name?: string; removed: boolean }[];
+  requests: { method: string; path: string }[];
+  nextId: number;
+  /** When set, requests with any other bearer token get HTTP 401. */
+  acceptedToken?: string;
+}
+
+export function createMockDriveStore(): MockDriveStore {
+  return { files: new Map(), changes: [], requests: [], nextId: 0 };
+}
+
+function parseMultipart(request: {
+  postDataBuffer(): Buffer | null;
+  headers(): Record<string, string>;
+}) {
+  const body = request.postDataBuffer()!;
+  const boundary = request.headers()['content-type'].split('boundary=')[1];
+  const first = body.indexOf('\r\n\r\n') + 4;
+  const metadataEnd = body.indexOf(`\r\n--${boundary}`, first);
+  const metadata = JSON.parse(body.subarray(first, metadataEnd).toString());
+  const binaryStart = body.indexOf('\r\n\r\n', metadataEnd) + 4;
+  const binaryEnd = body.lastIndexOf(`\r\n--${boundary}--`);
+  return {
+    metadata,
+    bytes: Buffer.from(body.subarray(binaryStart, binaryEnd)),
+  };
+}
+
 /** In-memory Drive transport; production encryption and sync still run. */
-export async function mockGoogleDrive(page: Page) {
-  const files = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      appProperties?: Record<string, string>;
-      bytes: Buffer;
-    }
-  >();
+export async function mockGoogleDrive(
+  page: Page,
+  store: MockDriveStore = createMockDriveStore()
+): Promise<MockDriveStore> {
+  const { files, changes } = store;
   await page.route('https://www.googleapis.com/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    if (request.method() === 'POST' || request.method() === 'PATCH') {
-      const body = request.postDataBuffer()!;
-      const boundary = request.headers()['content-type'].split('boundary=')[1];
-      const first = body.indexOf('\r\n\r\n') + 4;
-      const metadataEnd = body.indexOf(`\r\n--${boundary}`, first);
-      const metadata = JSON.parse(body.subarray(first, metadataEnd).toString());
-      const binaryStart = body.indexOf('\r\n\r\n', metadataEnd) + 4;
-      const binaryEnd = body.lastIndexOf(`\r\n--${boundary}--`);
-      const existing =
-        request.method() === 'PATCH'
-          ? files.get(url.pathname.split('/').pop()!)
-          : undefined;
-      const id = existing?.id || `file-${files.size}`;
-      const record = {
+    if (url.pathname.startsWith('/oauth2/')) return route.fallback();
+    store.requests.push({ method: request.method(), path: url.pathname });
+    const auth = request.headers()['authorization'] || '';
+    if (store.acceptedToken && auth !== `Bearer ${store.acceptedToken}`)
+      return route.fulfill({
+        status: 401,
+        json: { error: { message: 'Invalid Credentials' } },
+      });
+    const fileId = url.pathname.split('/').pop()!;
+    if (request.method() === 'POST') {
+      const { metadata, bytes } = parseMultipart(request);
+      const id = `file-${store.nextId++}`;
+      const record: MockDriveFile = {
         id,
-        name: metadata.name || existing?.name,
+        name: metadata.name,
+        createdTime: new Date(Date.now() + store.nextId).toISOString(),
         appProperties: metadata.appProperties,
-        bytes: body.subarray(binaryStart, binaryEnd),
+        bytes,
       };
       files.set(id, record);
+      changes.push({ fileId: id, name: record.name, removed: false });
       await route.fulfill({
         json: { id, name: record.name, appProperties: record.appProperties },
       });
     } else if (request.method() === 'DELETE') {
-      files.delete(url.pathname.split('/').pop()!);
+      if (files.delete(fileId)) changes.push({ fileId, removed: true });
       await route.fulfill({ status: 204 });
-    } else if (url.searchParams.get('alt') === 'media') {
+    } else if (url.pathname.endsWith('/changes/startPageToken')) {
       await route.fulfill({
-        contentType: 'application/octet-stream',
-        body: files.get(url.pathname.split('/').pop()!)!.bytes,
+        json: { startPageToken: String(changes.length) },
       });
+    } else if (url.pathname.endsWith('/changes')) {
+      const from = Number(url.searchParams.get('pageToken'));
+      await route.fulfill({
+        json: {
+          changes: changes.slice(from).map(({ fileId, name, removed }) => ({
+            fileId,
+            removed,
+            ...(removed ? {} : { file: { name } }),
+          })),
+          newStartPageToken: String(changes.length),
+        },
+      });
+    } else if (url.searchParams.get('alt') === 'media') {
+      const file = files.get(fileId);
+      if (!file) await route.fulfill({ status: 404, body: 'Not found' });
+      else
+        await route.fulfill({
+          contentType: 'application/octet-stream',
+          body: file.bytes,
+        });
     } else {
       await route.fulfill({
         json: {
@@ -189,5 +246,41 @@ export async function mockGoogleDrive(page: Page) {
       });
     }
   });
-  return files;
+  return store;
+}
+
+/**
+ * Attaches the shared in-memory Drive and connects this page's device to it
+ * through the test bridge: creates the vault, or unlocks it with `phrase`.
+ */
+export async function connectTestSync(
+  page: Page,
+  options: {
+    store?: MockDriveStore;
+    phrase?: string;
+    userEmail?: string;
+    secretHex?: string;
+  } = {}
+): Promise<{ store: MockDriveStore; phrase: string }> {
+  const { store: existing, ...connect } = options;
+  const store = await mockGoogleDrive(page, existing);
+  const phrase = await page.evaluate(
+    (connect) => (window as any).__HEALTHY_TEST_BRIDGE__.connectSync(connect),
+    connect
+  );
+  return { store, phrase };
+}
+
+/** Runs one sync round on this page's device. */
+export async function syncTestDevice(page: Page) {
+  return await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.syncNow()
+  );
+}
+
+/** Concatenated bytes of every file in the fake Drive, for plaintext checks. */
+export function driveContents(store: MockDriveStore): string {
+  return [...store.files.values()]
+    .map((file) => file.bytes.toString())
+    .join('');
 }

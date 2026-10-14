@@ -30,8 +30,9 @@ The standalone Condition form has no Add Diagnosis action; existing terminology
 remains visible in Condition details and survives ordinary edits.
 
 ZIP archives and encrypted Drive sync carry complete resources, including IDs,
-references, codings and `meta.lastUpdated`. Remote sync uses the existing
-last-write-wins comparison. Patient ownership is enforced on writes.
+references, codings and `meta.lastUpdated`. Sync resolves concurrent edits per
+resource by hybrid logical clock ([ADR 0001](adr/0001-local-first-sync.md)).
+Patient ownership is enforced on writes.
 
 App settings, sync metadata and storage timestamps are infrastructure rather
 than clinical FHIR resources. This optional terminology change needs no schema
@@ -85,10 +86,11 @@ Reference cleanup is transactional:
   indication wording.
 
 Any failure rolls the whole operation back. ZIP archives (manifest v2,
-`records/medication_request_*.json`) and encrypted Drive sync
-(`medicationrequest_*.json.enc`) carry complete resources with
+`records/medication_request_*.json`) carry complete resources with
 `meta.lastUpdated`; restore order is patients, conditions, reports, encounters,
-treatments, then Compositions. Deletions use the clinical tombstone outbox.
+treatments, then Compositions. Encrypted sync replicates the same complete
+resources, in the same order, and records every deletion (cascades included) in
+its change log ([ADR 0001](adr/0001-local-first-sync.md)).
 
 ### Migration v11
 

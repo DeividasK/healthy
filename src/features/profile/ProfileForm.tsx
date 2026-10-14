@@ -12,7 +12,6 @@ import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { PatientInput } from './patientService';
-import { useSync } from '@/src/context/SyncContext';
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
@@ -52,7 +51,6 @@ export function ProfileForm({
   onDelete,
 }: ProfileFormProps) {
   const router = useRouter();
-  const { triggerSync } = useSync();
   const [givenName, setGivenName] = useState(initialValues?.givenName || '');
   const [familyName, setFamilyName] = useState(initialValues?.familyName || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | 'unknown'>(
@@ -95,10 +93,6 @@ export function ProfileForm({
         gender,
         birthDate: formattedBirthDate,
       });
-
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on profile save:', err)
-      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();

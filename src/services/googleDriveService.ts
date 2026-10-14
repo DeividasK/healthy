@@ -1,12 +1,20 @@
 export interface GoogleDriveFile {
   id: string;
   name: string;
+  createdTime?: string;
   modifiedTime?: string;
   appProperties?: Record<string, string>;
 }
 
+export interface GoogleDriveChange {
+  fileId: string;
+  removed?: boolean;
+  file?: { name?: string };
+}
+
 const GDRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const GDRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+const GDRIVE_CHANGES_URL = 'https://www.googleapis.com/drive/v3/changes';
 
 /**
  * Builds a multipart/related byte payload containing metadata JSON and raw binary file bytes.
@@ -56,7 +64,8 @@ export async function listAppDataFiles(
   do {
     const params = new URLSearchParams({
       spaces: 'appDataFolder',
-      fields: 'nextPageToken,files(id,name,modifiedTime,appProperties)',
+      fields:
+        'nextPageToken,files(id,name,createdTime,modifiedTime,appProperties)',
       pageSize: '1000',
     });
     if (pageToken) {
@@ -92,6 +101,71 @@ export async function listAppDataFiles(
   } while (pageToken);
 
   return allFiles;
+}
+
+async function getJson<T>(accessToken: string, url: string): Promise<T> {
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new GoogleAuthExpiredError();
+    }
+    const errorText = await res.text();
+    throw new Error(
+      `Google Drive request failed (HTTP ${res.status}): ${errorText}`
+    );
+  }
+  return (await res.json()) as T;
+}
+
+/**
+ * Returns the changes-feed position from which later changes are reported.
+ */
+export async function getChangesStartPageToken(
+  accessToken: string
+): Promise<string> {
+  const data = await getJson<{ startPageToken: string }>(
+    accessToken,
+    `${GDRIVE_CHANGES_URL}/startPageToken`
+  );
+  return data.startPageToken;
+}
+
+/**
+ * Lists appDataFolder changes since `pageToken`: usually a single request that
+ * answers "is there anything new?" without listing every file.
+ */
+export async function listAppDataChanges(
+  accessToken: string,
+  pageToken: string
+): Promise<{ changes: GoogleDriveChange[]; newStartPageToken: string }> {
+  const changes: GoogleDriveChange[] = [];
+  let token = pageToken;
+  for (;;) {
+    const params = new URLSearchParams({
+      pageToken: token,
+      spaces: 'appDataFolder',
+      fields:
+        'nextPageToken,newStartPageToken,changes(fileId,removed,file(name))',
+      pageSize: '1000',
+    });
+    const data = await getJson<{
+      changes?: GoogleDriveChange[];
+      nextPageToken?: string;
+      newStartPageToken?: string;
+    }>(accessToken, `${GDRIVE_CHANGES_URL}?${params.toString()}`);
+    changes.push(...(data.changes ?? []));
+    if (data.newStartPageToken)
+      return { changes, newStartPageToken: data.newStartPageToken };
+    if (!data.nextPageToken)
+      throw new Error('Google Drive changes feed ended without a page token');
+    token = data.nextPageToken;
+  }
 }
 
 /**
@@ -132,65 +206,6 @@ export async function uploadAppDataFile(
   }
 
   return (await res.json()) as GoogleDriveFile;
-}
-
-/**
- * Updates an existing file's binary content in Google Drive appDataFolder.
- */
-export async function updateAppDataFile(
-  accessToken: string,
-  fileId: string,
-  fileBytes: Uint8Array,
-  appProperties?: Record<string, string>
-): Promise<void> {
-  if (appProperties) {
-    const boundary = `healthy_boundary_${Date.now()}`;
-    const metadata = { appProperties };
-    const bodyBytes = buildMultipartBody(metadata, fileBytes, boundary);
-
-    const res = await fetch(
-      `${GDRIVE_UPLOAD_URL}/${fileId}?uploadType=multipart`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-          Accept: 'application/json',
-        },
-        body: bodyBytes as unknown as BodyInit,
-      }
-    );
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        throw new GoogleAuthExpiredError();
-      }
-      const errorText = await res.text();
-      throw new Error(
-        `Failed to update file in Google Drive (HTTP ${res.status}): ${errorText}`
-      );
-    }
-    return;
-  }
-
-  const res = await fetch(`${GDRIVE_UPLOAD_URL}/${fileId}?uploadType=media`, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-    },
-    body: fileBytes as unknown as BodyInit,
-  });
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new GoogleAuthExpiredError();
-    }
-    const errorText = await res.text();
-    throw new Error(
-      `Failed to update file in Google Drive (HTTP ${res.status}): ${errorText}`
-    );
-  }
 }
 
 /**

@@ -1,4 +1,10 @@
-import { test as baseTest, expect, type Page } from '@playwright/test';
+import {
+  test as baseTest,
+  expect,
+  type Browser,
+  type Page,
+  type TestInfo,
+} from '@playwright/test';
 import { mockGoogleIdentityServices } from './mockGoogleDrive';
 
 export { expect };
@@ -28,6 +34,42 @@ export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
     { auto: true },
   ],
 });
+
+/**
+ * Opens another browser context: a separate device with its own SQLite
+ * database and key storage. Close it with the returned function.
+ */
+export async function openSecondDevice(
+  browser: Browser,
+  testInfo: TestInfo
+): Promise<{ page: Page; close: () => Promise<void> }> {
+  const {
+    baseURL,
+    viewport,
+    userAgent,
+    deviceScaleFactor,
+    isMobile,
+    hasTouch,
+  } = testInfo.project.use;
+  const context = await browser.newContext({
+    baseURL,
+    viewport,
+    userAgent,
+    deviceScaleFactor,
+    isMobile,
+    hasTouch,
+  });
+  const page = await context.newPage();
+  await mockGoogleIdentityServices(page);
+  const monitor = setupConsoleMonitor(page);
+  return {
+    page,
+    close: async () => {
+      monitor.assertNoErrors();
+      await context.close();
+    },
+  };
+}
 
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
 export const DEFAULT_PROFILE_LAST_NAME = 'Doe';

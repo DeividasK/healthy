@@ -59,7 +59,6 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
-import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
   getObservationReferenceRange,
@@ -96,7 +95,6 @@ const countMeta = (
 export function HomeView() {
   const router = useRouter();
   const pathname = usePathname();
-  const { triggerSync } = useSync();
   const {
     activePatientId,
     patients,
@@ -291,9 +289,6 @@ export function HomeView() {
       await deleteReport(deleteModal.id);
       setDeleteModal((prev) => ({ ...prev, visible: false }));
       await loadData();
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on delete:', err)
-      );
     } catch (err) {
       console.error('Failed to delete item:', err);
     }

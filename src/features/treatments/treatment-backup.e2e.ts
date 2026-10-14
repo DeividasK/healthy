@@ -5,17 +5,16 @@ import {
   seedTestPatient,
   seedTestTreatment,
   seedTestConsultation,
-  mockGoogleDrive,
+  connectTestSync,
+  syncTestDevice,
+  driveContents,
 } from '@/src/features/testing/testStorage';
 
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   test(`${transport} preserves complete linked treatments and retains newer local data`, async ({
     page,
   }) => {
-    await seedTestPatient(page, {
-      id: 'treatment-backup-patient',
-      syncAccount: 'synthetic-google-sub',
-    });
+    await seedTestPatient(page, { id: 'treatment-backup-patient' });
     const consultation = await seedTestConsultation(page, {
       id: 'treatment-backup-visit',
       title: 'Backup visit',
@@ -40,10 +39,6 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         ),
       original
     );
-    const config = {
-      accessToken: 'synthetic-token',
-      userSub: 'synthetic-google-sub',
-    };
     let archive: number[] = [];
     if (transport === 'ZIP') {
       const download = page.waitForEvent('download');
@@ -52,24 +47,17 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       );
       archive = Array.from(await readFile((await (await download).path())!));
     } else {
-      const files = await mockGoogleDrive(page);
-      const summary = await page.evaluate(
-        (config) =>
-          (window as any).__HEALTHY_TEST_BRIDGE__.backupToGoogleDrive(config),
-        config
-      );
-      expect(summary.medicationRequests).toBe(1);
-      const file = Array.from(files.values()).find((file) =>
-        file.name.startsWith('medicationrequest_')
-      )!;
-      expect(file.bytes.toString()).not.toContain('Treatment to back up');
+      const { store } = await connectTestSync(page);
+      expect((await syncTestDevice(page)).pushed).toBeGreaterThanOrEqual(3);
+      expect(driveContents(store)).not.toContain('Treatment to back up');
     }
+    // A cleared database is a new device with the same account and phrase.
     const restored = await page.evaluate(
-      async ({ transport, archive, config }) => {
+      async ({ transport, archive }) => {
         const b = (window as any).__HEALTHY_TEST_BRIDGE__;
         await b.clearDatabase();
         if (transport === 'ZIP') await b.restoreArchive(archive);
-        else await b.restoreFromGoogleDrive(config);
+        else await b.syncNow();
         return {
           request: await b.getTreatment('backed-up-treatment'),
           document: await b.getClinicalDocumentByConsultationId(
@@ -77,22 +65,25 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
           ),
         };
       },
-      { transport, archive, config }
+      { transport, archive }
     );
     expect(restored.request).toEqual(original);
     expect(restored.document.section[0].entry).toContainEqual({
       reference: 'MedicationRequest/backed-up-treatment',
     });
     if (transport === 'encrypted Drive') {
-      const newer = await page.evaluate(async (config) => {
+      // The later edit wins on any device, whatever order chunks arrive in.
+      const newer = await page.evaluate(async () => {
         const b = (window as any).__HEALTHY_TEST_BRIDGE__;
         const request = await b.getTreatment('backed-up-treatment');
         request.meta.lastUpdated = '2099-01-01T00:00:00Z';
         request.note[0].text = 'Newer local note';
         await b.saveTreatment(request, 'treatment-backup-patient');
-        await b.restoreFromGoogleDrive(config);
+        await b.syncNow();
+        await b.clearDatabase();
+        await b.syncNow();
         return await b.getTreatment('backed-up-treatment');
-      }, config);
+      });
       expect(newer.note[0].text).toBe('Newer local note');
       expect(newer.meta.lastUpdated).toBe('2099-01-01T00:00:00Z');
     }

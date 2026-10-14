@@ -1,36 +1,11 @@
 import * as Crypto from 'expo-crypto';
-import {
-  AESEncryptionKey,
-  AESSealedData,
-  aesEncryptAsync,
-  aesDecryptAsync,
-} from 'expo-crypto';
+import { AESEncryptionKey, AESSealedData, aesDecryptAsync } from 'expo-crypto';
 
 export const GDRIVE_SYNC_SALT = 'HEALTHY_GOOGLE_DRIVE_APP_DATA_SALT_V1';
 
 /**
- * Derives a deterministic 256-bit AESEncryptionKey from a Google account's Subject ID (`sub`)
- * and the app salt.
- *
- * This provides client-side encryption-at-rest for records stored in the hidden Google Drive
- * AppData folder, scoped to the authenticated user's account without requiring a separate
- * password prompt. All payload files are encrypted locally before upload and decrypted locally
- * after download.
- */
-export async function deriveKeyFromGoogleUser(
-  googleSub: string
-): Promise<AESEncryptionKey> {
-  const digest = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${GDRIVE_SYNC_SALT}::${googleSub.trim()}`,
-    { encoding: Crypto.CryptoEncoding.HEX }
-  );
-
-  return (await AESEncryptionKey.import(digest, 'hex')) as AESEncryptionKey;
-}
-
-/**
- * Derives a 256-bit AESEncryptionKey from an arbitrary passphrase (used for offline zip archives).
+ * Derives a 256-bit AESEncryptionKey from an arbitrary passphrase. Only used to
+ * read encrypted ZIP archives made by earlier app versions.
  */
 export async function deriveKeyFromPassphrase(
   passphrase: string
@@ -42,19 +17,6 @@ export async function deriveKeyFromPassphrase(
   );
 
   return (await AESEncryptionKey.import(digest, 'hex')) as AESEncryptionKey;
-}
-
-/**
- * Encrypts a plaintext string into a binary AES-GCM sealed byte array (IV + ciphertext + tag).
- */
-export async function encryptText(
-  plainText: string,
-  key: AESEncryptionKey
-): Promise<Uint8Array> {
-  const encoder = new TextEncoder();
-  const plainBytes = encoder.encode(plainText);
-  const sealedData = await aesEncryptAsync(plainBytes, key);
-  return await sealedData.combined();
 }
 
 /**

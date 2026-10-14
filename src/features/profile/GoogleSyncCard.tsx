@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,32 +7,26 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Cloud,
   CheckCircle2,
   RefreshCw,
   LogOut,
   Archive,
+  KeyRound,
 } from 'lucide-react-native';
 import { useSync } from '@/src/context/SyncContext';
-import { useActivePatient } from './ActivePatientContext';
-import {
-  getActivePatient,
-  getStoredPatient,
-  getAllStoredPatients,
-  updatePatientSyncAccount,
-  StoredPatient,
-} from './patientService';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
-import { deletePatientFromGoogleDrive } from '@/src/services/syncManager';
 import { exportZipArchive } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
-import { useDatabaseSubscription } from '@/src/database/dbEvents';
 
 export function GoogleSyncCard() {
+  const router = useRouter();
   const {
     config,
+    vaultState,
     syncState,
     isSyncing,
     lastSyncedAt,
@@ -40,104 +34,42 @@ export function GoogleSyncCard() {
     syncNow,
     connectWithGoogle,
     disconnect,
-    triggerSync,
   } = useSync();
-  const { activePatient, refreshPatients } = useActivePatient();
 
-  const [activeStoredPatient, setActiveStoredPatient] =
-    useState<StoredPatient | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      const stored = activePatient?.id
-        ? await getStoredPatient(activePatient.id)
-        : null;
-      if (isMounted) {
-        setActiveStoredPatient(stored);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [activePatient]);
-
-  useDatabaseSubscription(['patients'], () => {
-    if (activePatient?.id) {
-      getStoredPatient(activePatient.id).then((stored) => {
-        setActiveStoredPatient(stored);
-      });
-    }
-  });
 
   // Google OAuth Hook
   const { signIn: promptGoogleSignIn, isReady: isGoogleReady } =
     useGoogleAuthSignIn(async (authData: GoogleAuthPayload) => {
       setActionLoading('connecting');
       try {
-        const userSub = authData.userSub;
-
-        const currActive = await getActivePatient();
-        if (currActive?.id) {
-          await updatePatientSyncAccount(currActive.id, userSub);
-          await refreshPatients();
-          const updated = await getStoredPatient(currActive.id);
-          setActiveStoredPatient(updated);
-        }
-
-        await connectWithGoogle({
+        const outcome = await connectWithGoogle({
           accessToken: authData.accessToken,
+          refreshToken: authData.refreshToken,
           tokenExpiresAt: authData.tokenExpiresAt,
-          userSub,
+          userSub: authData.userSub,
           userEmail: authData.userEmail,
           userName: authData.userName,
         });
-        setFeedbackMessage('Google Drive connected and initial sync started!');
+        router.push(
+          outcome === 'created' ? '/sync/recovery-phrase' : '/sync/restore'
+        );
       } catch (err) {
-        console.error('Google profile connect failed:', err);
-        Alert.alert('Error', 'Failed to connect Google profile.');
+        console.error('Google Drive connect failed:', err);
+        Alert.alert('Error', 'Failed to connect Google Drive.');
       } finally {
         setActionLoading(null);
       }
     });
 
-  const isProfileSynced = Boolean(
-    config &&
-    activeStoredPatient?.syncAccount &&
-    activeStoredPatient.syncAccount === config.userSub
-  );
+  const isConnected = vaultState === 'unlocked';
 
-  const handleConnectGoogleDrive = async () => {
-    if (config) {
-      if (activePatient?.id) {
-        setActionLoading('connecting');
-        try {
-          await updatePatientSyncAccount(activePatient.id, config.userSub);
-          const updated = await getStoredPatient(activePatient.id);
-          setActiveStoredPatient(updated);
-          await refreshPatients();
-          setFeedbackMessage(
-            'Google Drive connected to this profile and sync started!'
-          );
-          triggerSync().catch((syncErr) => {
-            console.warn(
-              'Initial sync after connect encountered error:',
-              syncErr
-            );
-          });
-        } catch (err) {
-          console.error('Failed to link profile to Google Drive:', err);
-          Alert.alert('Error', 'Failed to connect profile to Google Drive.');
-        } finally {
-          setActionLoading(null);
-        }
-      }
-    } else {
-      promptGoogleSignIn();
-    }
+  const handleConnectGoogleDrive = () => {
+    // Already signed in to Google: only the recovery phrase is missing.
+    if (vaultState === 'locked') router.push('/sync/restore');
+    else promptGoogleSignIn();
   };
 
   const handleConfirmDisconnect = async (options?: {
@@ -146,37 +78,7 @@ export function GoogleSyncCard() {
     setShowDisconnectModal(false);
     setActionLoading('disconnecting');
     try {
-      if (!activePatient?.id) return;
-
-      if (options?.deleteFromCloud && config) {
-        try {
-          await deletePatientFromGoogleDrive(config, activePatient.id);
-        } catch (cloudErr) {
-          console.warn(
-            'Failed to delete patient data from Google Drive on disconnect:',
-            cloudErr
-          );
-        }
-      }
-
-      await updatePatientSyncAccount(activePatient.id, null);
-      const updated = await getStoredPatient(activePatient.id);
-      setActiveStoredPatient(updated);
-      await refreshPatients();
-
-      // Check if any other profiles are still synced to this Google account
-      if (config?.userSub) {
-        const storedPatients = await getAllStoredPatients();
-        const otherSynced = storedPatients.some(
-          (sp) =>
-            sp.patient.id !== activePatient.id &&
-            sp.syncAccount === config.userSub
-        );
-        if (!otherSynced) {
-          await disconnect();
-        }
-      }
-
+      await disconnect({ deleteCloudData: options?.deleteFromCloud });
       setFeedbackMessage(
         options?.deleteFromCloud
           ? 'Disconnected from Google Drive and cloud data deleted. Local records remain saved.'
@@ -233,22 +135,24 @@ export function GoogleSyncCard() {
         <Text style={styles.sectionTitle}>Cloud Backup</Text>
       </View>
 
-      {!isProfileSynced ? (
-        // State A: Disconnected for this profile
+      {!isConnected ? (
+        // State A: Not syncing on this device
         <View
           style={styles.disconnectedSection}
           testID="google-sync-disconnected"
         >
           <Text style={styles.description}>
-            Sync your records safely across devices using your private Google
-            Drive AppData folder, isolated from all other applications.
+            Sync all profiles across your devices through your Google Drive.
+            Records are end-to-end encrypted with a recovery phrase that only
+            you hold.
           </Text>
 
           <TouchableOpacity
             testID="google-signin-button"
             style={styles.googleBtn}
             disabled={
-              (!isGoogleReady && !config) || actionLoading === 'connecting'
+              (!isGoogleReady && vaultState !== 'locked') ||
+              actionLoading === 'connecting'
             }
             onPress={handleConnectGoogleDrive}
             activeOpacity={0.8}
@@ -264,7 +168,7 @@ export function GoogleSyncCard() {
           </TouchableOpacity>
         </View>
       ) : (
-        // State B: Connected for this profile
+        // State B: Syncing on this device
         <View style={styles.connectedSection}>
           <View style={styles.accountInfoBlock}>
             <Text
@@ -310,6 +214,16 @@ export function GoogleSyncCard() {
               <Text style={styles.syncButtonText}>Sync Now</Text>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            testID="show-recovery-phrase-button"
+            style={[styles.regularButton, styles.recoveryPhraseButton]}
+            onPress={() => router.push('/sync/recovery-phrase')}
+            activeOpacity={0.7}
+          >
+            <KeyRound size={16} color={COLORS.light.foreground} />
+            <Text style={styles.regularButtonText}>Show recovery phrase</Text>
+          </TouchableOpacity>
 
           {/* Disconnect Button below Sync Now */}
           <TouchableOpacity
@@ -368,11 +282,11 @@ export function GoogleSyncCard() {
       <DeleteConfirmationModal
         visible={showDisconnectModal}
         title="Disconnect Google Drive"
-        message="Are you sure you want to disconnect Google Drive? Your profile and health records will remain safely on this device."
+        message="Are you sure you want to disconnect Google Drive? Your profiles and health records will remain safely on this device."
         confirmLabel="Disconnect"
         requireCountdown={false}
         showCloudDeleteOption={true}
-        cloudDeleteLabel="Delete data from Google Drive"
+        cloudDeleteLabel="Delete all synced data from Google Drive"
         onConfirm={handleConfirmDisconnect}
         onCancel={() => setShowDisconnectModal(false)}
         testID="disconnect-confirmation-modal"
@@ -511,6 +425,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.card,
     borderWidth: 1,
     borderColor: COLORS.light.border,
+  },
+  recoveryPhraseButton: {
+    flex: 0,
+    marginBottom: 10,
   },
   regularButtonText: {
     fontSize: 13,

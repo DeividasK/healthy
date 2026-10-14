@@ -130,7 +130,6 @@ export async function clearAllDatabaseTables(): Promise<void> {
   const db = await getDb();
   await db.execAsync(`
     DELETE FROM observations;
-    DELETE FROM pending_clinical_resource_deletions;
     DELETE FROM diagnostic_reports;
     DELETE FROM clinical_documents;
     DELETE FROM medication_requests;
@@ -138,10 +137,17 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM consultations;
     DELETE FROM conditions;
     DELETE FROM app_settings;
-    -- A reset must not reimport acknowledged entries from the legacy queue.
-    INSERT INTO app_settings (key, value)
-      VALUES ('clinical_deletion_outbox_v10_imported', 'true');
     DELETE FROM patients;
+    -- A reset device starts with no sync history and a new device identity.
+    DELETE FROM sync_dirty;
+    DELETE FROM sync_changes;
+    DELETE FROM sync_row_versions;
+    DELETE FROM sync_remote_devices;
+    DELETE FROM sync_excluded_patients;
+    DELETE FROM sync_pending_apply;
+    UPDATE sync_device SET device_id = lower(hex(randomblob(8))),
+      hlc_last = NULL, last_seq = 0, snapshot_seq = 0, space_id = NULL,
+      provider_cursor = NULL;
   `);
   notifyDatabaseChanged([
     'observations',
