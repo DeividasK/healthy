@@ -8,6 +8,8 @@ import {
   checkA11y,
   seedTestCondition,
   seedTestConsultation,
+  seedTestReport,
+  seedTestTreatment,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -32,6 +34,23 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
   test.beforeEach(async ({ page }) => {
     await clearAppStorage(page);
     await createPatientViaUI(page);
+  });
+
+  test('labels lab results whenever another section precedes them', async ({
+    page,
+  }) => {
+    await seedTestReport(page, {
+      date: '2026-10-02',
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+    });
+    await page.goto('/');
+    await page.getByText('Hemoglobin (Hgb)').waitFor();
+    // A lone section needs no heading
+    await expect(page.getByText('Lab Results', { exact: true })).toHaveCount(0);
+
+    await seedTestTreatment(page, { title: 'Vitamin D' });
+    await expect(page.getByText('Treatments', { exact: true })).toBeVisible();
+    await expect(page.getByText('Lab Results', { exact: true })).toBeVisible();
   });
 
   test('keeps the shared header mounted, logo on the left, and island transitions continuous', async ({

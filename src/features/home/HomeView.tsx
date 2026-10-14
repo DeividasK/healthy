@@ -504,7 +504,7 @@ export function HomeView() {
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                {conditions.length > 0 && (
+                {(conditions.length > 0 || treatments.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
                 {records.map((record) => {
