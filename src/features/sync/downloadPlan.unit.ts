@@ -85,3 +85,14 @@ test('ignores files from another sync space', () => {
     )
   ).toEqual(['chunk-other-1']);
 });
+
+test('skips over a sequence number whose upload never arrived', () => {
+  const plan = planDownloads(
+    [file('chunk', 'other', 1), file('chunk', 'other', 3)],
+    'space',
+    'mine',
+    new Map()
+  );
+  expect(ids(plan)).toEqual(['chunk-other-1', 'chunk-other-3']);
+  expect(plan.cursors.get('other')).toBe(3);
+});

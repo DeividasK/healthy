@@ -343,9 +343,12 @@ async function pushLocalChanges(
   }
   const { deviceId } = await getDeviceState(db);
   for (const batch of batches) {
-    // Sequence numbers are only consumed after a successful upload, so other
-    // devices never see a gap in this device's chunks.
+    // Reserve the sequence number before uploading. If an upload reaches the
+    // cloud but its confirmation is lost, the retry gets a new number instead
+    // of reusing one other devices may already have read; a number whose
+    // upload truly failed only leaves a gap, which downloads tolerate.
     const seq = (await getDeviceState(db)).lastSeq + 1;
+    await updateDeviceState(db, { lastSeq: seq });
     await provider.upload(
       chunkName(deviceId, seq),
       await encodeSyncFile(
@@ -363,7 +366,6 @@ async function pushLocalChanges(
           'UPDATE sync_changes SET chunk_seq = ? WHERE hlc = ?;',
           [seq, row.hlc]
         );
-      await updateDeviceState(db, { lastSeq: seq });
     });
   }
   return rows.length;
