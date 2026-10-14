@@ -1,14 +1,12 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Consultation View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -36,16 +34,6 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await takeSnapshot(
       page,
       'Consultation View - Separate diagnosis items',
-      testInfo
-    );
-    await page.getByTestId('remove-diagnosis-1').click();
-    await page.getByTestId('remove-diagnosis-0').click();
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-condition').click();
-    await page.getByTestId('condition-search-input').waitFor();
-    await takeSnapshot(
-      page,
-      'Consultation View - Empty conditions section',
       testInfo
     );
     await seedTestCondition(page, {

@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
@@ -11,7 +10,6 @@ import {
 
 test.describe('Edit Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 

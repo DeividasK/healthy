@@ -2,7 +2,6 @@ import { strToU8, zipSync } from 'fflate';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestTreatment,
 } from '@/src/features/testing/testStorage';
@@ -13,10 +12,7 @@ for (const scenario of [
   'partial-v11',
   'current-v11',
 ]) {
-  test(`repairs ${scenario} and restores archives without losing treatments`, async ({
-    page,
-  }) => {
-    await clearAppStorage(page);
+  test(`repairs ${scenario} without losing treatments`, async ({ page }) => {
     await seedTestPatient(page, { id: 'migration-patient' });
     await seedTestTreatment(page, {
       id: 'existing-treatment',
@@ -94,54 +90,62 @@ for (const scenario of [
       );
     }
 
-    // Older v2 archives, including the supplied backup, contain no treatments.
-    const olderArchive = zipSync({
-      'manifest.json': strToU8(
-        JSON.stringify({ version: 2, fhirVersion: '5.0.0' })
-      ),
-      'records/patient.json': strToU8(
-        JSON.stringify({
-          resourceType: 'Patient',
-          id: 'restored-patient',
-          name: [{ given: ['Synthetic'], family: 'Restore' }],
-        })
-      ),
-    });
-    const olderResult = await page.evaluate(
-      (bytes) => (window as any).__HEALTHY_TEST_BRIDGE__.restoreArchive(bytes),
-      Array.from(olderArchive)
-    );
-    expect(olderResult.patients).toBe(1);
-    expect(olderResult.medicationRequests).toBe(0);
+    // Archive compatibility is independent of the source schema; exercise it once
+    // after a real legacy repair, while every variant retains restart/edit checks.
+    if (scenario === 'legacy-v10') {
+      // Older v2 archives, including the supplied backup, contain no treatments.
+      const olderArchive = zipSync({
+        'manifest.json': strToU8(
+          JSON.stringify({ version: 2, fhirVersion: '5.0.0' })
+        ),
+        'records/patient.json': strToU8(
+          JSON.stringify({
+            resourceType: 'Patient',
+            id: 'restored-patient',
+            name: [{ given: ['Synthetic'], family: 'Restore' }],
+          })
+        ),
+      });
+      const olderResult = await page.evaluate(
+        (bytes) =>
+          (window as any).__HEALTHY_TEST_BRIDGE__.restoreArchive(bytes),
+        Array.from(olderArchive)
+      );
+      expect(olderResult.patients).toBe(1);
+      expect(olderResult.medicationRequests).toBe(0);
 
-    const archive = zipSync({
-      'manifest.json': strToU8(
-        JSON.stringify({ version: 2, fhirVersion: '5.0.0' })
-      ),
-      'records/medication_request_restored.json': strToU8(
-        JSON.stringify({
-          patientId: 'migration-patient',
-          resource: {
-            resourceType: 'MedicationRequest',
-            id: 'restored-treatment',
-            subject: { reference: 'Patient/migration-patient' },
-            medication: { concept: { text: 'Restored treatment' } },
-            status: 'unknown',
-            intent: 'plan',
-            authoredOn: '2026-02-03',
-          },
-        })
-      ),
-    });
-    const restored = await page.evaluate(
-      (bytes) => (window as any).__HEALTHY_TEST_BRIDGE__.restoreArchive(bytes),
-      Array.from(archive)
-    );
-    expect(restored.medicationRequests).toBe(1);
+      const archive = zipSync({
+        'manifest.json': strToU8(
+          JSON.stringify({ version: 2, fhirVersion: '5.0.0' })
+        ),
+        'records/medication_request_restored.json': strToU8(
+          JSON.stringify({
+            patientId: 'migration-patient',
+            resource: {
+              resourceType: 'MedicationRequest',
+              id: 'restored-treatment',
+              subject: { reference: 'Patient/migration-patient' },
+              medication: { concept: { text: 'Restored treatment' } },
+              status: 'unknown',
+              intent: 'plan',
+              authoredOn: '2026-02-03',
+            },
+          })
+        ),
+      });
+      const restored = await page.evaluate(
+        (bytes) =>
+          (window as any).__HEALTHY_TEST_BRIDGE__.restoreArchive(bytes),
+        Array.from(archive)
+      );
+      expect(restored.medicationRequests).toBe(1);
+    }
     await page.reload();
-    await expect(
-      page.getByTestId('treatment-card-restored-treatment')
-    ).toBeVisible();
+    if (scenario === 'legacy-v10') {
+      await expect(
+        page.getByTestId('treatment-card-restored-treatment')
+      ).toBeVisible();
+    }
     await expect(
       page.getByTestId('treatment-card-existing-treatment')
     ).toBeVisible();

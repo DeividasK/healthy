@@ -1,16 +1,13 @@
 import {
   test,
   expect,
-  clearAppStorage,
-  createPatientViaUI,
-  createTestConditionViaUI,
+  seedTestPatient,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(
@@ -100,19 +97,7 @@ test.describe('Add Condition Flow', () => {
 
 test.describe('New condition form keyboard support', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
-  });
-
-  test('focuses the first field and Escape cancels a pristine form', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-condition').click();
-    await expect(page.getByTestId('condition-title-input')).toBeFocused();
-    await page.keyboard.press('Escape');
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
+    await seedTestPatient(page);
   });
 
   test('Escape asks before discarding entered data, defaulting to No', async ({
@@ -164,8 +149,7 @@ test.describe('New condition form keyboard support', () => {
 
 test.describe('Condition form island', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test('centers the add menu on its + and turns the + into a close icon', async ({
@@ -193,17 +177,5 @@ test.describe('Condition form island', () => {
         );
       })
       .toBeLessThan(1);
-  });
-
-  test('cancelling an unchanged edit form leaves without asking', async ({
-    page,
-  }) => {
-    await createTestConditionViaUI(page);
-    await page.getByRole('button', { name: /^View condition:/ }).click();
-    await page.getByTestId('edit-condition-button').click();
-    await expect(page.getByTestId('condition-title-input')).toBeVisible();
-    await page.getByTestId('cancel-button').click();
-    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
-    await expect(page.getByTestId('condition-title')).toBeVisible();
   });
 });

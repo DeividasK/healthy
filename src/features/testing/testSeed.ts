@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { test, type Page } from '@playwright/test';
 import type { MedicationRequest } from 'fhir/r5';
 
 export interface SeedPatientOptions {
@@ -60,29 +60,63 @@ export interface SeedTreatmentOptions {
   requesterName?: string;
 }
 
-/**
- * Seeds a Patient directly into SQLite via the test bridge.
- */
+/** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
+export async function seedTestResources(
+  page: Page,
+  resources: {
+    conditions?: SeedConditionOptions[];
+    consultations?: SeedConsultationOptions[];
+    treatments?: SeedTreatmentOptions[];
+    reports?: SeedReportOptions[];
+  }
+): Promise<void> {
+  await test.step('Seed related resources', async () => {
+    await bootstrapApp(page);
+    await page.evaluate(async (resources) => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      for (const input of resources.conditions ?? [])
+        await bridge.seedCondition(input);
+      for (const input of resources.consultations ?? [])
+        await bridge.seedConsultation(input);
+      for (const input of resources.treatments ?? [])
+        await bridge.seedTreatment(input);
+      for (const input of resources.reports ?? [])
+        await bridge.seedReport(input);
+    }, resources);
+  });
+}
+
+/** Boot once per page; subsequent seeds preserve the route under test. */
+export async function bootstrapApp(page: Page): Promise<void> {
+  await test.step('Bootstrap app and SQLite', async () => {
+    if (page.url() === 'about:blank') await page.goto('/profile/new');
+    await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  });
+}
+
+/** Seeds a Patient through the real service; a fresh page starts on Home. */
 export async function seedTestPatient(
   page: Page,
   options?: SeedPatientOptions
 ): Promise<any> {
-  await page.goto('/');
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  const patient = await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-      id: opts?.id,
-      givenName: opts?.givenName || 'John',
-      familyName: opts?.familyName || 'Doe',
-      gender: opts?.gender,
-      birthDate: opts?.birthDate,
-      syncAccount: opts?.syncAccount,
-    });
-  }, options);
-  if (page.url().includes('/profile/new')) {
-    await page.goto('/');
+  const freshPage = page.url() === 'about:blank';
+  await bootstrapApp(page);
+  const patient = await test.step('Seed patient', () =>
+    page.evaluate(async (opts) => {
+      return await (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
+        id: opts?.id,
+        givenName: opts?.givenName || 'John',
+        familyName: opts?.familyName || 'Doe',
+        gender: opts?.gender,
+        birthDate: opts?.birthDate,
+        syncAccount: opts?.syncAccount,
+      });
+    }, options));
+  if (freshPage) {
+    await page.getByTestId('cancel-button').waitFor();
+    await page.getByTestId('app-home-button').click();
+    await page.getByTestId('floating-add-button').waitFor();
   }
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return patient;
 }
 

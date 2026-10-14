@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
@@ -9,7 +8,6 @@ import {
 
 test.describe('Edit Treatment - Visual Regression', () => {
   test('Populated form', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const condition = await seedTestCondition(page, {
       title: 'Acute bacterial sinusitis',

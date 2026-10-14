@@ -27,18 +27,23 @@ jobs:
         with:
           cache: true
 
-      - name: Build Web Static Export
-        uses: ./.github/actions/build-web
-
       - name: Run Visual Tests
         run: pnpm test:visual
+
+      - name: Upload Capture Timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-test-results
+          path: test-results/results.json
+          retention-days: 7
 
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: visual-test-report
-          path: playwright-report/
+          path: test-results/
           retention-days: 7
 
       - name: Accept Snapshots in Chromatic

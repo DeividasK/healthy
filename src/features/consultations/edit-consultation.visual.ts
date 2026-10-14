@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -9,7 +8,6 @@ import {
 
 test.describe('Edit Consultation View - Visual Regression', () => {
   test('Consultation View - Edit Existing Mode', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     await seedTestCondition(page, {
       id: 'edit-first',

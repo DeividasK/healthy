@@ -3,7 +3,6 @@ import { mockGoogleDrive } from '@/src/features/testing/mockGoogleDrive';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -12,7 +11,6 @@ import {
 test('encrypted Drive restoration rebuilds diagnoses and retains a newer local Encounter', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, {
     id: 'sync-diagnoses',
     syncAccount: 'synthetic-google-sub',

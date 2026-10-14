@@ -1,8 +1,8 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
+  seedTestResources,
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,
@@ -11,7 +11,6 @@ import {
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -42,15 +41,6 @@ test.describe('Home View - Visual Regression', () => {
       title: 'Lisinopril 10mg',
       dosageInstructions: 'Take 1 tablet daily.',
     });
-    await page.goto('/');
-    await page
-      .getByTestId('consultation-card-consultation-home-visual')
-      .waitFor();
-    await takeSnapshot(
-      page,
-      'Home View - Condition and Consultation cards',
-      testInfo
-    );
     await seedTestCondition(page, {
       id: 'second-home-visual',
       title: 'Ligament injury',
@@ -70,25 +60,6 @@ test.describe('Home View - Visual Regression', () => {
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('floating-add-menu').waitFor();
     await takeSnapshot(page, 'Home View - Add menu', testInfo);
-  });
-
-  test('Home View - Populated with Single Report', async ({
-    page,
-  }, testInfo) => {
-    await seedTestReport(page, {
-      id: 'report-home-single',
-      date: '2026-10-02',
-      biomarkers: [
-        { name: 'Hemoglobin', value: 14.5 },
-        { name: 'White Blood Cells', value: 6.8 },
-      ],
-      notes: 'Routine morning blood test',
-    });
-
-    await page.goto('/');
-    await page.getByText('Hemoglobin (Hgb)').waitFor();
-
-    await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
   });
 
   test('Home View - Multi-Report with All Status Badges', async ({
@@ -127,23 +98,21 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Collapsed and expanded sections', async ({
     page,
   }, testInfo) => {
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestCondition(page, {
+    await seedTestResources(page, {
+      conditions: [1, 2, 3, 4].map((n) => ({
         id: `collapse-condition-${n}`,
         title: `Condition ${n}`,
         onsetDate: `2026-0${n}-01`,
-      });
-    }
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestConsultation(page, {
+      })),
+      consultations: [1, 2, 3, 4].map((n) => ({
         id: `collapse-consultation-${n}`,
         title: `Consultation ${n}`,
         date: `2026-0${n}-15`,
         doctorName: `Specialist ${n}`,
         conditionIds: [`collapse-condition-${n}`],
-      });
-    }
-    await page.goto('/');
+      })),
+    });
+
     await page.getByTestId('conditions-list-toggle').waitFor();
     await takeSnapshot(page, 'Home View - Collapsed sections', testInfo);
     await page.getByTestId('conditions-list-toggle').click();

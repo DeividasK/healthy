@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
@@ -9,7 +8,6 @@ import {
 
 test.describe('View Condition', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -23,6 +21,9 @@ test.describe('View Condition', () => {
     await expect(page.getByTestId('condition-treatments-section')).toHaveCount(
       0
     );
+    await expect(
+      page.getByTestId('condition-consultations-section')
+    ).toHaveCount(0);
 
     const associated = await seedTestTreatment(page, {
       title: 'Sumatriptan 50mg',
@@ -58,7 +59,6 @@ test.describe('View Condition', () => {
 
 test.describe('Condition view island', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -92,6 +92,11 @@ test.describe('Condition view island', () => {
   }) => {
     await seedTestCondition(page, { id: 'escape-condition', title: 'Escape' });
     await page.goto('/condition/escape-condition');
+    await page.getByTestId('edit-condition-button').click();
+    await expect(page.getByTestId('condition-title-input')).toBeVisible();
+    await page.getByTestId('cancel-button').click();
+    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/condition\/escape-condition$/);
     await page.getByTestId('edit-condition-button').click();
     await expect(page.getByTestId('condition-title-input')).toBeVisible();
     await page.keyboard.press('Escape');

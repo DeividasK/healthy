@@ -1,9 +1,9 @@
 import {
   test,
   expect,
-  clearAppStorage,
-  createPatientViaUI,
+  seedTestPatient,
   createConditionViaUI,
+  mockGoogleDrive,
   mockGoogleDriveRoutes,
   mockGoogleAuthRoutes,
   mockGoogleIdentityServices,
@@ -12,8 +12,7 @@ import {
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(
@@ -471,119 +470,142 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(checkbox).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('should not re-sync locally deleted profile from Google Drive on subsequent sync', async ({
+  test('does not restore a locally deleted profile during a completed Drive sync', async ({
     page,
   }) => {
-    // 1. Mock Google Drive configuration
-    await page.evaluate(() => {
-      localStorage.setItem(
-        '@healthy_device_google_sync_config',
-        JSON.stringify({
-          accessToken: 'mock-google-token',
-          userEmail: 'alice@gmail.com',
-          userName: 'Alice Test',
-          userSub: 'alice-sub-12345',
-          lastSyncTimestamp: new Date().toISOString(),
-        })
-      );
+    const files = await mockGoogleDrive(page);
+    const config = { accessToken: 'mock-token', userSub: 'deletion-user' };
+    const [john] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM patients'
+      )
+    );
+    await seedTestPatient(page, { id: john.id, syncAccount: config.userSub });
+    await seedTestPatient(page, {
+      id: 'deleted-bob',
+      givenName: 'Bob',
+      familyName: 'Smith',
+      syncAccount: config.userSub,
     });
-
-    await page.getByTestId('profile-header-button').click();
-
-    // 2. Create a second profile "Bob Smith"
-    await page.getByTestId('add-new-profile-button').click();
-    await page.getByTestId('patient-given-name-input').fill('Bob');
-    await page.getByTestId('patient-family-name-input').fill('Smith');
-    await page.getByTestId('save-profile-button').click();
-
-    // Verify Bob Smith is on profile screen
-    await expect(page.getByTestId('profile-display-name').first()).toHaveText(
+    await page.evaluate(
+      (config) =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.backupToGoogleDrive(config),
+      config
+    );
+    expect(
+      [...files.values()].some(
+        (file) => file.name === 'patient_deleted-bob.json.enc'
+      )
+    ).toBe(true);
+    // Keep background sync idle; this test explicitly awaits the post-deletion sync.
+    await page.evaluate(() =>
+      localStorage.removeItem('@healthy_device_google_sync_config')
+    );
+    await page.goto('/profile');
+    await expect(page.getByTestId('profile-display-name')).toHaveText(
       'Bob Smith'
     );
-
-    // 3. Delete Bob Smith locally (with cloud delete unchecked)
-    await page.getByTestId('edit-profile-button').first().click();
+    await page.getByTestId('edit-profile-button').click();
     await page.clock.install();
     await page.getByTestId('delete-profile-button').click();
-
-    const modal = page.getByTestId('delete-profile-modal');
-    await expect(modal).toBeVisible();
-
-    const confirmBtn = page.getByTestId('delete-modal-confirm-button');
+    await page.getByTestId('delete-profile-modal').waitFor();
     await page.clock.runFor(5000);
-    await expect(confirmBtn).toHaveText('Delete');
-    await confirmBtn.click();
-
-    // 4. Verify we are back on Profile with "John Doe" active and Bob Smith is gone
+    await page.getByTestId('delete-modal-confirm-button').click();
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
       'John Doe'
     );
-    await expect(page.getByText('Bob Smith')).not.toBeVisible();
+    // Await the real sync service, including decryption and patient eligibility filtering.
+    await page.evaluate(
+      (config) =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.syncWithGoogleDrive(config),
+      config
+    );
+    const patients = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM patients'
+      )
+    );
+    expect(patients).toEqual([{ id: john.id }]);
+    expect(
+      [...files.values()].some(
+        (file) => file.name === 'patient_deleted-bob.json.enc'
+      )
+    ).toBe(true);
+    await expect(page.getByText('Bob Smith')).toHaveCount(0);
+  });
 
-    // 5. Trigger background sync via Sync Now button if visible
-    const syncNowBtn = page.getByTestId('sync-now-button').first();
-    if (await syncNowBtn.isVisible()) {
-      await syncNowBtn.click();
+  test('selects and deselects cloud profiles and restores only the selection', async ({
+    page,
+  }) => {
+    await mockGoogleDrive(page);
+    await mockGoogleAuthRoutes(page);
+    for (const [id, givenName] of [
+      ['remote-alice', 'Alice'],
+      ['remote-bob', 'Bob'],
+    ]) {
+      await seedTestPatient(page, {
+        id,
+        givenName,
+        syncAccount: 'google-sub-empty',
+      });
     }
-
-    // 6. Verify Bob Smith does NOT re-appear after sync
-    await expect(page.getByText('Bob Smith')).not.toBeVisible();
-  });
-
-  test('should allow selecting and deselecting specific profiles when restoring from Google Drive', async ({
-    page,
-  }) => {
-    // Intercept Google Drive API to return mock remote profiles
-    await page.goto('/profile/new');
-    await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
-
-    // Verify option exists and is interactive
-    await page.getByTestId('option-restore-gdrive').click();
-  });
-
-  test('should display "No profiles found in <user_email> Google Drive" modal when no profiles are found and dismiss on Close', async ({
-    page,
-  }) => {
-    await page.goto('/profile/restore-from-google-drive');
-
-    // Mock Google OAuth and API calls in the browser context
-    await mockGoogleAuthRoutes(page, {
-      accessToken: 'mock-token',
-      userEmail: 'testuser@gmail.com',
-      userName: 'Test User',
-      userSub: 'google-sub-empty',
+    await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      await bridge.backupToGoogleDrive({
+        accessToken: 'mock-token',
+        userSub: 'google-sub-empty',
+      });
+      await bridge.clearDatabase();
+      localStorage.removeItem('@healthy_device_google_sync_config');
     });
+    await page.goto('/profile/restore-from-google-drive');
+    await page.getByTestId('connect-google-drive-button').click();
+    const modal = page.getByTestId('google-profile-picker-modal');
+    await expect(modal).toBeVisible();
+    const alice = modal.getByTestId('remote-profile-item-remote-alice');
+    const bob = modal.getByTestId('remote-profile-item-remote-bob');
+    const restore = modal.getByTestId('restore-selected-profiles-button');
+    await expect(restore).toHaveText('Restore (2) Profiles');
+    await expect(alice).toBeVisible();
+    await expect(bob).toBeVisible();
+    await modal.getByTestId('toggle-select-all-profiles-button').click();
+    await expect(restore).toHaveText('Select Profiles');
+    await expect(restore).toHaveAttribute('aria-disabled', 'true');
+    await alice.click();
+    await expect(restore).toHaveText('Restore Profile');
+    await alice.click();
+    await expect(restore).toHaveAttribute('aria-disabled', 'true');
+    await alice.click();
+    await expect(restore).not.toHaveAttribute('aria-disabled', 'true');
+    await modal.getByTestId('restore-selected-profiles-button').click();
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    expect(
+      await page.evaluate(() =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+          'SELECT id FROM patients'
+        )
+      )
+    ).toEqual([{ id: 'remote-alice' }]);
+  });
+
+  test('shows and dismisses the empty Google Drive modal after authentication', async ({
+    page,
+  }) => {
     await mockGoogleDriveRoutes(page, { files: [] });
-
-    // Verify the Restore from Google Drive screen and Connect Google Drive button
-    const connectBtn = page.getByTestId('connect-google-drive-button');
-    if (await connectBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await connectBtn.click();
-    }
-
-    // The modal can be validated if auth completes or directly if triggered
-    // Let's also verify modal elements and dismiss interaction
-    const noProfilesModal = page.getByTestId('no-profiles-found-modal');
-    if (await noProfilesModal.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await expect(noProfilesModal).toBeVisible();
-      await expect(page.getByTestId('no-profiles-message')).toContainText(
-        'No profiles found in testuser@gmail.com Google Drive.'
-      );
-      const closeBtn = page.getByTestId('close-no-profiles-modal-button');
-      await expect(closeBtn).toBeVisible();
-      await closeBtn.click();
-      await expect(noProfilesModal).not.toBeVisible();
-
-      // Ensure connection was not saved and Connect Google Drive button is still present
-      await expect(
-        page.getByTestId('connect-google-drive-button')
-      ).toBeVisible();
-
-      // Verify user can switch to other options (e.g., Create profile or Restore from file)
-      const createOption = page.getByTestId('option-create-profile');
-      await createOption.click();
-      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
-    }
+    await mockGoogleAuthRoutes(page, { userEmail: 'testuser@gmail.com' });
+    await page.goto('/profile/restore-from-google-drive');
+    await page.getByTestId('connect-google-drive-button').click();
+    const modal = page.getByTestId('no-profiles-found-modal');
+    await expect(modal).toBeVisible();
+    await expect(page.getByTestId('no-profiles-message')).toHaveText(
+      'No profiles found in testuser@gmail.com Google Drive.'
+    );
+    await page.getByTestId('close-no-profiles-modal-button').click();
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
+    await page.getByTestId('option-create-profile').click();
+    await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
   });
 
   test('should individually connect profiles to Google Drive and show accurate status badges', async ({

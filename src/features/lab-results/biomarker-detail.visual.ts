@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
@@ -9,7 +8,6 @@ import {
 test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
   page,
 }, testInfo) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   await seedTestReport(page, {
     id: 'hemoglobin-visual-first',
@@ -33,7 +31,6 @@ test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
 test('Biomarker detail - Red Blood Cells history', async ({
   page,
 }, testInfo) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   await seedTestReport(page, {
     id: 'rbc-visual-first',
