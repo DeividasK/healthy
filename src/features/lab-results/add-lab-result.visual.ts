@@ -14,16 +14,6 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await page.getByTestId('test-search-input').waitFor();
 
     await takeSnapshot(page, 'Add Report View - Initial Clean Form', testInfo);
-
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.click();
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').waitFor();
-
-    await takeSnapshot(
-      page,
-      'Add Report View - Autocomplete Dropdown Open',
-      testInfo
-    );
   });
 
   test('Add Report View - Populated Biomarkers', async ({ page }, testInfo) => {

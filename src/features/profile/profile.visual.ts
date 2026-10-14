@@ -20,7 +20,7 @@ test.describe('Profile Views - Visual Regression', () => {
 
     await takeSnapshot(page, 'Profile View - Add Profile Options', testInfo);
     await page.getByTestId('option-restore-file').click();
-    await page.getByTestId('option-restore-file').waitFor();
+    await page.getByText('Restore From Backup', { exact: true }).waitFor();
 
     await takeSnapshot(
       page,
@@ -29,7 +29,7 @@ test.describe('Profile Views - Visual Regression', () => {
     );
 
     await page.getByTestId('option-restore-gdrive').click();
-    await page.getByTestId('option-restore-gdrive').waitFor();
+    await page.getByText('Google Drive Sync', { exact: true }).waitFor();
 
     await takeSnapshot(
       page,

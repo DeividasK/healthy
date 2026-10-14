@@ -21,6 +21,9 @@ test.describe('View Condition', () => {
     await expect(page.getByTestId('condition-treatments-section')).toHaveCount(
       0
     );
+    await expect(
+      page.getByTestId('condition-consultations-section')
+    ).toHaveCount(0);
 
     const associated = await seedTestTreatment(page, {
       title: 'Sumatriptan 50mg',

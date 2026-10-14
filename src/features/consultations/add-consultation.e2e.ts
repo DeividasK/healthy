@@ -441,7 +441,8 @@ for (const terminology of [
       .fill('Seborrhoeic dermatitis');
     for (const [field, value] of Object.entries(terminology))
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
-    if (!terminology.system) await checkA11y(page);
+    // Both variants render the same controls; audit the fully populated one.
+    if (terminology.system) await checkA11y(page);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/consultation\/add/);
     const stored = await page.evaluate(async () => {

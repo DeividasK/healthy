@@ -24,9 +24,6 @@ test.describe('View Condition View - Visual Regression', () => {
       notes: 'Persistent ache after running on tarmac.',
       onsetDate: '2026-10-02',
     });
-    await page.goto(`/condition/${cond.id}`);
-    await page.getByTestId('condition-title').waitFor();
-    await takeSnapshot(page, 'Condition View - No consultations', testInfo);
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-follow-up',
       conditionIds: [cond.id],

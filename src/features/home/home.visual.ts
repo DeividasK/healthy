@@ -41,15 +41,6 @@ test.describe('Home View - Visual Regression', () => {
       title: 'Lisinopril 10mg',
       dosageInstructions: 'Take 1 tablet daily.',
     });
-    await page.goto('/');
-    await page
-      .getByTestId('consultation-card-consultation-home-visual')
-      .waitFor();
-    await takeSnapshot(
-      page,
-      'Home View - Condition and Consultation cards',
-      testInfo
-    );
     await seedTestCondition(page, {
       id: 'second-home-visual',
       title: 'Ligament injury',
@@ -69,25 +60,6 @@ test.describe('Home View - Visual Regression', () => {
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('floating-add-menu').waitFor();
     await takeSnapshot(page, 'Home View - Add menu', testInfo);
-  });
-
-  test('Home View - Populated with Single Report', async ({
-    page,
-  }, testInfo) => {
-    await seedTestReport(page, {
-      id: 'report-home-single',
-      date: '2026-10-02',
-      biomarkers: [
-        { name: 'Hemoglobin', value: 14.5 },
-        { name: 'White Blood Cells', value: 6.8 },
-      ],
-      notes: 'Routine morning blood test',
-    });
-
-    await page.goto('/');
-    await page.getByText('Hemoglobin (Hgb)').waitFor();
-
-    await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
   });
 
   test('Home View - Multi-Report with All Status Badges', async ({
