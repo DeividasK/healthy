@@ -40,6 +40,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { convertBiomarkerValue } from '@/src/features/lab-results/biomarkerMeasurements';
 
 async function resolvePatientId(
   explicitId?: string
@@ -150,25 +151,41 @@ export function setupTestBridge() {
 
         const val = typeof b.value === 'string' ? parseFloat(b.value) : b.value;
         if (def) {
+          const selectedUnit = def.units.find(
+            (unit) => unit.ucum === b.unit || unit.label === b.unit
+          );
+          if (b.unit && !selectedUnit) {
+            throw new Error(`Unknown unit "${b.unit}" for ${def.name}`);
+          }
+          const ucumCode = selectedUnit?.ucum || def.ucumCode;
           return {
             id: def.id,
             name: def.name,
             loinc: def.loinc,
             value: val,
             unit: b.unit || def.primaryUnit,
-            ucumCode: def.ucumCode,
-            referenceLow: def.referenceRange?.low,
-            referenceHigh: def.referenceRange?.high,
+            ucumCode,
+            referenceLow:
+              def.referenceRange?.low === undefined
+                ? undefined
+                : convertBiomarkerValue(
+                    def.referenceRange.low,
+                    def.ucumCode,
+                    ucumCode,
+                    def
+                  ),
+            referenceHigh:
+              def.referenceRange?.high === undefined
+                ? undefined
+                : convertBiomarkerValue(
+                    def.referenceRange.high,
+                    def.ucumCode,
+                    ucumCode,
+                    def
+                  ),
           };
         }
-        return {
-          id: `custom_${b.name.toLowerCase().replace(/\s+/g, '_')}`,
-          name: b.name,
-          loinc: 'custom',
-          value: val,
-          unit: b.unit || '',
-          ucumCode: '',
-        };
+        throw new Error(`Biomarker "${b.name}" is not in the CBC catalog.`);
       });
 
       return await createAndSaveDiagnosticReport({

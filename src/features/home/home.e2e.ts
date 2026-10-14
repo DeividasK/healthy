@@ -254,6 +254,9 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
 
         const reportCard = page.getByTestId(/^report-card-/).first();
         await expect(reportCard).toBeVisible();
+        await expect(
+          reportCard.getByTestId('biomarker-range-line-718-7')
+        ).toBeVisible();
 
         const deleteBtn = page.getByTestId(/^delete-report-button-/).first();
         const editBtn = page.getByTestId(/^edit-report-button-/).first();
