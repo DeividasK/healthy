@@ -1,27 +1,21 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
-import { Clock, X } from 'lucide-react-native';
+import { Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { Clock } from 'lucide-react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { COLORS } from '@/src/theme/colors';
 
 export interface NativeTimePickerProps {
   value: string; // "HH:mm"
   onChange: (time: string) => void;
-  onRemove: () => void;
   maxTime?: string;
   testID?: string;
+  id?: string;
+  name?: string;
 }
 
 export function NativeTimePicker({
   value,
   onChange,
-  onRemove,
   maxTime,
   testID = 'time-picker-button',
 }: NativeTimePickerProps) {
@@ -51,55 +45,35 @@ export function NativeTimePicker({
   };
 
   return (
-    <View style={styles.timePill} testID={testID}>
-      <TouchableOpacity
-        style={styles.timePillInner}
-        onPress={handlePress}
-        activeOpacity={0.8}
-      >
-        <Clock
-          color={COLORS.light.iconMuted}
-          size={16}
-          style={styles.pillIcon}
-        />
-        <Text style={styles.pillText}>{value}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        testID="remove-time-button"
-        onPress={onRemove}
-        style={styles.removeButton}
-      >
-        <X color={COLORS.light.iconClear} size={14} />
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity
+      style={styles.timeInputContainer}
+      onPress={handlePress}
+      activeOpacity={0.8}
+      testID={testID}
+    >
+      <Clock color={COLORS.light.iconMuted} size={18} style={styles.icon} />
+      <Text style={styles.timeText}>{value}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  timePill: {
+  timeInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.light.pillBackground,
     borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    width: '100%',
   },
-  timePillInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  icon: {
+    marginRight: 8,
   },
-  pillIcon: {
-    marginRight: 6,
-  },
-  pillText: {
+  timeText: {
+    fontSize: 16,
     color: COLORS.light.foreground,
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 6,
-  },
-  removeButton: {
-    padding: 2,
   },
 });

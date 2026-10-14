@@ -19,8 +19,6 @@ export function RelatedResourceList({
       icon={Pill}
       title="Treatments"
       testID="consultation-treatments"
-      emptyText="No treatments linked to this consultation."
-      emptyTestID="consultation-no-treatments"
     >
       {linkedTreatments.map((treatment) => (
         <TreatmentRelatedRow

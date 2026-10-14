@@ -4,6 +4,7 @@ import {
   clearAppStorage,
   seedTestPatient,
   seedTestConsultation,
+  seedTestCondition,
   seedTestTreatment,
   getTestTreatment,
   getTestClinicalDocument,
@@ -93,4 +94,36 @@ test.describe('Edit Treatment add menu', () => {
     await page.getByTestId('menu-link-consultation').click();
     await expect(page.getByTestId('add-option-button')).toBeDisabled();
   });
+});
+
+test('hides the link search once every consultation and condition is linked', async ({
+  page,
+}) => {
+  await clearAppStorage(page);
+  await seedTestPatient(page);
+  const consultation = await seedTestConsultation(page, {
+    title: 'Only visit',
+  });
+  const condition = await seedTestCondition(page, { title: 'Only condition' });
+  const treatment = await seedTestTreatment(page, {
+    title: 'Fully linked',
+    consultationId: consultation.id,
+    reasonConditionIds: [condition.id],
+  });
+  await page.goto(`/treatment/${treatment.id}/edit`);
+  await expect(
+    page.getByTestId(`link-selected-consultation-${consultation.id}`)
+  ).toBeVisible();
+  await expect(page.getByTestId('link-consultation-search-input')).toHaveCount(
+    0
+  );
+  await expect(
+    page.getByTestId('treatment-condition-search-input')
+  ).toHaveCount(0);
+
+  // Unlinking makes the search available again
+  await page.getByTestId('link-remove-consultation-button').click();
+  await expect(
+    page.getByTestId('link-consultation-search-input')
+  ).toBeVisible();
 });

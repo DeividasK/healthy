@@ -74,13 +74,18 @@ const blurActiveElement = () => {
   }
 };
 
+/** Rows only show counts for associated resource types they actually have. */
+const withoutZeroCounts = (counts: (ResourceMeta & { count: number })[]) =>
+  counts.filter(({ count }) => count > 0);
+
 /** Meta item showing how many associated resources of one type a row has. */
 const countMeta = (
   icon: LucideIcon,
   count: number,
   label: string,
   testID: string
-): ResourceMeta => ({
+): ResourceMeta & { count: number } => ({
+  count,
   icon,
   text: String(count),
   accessibilityLabel: `${count} ${label}`,
@@ -391,7 +396,7 @@ export function HomeView() {
                             blurActiveElement();
                             router.push(`/condition/${condId}`);
                           }}
-                          extraMeta={[
+                          extraMeta={withoutZeroCounts([
                             countMeta(
                               Stethoscope,
                               countConditionConsultations(condId),
@@ -404,7 +409,7 @@ export function HomeView() {
                               'treatments',
                               `condition-treatments-count-${condId}`
                             ),
-                          ]}
+                          ])}
                         />
                       </View>
                     );
@@ -434,6 +439,14 @@ export function HomeView() {
                             params: { id: treatId },
                           });
                         }}
+                        extraMeta={withoutZeroCounts([
+                          countMeta(
+                            FolderPlus,
+                            getTreatmentReasonConditionIds(treatment).length,
+                            'conditions',
+                            `treatment-conditions-count-${treatId}`
+                          ),
+                        ])}
                       />
                     </View>
                   );
@@ -441,10 +454,58 @@ export function HomeView() {
               </ResourceSection>
             )}
 
+            {/* Consultations Section */}
+            {recentConsultations.length > 0 && (
+              <ResourceSection
+                icon={Stethoscope}
+                title="Consultations"
+                testID="home-consultations-section"
+              >
+                <CollapsibleList
+                  items={recentConsultations}
+                  testID="consultations-list"
+                  renderItem={(consultation) => {
+                    const consId = consultation.id || '';
+                    return (
+                      <View key={consId} testID={`consultation-card-${consId}`}>
+                        <ConsultationRelatedRow
+                          consultation={consultation}
+                          testID={`consultation-open-${consId}`}
+                          onPress={() => {
+                            blurActiveElement();
+                            router.push({
+                              pathname: '/consultation/[id]',
+                              params: { id: consId },
+                            });
+                          }}
+                          extraMeta={withoutZeroCounts([
+                            countMeta(
+                              FolderPlus,
+                              countConsultationConditions(consultation),
+                              'conditions',
+                              `consultation-conditions-count-${consId}`
+                            ),
+                            countMeta(
+                              Pill,
+                              consultationTreatmentCounts[consId] || 0,
+                              'treatments',
+                              `consultation-treatments-count-${consId}`
+                            ),
+                          ])}
+                        />
+                      </View>
+                    );
+                  }}
+                />
+              </ResourceSection>
+            )}
+
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                {(conditions.length > 0 || treatments.length > 0) && (
+                {(conditions.length > 0 ||
+                  treatments.length > 0 ||
+                  consultations.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
                 {records.map((record) => {
@@ -576,52 +637,6 @@ export function HomeView() {
                   );
                 })}
               </View>
-            )}
-
-            {/* Consultations Section */}
-            {recentConsultations.length > 0 && (
-              <ResourceSection
-                icon={Stethoscope}
-                title="Consultations"
-                testID="home-consultations-section"
-              >
-                <CollapsibleList
-                  items={recentConsultations}
-                  testID="consultations-list"
-                  renderItem={(consultation) => {
-                    const consId = consultation.id || '';
-                    return (
-                      <View key={consId} testID={`consultation-card-${consId}`}>
-                        <ConsultationRelatedRow
-                          consultation={consultation}
-                          testID={`consultation-open-${consId}`}
-                          onPress={() => {
-                            blurActiveElement();
-                            router.push({
-                              pathname: '/consultation/[id]',
-                              params: { id: consId },
-                            });
-                          }}
-                          extraMeta={[
-                            countMeta(
-                              FolderPlus,
-                              countConsultationConditions(consultation),
-                              'conditions',
-                              `consultation-conditions-count-${consId}`
-                            ),
-                            countMeta(
-                              Pill,
-                              consultationTreatmentCounts[consId] || 0,
-                              'treatments',
-                              `consultation-treatments-count-${consId}`
-                            ),
-                          ]}
-                        />
-                      </View>
-                    );
-                  }}
-                />
-              </ResourceSection>
             )}
           </ScrollView>
         )}

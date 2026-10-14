@@ -98,37 +98,40 @@ export function LinkedResourcesField({
           </TouchableOpacity>
         </View>
       ))}
-      <View ref={searchRef} onFocus={open} onBlur={onBlur}>
-        <FormTextInput
-          testID={searchID}
-          id={searchID}
-          nativeID={searchID}
-          name={`${idPrefix}${itemType}Search`}
-          accessibilityLabel={searchLabel}
-          placeholder="Select..."
-          value={query}
-          onChangeText={(value) => {
-            setQuery(value);
-            open();
-          }}
-          onFocus={open}
-          onBlur={onBlur}
-          onPressIn={open}
-        />
-        {isFocused && (
-          <AutocompleteDropdown
-            testID={`${idPrefix}${itemType}-autocomplete-list`}
-            itemTestIDPrefix={`${idPrefix}${itemType}-autocomplete-item-`}
-            items={matches}
-            onSelect={(item) => {
-              if (!selectedIds.includes(item.id))
-                onChange([...selectedIds, item.id]);
-              setQuery('');
-              close();
+      {/* Nothing is left to link once every option is selected. */}
+      {options.some((option) => !selectedIds.includes(option.id)) && (
+        <View ref={searchRef} onFocus={open} onBlur={onBlur}>
+          <FormTextInput
+            testID={searchID}
+            id={searchID}
+            nativeID={searchID}
+            name={`${idPrefix}${itemType}Search`}
+            accessibilityLabel={searchLabel}
+            placeholder="Select..."
+            value={query}
+            onChangeText={(value) => {
+              setQuery(value);
+              open();
             }}
+            onFocus={open}
+            onBlur={onBlur}
+            onPressIn={open}
           />
-        )}
-      </View>
+          {isFocused && (
+            <AutocompleteDropdown
+              testID={`${idPrefix}${itemType}-autocomplete-list`}
+              itemTestIDPrefix={`${idPrefix}${itemType}-autocomplete-item-`}
+              items={matches}
+              onSelect={(item) => {
+                if (!selectedIds.includes(item.id))
+                  onChange([...selectedIds, item.id]);
+                setQuery('');
+                close();
+              }}
+            />
+          )}
+        </View>
+      )}
     </FormField>
   );
 }

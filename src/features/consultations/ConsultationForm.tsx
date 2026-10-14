@@ -7,22 +7,12 @@ import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { FormField } from '@/src/components/FormField';
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  Alert,
-  ActionSheetIOS,
-} from 'react-native';
+import { StyleSheet, View, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
   Stethoscope,
-  ChevronDown,
   Clock,
   FileText,
   FolderPlus,
@@ -31,10 +21,8 @@ import {
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
-import {
-  AddOptionsModal,
-  AddOptionItem,
-} from '@/src/components/AddOptionsModal';
+import type { AddOptionItem } from '@/src/components/AddOptionsModal';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
 import { SpecialistField } from '@/src/components/SpecialistField';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
@@ -233,7 +221,6 @@ export function ConsultationForm({
   });
   const [focusedDiagnosis, setFocusedDiagnosis] = useState<number | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load patient conditions, doctors, and service types
@@ -270,27 +257,6 @@ export function ConsultationForm({
     }
     return all.filter((st) => st.toLowerCase().includes(trimmed));
   }, [serviceType, knownServiceTypes]);
-
-  const handleStatusPress = () => {
-    if (Platform.OS === 'ios') {
-      const options = [...statusOptions.map((s) => s.label), 'Cancel'];
-      const cancelButtonIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Select Status',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            setSelectedStatus(statusOptions[buttonIndex]);
-          }
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowStatusModal(true);
-    }
-  };
 
   const conditionOptions = availableConditions.flatMap((condition) =>
     condition.id
@@ -476,89 +442,6 @@ export function ConsultationForm({
           <ScreenHeading testID="header-title">
             {isEdit ? 'Edit Consultation' : 'New Consultation'}
           </ScreenHeading>
-          {/* Top Pill Row: Status, Date, Time, Plus Button */}
-          <View style={styles.pillRow}>
-            {/* Status Pill */}
-            <TouchableOpacity
-              testID="status-picker-button"
-              style={styles.statusPill}
-              onPress={handleStatusPress}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: selectedStatus.dotColor },
-                ]}
-              />
-              <Text style={styles.statusPillText}>{selectedStatus.label}</Text>
-              <ChevronDown
-                color={COLORS.light.iconClear}
-                size={16}
-                style={{ marginLeft: 4 }}
-              />
-
-              {Platform.OS === 'web' &&
-                React.createElement(
-                  'select',
-                  {
-                    id: 'consultation-status-select',
-                    name: 'status',
-                    'aria-label': 'Consultation status',
-                    value: selectedStatus.id,
-                    onChange: (e: any) => {
-                      const found = statusOptions.find(
-                        (s) => s.id === e.target.value
-                      );
-                      if (found) setSelectedStatus(found);
-                    },
-                    style: {
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      opacity: 0,
-                      width: '100%',
-                      height: '100%',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                    },
-                    'data-testid': 'status-picker-select',
-                  },
-                  statusOptions.map((opt) =>
-                    React.createElement(
-                      'option',
-                      { key: opt.id, value: opt.id },
-                      opt.label
-                    )
-                  )
-                )}
-            </TouchableOpacity>
-
-            {/* Date Pill (can be in future, no validation on date) */}
-            <NativeDatePicker
-              value={date}
-              onChange={(newDate) => {
-                if (newDate) setDate(newDate);
-              }}
-              allowFuture={true}
-              testID="date-picker-button"
-            />
-
-            {/* Optional Time Pill */}
-            {time !== null && (
-              <NativeTimePicker
-                value={time}
-                onChange={setTime}
-                onRemove={() => setTime(null)}
-                testID="time-picker-button"
-              />
-            )}
-
-            {/* Plus Action Button */}
-          </View>
-
           {/* Consultation Title Input (Required) */}
           <FormField
             label="Consultation / Service"
@@ -576,6 +459,55 @@ export function ConsultationForm({
               onChangeText: setTitle,
             }}
           />
+
+          <FormField label="Status" nativeID="status-picker-select" required>
+            <NativeSelect
+              testID="status-picker-select"
+              name="status"
+              label="Consultation status"
+              value={selectedStatus.id}
+              options={statusOptions.map(({ id, label }) => ({ id, label }))}
+              onChange={(value) => {
+                const found = statusOptions.find(
+                  (option) => option.id === value
+                );
+                if (found) setSelectedStatus(found);
+              }}
+            />
+          </FormField>
+
+          {/* The date can be in the future (planned consultations). */}
+          <FormField label="Date" nativeID="consultation-date" required>
+            <NativeDatePicker
+              value={date}
+              onChange={(newDate) => {
+                if (newDate) setDate(newDate);
+              }}
+              allowFuture={true}
+              testID="date-picker-button"
+              id="consultation-date"
+              name="date"
+              variant="input"
+            />
+          </FormField>
+
+          {time !== null && (
+            <FormField
+              label="Time"
+              nativeID="consultation-time"
+              removeTestID="remove-time-button"
+              removeLabel="Remove time"
+              onRemove={() => setTime(null)}
+            >
+              <NativeTimePicker
+                value={time}
+                onChange={setTime}
+                testID="time-picker-button"
+                id="consultation-time"
+                name="time"
+              />
+            </FormField>
+          )}
 
           {showCondition && (
             <LinkedResourcesField
@@ -878,31 +810,6 @@ export function ConsultationForm({
           onClose={() => setShowPlusMenu(false)}
           options={menuOptions}
         />
-
-        {/* Status Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          overlayTestID="status-menu-overlay"
-          cardTestID="status-menu-card"
-          options={statusOptions.map((opt) => ({
-            id: opt.id,
-            label: opt.label,
-            icon: (
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: opt.dotColor,
-                  marginRight: 12,
-                }}
-              />
-            ),
-            testID: `status-option-${opt.id}`,
-            onPress: () => setSelectedStatus(opt),
-          }))}
-        />
       </View>
     </SafeAreaView>
   );
@@ -922,35 +829,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     padding: 16,
     paddingBottom: 132,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  statusPill: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
   },
   diagnosisItem: {
     borderTopWidth: 1,

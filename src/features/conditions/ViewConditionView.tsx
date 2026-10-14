@@ -263,8 +263,6 @@ export function ViewConditionView() {
         icon={Stethoscope}
         title="Recent Consultations"
         testID="condition-consultations-section"
-        emptyText="No consultations associated with this condition yet."
-        emptyTestID="empty-consultations"
       >
         {consultations.map((consultation) => (
           <ConsultationRelatedRow

@@ -7,37 +7,27 @@ interface ResourceSectionProps {
   icon: LucideIcon;
   title: string;
   testID?: string;
-  /** Shown instead of rows when there are none; omit to show only rows. */
-  emptyText?: string;
-  emptyTestID?: string;
   children?: React.ReactNode;
 }
 
-/** Heading plus full-width rows linking to resources related to a view. */
+/** Heading plus full-width rows linking to resources related to a view; renders nothing without rows. */
 export function ResourceSection({
   icon: Icon,
   title,
   testID,
-  emptyText,
-  emptyTestID,
   children,
 }: ResourceSectionProps) {
-  const hasRows = React.Children.toArray(children).length > 0;
+  // Sections with no related resources are left out entirely.
+  if (React.Children.toArray(children).length === 0) return null;
   return (
-    <View style={[styles.section, hasRows && styles.list]} testID={testID}>
+    <View style={[styles.section, styles.list]} testID={testID}>
       <View style={styles.heading}>
         <Icon size={18} color={COLORS.light.primary} />
         <Text style={styles.title} accessibilityRole="header">
           {title}
         </Text>
       </View>
-      {hasRows ? (
-        children
-      ) : emptyText ? (
-        <Text style={styles.emptyText} testID={emptyTestID}>
-          {emptyText}
-        </Text>
-      ) : null}
+      {children}
     </View>
   );
 }
@@ -211,10 +201,5 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontStyle: 'italic',
     color: COLORS.light.textSecondary,
-  },
-  emptyText: {
-    paddingVertical: 12,
-    fontSize: 14,
-    color: COLORS.light.mutedForeground,
   },
 });

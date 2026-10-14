@@ -198,7 +198,7 @@ test.describe('View Consultation Flow', () => {
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Cardiology Follow-up'
     );
-    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
+    await expect(page.getByTestId('consultation-treatments')).toHaveCount(0);
 
     // + only creates; linking happens in the edit form
     await page.getByTestId('consultation-add-treatment').click();
@@ -237,7 +237,7 @@ test.describe('View Consultation Flow', () => {
     ).toBeVisible();
     await page.getByTestId('link-remove-treatment-button').click();
     await page.getByTestId('save-button').click();
-    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
+    await expect(page.getByTestId('consultation-treatments')).toHaveCount(0);
 
     // The last entry is gone, so the empty section is removed too
     const docAfterUnlink = await getTestClinicalDocument(page, consultation.id);

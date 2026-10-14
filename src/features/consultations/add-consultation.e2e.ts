@@ -346,7 +346,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Set future consultation date without validation restriction', async () => {
-        const dateInput = page.locator('#date-picker-button-native-input');
+        const dateInput = page.locator('#consultation-date');
         await dateInput.fill('2028-11-20');
         await expect(page.getByTestId('date-picker-button')).toContainText(
           '2028'
@@ -361,7 +361,7 @@ test.describe('Add Consultation Flow', () => {
         const timePicker = page.getByTestId('time-picker-button');
         await expect(timePicker).toBeVisible();
 
-        const timeInput = page.locator('#time-picker-button-native-input');
+        const timeInput = page.locator('#consultation-time');
         await timeInput.fill('15:45');
         await expect(timePicker).toContainText('15:45');
       });

@@ -454,8 +454,9 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
     await expect(
       page.getByTestId('condition-consultations-count-c2')
     ).toHaveText('1');
-    await expect(page.getByTestId('condition-treatments-count-c2')).toHaveText(
-      '0'
+    // Resource types with no associations show no count at all
+    await expect(page.getByTestId('condition-treatments-count-c2')).toHaveCount(
+      0
     );
     await expect(
       page.getByTestId('consultation-conditions-count-k1')
@@ -465,7 +466,10 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
     ).toHaveText('1');
     await expect(
       page.getByTestId('consultation-conditions-count-k2')
-    ).toHaveText('0');
+    ).toHaveCount(0);
+    await expect(page.getByTestId('treatment-conditions-count-t1')).toHaveText(
+      '1'
+    );
   });
 
   test('opens a condition or consultation by clicking anywhere on its row', async ({
@@ -524,4 +528,27 @@ test.describe('Home add menu keyboard navigation', () => {
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/treatment\/add$/);
   });
+});
+
+test('lists lab results after every other section', async ({ page }) => {
+  await clearAppStorage(page);
+  await createPatientViaUI(page);
+  await seedTestCondition(page, { title: 'Order condition' });
+  await seedTestConsultation(page, { title: 'Order consultation' });
+  await seedTestTreatment(page, { title: 'Order treatment' });
+  await seedTestReport(page, {
+    date: '2026-10-02',
+    biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+  });
+  await page.goto('/');
+  await page.getByText('Hemoglobin (Hgb)').waitFor();
+  const top = async (text: string) =>
+    (await page.getByText(text, { exact: true }).first().boundingBox())!.y;
+  const order = [
+    await top('Conditions'),
+    await top('Treatments'),
+    await top('Consultations'),
+    await top('Lab Results'),
+  ];
+  expect(order).toEqual([...order].sort((a, b) => a - b));
 });

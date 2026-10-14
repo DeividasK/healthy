@@ -152,7 +152,9 @@ test.describe('Edit Consultation Flow', () => {
         await expect(
           page.getByText('Consultation To Delete')
         ).not.toBeVisible();
-        await expect(page.getByTestId('empty-consultations')).toBeVisible();
+        await expect(
+          page.getByTestId('condition-consultations-section')
+        ).toHaveCount(0);
 
         const pendingDeletions = await page.evaluate(() => {
           return localStorage.getItem('@healthy_pending_deleted_consultations');

@@ -410,34 +410,41 @@ export function LabResultForm({
           keyboardShouldPersistTaps="handled"
         >
           <ScreenHeading>{titleText}</ScreenHeading>
-          {/* Top Pill Row: Date, Optional Time, Plus Action */}
-          <View style={styles.pillRow}>
-            {/* Native Date Picker */}
+          <FormField label="Date" nativeID="lab-result-date" required>
             <NativeDatePicker
               value={selectedDate}
               onChange={(date) => {
                 if (date) handleDateChange(date);
               }}
               testID="date-picker-button"
+              id="lab-result-date"
+              name="date"
+              variant="input"
             />
+          </FormField>
 
-            {/* Optional Time Pill */}
-            {hasTime && (
+          {hasTime && (
+            <FormField
+              label="Time"
+              nativeID="lab-result-time"
+              removeTestID="remove-time-button"
+              removeLabel="Remove time"
+              onRemove={() => setTestTime(null)}
+            >
               <NativeTimePicker
                 value={testTime}
                 onChange={setTestTime}
-                onRemove={() => setTestTime(null)}
                 maxTime={
                   formatLocalDate(selectedDate) === formatLocalDate(new Date())
                     ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`
                     : undefined
                 }
                 testID="time-picker-button"
+                id="lab-result-time"
+                name="time"
               />
-            )}
-
-            {/* Plus Action Button */}
-          </View>
+            </FormField>
+          )}
 
           {/* Optional Notes Section if added */}
           {showNotesInput && (
@@ -697,13 +704,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     padding: 16,
     paddingBottom: 132,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
   },
   activeTestsList: {
     gap: 16,
