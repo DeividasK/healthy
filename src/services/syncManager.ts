@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { assertCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import type {
   Patient,
   DiagnosticReport,
@@ -672,6 +673,11 @@ export async function restoreFromGoogleDrive(
     } catch (err) {
       console.warn('Failed to restore file from Google Drive:', file.name, err);
     }
+  }
+
+  // Validate all selected lab results before writing restored resources.
+  for (const { observations } of reportResources) {
+    observations.forEach(assertCBCObservation);
   }
 
   // Restore in dependency order: Patients -> Conditions -> DiagnosticReports -> Encounters -> Compositions

@@ -1,0 +1,161 @@
+import type { Observation } from 'fhir/r5';
+import {
+  CBC_MARKERS,
+  type CBCBiomarkerDefinition,
+} from '@/src/data/cbcMarkers';
+
+export type MeasurementStatus = 'Low' | 'Normal' | 'High';
+export type MeasurementReferenceRange = { low?: number; high?: number };
+
+/** Matches an observation to its CBC catalog definition by code or name. */
+export function getObservationMarker(observation: Observation) {
+  const coding = observation.code.coding?.[0];
+  const name = (coding?.display || observation.code.text || '').toLowerCase();
+  return CBC_MARKERS.find(
+    (marker) =>
+      marker.loinc === coding?.code ||
+      marker.name.toLowerCase() === name ||
+      marker.aliases.some((alias) => alias.toLowerCase() === name)
+  );
+}
+
+/** Gets the reported UCUM code, falling back to its unit label. */
+export function getObservationUnitCode(observation: Observation) {
+  return (
+    observation.valueQuantity?.code || observation.valueQuantity?.unit || ''
+  );
+}
+
+/** Rejects observations outside the CBC catalog or with unsupported/mismatched units. */
+export function assertCBCObservation(observation: Observation) {
+  const marker = getObservationMarker(observation);
+  if (!marker) {
+    const name =
+      observation.code.text ||
+      observation.code.coding?.[0]?.display ||
+      observation.code.coding?.[0]?.code ||
+      'Unknown';
+    throw new Error(`Biomarker "${name}" is not in the CBC catalog.`);
+  }
+  const quantity = observation.valueQuantity;
+  const codeUnit = marker.units.find((unit) => unit.ucum === quantity?.code);
+  const labelUnit = marker.units.find(
+    (unit) => unit.label === quantity?.unit || unit.ucum === quantity?.unit
+  );
+  if (
+    (quantity?.code && !codeUnit) ||
+    (quantity?.unit && !labelUnit) ||
+    (!codeUnit && !labelUnit)
+  ) {
+    const unit =
+      quantity?.code && !codeUnit
+        ? quantity.code
+        : quantity?.unit || '(missing)';
+    throw new Error(
+      `Unsupported unit "${unit}" for ${marker.name}. Supported units: ${marker.units.map((option) => option.label).join(', ')}.`
+    );
+  }
+  if (codeUnit && labelUnit && codeUnit.ucum !== labelUnit.ucum) {
+    throw new Error(`Mismatched unit label and UCUM code for ${marker.name}.`);
+  }
+}
+
+/** Checks whether an existing result can be displayed under the CBC-only policy. */
+export function isSupportedCBCObservation(observation: Observation) {
+  try {
+    assertCBCObservation(observation);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Converts compatible catalog units; returns undefined for unknown conversions. */
+export function convertBiomarkerValue(
+  value: number,
+  fromUnit: string,
+  toUnit: string,
+  marker?: CBCBiomarkerDefinition
+) {
+  if (!Number.isFinite(value)) return undefined;
+  if (!marker && fromUnit === toUnit) return value;
+  const from = marker?.units.find(
+    (unit) => unit.ucum === fromUnit || unit.label === fromUnit
+  );
+  const to = marker?.units.find(
+    (unit) => unit.ucum === toUnit || unit.label === toUnit
+  );
+  if (!from || !to) return undefined;
+  if (fromUnit === toUnit) return value;
+  return (value / (from.factor ?? 1)) * (to.factor ?? 1);
+}
+
+/** Returns the reference bounds in the observation's reported unit. */
+export function getObservationReferenceRange(
+  observation: Observation,
+  marker = getObservationMarker(observation)
+): MeasurementReferenceRange | undefined {
+  const unitCode = getObservationUnitCode(observation);
+  const reportedRange = observation.referenceRange?.find(
+    (range) => range.low?.value !== undefined || range.high?.value !== undefined
+  );
+  /** Converts an individual FHIR bound into the observation's unit. */
+  const convertBound = (
+    bound: { value?: number; code?: string; unit?: string } | undefined
+  ) =>
+    bound?.value === undefined
+      ? undefined
+      : convertBiomarkerValue(
+          bound.value,
+          bound.code || bound.unit || unitCode,
+          unitCode,
+          marker
+        );
+  const low = reportedRange
+    ? convertBound(reportedRange.low)
+    : marker?.referenceRange?.low === undefined
+      ? undefined
+      : convertBiomarkerValue(
+          marker.referenceRange.low,
+          marker.ucumCode,
+          unitCode,
+          marker
+        );
+  const high = reportedRange
+    ? convertBound(reportedRange.high)
+    : marker?.referenceRange?.high === undefined
+      ? undefined
+      : convertBiomarkerValue(
+          marker.referenceRange.high,
+          marker.ucumCode,
+          unitCode,
+          marker
+        );
+  if (low === undefined && high === undefined) return undefined;
+  if (low !== undefined && high !== undefined && high <= low) return undefined;
+  return { low, high };
+}
+
+/** Prefers recognized FHIR interpretations, then compares unit-aligned bounds. */
+export function getObservationStatus(
+  observation: Observation,
+  marker = getObservationMarker(observation)
+): MeasurementStatus | undefined {
+  const codes = observation.interpretation?.flatMap(
+    (interpretation) =>
+      interpretation.coding?.map((coding) => coding.code) || []
+  );
+  const code = codes?.find((candidate) =>
+    ['L', 'LL', 'N', 'H', 'HH'].includes(candidate || '')
+  );
+  if (code === 'L' || code === 'LL') return 'Low';
+  if (code === 'H' || code === 'HH') return 'High';
+  if (code === 'N') return 'Normal';
+  const value = observation.valueQuantity?.value;
+  const range = getObservationReferenceRange(observation, marker);
+  if (value === undefined || !Number.isFinite(value) || !range)
+    return undefined;
+  if (range.low !== undefined && value < range.low) return 'Low';
+  if (range.high !== undefined && value > range.high) return 'High';
+  return 'Normal';
+}

@@ -62,7 +62,14 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
 import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import {
+  getObservationReferenceRange,
+  getObservationStatus,
+  isSupportedCBCObservation,
+} from '@/src/features/lab-results/biomarkerMeasurements';
+import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 
+/** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
   const router = useRouter();
   const pathname = usePathname();
@@ -243,20 +250,21 @@ export function HomeView() {
     }
   };
 
+  /** Renders a consistent interpreted or reference-range status for a result. */
   const getStatusBadge = (obs: Observation) => {
-    const interpretationCode = obs.interpretation?.[0]?.coding?.[0]?.code;
+    const status = getObservationStatus(obs);
 
-    if (!interpretationCode) return null;
+    if (!status) return null;
 
     let badgeText = 'Normal';
     let badgeStyle: any = styles.badgeNormal;
     let textStyle: any = styles.badgeTextNormal;
 
-    if (interpretationCode === 'L') {
+    if (status === 'Low') {
       badgeText = 'Low';
       badgeStyle = styles.badgeLow;
       textStyle = styles.badgeTextLow;
-    } else if (interpretationCode === 'H') {
+    } else if (status === 'High') {
       badgeText = 'High';
       badgeStyle = styles.badgeHigh;
       textStyle = styles.badgeTextHigh;
@@ -342,7 +350,7 @@ export function HomeView() {
           >
             {/* Conditions Section */}
             {conditions.length > 0 && (
-              <View style={styles.sectionContainer}>
+              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 <Text style={styles.sectionTitle}>Conditions</Text>
                 {conditions.map((conditionItem) => {
                   const title = getConditionTitle(conditionItem);
@@ -495,7 +503,7 @@ export function HomeView() {
 
             {/* Diagnostic Reports Section */}
             {records.length > 0 && (
-              <View style={styles.sectionContainer}>
+              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 {conditions.length > 0 && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
@@ -559,39 +567,70 @@ export function HomeView() {
 
                       {/* Observations List */}
                       <View style={styles.obsList}>
-                        {record.observations.map((obs) => {
-                          const name =
-                            obs.code?.coding?.[0]?.display ||
-                            obs.code?.text ||
-                            'Observation';
-                          const value = obs.valueQuantity?.value ?? '-';
-                          const unit =
-                            obs.valueQuantity?.unit ||
-                            obs.valueQuantity?.code ||
-                            '';
+                        {record.observations
+                          .filter(isSupportedCBCObservation)
+                          .map((obs) => {
+                            const name =
+                              obs.code?.coding?.[0]?.display ||
+                              obs.code?.text ||
+                              'Observation';
+                            const value = obs.valueQuantity?.value ?? '-';
+                            const unit =
+                              obs.valueQuantity?.unit ||
+                              obs.valueQuantity?.code ||
+                              '';
 
-                          return (
-                            <View key={obs.id} style={styles.obsItem}>
-                              <View style={styles.obsLeft}>
-                                <Text style={styles.obsName}>{name}</Text>
-                                {obs.code?.coding?.[0]?.code &&
-                                  obs.code?.coding?.[0]?.code !== 'custom' && (
-                                    <Text style={styles.obsLoinc}>
-                                      LOINC: {obs.code.coding[0].code}
-                                    </Text>
-                                  )}
-                              </View>
-
-                              <View style={styles.obsRight}>
-                                <View style={styles.valueGroup}>
-                                  <Text style={styles.obsValue}>{value}</Text>
-                                  <Text style={styles.obsUnit}>{unit}</Text>
+                            return (
+                              <TouchableOpacity
+                                key={obs.id}
+                                style={styles.obsItem}
+                                testID={`biomarker-row-${obs.code?.coding?.[0]?.code || obs.id}`}
+                                accessibilityRole="button"
+                                accessibilityLabel={`View biomarker: ${name}`}
+                                onPress={() =>
+                                  router.push({
+                                    pathname: '/biomarker/[id]',
+                                    params: {
+                                      id:
+                                        obs.code?.coding?.[0]?.code === 'custom'
+                                          ? name
+                                          : obs.code?.coding?.[0]?.code || name,
+                                    },
+                                  })
+                                }
+                                activeOpacity={0.75}
+                              >
+                                <View style={styles.obsLeft}>
+                                  <Text style={styles.obsName}>{name}</Text>
+                                  {obs.code?.coding?.[0]?.code &&
+                                    obs.code?.coding?.[0]?.code !==
+                                      'custom' && (
+                                      <Text style={styles.obsLoinc}>
+                                        LOINC: {obs.code.coding[0].code}
+                                      </Text>
+                                    )}
                                 </View>
-                                {getStatusBadge(obs)}
-                              </View>
-                            </View>
-                          );
-                        })}
+
+                                <View style={styles.obsRight}>
+                                  <View style={styles.valueGroup}>
+                                    <Text style={styles.obsValue}>{value}</Text>
+                                    <Text style={styles.obsUnit}>{unit}</Text>
+                                  </View>
+                                  <View style={styles.obsStatusRangeRow}>
+                                    {getStatusBadge(obs)}
+                                    {typeof obs.valueQuantity?.value ===
+                                      'number' && (
+                                      <BiomarkerRangeLine
+                                        value={obs.valueQuantity.value}
+                                        {...getObservationReferenceRange(obs)}
+                                        testID={`biomarker-range-line-${obs.code?.coding?.[0]?.code || obs.id || 'unknown'}`}
+                                      />
+                                    )}
+                                  </View>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
                       </View>
                     </View>
                   );
@@ -811,6 +850,11 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginBottom: 16,
   },
+  maxWidthSection: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -967,6 +1011,11 @@ const styles = StyleSheet.create({
     color: COLORS.light.muted,
   },
   obsRight: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  obsStatusRangeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

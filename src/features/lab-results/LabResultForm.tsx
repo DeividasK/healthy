@@ -34,6 +34,7 @@ import {
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
+import { convertBiomarkerValue } from './biomarkerMeasurements';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -43,6 +44,7 @@ export interface ActiveMarkerItem {
   selectedUcum: string;
 }
 
+/** Checks the selected local date and optional time against the current time. */
 export function isDateTimeInFuture(
   date: Date,
   timeStr: string | null
@@ -66,6 +68,7 @@ export function isDateTimeInFuture(
   return target.getTime() > todayEnd.getTime();
 }
 
+/** Displays form feedback using the platform's alert implementation. */
 function showAlert(title: string, message: string) {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.alert(`${title}\n${message}`);
@@ -79,6 +82,7 @@ export interface LabResultFormProps {
   isEdit?: boolean;
 }
 
+/** Creates or edits lab observations with reference bounds in their selected units. */
 export function LabResultForm({
   initialReportId,
   isEdit = false,
@@ -165,6 +169,12 @@ export function LabResultForm({
               ucumCode: ucum,
               units: [{ label: unit, ucum }],
               description: name,
+              education: {
+                about: '',
+                whyItMatters: '',
+                whatItMayAffect: '',
+                whatMayBeRelatedToAChange: '',
+              },
             };
 
             return {
@@ -280,8 +290,24 @@ export function LabResultForm({
         value: parseFloat(item.valueStr),
         unit: item.selectedUnit,
         ucumCode: item.selectedUcum,
-        referenceLow: item.definition.referenceRange?.low,
-        referenceHigh: item.definition.referenceRange?.high,
+        referenceLow:
+          item.definition.referenceRange?.low === undefined
+            ? undefined
+            : convertBiomarkerValue(
+                item.definition.referenceRange.low,
+                item.definition.ucumCode,
+                item.selectedUcum,
+                item.definition
+              ),
+        referenceHigh:
+          item.definition.referenceRange?.high === undefined
+            ? undefined
+            : convertBiomarkerValue(
+                item.definition.referenceRange.high,
+                item.definition.ucumCode,
+                item.selectedUcum,
+                item.definition
+              ),
       }));
 
       await createAndSaveDiagnosticReport({

@@ -25,7 +25,22 @@ export interface CBCBiomarkerDefinition {
     text?: string;
   };
   description: string;
+  education: CBCBiomarkerEducation;
 }
+
+export interface CBCBiomarkerEducation {
+  about: string;
+  whyItMatters: string;
+  whatItMayAffect: string;
+  whatMayBeRelatedToAChange: string;
+}
+
+const EMPTY_BIOMARKER_EDUCATION: CBCBiomarkerEducation = {
+  about: '',
+  whyItMatters: '',
+  whatItMayAffect: '',
+  whatMayBeRelatedToAChange: '',
+};
 
 export const CBC_PANEL_LOINC = '58410-2'; // Complete blood count (hemogram) panel - Blood by Automated count
 export const GENERAL_LAB_REPORT_LOINC = '11502-2'; // Laboratory report
@@ -51,6 +66,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Total number of white blood cells; key indicator of infection, inflammation, or immune health.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_rbc',
@@ -71,6 +87,16 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Number of oxygen-carrying red blood cells per volume of blood.',
+    education: {
+      about:
+        'An RBC count measures how many red blood cells (erythrocytes) are present in a volume of blood. These cells are made in the bone marrow and contain hemoglobin.',
+      whyItMatters:
+        'Hemoglobin carries oxygen from the lungs to the body’s tissues. The RBC count helps assess oxygen-carrying capacity and is interpreted together with hemoglobin, hematocrit, and red blood cell indices.',
+      whatItMayAffect:
+        'When there are too few healthy red blood cells, less oxygen may reach tissues, which can contribute to fatigue, weakness, or shortness of breath. Symptoms and their causes vary from person to person.',
+      whatMayBeRelatedToAChange:
+        'A low count may be associated with blood loss, anemia, pregnancy, or problems affecting red blood cell production. A high count may be associated with dehydration, smoking, high altitude, or conditions that reduce blood oxygen. These are possible explanations, not a diagnosis.',
+    },
   },
   {
     id: 'cbc_hemoglobin',
@@ -92,6 +118,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Iron-containing oxygen transport metalloprotein in red blood cells.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_hematocrit',
@@ -112,6 +139,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage proportion of blood volume that is occupied by red blood cells.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_platelets',
@@ -133,6 +161,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Cell fragments essential for normal blood clotting and vessel repair.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_mcv',
@@ -149,6 +178,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '80 - 100 fL',
     },
     description: 'Average volume and size of individual red blood cells.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_mch',
@@ -168,6 +198,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '27 - 33 pg',
     },
     description: 'Average mass of hemoglobin inside a single red blood cell.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_mchc',
@@ -188,6 +219,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Average concentration of hemoglobin within a given volume of packed red blood cells.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_rdw_cv',
@@ -205,6 +237,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Measurement of the variation in red blood cell volume and size (coefficient of variation).',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_rdw_sd',
@@ -222,6 +255,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Actual measurement of the width of red blood cell volume distribution curve at 20% height.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_mpv',
@@ -239,6 +273,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Average size of platelets; reflects platelet production and bone marrow function.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_neutrophils_pct',
@@ -256,6 +291,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage of white blood cells that are neutrophils, vital for combating acute bacterial infections.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_neutrophils_abs',
@@ -275,6 +311,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '1.8 - 7.7 10*3/uL',
     },
     description: 'Absolute count of circulating neutrophils.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_lymphocytes_pct',
@@ -292,6 +329,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage of white blood cells that are lymphocytes (T cells, B cells, NK cells).',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_lymphocytes_abs',
@@ -311,6 +349,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '1.0 - 4.8 10*3/uL',
     },
     description: 'Absolute count of circulating lymphocytes.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_monocytes_pct',
@@ -328,6 +367,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage of white blood cells that are monocytes, precursor cells to macrophages.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_monocytes_abs',
@@ -347,6 +387,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '0.2 - 0.8 10*3/uL',
     },
     description: 'Absolute count of circulating monocytes.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_eosinophils_pct',
@@ -364,6 +405,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage of white blood cells involved in allergic responses and parasitic defense.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_eosinophils_abs',
@@ -383,6 +425,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '0.05 - 0.5 10*3/uL',
     },
     description: 'Absolute count of circulating eosinophils.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_basophils_pct',
@@ -400,6 +443,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     },
     description:
       'Percentage of granulocytes releasing histamine and heparin during inflammatory reactions.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
   {
     id: 'cbc_basophils_abs',
@@ -419,6 +463,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       text: '0.01 - 0.2 10*3/uL',
     },
     description: 'Absolute count of circulating basophils.',
+    education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
 ];
 
