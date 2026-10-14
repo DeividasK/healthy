@@ -275,6 +275,29 @@ test.describe('Sync between devices', () => {
     await second.close();
   });
 
+  test('rebuilds the change log for a database already marked v12 without it', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    await bridge(page, async (b) => {
+      const names = await b.querySql(
+        "SELECT name, type FROM sqlite_master WHERE name LIKE 'sync_%' AND type IN ('table', 'trigger')"
+      );
+      for (const { name, type } of names)
+        await b.executeSql(`DROP ${type.toUpperCase()} ${name}`);
+      // Another schema lineage may still carry the old deletion outbox.
+      await b.executeSql(
+        'CREATE TABLE pending_clinical_resource_deletions (resource_type TEXT, resource_id TEXT, patient_id TEXT)'
+      );
+    });
+    await page.reload();
+    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    const dirty = await bridge(page, (b) =>
+      b.querySql('SELECT resource_type FROM sync_dirty')
+    );
+    expect(dirty).toEqual([{ resource_type: 'Patient' }]);
+  });
+
   test('captures every repository write, including cascades, in the change log', async ({
     page,
   }) => {

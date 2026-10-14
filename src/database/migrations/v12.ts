@@ -66,7 +66,9 @@ const backfill = replicatedTables
  * Breaking: the `repair` step drops `pending_clinical_resource_deletions`
  * after converting its entries into change-log tombstones, so older app
  * versions lose their deletion outbox. It also re-creates the capture
- * triggers on every start, because rebuilding a table drops them. All clinical tables and their data are untouched, and
+ * triggers on every start, because rebuilding a table drops them, and creates
+ * the tables if a database marked v12 lacks them. All clinical tables and
+ * their data are untouched, and
  * `patients.sync_account` stays but is no longer read.
  *
  * Every existing resource is backfilled as changed (timestamped from
@@ -146,6 +148,12 @@ export const migrationV12: DatabaseMigration = {
     DELETE FROM app_settings WHERE key = 'clinical_deletion_outbox_v10_imported';
   `,
   async repair(db) {
+    // A database already marked v12 by another schema lineage (for example an
+    // older branch) skipped this migration; create and backfill the tables.
+    const hasChangeLog = await db.getFirstAsync(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_dirty';"
+    );
+    if (!hasChangeLog) await db.execAsync(migrationV12.sql);
     // Rebuilding a table (as older repairs do) drops its triggers; restore them.
     await db.execAsync(triggers);
     const outbox = await db.getFirstAsync(
