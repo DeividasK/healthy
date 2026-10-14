@@ -132,7 +132,7 @@ export function ViewConditionView() {
             options={[
               {
                 id: 'consultation',
-                label: 'Add Consultation',
+                label: 'Consultation',
                 testID: 'menu-add-consultation',
                 icon: (
                   <Stethoscope

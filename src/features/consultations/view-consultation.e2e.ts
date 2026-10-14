@@ -5,6 +5,10 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
+  getTestTreatment,
+  getTestClinicalDocument,
+  findTreatmentsSection,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
@@ -168,5 +172,61 @@ test.describe('View Consultation Flow', () => {
       page.getByTestId('consultation-diagnosis-condition')
     ).toHaveCount(0);
     await expect(page.getByTestId('edit-consultation-button')).toBeEnabled();
+  });
+
+  test('links and unlinks an existing treatment without changing its origin', async ({
+    page,
+  }) => {
+    const treatment = await seedTestTreatment(page, {
+      title: 'Lisinopril 10mg',
+      intent: 'plan',
+      status: 'active',
+      dosageInstructions: 'Take 1 tablet daily every morning.',
+    });
+    const consultation = await seedTestConsultation(page, {
+      title: 'Cardiology Follow-up',
+      doctorName: 'Dr. Leonard McCoy',
+      serviceType: 'Cardiology',
+    });
+
+    await page.goto(`/consultation/${consultation.id}`);
+    await expect(page.getByTestId('consultation-title')).toHaveText(
+      'Cardiology Follow-up'
+    );
+    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
+
+    await page.getByTestId('consultation-add-treatment').click();
+    await page.getByTestId('option-link-existing-treatment').click();
+    await page.getByTestId('link-documenter-input').fill('Actual documenter');
+    await page.getByTestId('link-treatment-select').selectOption(treatment.id);
+
+    const row = page.getByTestId(`consultation-treatment-${treatment.id}`);
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Lisinopril 10mg');
+    await expect(row).toContainText('Active');
+    await expect(row).toContainText('Plan');
+    await checkA11y(page, {
+      include: '[data-testid="consultation-treatments"]',
+    });
+
+    const doc = await getTestClinicalDocument(page, consultation.id);
+    expect(findTreatmentsSection(doc).entry).toContainEqual({
+      reference: `MedicationRequest/${treatment.id}`,
+    });
+    // Linking never rewrites where the treatment originated
+    expect(
+      (await getTestTreatment(page, treatment.id)).encounter
+    ).toBeUndefined();
+
+    await page.getByTestId(`unlink-treatment-${treatment.id}`).click();
+    await expect(row).not.toBeVisible();
+
+    // The last entry is gone, so the empty section is removed too
+    const docAfterUnlink = await getTestClinicalDocument(page, consultation.id);
+    expect(findTreatmentsSection(docAfterUnlink)).toBeUndefined();
+
+    expect(await getTestTreatment(page, treatment.id)).toBeTruthy();
+    await page.goto('/');
+    await expect(page.getByText('Lisinopril 10mg')).toBeVisible();
   });
 });

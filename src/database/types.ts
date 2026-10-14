@@ -5,6 +5,7 @@ import type {
   Patient,
   Encounter,
   Composition,
+  MedicationRequest,
 } from 'fhir/r5';
 
 export interface StoredPatientRow {
@@ -99,4 +100,21 @@ export interface StoredClinicalDocumentRow {
 
 export interface ClinicalDocumentRecord {
   document: Composition;
+}
+
+export interface StoredMedicationRequestRow {
+  id: string;
+  patient_id: string;
+  consultation_id: string | null;
+  display_label: string;
+  status: string;
+  intent: string;
+  authored_on: string;
+  fhir_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MedicationRequestRecord {
+  request: MedicationRequest;
 }

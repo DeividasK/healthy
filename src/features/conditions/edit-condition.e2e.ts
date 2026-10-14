@@ -175,7 +175,7 @@ test.describe('Edit Condition Flow', () => {
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('button')).toHaveCount(1);
     await expect(
-      menu.getByRole('button', { name: 'Add Consultation', exact: true })
+      menu.getByRole('button', { name: 'Consultation', exact: true })
     ).toBeVisible();
     await expect(addButton).toHaveAttribute('aria-expanded', 'true');
     await expect(addButton).toHaveAccessibleName('Close add menu');
@@ -249,7 +249,7 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await menu
-      .getByRole('button', { name: 'Add Consultation', exact: true })
+      .getByRole('button', { name: 'Consultation', exact: true })
       .click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation/add\\?conditionId=${initial.id}$`)

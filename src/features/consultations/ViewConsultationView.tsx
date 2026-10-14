@@ -3,12 +3,14 @@ import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import type { Condition, Encounter } from 'fhir/r5';
+import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationById } from '@/src/features/consultations/consultationService';
 import { getConditionById } from '@/src/features/conditions/conditionService';
+import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
+import { RelatedResourceList } from './RelatedResourceList';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConditionTitle,
@@ -28,6 +30,9 @@ export function ViewConsultationView() {
   const loadGeneration = useRef(0);
   const [consultation, setConsultation] = useState<Encounter | null>(null);
   const [relatedConditions, setRelatedConditions] = useState<Condition[]>([]);
+  const [linkedTreatments, setLinkedTreatments] = useState<MedicationRequest[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -36,11 +41,15 @@ export function ViewConsultationView() {
     const generation = ++loadGeneration.current;
     if (!id || !activePatientId) return;
     try {
-      const value = await getConsultationById(id, activePatientId);
+      const [value, treatments] = await Promise.all([
+        getConsultationById(id, activePatientId),
+        getLinkedTreatmentsForConsultation(id, activePatientId).catch(() => []),
+      ]);
       if (generation !== loadGeneration.current) return;
       if (!value) {
         setConsultation(null);
         setRelatedConditions([]);
+        setLinkedTreatments([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
@@ -65,6 +74,7 @@ export function ViewConsultationView() {
           Boolean(condition)
         )
       );
+      setLinkedTreatments(treatments);
       setNotFound(false);
       setHasLoadError(false);
     } catch (error) {
@@ -76,7 +86,15 @@ export function ViewConsultationView() {
   }, [id, activePatientId]);
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
-  useDatabaseSubscription(['consultations', 'conditions'], loadData);
+  useDatabaseSubscription(
+    [
+      'consultations',
+      'conditions',
+      'medication_requests',
+      'clinical_documents',
+    ],
+    loadData
+  );
 
   if (isLoading) {
     return <ResourceViewLayout testID="consultation-view" isLoading />;
@@ -221,6 +239,14 @@ export function ViewConsultationView() {
             })
           )}
         </View>
+      )}
+
+      {Boolean(id) && (
+        <RelatedResourceList
+          consultationId={id!}
+          linkedTreatments={linkedTreatments}
+          onRefresh={loadData}
+        />
       )}
     </ResourceViewLayout>
   );

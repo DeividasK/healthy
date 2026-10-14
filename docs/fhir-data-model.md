@@ -51,3 +51,52 @@ verification and category remain Condition elements, not diagnosis backbone fiel
 Category labels are Ongoing (problem-list-item) and Temporary (encounter-diagnosis).
 Both use the HL7 condition-category system. These are presentation labels, not
 inferred durations or automatic reclassification.
+
+## Treatments
+
+Treatments are FHIR R5 `MedicationRequest` resources stored in
+`medication_requests`. The name is `medication.concept.text`; regimen text is
+`dosageInstruction[0].text`; indication wording is `reason[0].concept.text` and
+an optional link to a same-patient Condition is `reason[0].reference`. Notes are
+`note[0]`. Intent defaults to `plan` (recommendation) and status to `unknown`.
+Further dosage entries, reasons, notes and codings are preserved on edit.
+
+The narrative (`text`) is rebuilt on every save while its status is
+`generated`; narratives with any other status are treated as authored and kept.
+
+A treatment has two kinds of consultation relationship:
+
+- **Origin**: `MedicationRequest.encounter` records the consultation the
+  treatment was created from. It is provenance and never changes on linking.
+- **Links**: membership in a consultation is an entry in that consultation's
+  Composition, in a section coded LOINC `10160-0` (History of Medication use
+  Narrative, the IPS/C-CDA medications section). Creating a treatment from a
+  consultation adds both; "Link existing" adds only the entry. Sections written
+  by development builds with `18605-6` are recognised and recoded on the next
+  link.
+
+Reference cleanup is transactional:
+
+- Deleting a treatment removes its Composition entries. A section left with no
+  text, entries or sub-sections is removed (R5 cmp-1).
+- Deleting a consultation clears `encounter` on its treatments (JSON and SQL
+  projection together) and keeps the treatments.
+- Deleting a Condition removes it from `reason[].reference` and keeps the
+  indication wording.
+
+Any failure rolls the whole operation back. ZIP archives (manifest v2,
+`records/medication_request_*.json`) and encrypted Drive sync
+(`medicationrequest_*.json.enc`) carry complete resources with
+`meta.lastUpdated`; restore order is patients, conditions, reports, encounters,
+treatments, then Compositions. Deletions use the clinical tombstone outbox.
+
+### Migration v11
+
+v11 is additive: it creates `medication_requests` (canonical JSON plus
+projected consultation, label, status, intent and authored date) and its
+indexes. Migrations may define an idempotent `repair` step that runs inside a
+transaction on every start, including after the version was applied. v11 uses
+it to rebuild tables left by pre-release builds with a different column layout:
+projection columns are recomputed from `fhir_json`, while `fhir_json` and the
+storage timestamps are copied verbatim. If canonical columns are missing the
+repair aborts and rolls back, leaving the original table for backup and restore.
