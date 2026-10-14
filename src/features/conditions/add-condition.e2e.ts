@@ -131,6 +131,10 @@ test.describe('New condition form keyboard support', () => {
     const no = modal.getByRole('button', { name: 'No' });
     const yes = modal.getByRole('button', { name: 'Yes' });
     await expect(no).toBeFocused();
+    // Cmd/Ctrl+Enter does not save while the prompt is open
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(modal).toBeVisible();
+    await expect(page).toHaveURL(/condition\/add/);
 
     // Enter on the focused No keeps the form and its data
     await page.keyboard.press('Enter');

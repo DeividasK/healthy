@@ -101,6 +101,8 @@ export function ActionDock({
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return;
+      // Enter that confirms an IME composition is not a shortcut.
+      if (event.isComposing) return;
       if (!primaryPressRef.current) return;
       event.preventDefault();
       // Defer past pending effects so edits typed just before the shortcut

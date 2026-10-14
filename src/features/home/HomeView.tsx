@@ -190,7 +190,11 @@ export function HomeView() {
             ? getConsultationIdsLinkingTreatment(
                 treatment.id,
                 requestedPatientId
-              )
+              ).catch((error) => {
+                // A failed link lookup only loses that treatment's count.
+                console.warn('Failed to load treatment links:', error);
+                return [] as string[];
+              })
             : Promise.resolve([])
         )
       );

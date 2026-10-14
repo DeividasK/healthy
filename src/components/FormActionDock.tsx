@@ -78,7 +78,8 @@ export function FormActionDock({
     icon: Check,
     onPress: onSave,
     primary: true,
-    disabled: isSaving || saveDisabled,
+    // Not while asking whether to discard (Cmd/Ctrl+Enter would save).
+    disabled: isSaving || saveDisabled || discardVisible,
     busy: isSaving,
   });
   if (onAdd)
