@@ -80,7 +80,11 @@ test.describe('Home View - Visual Regression', () => {
     });
 
     await page.goto('/');
-    await page.getByText('Hemoglobin (Hgb)').waitFor();
+    await page
+      .getByTestId('results-scroll-view')
+      .locator('[data-testid^="report-card-"]')
+      .getByText('Hemoglobin (Hgb)')
+      .waitFor();
 
     await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
   });
@@ -101,20 +105,43 @@ test.describe('Home View - Visual Regression', () => {
 
     await seedTestReport(page, {
       id: 'report-home-multi-2',
-      date: '2026-10-02',
+      date: '2020-10-02',
       biomarkers: [
         { name: 'Red Blood Cells', value: 4.7 },
         { name: 'Hematocrit', value: 41.5 },
       ],
     });
 
+    await seedTestReport(page, {
+      id: 'report-home-multi-older',
+      date: '2026-09-20',
+      biomarkers: [{ name: 'Hemoglobin', value: 8 }],
+    });
     await page.goto('/');
-    await page.getByText('Normal', { exact: true }).first().waitFor();
+    await page.getByTestId('labs-summary-total').waitFor();
 
     await takeSnapshot(
       page,
       'Home View - Multi-Report with Status Badges',
       testInfo
     );
+    await page
+      .getByRole('combobox', { name: 'Period' })
+      .selectOption({ label: '1 month' });
+    await takeSnapshot(page, 'Home View - Labs Summary last month', testInfo);
+    await page.screenshot({ path: testInfo.outputPath('labs-summary.png') });
+    const search = page.getByRole('textbox', { name: 'Search', exact: true });
+    await search.fill('Hemoglobin');
+    await page.getByTestId('labs-summary-search-result-718-7').waitFor();
+    await takeSnapshot(page, 'Home View - Labs Summary search match', testInfo);
+    await search.fill('unknown biomarker');
+    await takeSnapshot(
+      page,
+      'Home View - Labs Summary no search results',
+      testInfo
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('labs-summary-search.png'),
+    });
   });
 });

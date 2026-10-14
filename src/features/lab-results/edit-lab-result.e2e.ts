@@ -65,7 +65,7 @@ test.describe('Edit Lab Results Flow', () => {
         await page.getByTestId('marker-value-input-0').fill('16.2');
         await page.getByTestId('remove-marker-1').click();
         await expect(
-          page.getByText('White Blood Cells (WBC)')
+          page.getByTestId(/^marker-card-/).getByText('White Blood Cells (WBC)')
         ).not.toBeVisible();
 
         const searchInput = page.getByTestId('test-search-input');
@@ -79,15 +79,43 @@ test.describe('Edit Lab Results Flow', () => {
       });
 
       await test.step('Verify updated report on Home', async () => {
-        await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-        await expect(page.getByText('16.2')).toBeVisible();
-        await expect(page.getByText('14.5')).not.toBeVisible();
-
-        await expect(page.getByText('Platelets (PLT)')).toBeVisible();
-        await expect(page.getByText('250')).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('Hemoglobin (Hgb)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^=\"report-card-\"]')
+            .getByText('16.2')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^=\"report-card-\"]')
+            .getByText('14.5')
+        ).not.toBeVisible();
 
         await expect(
-          page.getByText('White Blood Cells (WBC)')
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('Platelets (PLT)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^=\"report-card-\"]')
+            .getByText('250')
+        ).toBeVisible();
+
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('White Blood Cells (WBC)')
         ).not.toBeVisible();
         await expect(page.getByText('"Updated checkup note"')).toBeVisible();
       });

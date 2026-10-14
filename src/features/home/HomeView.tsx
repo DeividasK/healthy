@@ -27,7 +27,7 @@ import {
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { getAllConsultations } from '@/src/features/consultations/consultationService';
 
-import type { Observation, Condition, Encounter } from 'fhir/r5';
+import type { Condition, Encounter } from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConditionTitle,
@@ -48,12 +48,9 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
 import { useSync } from '@/src/context/SyncContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import {
-  getObservationReferenceRange,
-  getObservationStatus,
-  isSupportedCBCObservation,
-} from '@/src/features/lab-results/biomarkerMeasurements';
-import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
+import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
+import { LabsSummary, latestBiomarkers } from './LabsSummary';
+import { BiomarkerResultRow } from './BiomarkerResultRow';
 
 /** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
@@ -225,33 +222,6 @@ export function HomeView() {
     }
   };
 
-  /** Renders a consistent interpreted or reference-range status for a result. */
-  const getStatusBadge = (obs: Observation) => {
-    const status = getObservationStatus(obs);
-
-    if (!status) return null;
-
-    let badgeText = 'Normal';
-    let badgeStyle: any = styles.badgeNormal;
-    let textStyle: any = styles.badgeTextNormal;
-
-    if (status === 'Low') {
-      badgeText = 'Low';
-      badgeStyle = styles.badgeLow;
-      textStyle = styles.badgeTextLow;
-    } else if (status === 'High') {
-      badgeText = 'High';
-      badgeStyle = styles.badgeHigh;
-      textStyle = styles.badgeTextHigh;
-    }
-
-    return (
-      <View style={[styles.badge, badgeStyle]}>
-        <Text style={[styles.badgeText, textStyle]}>{badgeText}</Text>
-      </View>
-    );
-  };
-
   const getConditionStatusBadge = (condition: Condition) => {
     const clinicalStatus =
       condition.clinicalStatus?.coding?.[0]?.code || 'active';
@@ -292,6 +262,8 @@ export function HomeView() {
       getConsultationReasonConditionIds(c).length === 0
   );
 
+  const hasSummary = latestBiomarkers(records).length > 0;
+
   const hasAnyData =
     records.length > 0 ||
     conditions.length > 0 ||
@@ -319,6 +291,7 @@ export function HomeView() {
           /* Results and Conditions View */
           <ScrollView
             testID="results-scroll-view"
+            keyboardShouldPersistTaps="handled"
             style={styles.scrollList}
             contentContainerStyle={styles.scrollListContent}
           >
@@ -378,6 +351,15 @@ export function HomeView() {
                     </TouchableOpacity>
                   );
                 })}
+              </View>
+            )}
+
+            {hasSummary && (
+              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
+                <Text style={styles.sectionTitle}>Labs Summary</Text>
+                <View style={styles.reportCard}>
+                  <LabsSummary records={records} />
+                </View>
               </View>
             )}
 
@@ -449,68 +431,12 @@ export function HomeView() {
                       <View style={styles.obsList}>
                         {record.observations
                           .filter(isSupportedCBCObservation)
-                          .map((obs) => {
-                            const name =
-                              obs.code?.coding?.[0]?.display ||
-                              obs.code?.text ||
-                              'Observation';
-                            const value = obs.valueQuantity?.value ?? '-';
-                            const unit =
-                              obs.valueQuantity?.unit ||
-                              obs.valueQuantity?.code ||
-                              '';
-
-                            return (
-                              <TouchableOpacity
-                                key={obs.id}
-                                style={styles.obsItem}
-                                testID={`biomarker-row-${obs.code?.coding?.[0]?.code || obs.id}`}
-                                accessibilityRole="button"
-                                accessibilityLabel={`View biomarker: ${name}`}
-                                onPress={() =>
-                                  router.push({
-                                    pathname: '/biomarker/[id]',
-                                    params: {
-                                      id:
-                                        obs.code?.coding?.[0]?.code === 'custom'
-                                          ? name
-                                          : obs.code?.coding?.[0]?.code || name,
-                                    },
-                                  })
-                                }
-                                activeOpacity={0.75}
-                              >
-                                <View style={styles.obsLeft}>
-                                  <Text style={styles.obsName}>{name}</Text>
-                                  {obs.code?.coding?.[0]?.code &&
-                                    obs.code?.coding?.[0]?.code !==
-                                      'custom' && (
-                                      <Text style={styles.obsLoinc}>
-                                        LOINC: {obs.code.coding[0].code}
-                                      </Text>
-                                    )}
-                                </View>
-
-                                <View style={styles.obsRight}>
-                                  <View style={styles.valueGroup}>
-                                    <Text style={styles.obsValue}>{value}</Text>
-                                    <Text style={styles.obsUnit}>{unit}</Text>
-                                  </View>
-                                  <View style={styles.obsStatusRangeRow}>
-                                    {getStatusBadge(obs)}
-                                    {typeof obs.valueQuantity?.value ===
-                                      'number' && (
-                                      <BiomarkerRangeLine
-                                        value={obs.valueQuantity.value}
-                                        {...getObservationReferenceRange(obs)}
-                                        testID={`biomarker-range-line-${obs.code?.coding?.[0]?.code || obs.id || 'unknown'}`}
-                                      />
-                                    )}
-                                  </View>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          .map((obs) => (
+                            <BiomarkerResultRow
+                              key={obs.id}
+                              observation={obs}
+                            />
+                          ))}
                       </View>
                     </View>
                   );
@@ -857,75 +783,5 @@ const styles = StyleSheet.create({
   },
   obsList: {
     gap: 12,
-  },
-  obsItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  obsLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  obsName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-    marginBottom: 2,
-  },
-  obsLoinc: {
-    fontSize: 12,
-    color: COLORS.light.muted,
-  },
-  obsRight: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  obsStatusRangeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  valueGroup: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  obsValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  obsUnit: {
-    fontSize: 13,
-    color: COLORS.light.muted,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeNormal: {
-    backgroundColor: COLORS.light.badgeNormalBg,
-  },
-  badgeLow: {
-    backgroundColor: COLORS.light.badgeLowBg,
-  },
-  badgeHigh: {
-    backgroundColor: COLORS.light.badgeHighBg,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  badgeTextNormal: {
-    color: COLORS.light.badgeNormalText,
-  },
-  badgeTextLow: {
-    color: COLORS.light.badgeLowText,
-  },
-  badgeTextHigh: {
-    color: COLORS.light.badgeHighText,
   },
 });
