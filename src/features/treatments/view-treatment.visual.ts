@@ -36,7 +36,7 @@ test.describe('View Treatment - Visual Regression', () => {
       consultationId: consultation.id,
       dosageInstructions: longInstructions,
       reason: 'Lyme disease prophylaxis',
-      reasonConditionId: condition.id,
+      reasonConditionIds: [condition.id],
       notes: 'Monitored for sun sensitivity.',
     });
 

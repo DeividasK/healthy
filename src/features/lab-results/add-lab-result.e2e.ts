@@ -28,7 +28,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
           page.getByRole('heading', { name: 'Add Lab Results', exact: true })
         ).toBeVisible();
         await expect(addLabResultsMenuBtn).not.toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        await checkA11y(page);
       });
 
       await test.step('Search and select Hemoglobin and WBC biomarkers', async () => {

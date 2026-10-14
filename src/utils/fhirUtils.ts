@@ -1,4 +1,5 @@
 import type {
+  CodeableReference,
   Condition,
   Encounter,
   MedicationRequest,
@@ -119,6 +120,36 @@ export function getConsultationConditionIds(encounter: Encounter): string[] {
   ];
 }
 
+/**
+ * Removes a reference from an Encounter's diagnoses and reasons. Wording on
+ * an entry is kept; entries left empty are dropped.
+ */
+export function withoutEncounterReference(
+  encounter: Encounter,
+  reference: string
+): Encounter {
+  const strip = (values: CodeableReference[] = []) =>
+    values.flatMap((value) => {
+      if (value.reference?.reference !== reference) return [value];
+      const retained = { ...value };
+      delete retained.reference;
+      return retained.concept ? [retained] : [];
+    });
+  const updated: Encounter = { ...encounter };
+  updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
+    const condition = strip(entry.condition);
+    return condition.length ? [{ ...entry, condition }] : [];
+  });
+  if (!updated.diagnosis?.length) delete updated.diagnosis;
+  updated.reason = encounter.reason?.flatMap((entry) => {
+    if (!entry.value) return [entry];
+    const value = strip(entry.value);
+    return value.length ? [{ ...entry, value }] : [];
+  });
+  if (!updated.reason?.length) delete updated.reason;
+  return updated;
+}
+
 /** Updates diagnosis links while preserving backbone metadata and unexposed concepts/references. */
 export function withConsultationConditions(
   encounter: Encounter,
@@ -218,12 +249,15 @@ export function getTreatmentReason(request: MedicationRequest): string | null {
   return request.reason?.[0]?.concept?.text || null;
 }
 
-/** Safely extracts reason condition ID from a MedicationRequest. */
-export function getTreatmentReasonConditionId(
+/** IDs of every Condition a MedicationRequest's reasons reference. */
+export function getTreatmentReasonConditionIds(
   request: MedicationRequest
-): string | null {
-  const ref = request.reason?.[0]?.reference?.reference;
-  return ref?.startsWith('Condition/') ? ref.slice(10) : null;
+): string[] {
+  const ids = (request.reason || []).flatMap((reason) => {
+    const ref = reason.reference?.reference;
+    return ref?.startsWith('Condition/') ? [ref.slice(10)] : [];
+  });
+  return [...new Set(ids)];
 }
 
 /** Exact resource references in every document section, including nested sections. */

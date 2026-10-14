@@ -12,23 +12,29 @@ import { createOrUpdateTreatment } from './treatmentService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
-import { fetchClinicalDocumentByConsultationId } from '@/src/features/consultations/clinicalDocumentsRepository';
+import {
+  getConsultationById,
+  getDistinctDoctorNames,
+} from '@/src/features/consultations/consultationService';
+import { getConsultationDoctor } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
 import { COLORS } from '@/src/theme/colors';
 
 export function AddTreatmentView() {
-  const { consultationId } = useLocalSearchParams<{
+  const { consultationId, conditionId } = useLocalSearchParams<{
     consultationId?: string;
+    conditionId?: string;
   }>();
   const { activePatientId, isLoading } = useActivePatient();
   if (isLoading)
     return <ActivityIndicator accessibilityLabel="Loading patient" />;
   return (
     <AddTreatmentForPatient
-      key={`${activePatientId}:${consultationId || ''}`}
+      key={`${activePatientId}:${consultationId || ''}:${conditionId || ''}`}
       activePatientId={activePatientId}
       consultationId={consultationId}
+      conditionId={conditionId}
     />
   );
 }
@@ -36,29 +42,40 @@ export function AddTreatmentView() {
 function AddTreatmentForPatient({
   activePatientId,
   consultationId,
+  conditionId,
 }: {
   activePatientId: string;
   consultationId?: string;
+  /** Added from a condition, which starts out associated. */
+  conditionId?: string;
 }) {
-  const [documentState, setDocumentState] = useState<
-    'loading' | 'existing' | 'new' | 'error'
-  >('loading');
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
+    'loading'
+  );
   const [conditions, setConditions] = useState<Condition[]>([]);
+  const [specialists, setSpecialists] = useState<string[]>([]);
+  // Added through a consultation, the treatment defaults to its specialist.
+  const [consultationSpecialist, setConsultationSpecialist] = useState('');
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      consultationId
-        ? fetchClinicalDocumentByConsultationId(consultationId, activePatientId)
-        : Promise.resolve(null),
       getAllConditions(activePatientId),
+      getDistinctDoctorNames(activePatientId),
+      consultationId
+        ? getConsultationById(consultationId, activePatientId)
+        : null,
     ])
-      .then(([doc, patientConditions]) => {
+      .then(([patientConditions, knownSpecialists, consultation]) => {
         if (cancelled) return;
         setConditions(patientConditions);
-        setDocumentState(doc || !consultationId ? 'existing' : 'new');
+        setSpecialists(knownSpecialists);
+        setConsultationSpecialist(
+          (consultation && getConsultationDoctor(consultation)) || ''
+        );
+        setLoadState('ready');
       })
       .catch(() => {
-        if (!cancelled) setDocumentState('error');
+        if (!cancelled) setLoadState('error');
       });
     return () => {
       cancelled = true;
@@ -67,9 +84,8 @@ function AddTreatmentForPatient({
   const { triggerSync } = useSync();
   const router = useRouter();
 
-  if (documentState === 'error')
-    return <Text>Failed to load treatment form.</Text>;
-  if (documentState === 'loading') {
+  if (loadState === 'error') return <Text>Failed to load treatment form.</Text>;
+  if (loadState === 'loading') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.light.primary} />
@@ -88,11 +104,11 @@ function AddTreatmentForPatient({
       authoredDate: formattedDate,
       dosageInstructions: values.dosageInstructions,
       reason: values.reason,
-      reasonConditionId: values.reasonConditionId,
+      reasonConditionIds: values.reasonConditionIds,
       notes: values.notes,
       patientId: activePatientId,
       consultationId: consultationId || undefined,
-      documenterName: values.documenterName,
+      requesterName: values.requesterName,
     });
 
     triggerSync().catch((err) =>
@@ -105,6 +121,8 @@ function AddTreatmentForPatient({
 
     if (consultationId) {
       router.dismissTo(`/consultation/${consultationId}`);
+    } else if (conditionId) {
+      router.dismissTo(`/condition/${conditionId}`);
     } else if (router.canGoBack()) {
       router.back();
     } else {
@@ -117,7 +135,11 @@ function AddTreatmentForPatient({
       onSubmit={handleSubmit}
       conditions={conditions}
       isEditing={false}
-      requireDocumenter={documentState === 'new'}
+      initialValues={{
+        requesterName: consultationSpecialist,
+        reasonConditionIds: conditionId ? [conditionId] : [],
+      }}
+      specialistSuggestions={specialists}
     />
   );
 }

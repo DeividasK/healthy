@@ -13,6 +13,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppOverlay } from './AppChrome';
@@ -46,6 +47,7 @@ export function FloatingAddMenu({
   testID = 'floating-add-menu',
 }: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   if (!visible || options.length === 0) return null;
 
   return (
@@ -68,7 +70,11 @@ export function FloatingAddMenu({
         exiting={menuExit}
         style={[
           styles.menu,
-          { bottom: bottomOffset ?? getActionDockMenuOffset(insets.bottom) },
+          {
+            bottom: bottomOffset ?? getActionDockMenuOffset(insets.bottom),
+            // Grow with the longest label, but keep a gutter to the screen edges.
+            maxWidth: screenWidth - 32,
+          },
         ]}
         testID={testID}
       >
@@ -112,7 +118,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.card,
     borderRadius: 12,
     paddingVertical: 6,
-    width: 200,
+    minWidth: 200,
     zIndex: 95,
     borderWidth: 1,
     borderColor: COLORS.light.border,

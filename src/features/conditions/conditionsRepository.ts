@@ -4,7 +4,7 @@ import {
   getConditionTitle,
   getConditionNotes,
   getConsultationConditionIds,
-  withConsultationConditions,
+  withoutEncounterReference,
   withoutTreatmentReasonReference,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
@@ -176,38 +176,7 @@ export async function deleteConditionRecord(id: string): Promise<void> {
       );
       if (!getConsultationConditionIds(encounter).includes(id) && !hasReason)
         continue;
-      const updated = withConsultationConditions(
-        encounter,
-        getConsultationConditionIds(encounter).filter(
-          (conditionId) => conditionId !== id
-        )
-      );
-      updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
-        const condition = entry.condition?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return condition?.length ? [{ ...entry, condition }] : [];
-      });
-      if (!updated.diagnosis?.length) delete updated.diagnosis;
-      updated.reason = encounter.reason?.flatMap((reason) => {
-        if (
-          !reason.value?.some(
-            (value) => value.reference?.reference === reference
-          )
-        )
-          return [reason];
-        const value = reason.value?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return value?.length ? [{ ...reason, value }] : [];
-      });
-      if (!updated.reason?.length) delete updated.reason;
+      const updated = withoutEncounterReference(encounter, reference);
       updated.meta = { ...encounter.meta, lastUpdated: now };
       await db.runAsync(
         'UPDATE consultations SET fhir_json = ?, updated_at = ? WHERE id = ?;',

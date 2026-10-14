@@ -58,9 +58,10 @@ test.describe('Add Treatment Flow', () => {
     await page
       .getByTestId('treatment-reason-input')
       .fill('Acute bacterial sinusitis');
+    await page.getByTestId('treatment-condition-search-input').click();
     await page
-      .getByTestId('treatment-reason-condition-select')
-      .selectOption(condition.id);
+      .getByTestId(`treatment-condition-autocomplete-item-${condition.id}`)
+      .click();
     await page
       .getByTestId('treatment-notes-input')
       .fill('Patient reported no penicillin allergies.');
@@ -75,7 +76,7 @@ test.describe('Add Treatment Flow', () => {
       'Amoxicillin 500mg Capsule'
     );
     await expect(page.getByTestId('treatment-intent')).toContainText(
-      'Prescription / Order'
+      'Prescription'
     );
     await expect(page.getByTestId('treatment-instructions')).toContainText(
       'Complete full course.'
@@ -85,7 +86,7 @@ test.describe('Add Treatment Flow', () => {
       'Acute bacterial sinusitis'
     );
     await expect(
-      page.getByTestId('treatment-reason-condition-section')
+      page.getByTestId('treatment-reason-conditions-section')
     ).toContainText('Acute sinusitis');
     await expect(page.getByTestId('treatment-notes-section')).toContainText(
       'Patient reported no penicillin allergies.'
@@ -94,10 +95,8 @@ test.describe('Add Treatment Flow', () => {
     const id = page.url().split('/').pop()!;
     const stored = await getTestTreatment(page, id);
     expect(stored.reason).toEqual([
-      {
-        concept: { text: 'Acute bacterial sinusitis' },
-        reference: { reference: `Condition/${condition.id}` },
-      },
+      { concept: { text: 'Acute bacterial sinusitis' } },
+      { reference: { reference: `Condition/${condition.id}` } },
     ]);
     expect(stored.text.status).toBe('generated');
     expect(stored.text.div).toContain('Amoxicillin 500mg Capsule');
@@ -122,9 +121,9 @@ test.describe('Add Treatment Flow', () => {
     await page.getByTestId('treatment-intent-select').selectOption('order');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-treatment-instructions').click();
-    await page
-      .getByTestId('treatment-documenter-input')
-      .fill('Actual documenter');
+    await expect(page.getByTestId('treatment-requester-input')).toHaveValue(
+      'Dr. Julian Bashir'
+    );
     await page
       .getByTestId('treatment-instructions-input')
       .fill('Take 1 tablet at onset of migraine.');
@@ -148,7 +147,9 @@ test.describe('Add Treatment Flow', () => {
     expect(rows[0].consultation_id).toBe(consultation.id);
     const created = JSON.parse(rows[0].fhir_json);
     expect(created.encounter?.reference).toBe(`Encounter/${consultation.id}`);
+    expect(created.requester).toEqual({ display: 'Dr. Julian Bashir' });
     const doc = await getTestClinicalDocument(page, consultation.id);
+    expect(doc.author).toEqual([{ reference: consultation.subject.reference }]);
     const section = findTreatmentsSection(doc);
     expect(section.code.coding[0]).toEqual({
       system: 'http://loinc.org',
@@ -178,5 +179,53 @@ test.describe('Add Treatment Flow', () => {
     expect(retained.length).toBe(1);
     expect(retained[0].consultation_id).toBeNull();
     expect(JSON.parse(retained[0].fhir_json).encounter).toBeUndefined();
+  });
+
+  test('records an optional requester on a standalone treatment', async ({
+    page,
+  }) => {
+    await seedTestConsultation(page, {
+      title: 'Earlier visit',
+      doctorName: 'Dr. Known Specialist',
+    });
+
+    await page.goto('/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Ibuprofen 400mg');
+    await expect(page.getByTestId('treatment-requester-input')).toHaveCount(0);
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-treatment-requester').click();
+    const requester = page.getByTestId('treatment-requester-input');
+    await requester.click();
+    await expect(
+      page.getByTestId('treatment-requester-input-autocomplete-item-0')
+    ).toHaveText('Dr. Known Specialist');
+    // Focusing out closes the suggestions
+    await page.getByTestId('treatment-title-input').click();
+    await expect(
+      page.getByTestId('treatment-requester-input-autocomplete-list')
+    ).toHaveCount(0);
+
+    // A specialist not seen before can be entered
+    await requester.fill('Dr. New Specialist');
+    await page.getByTestId('save-treatment-button').click();
+    await page.getByText('Ibuprofen 400mg').click();
+    await expect(page.getByTestId('treatment-requester')).toContainText(
+      'Dr. New Specialist'
+    );
+    const [row] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        "SELECT id, fhir_json FROM medication_requests WHERE display_label = 'Ibuprofen 400mg'"
+      )
+    );
+    expect(JSON.parse(row.fhir_json).requester).toEqual({
+      display: 'Dr. New Specialist',
+    });
+
+    // Removing the field clears the requester
+    await page.getByTestId('edit-treatment-button').click();
+    await page.getByTestId('remove-treatment-requester-button').click();
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-requester')).toHaveCount(0);
+    expect((await getTestTreatment(page, row.id)).requester).toBeUndefined();
   });
 });

@@ -22,7 +22,7 @@ test.describe('Add Condition Flow', () => {
 
         await expect(page).toHaveURL(/.*condition\/add/);
         await expect(page.getByText('New Condition')).toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        await checkA11y(page);
         const titleBounds = (await page
           .getByTestId('condition-title-input')
           .boundingBox())!;

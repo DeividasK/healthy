@@ -4,8 +4,8 @@ import type {
 } from './consultationService';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import { FormField, FormTextInput } from '@/src/components/FormField';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { FormField } from '@/src/components/FormField';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -26,7 +26,6 @@ import {
   FileText,
   FolderPlus,
   User,
-  X,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
@@ -36,6 +35,13 @@ import {
   AddOptionItem,
 } from '@/src/components/AddOptionsModal';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
+import { SpecialistField } from '@/src/components/SpecialistField';
+import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
@@ -111,7 +117,12 @@ export interface ConsultationFormProps {
   initialConditionIds?: string[];
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: ConsultationInput) => Promise<void>;
+  onSave: (
+    values: ConsultationInput,
+    links: Record<string, LinkSelection>
+  ) => Promise<void>;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 function showAlert(title: string, message: string) {
@@ -128,7 +139,9 @@ export function ConsultationForm({
   isEdit = false,
   onSave,
   onDelete,
+  linkFields = [],
 }: ConsultationFormProps) {
+  const links = useLinkFields(linkFields);
   const router = useRouter();
   const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
@@ -193,16 +206,12 @@ export function ConsultationForm({
   const [showCondition, setShowCondition] = useState(
     Boolean((initialValues?.reasonConditionIds ?? initialConditionIds)?.length)
   );
-  const [conditionQuery, setConditionQuery] = useState('');
-  const [isConditionFocused, setIsConditionFocused] = useState(false);
-  const conditionSearchRef = useRef<View>(null);
 
   const [availableConditions, setAvailableConditions] = useState<Condition[]>(
     []
   );
   const [knownDoctors, setKnownDoctors] = useState<string[]>([]);
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
-  const [isDoctorFocused, setIsDoctorFocused] = useState(false);
   const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
     initialValues?.diagnoses || []
@@ -238,15 +247,6 @@ export function ConsultationForm({
     };
   }, [activePatientId]);
 
-  // Autocomplete matching doctors
-  const matchingDoctors = useMemo(() => {
-    const trimmed = doctorName.trim().toLowerCase();
-    if (!trimmed) {
-      return knownDoctors;
-    }
-    return knownDoctors.filter((doc) => doc.toLowerCase().includes(trimmed));
-  }, [doctorName, knownDoctors]);
-
   // Autocomplete matching service types
   const matchingServiceTypes = useMemo(() => {
     const all = Array.from(
@@ -280,13 +280,10 @@ export function ConsultationForm({
     }
   };
 
-  const conditionOptions = availableConditions.filter(
-    (condition) =>
-      condition.id &&
-      !selectedConditionIds.includes(condition.id) &&
-      getConditionTitle(condition)
-        .toLowerCase()
-        .includes(conditionQuery.trim().toLowerCase())
+  const conditionOptions = availableConditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
   );
 
   const handleSubmit = async () => {
@@ -315,21 +312,24 @@ export function ConsultationForm({
         ? `${formattedDate}T${time}:00${zone}`
         : formattedDate;
 
-      await onSave({
-        id: initialValues?.id,
-        title: trimmedTitle,
-        status: selectedStatus.status,
-        date: fullDate,
-        doctorName:
-          showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
-        serviceType:
-          showServiceType && serviceType.trim()
-            ? serviceType.trim()
-            : undefined,
-        reasonConditionIds: selectedConditionIds.filter(Boolean),
-        diagnoses,
-        notes: showNotes && notes.trim() ? notes.trim() : undefined,
-      });
+      await onSave(
+        {
+          id: initialValues?.id,
+          title: trimmedTitle,
+          status: selectedStatus.status,
+          date: fullDate,
+          doctorName:
+            showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
+          serviceType:
+            showServiceType && serviceType.trim()
+              ? serviceType.trim()
+              : undefined,
+          reasonConditionIds: selectedConditionIds.filter(Boolean),
+          diagnoses,
+          notes: showNotes && notes.trim() ? notes.trim() : undefined,
+        },
+        links.values
+      );
 
       triggerSync().catch((err) =>
         console.warn('Background sync failed on consultation change:', err)
@@ -409,7 +409,7 @@ export function ConsultationForm({
   if (!showDoctor) {
     plusMenuOptions.push({
       id: 'add-doctor',
-      label: 'Doctor',
+      label: 'Specialist',
       icon: (
         <User
           color={COLORS.light.primary}
@@ -451,6 +451,8 @@ export function ConsultationForm({
       onPress: () => setShowNotes(true),
     });
   }
+
+  const menuOptions = [...plusMenuOptions, ...links.menuOptions];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -563,108 +565,34 @@ export function ConsultationForm({
           />
 
           {showCondition && (
-            <FormField
+            <LinkedResourcesField
               label="Reasons for visit"
-              nativeID="condition-search-input"
+              searchLabel="Select reasons for visit"
+              options={conditionOptions}
+              selectedIds={selectedConditionIds}
+              onChange={setSelectedConditionIds}
               testID="consultation-conditions-section"
               removeTestID="remove-conditions-section-button"
               onRemove={() => {
                 setShowCondition(false);
                 setSelectedConditionIds([]);
-                setConditionQuery('');
-                setIsConditionFocused(false);
               }}
-            >
-              {selectedConditionIds.map((conditionId, index) => (
-                <View
-                  key={conditionId}
-                  style={styles.selectedConditionRow}
-                  testID={`selected-condition-${conditionId}`}
-                >
-                  <Text style={styles.selectedConditionText}>
-                    {availableConditions
-                      .filter((condition) => condition.id === conditionId)
-                      .map(getConditionTitle)[0] || conditionId}
-                  </Text>
-                  <TouchableOpacity
-                    testID={
-                      index === 0
-                        ? 'remove-condition-button'
-                        : `remove-condition-button-${index}`
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove condition ${availableConditions.filter((condition) => condition.id === conditionId).map(getConditionTitle)[0] || conditionId}`}
-                    onPress={() =>
-                      setSelectedConditionIds((current) =>
-                        current.filter((id) => id !== conditionId)
-                      )
-                    }
-                  >
-                    <X color={COLORS.light.iconClear} size={16} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View
-                ref={conditionSearchRef}
-                onFocus={() => setIsConditionFocused(true)}
-                onBlur={(event: any) => {
-                  const next = event.relatedTarget;
-                  if (
-                    next &&
-                    (conditionSearchRef.current as any)?.contains?.(next)
-                  )
-                    return;
-                  setIsConditionFocused(false);
-                }}
-              >
-                <FormTextInput
-                  testID="condition-search-input"
-                  id="condition-search-input"
-                  nativeID="condition-search-input"
-                  name="conditionSearch"
-                  accessibilityLabel="Select reasons for visit"
-                  placeholder="Select..."
-                  placeholderTextColor={COLORS.light.mutedForeground}
-                  value={conditionQuery}
-                  onChangeText={(value) => {
-                    setConditionQuery(value);
-                    setIsConditionFocused(true);
-                  }}
-                  onFocus={() => setIsConditionFocused(true)}
-                  onPressIn={() => setIsConditionFocused(true)}
-                />
-                {isConditionFocused && (
-                  <AutocompleteDropdown
-                    testID="condition-autocomplete-list"
-                    itemTestIDPrefix="condition-autocomplete-item-"
-                    items={conditionOptions.map((condition) => ({
-                      id: condition.id!,
-                      label: getConditionTitle(condition),
-                    }))}
-                    onSelect={(item) => {
-                      setSelectedConditionIds((current) =>
-                        current.includes(item.id)
-                          ? current
-                          : [...current, item.id]
-                      );
-                      setConditionQuery('');
-                      setIsConditionFocused(false);
-                    }}
-                  />
-                )}
-              </View>
-            </FormField>
+            />
           )}
 
           {diagnoses.length > 0 && (
             <FormField
               label="Diagnoses"
               testID="consultation-diagnoses-section"
+              style={focusedDiagnosis !== null && styles.raised}
             >
               {diagnoses.map((diagnosis, index) => (
                 <View
                   key={index}
-                  style={styles.diagnosisItem}
+                  style={[
+                    styles.diagnosisItem,
+                    focusedDiagnosis === index && styles.raised,
+                  ]}
                   testID={`consultation-diagnosis-${index}`}
                 >
                   {(['title', 'system', 'code', 'display'] as const).map(
@@ -730,6 +658,9 @@ export function ConsultationForm({
                           {field === 'title' && (
                             <FormField
                               label="Referenced Condition (optional)"
+                              style={
+                                focusedDiagnosis === index && styles.raised
+                              }
                               nativeID={`diagnosis-${index}-condition-input`}
                               inputProps={{
                                 testID: `diagnosis-${index}-condition-input`,
@@ -831,6 +762,7 @@ export function ConsultationForm({
           {showServiceType && (
             <FormField
               label="Specialty / Service Type"
+              style={isServiceTypeFocused && styles.raised}
               nativeID="consultation-service-type-input"
               removeTestID="remove-service-type-button"
               removeLabel="Remove service type"
@@ -871,48 +803,19 @@ export function ConsultationForm({
             </FormField>
           )}
 
-          {/* Doctor / Specialist Input with Autocomplete (Optional) */}
           {showDoctor && (
-            <FormField
-              label="Doctor or Specialist"
-              nativeID="consultation-doctor-input"
+            <SpecialistField
+              inputID="consultation-doctor-input"
+              autocompleteTestID="doctor-autocomplete"
+              value={doctorName}
+              onChangeText={setDoctorName}
+              suggestions={knownDoctors}
               removeTestID="remove-doctor-button"
-              removeLabel="Remove doctor"
               onRemove={() => {
                 setShowDoctor(false);
                 setDoctorName('');
               }}
-              inputProps={{
-                testID: 'consultation-doctor-input',
-                id: 'consultation-doctor-input',
-                nativeID: 'consultation-doctor-input',
-                name: 'doctorName',
-                accessibilityLabel: 'Doctor or Specialist',
-                placeholder: 'e.g. Dr. Sarah Adams',
-                value: doctorName,
-                onChangeText: (text) => {
-                  setDoctorName(text);
-                  setIsDoctorFocused(true);
-                },
-                onFocus: () => setIsDoctorFocused(true),
-              }}
-            >
-              {/* Doctor Autocomplete Suggestions */}
-              {isDoctorFocused && matchingDoctors.length > 0 && (
-                <AutocompleteDropdown
-                  testID="doctor-autocomplete-list"
-                  itemTestIDPrefix="doctor-autocomplete-item-"
-                  items={matchingDoctors.map((doc, idx) => ({
-                    id: String(idx),
-                    label: doc,
-                  }))}
-                  onSelect={(item) => {
-                    setDoctorName(item.label);
-                    setIsDoctorFocused(false);
-                  }}
-                />
-              )}
-            </FormField>
+            />
           )}
 
           {/* Consultation Notes Textarea (Optional) */}
@@ -939,13 +842,15 @@ export function ConsultationForm({
               }}
             />
           )}
+
+          {links.fields}
         </ScrollView>
 
         {/* Bottom Save Action */}
         <FormActionDock
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
-          addDisabled={plusMenuOptions.length === 0}
+          addDisabled={menuOptions.length === 0}
           addTestID="add-option-button"
           onSave={handleSubmit}
           isSaving={isSaving}
@@ -968,7 +873,7 @@ export function ConsultationForm({
           testID="form-add-menu"
           visible={showPlusMenu}
           onClose={() => setShowPlusMenu(false)}
-          options={plusMenuOptions}
+          options={menuOptions}
         />
 
         {/* Status Selection Modal for Android */}
@@ -1044,17 +949,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
   },
-  selectedConditionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  selectedConditionText: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
   diagnosisItem: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -1062,4 +956,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 20,
   },
+  // Lifts a field above later siblings while its autocomplete overlays them.
+  raised: { zIndex: 10 },
 });

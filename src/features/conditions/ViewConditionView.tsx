@@ -5,35 +5,24 @@ import {
 } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  Calendar,
-  ChevronRight,
-  MapPin,
-  Stethoscope,
-  User,
-} from 'lucide-react-native';
+import { MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceTextSection } from '@/src/components/ResourceTextSection';
+import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
+import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
-import {
-  formatDisplayDate,
-  formatDisplayDateTime,
-} from '@/src/utils/dateUtils';
-import {
-  getConditionNotes,
-  getConditionTitle,
-  getConsultationDoctor,
-  getConsultationNotes,
-  getConsultationServiceType,
-  getConsultationTitle,
-} from '@/src/utils/fhirUtils';
+import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentService';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { getConditionById } from './conditionService';
-import type { Condition, Encounter } from 'fhir/r5';
+import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 
 export function ViewConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -41,6 +30,7 @@ export function ViewConditionView() {
   const router = useRouter();
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
+  const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -51,20 +41,24 @@ export function ViewConditionView() {
     const sequence = ++loadSequence.current;
     if (!id || isPatientLoading || !activePatientId) return;
     try {
-      const [conditionData, consultationData] = await Promise.all([
-        getConditionById(id, activePatientId),
-        getConsultationsByConditionId(id),
-      ]);
+      const [conditionData, consultationData, treatmentData] =
+        await Promise.all([
+          getConditionById(id, activePatientId),
+          getConsultationsByConditionId(id),
+          getTreatmentsByConditionId(id, activePatientId),
+        ]);
       if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
       if (!conditionData) {
         setNotFound(true);
         setCondition(null);
         setConsultations([]);
+        setTreatments([]);
       } else {
         setNotFound(false);
         setCondition(conditionData);
         setConsultations(consultationData);
+        setTreatments(treatmentData);
       }
     } catch (error) {
       if (sequence !== loadSequence.current) return;
@@ -76,7 +70,10 @@ export function ViewConditionView() {
   }, [id, activePatientId, isPatientLoading]);
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
-  useDatabaseSubscription(['conditions', 'consultations'], loadData);
+  useDatabaseSubscription(
+    ['conditions', 'consultations', 'medication_requests'],
+    loadData
+  );
 
   const getStatus = (value: Condition) => {
     const clinicalStatus = value.clinicalStatus?.coding?.[0]?.code;
@@ -147,6 +144,23 @@ export function ViewConditionView() {
                     params: { conditionId: id },
                   }),
               },
+              {
+                id: 'treatment',
+                label: 'Treatment',
+                testID: 'menu-add-treatment',
+                icon: (
+                  <Pill
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/treatment/add',
+                    params: { conditionId: id },
+                  }),
+              },
             ]}
           />
           <ResourceActionDock
@@ -156,7 +170,7 @@ export function ViewConditionView() {
               router.push(`/condition/${id}/edit`);
             }}
             onAdd={() => setShowAddMenu((visible) => !visible)}
-            addLabel="Add consultation"
+            addLabel="Add record"
             addMenuExpanded={showAddMenu}
             editTestID="edit-condition-button"
             addTestID="condition-add-button"
@@ -231,86 +245,60 @@ export function ViewConditionView() {
               )}
             </View>
           )}
-          {notes && <Text style={styles.notes}>{notes}</Text>}
+          {notes && (
+            <ResourceTextSection
+              title="Notes"
+              text={notes}
+              testID="condition-notes"
+            />
+          )}
         </View>
       )}
 
-      <View
-        style={[
-          styles.consultationsSection,
-          consultations.length > 0 && styles.consultationsList,
-        ]}
+      <RelatedResourceSection
+        icon={Stethoscope}
+        title="Recent Consultations"
         testID="condition-consultations-section"
+        emptyText="No consultations associated with this condition yet."
+        emptyTestID="empty-consultations"
       >
-        <View style={styles.sectionHeading}>
-          <Stethoscope size={18} color={COLORS.light.primary} />
-          <Text style={styles.sectionTitle} accessibilityRole="header">
-            Recent Consultations
-          </Text>
-        </View>
-        {consultations.length ? (
-          consultations.map((consultation) => {
-            const consultationId = consultation.id || '';
-            const date =
-              consultation.actualPeriod?.start ||
-              consultation.plannedStartDate ||
-              '';
-            const doctor = getConsultationDoctor(consultation);
-            const serviceType = getConsultationServiceType(consultation);
-            const consultationNotes = getConsultationNotes(consultation);
-            return (
-              <View key={consultationId} style={styles.consultationItem}>
-                <TouchableOpacity
-                  testID={`condition-consultation-item-${consultationId}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View consultation: ${getConsultationTitle(consultation)}`}
-                  style={styles.consultationRow}
-                  activeOpacity={0.75}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/consultation/[id]',
-                      params: { id: consultationId },
-                    })
-                  }
-                >
-                  <View style={styles.consultationMain}>
-                    <Text style={styles.consultationTitle}>
-                      {getConsultationTitle(consultation)}
-                    </Text>
-                    <View style={styles.consultationMeta}>
-                      <View style={styles.inlineMeta}>
-                        <Calendar color={COLORS.light.muted} size={14} />
-                        <Text style={styles.metaText}>
-                          {formatDisplayDateTime(date)}
-                        </Text>
-                      </View>
-                      {doctor && (
-                        <View style={styles.inlineMeta}>
-                          <User color={COLORS.light.muted} size={14} />
-                          <Text style={styles.metaText}>{doctor}</Text>
-                        </View>
-                      )}
-                      {serviceType && (
-                        <Text style={styles.metaText}>{serviceType}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <ChevronRight color={COLORS.light.muted} size={18} />
-                </TouchableOpacity>
-                {consultationNotes && (
-                  <Text style={styles.consultationNote}>
-                    &quot;{consultationNotes}&quot;
-                  </Text>
-                )}
-              </View>
-            );
-          })
-        ) : (
-          <Text style={styles.emptyText} testID="empty-consultations">
-            No consultations associated with this condition yet.
-          </Text>
-        )}
-      </View>
+        {consultations.map((consultation) => (
+          <ConsultationRelatedRow
+            key={consultation.id}
+            consultation={consultation}
+            testID={`condition-consultation-item-${consultation.id}`}
+            showNotes
+            onPress={() =>
+              router.push({
+                pathname: '/consultation/[id]',
+                params: { id: consultation.id! },
+              })
+            }
+          />
+        ))}
+      </RelatedResourceSection>
+
+      {treatments.length > 0 && (
+        <RelatedResourceSection
+          icon={Pill}
+          title="Treatments"
+          testID="condition-treatments-section"
+        >
+          {treatments.map((treatment) => (
+            <TreatmentRelatedRow
+              key={treatment.id}
+              treatment={treatment}
+              testID={`condition-treatment-item-${treatment.id}`}
+              onPress={() =>
+                router.push({
+                  pathname: '/treatment/[id]',
+                  params: { id: treatment.id! },
+                })
+              }
+            />
+          ))}
+        </RelatedResourceSection>
+      )}
     </ResourceViewLayout>
   );
 }
@@ -339,66 +327,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     color: COLORS.light.textSecondary,
-  },
-  consultationsSection: {
-    marginTop: 2,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  consultationsList: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
-  },
-  sectionHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  consultationRow: {
-    minHeight: 60,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.cardBorder,
-    gap: 10,
-  },
-  consultationItem: {
-    marginBottom: 16,
-  },
-  consultationMain: {
-    flex: 1,
-    gap: 5,
-  },
-  consultationTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  consultationMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  consultationNote: {
-    paddingTop: 8,
-    paddingHorizontal: 1,
-    fontSize: 12,
-    lineHeight: 17,
-    fontStyle: 'italic',
-    color: COLORS.light.textSecondary,
-  },
-  emptyText: {
-    paddingVertical: 12,
-    fontSize: 14,
-    color: COLORS.light.mutedForeground,
   },
 });

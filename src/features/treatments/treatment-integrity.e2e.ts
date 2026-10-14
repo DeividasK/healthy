@@ -24,26 +24,30 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   await expect(page.getByTestId('treatment-status-select')).toHaveValue(
     'unknown'
   );
-  for (const field of ['instructions', 'reason', 'notes']) {
-    await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
+  const addField = async (field: string) => {
     await page.getByTestId('add-option-button').click();
     await page.getByTestId(`menu-add-treatment-${field}`).click();
+    // Wait for the closing menu to leave so its items are not matched twice.
+    await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
+  };
+  const textFields = ['instructions', 'reason', 'notes', 'requester'];
+  for (const field of textFields) {
+    await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
+    await addField(field);
     await page
       .getByTestId(`treatment-${field}-input`)
       .fill(`Original ${field}`);
     await page.getByTestId(`remove-treatment-${field}-button`).click();
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId(`menu-add-treatment-${field}`).click();
+    await addField(field);
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveValue('');
     await page.getByTestId(`treatment-${field}-input`).fill(`Saved ${field}`);
   }
-  // An unselected reason condition saves no link
-  await page.getByTestId('add-option-button').click();
-  await page.getByTestId('menu-add-treatment-reasonCondition').click();
-  await expect(
-    page.getByTestId('treatment-reason-condition-select')
-  ).toHaveValue('');
+  // An empty associated-conditions field saves no link
+  await addField('reasonCondition');
+  await expect(page.getByTestId(/^treatment-selected-condition-/)).toHaveCount(
+    0
+  );
   await expect(page.getByTestId('add-option-button')).toBeDisabled();
   await page.getByTestId('treatment-title-input').fill('Optional fields');
   await checkA11y(page, { include: '[data-testid="treatment-form"]' });
@@ -55,7 +59,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
     )
   );
   await page.goto(`/treatment/${rows[0].id}/edit`);
-  for (const field of ['instructions', 'reason', 'notes']) {
+  for (const field of textFields) {
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveValue(
       `Saved ${field}`
     );
@@ -64,13 +68,14 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   await page.getByTestId('save-treatment-button').click();
   await expect(page).not.toHaveURL(/\/edit$/);
   await page.goto(`/treatment/${rows[0].id}/edit`);
-  for (const field of ['instructions', 'reason', 'notes']) {
+  for (const field of textFields) {
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
   }
   const saved = await getTestTreatment(page, rows[0].id);
   expect(saved.reason).toBeUndefined();
   expect(saved.note).toBeUndefined();
   expect(saved.dosageInstruction).toBeUndefined();
+  expect(saved.requester).toBeUndefined();
   expect(saved.status).toBe('unknown');
 });
 
@@ -107,6 +112,8 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
           text: 'Original reason',
           coding: [{ system: 'https://example.org/reason', code: 'reason' }],
         },
+        // Not a Condition, so the form cannot edit it and must keep it
+        reference: { reference: 'Observation/imported-observation' },
       },
       { concept: { text: 'Second reason' } },
     ],
@@ -154,6 +161,7 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
   expect(saved.dosageInstruction[1]).toEqual(resource.dosageInstruction[1]);
   expect(saved.reason[0]).toEqual({
     concept: { coding: resource.reason[0].concept.coding },
+    reference: resource.reason[0].reference,
   });
   expect(saved.reason[1]).toEqual(resource.reason[1]);
   expect(saved.note).toEqual([
@@ -178,7 +186,9 @@ test('linking preserves document metadata and unlinking an origin survives edits
   });
   const initial = await getTestClinicalDocument(page, consultation.id);
   expect(initial.status).toBe('preliminary');
-  expect(initial.author).toEqual([{ display: 'Synthetic test documenter' }]);
+  expect(initial.author).toEqual([
+    { reference: consultation.subject.reference },
+  ]);
   const document = {
     ...initial,
     status: 'amended',
@@ -194,24 +204,23 @@ test('linking preserves document metadata and unlinking an origin survives edits
     { document }
   );
   const second = await seedTestTreatment(page, { title: 'Second treatment' });
-  await page.goto(`/consultation/${consultation.id}`);
-  await page.getByTestId('consultation-add-treatment').click();
-  await page.getByTestId('option-link-existing-treatment').click();
-  await expect(page.getByTestId('link-documenter-input')).toHaveCount(0);
+  // Link the second treatment and unlink the origin in one edit
+  await page.goto(`/consultation/${consultation.id}/edit`);
+  // The field is shown because the consultation already lists a treatment
+  await page.getByTestId('link-treatment-search-input').click();
   await page
-    .getByRole('combobox', { name: 'Link existing treatment' })
-    .selectOption(second.id);
-  await expect(
-    page.getByTestId(`consultation-treatment-${second.id}`)
-  ).toBeVisible();
+    .getByTestId(`link-treatment-autocomplete-item-${second.id}`)
+    .click();
+  await page.getByTestId('link-remove-treatment-button').click();
+  await page.getByTestId('save-button').click();
+  await expect(page).not.toHaveURL(/\/edit$/);
   const linked = await getTestClinicalDocument(page, consultation.id);
   expect(linked.author).toEqual(document.author);
   expect(linked.date).toBe(document.date);
   expect(linked.status).toBe(document.status);
-  await page.getByTestId(`unlink-treatment-${treatment.id}`).click();
-  await expect(
-    page.getByTestId(`consultation-treatment-${treatment.id}`)
-  ).toHaveCount(0);
+  expect(findTreatmentsSection(linked).entry).toEqual([
+    { reference: `MedicationRequest/${second.id}` },
+  ]);
   await page.goto(`/treatment/${treatment.id}/edit`);
   await page
     .getByTestId('treatment-title-input')
@@ -306,7 +315,7 @@ test('deleting a reason condition keeps the treatment, its wording and editabili
   const treatment = await seedTestTreatment(page, {
     title: 'Sumatriptan 50mg',
     reason: 'Migraine attacks',
-    reasonConditionId: condition.id,
+    reasonConditionIds: [condition.id],
   });
   await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.deleteCondition(id),
@@ -415,7 +424,7 @@ test('switching patients unmounts edit fields and restores the correct form on r
   );
 });
 
-test('new documents require explicit attribution and failed links roll back requests', async ({
+test('new documents are authored by the patient and requesters default to the consultation specialist', async ({
   page,
 }) => {
   const consultation = await seedTestConsultation(page, {
@@ -423,43 +432,24 @@ test('new documents require explicit attribution and failed links roll back requ
     title: 'Attribution visit',
     doctorName: 'Encounter clinician',
   });
-  const failed = await page.evaluate(async () => {
-    const b = (window as any).__HEALTHY_TEST_BRIDGE__;
-    let message = '';
-    try {
-      await b.updateTreatment({
-        id: 'unattributed',
-        patientId: 'integrity-patient',
-        consultationId: 'attribution-visit',
-        title: 'Missing author',
-      });
-    } catch (error) {
-      message = (error as Error).message;
-    }
-    return {
-      message,
-      request: await b.getTreatment('unattributed'),
-      document:
-        await b.getClinicalDocumentByConsultationId('attribution-visit'),
-    };
-  });
-  expect(failed.message).toContain('Documenter name is required');
-  expect(failed.request).toBeNull();
-  expect(failed.document).toBeNull();
   await page.goto(`/treatment/add?consultationId=${consultation.id}`);
-  await page.getByTestId('treatment-title-input').fill('Attributed treatment');
-  await page.getByTestId('save-treatment-button').click();
-  await expect(page.getByTestId('treatment-form-error')).toContainText(
-    'Documenter name is required'
+  await expect(page.getByTestId('treatment-requester-input')).toHaveValue(
+    'Encounter clinician'
   );
-  await page
-    .getByTestId('treatment-documenter-input')
-    .fill('Actual documenter');
+  await page.getByTestId('treatment-title-input').fill('Attributed treatment');
   await page.getByTestId('save-treatment-button').click();
   await expect(page).toHaveURL(new RegExp(`/consultation/${consultation.id}$`));
   const document = await getTestClinicalDocument(page, consultation.id);
-  expect(document.author).toEqual([{ display: 'Actual documenter' }]);
+  expect(document.author).toEqual([{ reference: 'Patient/integrity-patient' }]);
   expect(document.status).toBe('preliminary');
+  const [row] = await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+      "SELECT fhir_json FROM medication_requests WHERE display_label = 'Attributed treatment'"
+    )
+  );
+  expect(JSON.parse(row.fhir_json).requester).toEqual({
+    display: 'Encounter clinician',
+  });
 });
 
 test('rejects foreign reason and consultation references without saving', async ({
@@ -483,8 +473,8 @@ test('rejects foreign reason and consultation references without saving', async 
     const b = (window as any).__HEALTHY_TEST_BRIDGE__;
     const errors = [];
     for (const input of [
-      { reasonConditionId: 'foreign-reason' },
-      { consultationId: 'foreign-visit', documenterName: 'Actual documenter' },
+      { reasonConditionIds: ['foreign-reason'] },
+      { consultationId: 'foreign-visit' },
     ]) {
       try {
         await b.updateTreatment({

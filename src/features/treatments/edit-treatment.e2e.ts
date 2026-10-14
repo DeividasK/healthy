@@ -15,7 +15,7 @@ test.describe('Edit Treatment Flow', () => {
     await seedTestPatient(page);
   });
 
-  test('edits fields, regenerates the narrative and changes then clears the reason condition', async ({
+  test('edits fields, regenerates the narrative and associates multiple conditions', async ({
     page,
   }) => {
     const first = await seedTestCondition(page, { title: 'Hypertension' });
@@ -25,7 +25,7 @@ test.describe('Edit Treatment Flow', () => {
       intent: 'order',
       status: 'active',
       reason: 'Blood pressure',
-      reasonConditionId: first.id,
+      reasonConditionIds: [first.id],
     });
     const before = await getTestTreatment(page, treatment.id);
     expect(before.text.div).toContain('Amoxicillin 500mg');
@@ -34,14 +34,15 @@ test.describe('Edit Treatment Flow', () => {
     await page.getByTestId('edit-treatment-button').click();
     await expect(page).toHaveURL(/.*treatment\/[a-zA-Z0-9_-]+\/edit$/);
     await expect(
-      page.getByTestId('treatment-reason-condition-select')
-    ).toHaveValue(first.id);
+      page.getByTestId(`treatment-selected-condition-${first.id}`)
+    ).toBeVisible();
 
     await page.getByTestId('treatment-title-input').fill('Lisinopril 10mg');
     await page.getByTestId('treatment-status-select').selectOption('completed');
+    await page.getByTestId('treatment-condition-search-input').click();
     await page
-      .getByTestId('treatment-reason-condition-select')
-      .selectOption(second.id);
+      .getByTestId(`treatment-condition-autocomplete-item-${second.id}`)
+      .click();
     await checkA11y(page, { include: '[data-testid="treatment-form"]' });
     await page.getByTestId('save-treatment-button').click();
 
@@ -51,22 +52,29 @@ test.describe('Edit Treatment Flow', () => {
     await expect(
       page.getByTestId('treatment-view').getByText('Completed')
     ).toBeVisible();
-    await expect(
-      page.getByTestId('treatment-reason-condition-section')
-    ).toContainText('Kidney disease');
+    const section = page.getByTestId('treatment-reason-conditions-section');
+    await expect(section).toContainText('Hypertension');
+    await expect(section).toContainText('Kidney disease');
 
     const edited = await getTestTreatment(page, treatment.id);
     expect(edited.text.div).toContain('Lisinopril 10mg');
     expect(edited.text.div).not.toContain('Amoxicillin');
-    expect(edited.reason[0].reference.reference).toBe(`Condition/${second.id}`);
+    expect(
+      edited.reason.map((reason: any) => reason.reference?.reference)
+    ).toEqual([undefined, `Condition/${first.id}`, `Condition/${second.id}`]);
 
-    // Removing the field clears only the link; the wording stays
+    // Removing one condition keeps the other
+    await page.getByTestId('edit-treatment-button').click();
+    await page.getByTestId('treatment-remove-condition-button').click();
+    await page.getByTestId('save-treatment-button').click();
+    await expect(section).not.toContainText('Hypertension');
+    await expect(section).toContainText('Kidney disease');
+
+    // Removing the field clears only the links; the wording stays
     await page.getByTestId('edit-treatment-button').click();
     await page.getByTestId('remove-treatment-reasonCondition-button').click();
     await page.getByTestId('save-treatment-button').click();
-    await expect(
-      page.getByTestId('treatment-reason-condition-section')
-    ).toHaveCount(0);
+    await expect(section).toHaveCount(0);
     const cleared = await getTestTreatment(page, treatment.id);
     expect(cleared.reason).toEqual([{ concept: { text: 'Blood pressure' } }]);
   });

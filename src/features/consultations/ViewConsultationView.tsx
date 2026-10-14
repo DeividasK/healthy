@@ -1,11 +1,18 @@
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { FolderPlus, Plus } from 'lucide-react-native';
 import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceTextSection } from '@/src/components/ResourceTextSection';
+import {
+  RelatedResourceRow,
+  RelatedResourceSection,
+} from '@/src/components/RelatedResourceSection';
+import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationById } from '@/src/features/consultations/consultationService';
 import { getConditionById } from '@/src/features/conditions/conditionService';
@@ -36,6 +43,7 @@ export function ViewConsultationView() {
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const loadData = useCallback(async () => {
     const generation = ++loadGeneration.current;
@@ -136,24 +144,66 @@ export function ViewConsultationView() {
       date={date ? formatDisplayDateTime(date) : undefined}
       status={{ label: status }}
       actions={
-        <ResourceActionDock
-          editLabel="Edit consultation"
-          onEdit={() => router.push(`/consultation/${id}/edit`)}
-          editTestID="edit-consultation-button"
-        />
+        <>
+          <FloatingAddMenu
+            visible={showAddMenu}
+            onClose={() => setShowAddMenu(false)}
+            testID="consultation-add-menu"
+            options={[
+              {
+                id: 'create-treatment',
+                label: 'Create New Treatment',
+                testID: 'option-create-new-treatment',
+                icon: (
+                  <Plus
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/treatment/add',
+                    params: { consultationId: id },
+                  }),
+              },
+            ]}
+          />
+          <ResourceActionDock
+            editLabel="Edit consultation"
+            onEdit={() => {
+              setShowAddMenu(false);
+              router.push(`/consultation/${id}/edit`);
+            }}
+            editTestID="edit-consultation-button"
+            onAdd={() => setShowAddMenu((visible) => !visible)}
+            addLabel="Add treatment"
+            addMenuExpanded={showAddMenu}
+            addTestID="consultation-add-treatment"
+          />
+        </>
       }
     >
       {(doctor || serviceType || notes) && (
         <View style={styles.details}>
-          {doctor && <InfoRow label="Practitioner" value={doctor} />}
+          {doctor && <InfoRow label="Specialist" value={doctor} />}
           {serviceType && <InfoRow label="Service" value={serviceType} />}
-          {notes && <Text style={styles.notes}>{notes}</Text>}
+          {notes && (
+            <ResourceTextSection
+              title="Notes"
+              text={notes}
+              testID="consultation-notes"
+            />
+          )}
         </View>
       )}
 
       {getConsultationReasonConditionIds(consultation).length > 0 && (
-        <View style={styles.relatedSection} testID="consultation-reasons">
-          <Text style={styles.sectionTitle}>Reasons for visit</Text>
+        <RelatedResourceSection
+          icon={FolderPlus}
+          title="Reasons for visit"
+          testID="consultation-reasons"
+        >
           {relatedConditions
             .filter((condition) =>
               getConsultationReasonConditionIds(consultation).includes(
@@ -161,29 +211,25 @@ export function ViewConsultationView() {
               )
             )
             .map((condition, index) => (
-              <TouchableOpacity
+              <ConditionRelatedRow
                 key={condition.id}
+                condition={condition}
                 testID={
                   index === 0
                     ? 'consultation-related-condition'
                     : `consultation-related-condition-${condition.id}`
                 }
-                accessibilityRole="button"
-                accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
-                style={styles.conditionRow}
                 onPress={() => router.dismissTo(`/condition/${condition.id}`)}
-              >
-                <Text style={styles.conditionTitle}>
-                  {getConditionTitle(condition)}
-                </Text>
-                <ChevronRight color={COLORS.light.muted} size={18} />
-              </TouchableOpacity>
+              />
             ))}
-        </View>
+        </RelatedResourceSection>
       )}
       {Boolean(consultation.diagnosis?.length) && (
-        <View style={styles.relatedSection} testID="consultation-diagnoses">
-          <Text style={styles.sectionTitle}>Diagnoses</Text>
+        <RelatedResourceSection
+          icon={FolderPlus}
+          title="Diagnoses"
+          testID="consultation-diagnoses"
+        >
           {consultation.diagnosis?.flatMap((diagnosis, index) =>
             (diagnosis.condition || []).map((value, valueIndex) => {
               const id = value.reference?.reference?.startsWith('Condition/')
@@ -199,55 +245,33 @@ export function ViewConsultationView() {
                   ? getConditionTitle(condition)
                   : value.reference?.display);
               if (!label) return null;
-              const contents = (
-                <>
-                  <Text style={styles.conditionTitle}>{label}</Text>
-                  {value.concept?.coding?.map((coding, codingIndex) => (
-                    <Text key={codingIndex} style={styles.notes}>
-                      {[coding.system, coding.code, coding.display]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Text>
-                  ))}
-                </>
-              );
-              return condition ? (
-                <TouchableOpacity
+              return (
+                <RelatedResourceRow
                   key={`${index}-${valueIndex}`}
-                  testID={
-                    index === 0
-                      ? 'consultation-diagnosis-condition'
-                      : `consultation-diagnosis-condition-${id}`
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
-                  style={styles.conditionRow}
-                  onPress={() => router.dismissTo(`/condition/${id}`)}
-                >
-                  <View style={{ flex: 1 }}>{contents}</View>
-                  <ChevronRight color={COLORS.light.muted} size={18} />
-                </TouchableOpacity>
-              ) : (
-                <View
-                  key={`${index}-${valueIndex}`}
-                  testID={`consultation-diagnosis-${index}`}
-                  style={styles.details}
-                >
-                  {contents}
-                </View>
+                  title={label}
+                  meta={(value.concept?.coding || []).map((coding) => ({
+                    text: [coding.system, coding.code, coding.display]
+                      .filter(Boolean)
+                      .join(' · '),
+                  }))}
+                  {...(condition
+                    ? {
+                        testID:
+                          index === 0
+                            ? 'consultation-diagnosis-condition'
+                            : `consultation-diagnosis-condition-${id}`,
+                        accessibilityLabel: `View condition: ${getConditionTitle(condition)}`,
+                        onPress: () => router.dismissTo(`/condition/${id}`),
+                      }
+                    : { testID: `consultation-diagnosis-${index}` })}
+                />
               );
             })
           )}
-        </View>
+        </RelatedResourceSection>
       )}
 
-      {Boolean(id) && (
-        <RelatedResourceList
-          consultationId={id!}
-          linkedTreatments={linkedTreatments}
-          onRefresh={loadData}
-        />
-      )}
+      <RelatedResourceList linkedTreatments={linkedTreatments} />
     </ResourceViewLayout>
   );
 }
@@ -285,37 +309,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
     textAlign: 'right',
-  },
-  notes: {
-    marginTop: 4,
-    fontSize: 14,
-    lineHeight: 21,
-    color: COLORS.light.textSecondary,
-  },
-  relatedSection: {
-    marginTop: 2,
-  },
-  sectionTitle: {
-    marginBottom: 8,
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  conditionRow: {
-    minHeight: 52,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.cardBorder,
-    backgroundColor: COLORS.light.dropdownSeparator,
-  },
-  conditionTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
   },
 });

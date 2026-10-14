@@ -233,7 +233,7 @@ export function setupTestBridge() {
     linkTreatmentToConsultation,
     unlinkTreatmentFromConsultation,
     seedTreatment: async (
-      input: Omit<TreatmentInput, 'authoredDate' | 'documenterName'> & {
+      input: Omit<TreatmentInput, 'authoredDate'> & {
         authoredOn?: string;
       }
     ) => {
@@ -242,7 +242,6 @@ export function setupTestBridge() {
         id: input.id,
         patientId,
         consultationId: input.consultationId,
-        documenterName: 'Synthetic test documenter',
         title: input.title,
         intent: input.intent || 'plan',
         status: input.status || 'unknown',
@@ -250,8 +249,9 @@ export function setupTestBridge() {
           input.authoredOn || new Date().toISOString().split('T')[0],
         dosageInstructions: input.dosageInstructions,
         reason: input.reason,
-        reasonConditionId: input.reasonConditionId,
+        reasonConditionIds: input.reasonConditionIds,
         notes: input.notes,
+        requesterName: input.requesterName,
       });
     },
   };

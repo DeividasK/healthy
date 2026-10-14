@@ -1,6 +1,7 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
+  Clock,
   FileText,
   FolderPlus,
   Pencil,
@@ -468,7 +469,16 @@ export function HomeView() {
                       </Text>
 
                       {treatInstructions ? (
-                        <View style={styles.cardNoteContainer}>
+                        <View
+                          style={styles.instructionsRow}
+                          testID={`treatment-card-instructions-${treatId}`}
+                        >
+                          <Clock
+                            color={COLORS.light.iconMuted}
+                            size={14}
+                            accessibilityLabel="Dosage"
+                            style={styles.instructionsIcon}
+                          />
                           <Text
                             style={styles.cardInstructionsText}
                             numberOfLines={2}
@@ -1027,7 +1037,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
+  instructionsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 6,
+  },
+  instructionsIcon: {
+    marginTop: 2,
+  },
   cardInstructionsText: {
+    flex: 1,
     fontSize: 13,
     color: COLORS.light.foreground,
     lineHeight: 18,

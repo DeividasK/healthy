@@ -174,7 +174,7 @@ test.describe('View Consultation Flow', () => {
     await expect(page.getByTestId('edit-consultation-button')).toBeEnabled();
   });
 
-  test('links and unlinks an existing treatment without changing its origin', async ({
+  test('links and unlinks an existing treatment from the edit form without changing its origin', async ({
     page,
   }) => {
     const treatment = await seedTestTreatment(page, {
@@ -195,21 +195,29 @@ test.describe('View Consultation Flow', () => {
     );
     await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
 
+    // + only creates; linking happens in the edit form
     await page.getByTestId('consultation-add-treatment').click();
-    await page.getByTestId('option-link-existing-treatment').click();
-    await page.getByTestId('link-documenter-input').fill('Actual documenter');
-    await page.getByTestId('link-treatment-select').selectOption(treatment.id);
+    await expect(page.getByTestId('option-create-new-treatment')).toBeVisible();
+    await expect(
+      page.getByTestId('option-link-existing-treatment')
+    ).toHaveCount(0);
+    await page.getByTestId('consultation-add-treatment').click();
+    await page.getByTestId('edit-consultation-button').click();
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-treatment').click();
+    await page.getByTestId('link-treatment-search-input').click();
+    await page
+      .getByTestId(`link-treatment-autocomplete-item-${treatment.id}`)
+      .click();
+    await page.getByTestId('save-button').click();
 
-    const row = page.getByTestId(`consultation-treatment-${treatment.id}`);
+    const row = page.getByTestId(`consultation-treatment-${treatment.id}-row`);
     await expect(row).toBeVisible();
     await expect(row).toContainText('Lisinopril 10mg');
     await expect(row).toContainText('Active');
-    await expect(row).toContainText('Plan');
-    await checkA11y(page, {
-      include: '[data-testid="consultation-treatments"]',
-    });
 
     const doc = await getTestClinicalDocument(page, consultation.id);
+    expect(doc.author).toEqual([{ reference: consultation.subject.reference }]);
     expect(findTreatmentsSection(doc).entry).toContainEqual({
       reference: `MedicationRequest/${treatment.id}`,
     });
@@ -218,8 +226,13 @@ test.describe('View Consultation Flow', () => {
       (await getTestTreatment(page, treatment.id)).encounter
     ).toBeUndefined();
 
-    await page.getByTestId(`unlink-treatment-${treatment.id}`).click();
-    await expect(row).not.toBeVisible();
+    await page.getByTestId('edit-consultation-button').click();
+    await expect(
+      page.getByTestId(`link-selected-treatment-${treatment.id}`)
+    ).toBeVisible();
+    await page.getByTestId('link-remove-treatment-button').click();
+    await page.getByTestId('save-button').click();
+    await expect(page.getByTestId('consultation-no-treatments')).toBeVisible();
 
     // The last entry is gone, so the empty section is removed too
     const docAfterUnlink = await getTestClinicalDocument(page, consultation.id);

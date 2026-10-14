@@ -262,6 +262,37 @@ export async function fetchMedicationRequestsByPatientId(
 }
 
 /**
+ * Fetches a patient's MedicationRequests whose `reason` references the
+ * Condition, newest first.
+ */
+export async function fetchMedicationRequestsByReasonConditionId(
+  conditionId: string,
+  patientId: string
+): Promise<MedicationRequest[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    fhir_json: string;
+    updated_at: string;
+  }>(
+    `SELECT fhir_json, updated_at FROM medication_requests
+     WHERE patient_id = ?
+     AND EXISTS (
+       SELECT 1 FROM json_each(fhir_json, '$.reason')
+       WHERE json_extract(value, '$.reference.reference') = ?
+     )
+     ORDER BY authored_on DESC, created_at DESC;`,
+    [patientId, `Condition/${conditionId}`]
+  );
+  return rows.map((r) => {
+    const req: MedicationRequest = JSON.parse(r.fhir_json);
+    if (!req.meta?.lastUpdated && r.updated_at) {
+      req.meta = { ...req.meta, lastUpdated: r.updated_at };
+    }
+    return req;
+  });
+}
+
+/**
  * Fetches all MedicationRequest records across all patients (or filtered by patientId).
  */
 export async function fetchAllMedicationRequestRecords(

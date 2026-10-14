@@ -1,17 +1,14 @@
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Alert,
-  Platform,
-} from 'react-native';
+import { StyleSheet, Text, View, Alert, Platform } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
+import { FolderPlus, Pencil, Stethoscope, Trash2 } from 'lucide-react-native';
 import type { MedicationRequest, Encounter, Condition } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { ResourceTextSection } from '@/src/components/ResourceTextSection';
+import { RelatedResourceSection } from '@/src/components/RelatedResourceSection';
+import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
+import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
@@ -33,9 +30,7 @@ import {
   getTreatmentInstructions,
   getTreatmentNotes,
   getTreatmentReason,
-  getTreatmentReasonConditionId,
-  getConsultationTitle,
-  getConditionTitle,
+  getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 
@@ -66,9 +61,7 @@ function TreatmentForPatient({
   const [treatment, setTreatment] = useState<MedicationRequest | null>(null);
   const [originConsultation, setOriginConsultation] =
     useState<Encounter | null>(null);
-  const [reasonCondition, setReasonCondition] = useState<Condition | null>(
-    null
-  );
+  const [reasonConditions, setReasonConditions] = useState<Condition[]>([]);
   const [linkedConsultations, setLinkedConsultations] = useState<Encounter[]>(
     []
   );
@@ -92,7 +85,7 @@ function TreatmentForPatient({
         setNotFound(true);
         setTreatment(null);
         setOriginConsultation(null);
-        setReasonCondition(null);
+        setReasonConditions([]);
         setLinkedConsultations([]);
         return;
       }
@@ -112,16 +105,18 @@ function TreatmentForPatient({
       if (sequence !== loadSequence.current) return;
       setOriginConsultation(origin);
 
-      // Load reason condition if any
-      const reasonCondId = getTreatmentReasonConditionId(treat);
-      let condition: Condition | null = null;
-      if (reasonCondId) {
-        condition = await getConditionById(reasonCondId, activePatientId).catch(
-          () => null
-        );
-      }
+      // Load every associated condition that still exists
+      const conditions = await Promise.all(
+        getTreatmentReasonConditionIds(treat).map((conditionId) =>
+          getConditionById(conditionId, activePatientId).catch(() => null)
+        )
+      );
       if (sequence !== loadSequence.current) return;
-      setReasonCondition(condition);
+      setReasonConditions(
+        conditions.filter((condition): condition is Condition =>
+          Boolean(condition)
+        )
+      );
 
       // Load other consultations whose documents link this treatment
       const otherConsIds = (
@@ -241,6 +236,13 @@ function TreatmentForPatient({
       >
         <View style={styles.details}>
           <InfoRow label="Intent" value={intentStr} testID="treatment-intent" />
+          {Boolean(treatment.requester?.display) && (
+            <InfoRow
+              label="Requester (Specialist)"
+              value={treatment.requester!.display!}
+              testID="treatment-requester"
+            />
+          )}
           {Boolean(reasonText) && (
             <InfoRow
               label="Reason"
@@ -248,116 +250,75 @@ function TreatmentForPatient({
               testID="treatment-reason-section"
             />
           )}
-          {reasonCondition && (
-            <View
-              style={styles.infoRow}
-              testID="treatment-reason-condition-section"
-            >
-              <Text style={styles.infoLabel}>Reason Condition</Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={`View condition: ${getConditionTitle(reasonCondition)}`}
-                onPress={() =>
-                  router.dismissTo(`/condition/${reasonCondition.id}`)
-                }
-              >
-                <Text style={[styles.infoValue, styles.linkText]}>
-                  {getConditionTitle(reasonCondition)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
           {Boolean(instructions) && (
-            <View
-              style={styles.sectionContainer}
+            <ResourceTextSection
+              title="Dosage Instructions"
+              text={instructions!}
               testID="treatment-instructions-section"
-            >
-              <Text style={styles.sectionTitle}>Dosage Instructions</Text>
-              <Text
-                style={styles.instructionsText}
-                testID="treatment-instructions"
-              >
-                {instructions}
-              </Text>
-            </View>
+              textTestID="treatment-instructions"
+            />
           )}
-
           {Boolean(notes) && (
-            <View
-              style={styles.sectionContainer}
+            <ResourceTextSection
+              title="Notes"
+              text={notes!}
               testID="treatment-notes-section"
-            >
-              <Text style={styles.sectionTitle}>Notes</Text>
-              <Text style={styles.notesText} testID="treatment-notes">
-                {notes}
-              </Text>
-            </View>
-          )}
-
-          {Boolean(originConsultation) && (
-            <View
-              style={styles.sectionContainer}
-              testID="treatment-origin-consultation"
-            >
-              <Text style={styles.sectionTitle}>Originating Consultation</Text>
-              <TouchableOpacity
-                style={styles.consultationCard}
-                testID="origin-consultation-link"
-                accessibilityRole="button"
-                accessibilityLabel={`View consultation: ${getConsultationTitle(originConsultation!)}`}
-                onPress={() =>
-                  router.dismissTo(`/consultation/${originConsultation!.id}`)
-                }
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.consultationCardTitle}>
-                    {getConsultationTitle(originConsultation!)}
-                  </Text>
-                  {Boolean(originConsultation!.actualPeriod?.start) && (
-                    <Text style={styles.consultationCardDate}>
-                      {formatDisplayDate(
-                        originConsultation!.actualPeriod!.start!
-                      )}
-                    </Text>
-                  )}
-                </View>
-                <ChevronRight color={COLORS.light.muted} size={18} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {linkedConsultations.length > 0 && (
-            <View
-              style={styles.sectionContainer}
-              testID="treatment-linked-consultations"
-            >
-              <Text style={styles.sectionTitle}>Linked Consultations</Text>
-              {linkedConsultations.map((cons) => (
-                <TouchableOpacity
-                  key={cons.id}
-                  style={styles.consultationCard}
-                  testID={`linked-consultation-${cons.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View consultation: ${getConsultationTitle(cons)}`}
-                  onPress={() => router.dismissTo(`/consultation/${cons.id}`)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.consultationCardTitle}>
-                      {getConsultationTitle(cons)}
-                    </Text>
-                    {Boolean(cons.actualPeriod?.start) && (
-                      <Text style={styles.consultationCardDate}>
-                        {formatDisplayDate(cons.actualPeriod!.start!)}
-                      </Text>
-                    )}
-                  </View>
-                  <ChevronRight color={COLORS.light.muted} size={18} />
-                </TouchableOpacity>
-              ))}
-            </View>
+              textTestID="treatment-notes"
+            />
           )}
         </View>
+
+        {reasonConditions.length > 0 && (
+          <RelatedResourceSection
+            icon={FolderPlus}
+            title="Associated Conditions"
+            testID="treatment-reason-conditions-section"
+          >
+            {reasonConditions.map((condition) => (
+              <ConditionRelatedRow
+                key={condition.id}
+                condition={condition}
+                testID={`treatment-condition-${condition.id}`}
+                onPress={() => router.dismissTo(`/condition/${condition.id}`)}
+              />
+            ))}
+          </RelatedResourceSection>
+        )}
+
+        {originConsultation && (
+          <RelatedResourceSection
+            icon={Stethoscope}
+            title="Originating Consultation"
+            testID="treatment-origin-consultation"
+          >
+            <ConsultationRelatedRow
+              consultation={originConsultation}
+              testID="origin-consultation-link"
+              onPress={() =>
+                router.dismissTo(`/consultation/${originConsultation.id}`)
+              }
+            />
+          </RelatedResourceSection>
+        )}
+
+        {linkedConsultations.length > 0 && (
+          <RelatedResourceSection
+            icon={Stethoscope}
+            title="Linked Consultations"
+            testID="treatment-linked-consultations"
+          >
+            {linkedConsultations.map((consultation) => (
+              <ConsultationRelatedRow
+                key={consultation.id}
+                consultation={consultation}
+                testID={`linked-consultation-${consultation.id}`}
+                onPress={() =>
+                  router.dismissTo(`/consultation/${consultation.id}`)
+                }
+              />
+            ))}
+          </RelatedResourceSection>
+        )}
       </ResourceViewLayout>
 
       <DeleteConfirmationModal
@@ -415,53 +376,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.light.foreground,
     textAlign: 'right',
-  },
-  linkText: {
-    color: COLORS.light.primary,
-  },
-  sectionContainer: {
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginBottom: 8,
-  },
-  instructionsText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: COLORS.light.foreground,
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 8,
-    padding: 12,
-  },
-  notesText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.light.textSecondary,
-  },
-  consultationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  consultationCardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  consultationCardDate: {
-    fontSize: 12,
-    color: COLORS.light.mutedForeground,
-    marginTop: 2,
   },
 });

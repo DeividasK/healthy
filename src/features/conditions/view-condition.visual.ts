@@ -5,6 +5,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Condition View - Visual Regression', () => {
@@ -49,6 +50,14 @@ test.describe('View Condition View - Visual Regression', () => {
       date: '2026-10-04',
       notes: 'MRI recommended for ligament check.',
       status: 'completed',
+    });
+    await seedTestTreatment(page, {
+      id: 'treat-cond-view-visual',
+      title: 'Ibuprofen 400mg',
+      status: 'active',
+      authoredOn: '2026-10-04',
+      reasonConditionIds: [cond.id],
+      requesterName: 'Dr. Sarah Connor',
     });
 
     await page.goto(`/condition/${cond.id}`);

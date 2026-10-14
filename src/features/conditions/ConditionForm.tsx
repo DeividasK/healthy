@@ -29,6 +29,11 @@ import {
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { AddOptionsModal } from '@/src/components/AddOptionsModal';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useSync } from '@/src/context/SyncContext';
@@ -124,7 +129,12 @@ export interface ConditionFormProps {
   initialValues?: Partial<ConditionFormValues>;
   isEdit?: boolean;
   onDelete?: () => Promise<void>;
-  onSave: (values: ConditionInput) => Promise<void>;
+  onSave: (
+    values: ConditionInput,
+    links: Record<string, LinkSelection>
+  ) => Promise<void>;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 function showAlert(title: string, message: string) {
@@ -140,8 +150,10 @@ export function ConditionForm({
   isEdit = false,
   onSave,
   onDelete,
+  linkFields = [],
 }: ConditionFormProps) {
   const router = useRouter();
+  const links = useLinkFields(linkFields);
   const { triggerSync } = useSync();
 
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -272,7 +284,7 @@ export function ConditionForm({
           Object.keys(baseline) as (keyof ConditionInput)[]
         ).filter((key) => normalize(values[key]) !== normalize(baseline[key]));
       }
-      await onSave(values);
+      await onSave(values, links.values);
 
       // Trigger automatic background sync
       triggerSync().catch((err) =>
@@ -392,6 +404,7 @@ export function ConditionForm({
       onPress: () => setShowNotes(true),
     });
   }
+  plusMenuOptions.push(...links.menuOptions);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -655,6 +668,8 @@ export function ConditionForm({
               }}
             />
           )}
+
+          {links.fields}
         </ScrollView>
 
         {/* Bottom Save Action */}

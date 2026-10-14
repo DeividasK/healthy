@@ -5,8 +5,8 @@ type Intent = MedicationRequest['intent'];
 type Status = MedicationRequest['status'];
 
 const INTENT_LABELS: Record<Intent, { full: string; short: string }> = {
-  plan: { full: 'Recommendation / Plan', short: 'Plan' },
-  order: { full: 'Prescription / Order', short: 'Prescription' },
+  plan: { full: 'Recommendation', short: 'Plan' },
+  order: { full: 'Prescription', short: 'Prescription' },
   proposal: { full: 'Proposal', short: 'Proposal' },
   'original-order': { full: 'Original order', short: 'Original order' },
   'reflex-order': { full: 'Reflex order', short: 'Reflex order' },

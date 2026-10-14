@@ -55,8 +55,9 @@ export interface SeedTreatmentOptions {
   authoredOn?: string;
   dosageInstructions?: string;
   reason?: string;
-  reasonConditionId?: string;
+  reasonConditionIds?: string[];
   notes?: string;
+  requesterName?: string;
 }
 
 /**

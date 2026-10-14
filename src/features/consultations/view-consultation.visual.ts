@@ -42,23 +42,10 @@ test.describe('View Consultation - Visual Regression', () => {
       consultationId: consultation.id,
       dosageInstructions: 'Complete original instructions.',
     });
-    await seedTestTreatment(page, {
-      id: 'available-visual-treatment',
-      title: 'Existing treatment to link',
-    });
     await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-title').waitFor();
     await takeSnapshot(page, 'Consultation View - Details', testInfo);
     await page.setViewportSize({ width: 1280, height: 900 });
     await takeSnapshot(page, 'Consultation View - Wide layout', testInfo);
-    await page.setViewportSize({ width: 360, height: 740 });
-    await page.getByTestId('consultation-add-treatment').click();
-    await page.getByTestId('option-link-existing-treatment').click();
-    await page.getByTestId('link-treatment-select').waitFor();
-    await takeSnapshot(
-      page,
-      'Consultation View - Native treatment selection',
-      testInfo
-    );
   });
 });

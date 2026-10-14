@@ -21,7 +21,7 @@ test.describe('Edit Treatment - Visual Regression', () => {
       dosageInstructions:
         'Take 1 capsule by mouth every 8 hours with meals for 10 days.\nFinish all medication even if feeling better.',
       reason: 'Sinus infection',
-      reasonConditionId: condition.id,
+      reasonConditionIds: [condition.id],
       notes: 'No penicillin allergies reported.',
     });
 

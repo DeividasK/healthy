@@ -7,11 +7,13 @@ import {
   insertMedicationRequestRecord,
   fetchMedicationRequestById,
   fetchMedicationRequestsByPatientId,
+  fetchMedicationRequestsByReasonConditionId,
   deleteMedicationRequestRecord,
 } from './treatmentsRepository';
 import {
   fetchClinicalDocumentByConsultationId,
   insertClinicalDocumentRecord,
+  fetchConsultationIdsReferencingResource,
 } from '@/src/features/consultations/clinicalDocumentsRepository';
 import { fetchConsultationById } from '@/src/features/consultations/consultationsRepository';
 import {
@@ -22,6 +24,7 @@ import {
   getTreatmentInstructions,
   getTreatmentReason,
   getTreatmentNotes,
+  getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 
 export interface TreatmentInput {
@@ -34,10 +37,11 @@ export interface TreatmentInput {
   authoredDate?: string; // ISO date YYYY-MM-DD or date-time with timezone
   dosageInstructions?: string | null; // Text regimen instructions
   reason?: string | null; // Indication / reason text
-  /** Indication Condition ID; null removes the link, undefined keeps it. */
-  reasonConditionId?: string | null;
+  /** Associated Condition IDs; [] removes all links, undefined keeps them. */
+  reasonConditionIds?: string[];
   notes?: string | null;
-  documenterName?: string;
+  /** Who ordered or recommended it; null/empty removes, undefined keeps. */
+  requesterName?: string | null;
 }
 
 /** LOINC section code for medications in clinical documents (IPS, C-CDA). */
@@ -121,7 +125,16 @@ export async function createOrUpdateTreatment(
       dosageInstruction: existing?.dosageInstruction,
       reason: existing?.reason,
       note: existing?.note,
+      requester: existing?.requester,
     };
+
+    if (input.requesterName !== undefined) {
+      const name = input.requesterName?.trim();
+      // An unchanged name keeps the existing reference intact.
+      if (!name) delete medicationRequest.requester;
+      else if (name !== existing?.requester?.display)
+        medicationRequest.requester = { display: name };
+    }
 
     // Omission means unchanged; null/empty text explicitly clears only the
     // exposed text, retaining structured dosage and coded reason information.
@@ -137,25 +150,44 @@ export async function createOrUpdateTreatment(
         ? dosages
         : undefined;
     }
-    if (input.reason !== undefined || input.reasonConditionId !== undefined) {
-      const first = { ...existing?.reason?.[0] };
-      const concept = { ...first.concept };
-      if (trimmedReason) concept.text = trimmedReason;
-      else if (input.reason !== undefined) delete concept.text;
-      if (Object.keys(concept).length) first.concept = concept;
-      else delete first.concept;
-      if (input.reasonConditionId) {
-        first.reference = {
-          ...first.reference,
-          reference: `Condition/${input.reasonConditionId}`,
-        };
-      } else if (input.reasonConditionId === null) {
-        delete first.reference;
+    if (input.reason !== undefined || input.reasonConditionIds !== undefined) {
+      let reasons = [...(existing?.reason || [])];
+      // The free-text reason lives on the first entry's concept.
+      if (input.reason !== undefined) {
+        const first = { ...reasons[0] };
+        const concept = { ...first.concept };
+        if (trimmedReason) concept.text = trimmedReason;
+        else delete concept.text;
+        if (Object.keys(concept).length) first.concept = concept;
+        else delete first.concept;
+        reasons = [
+          ...(Object.keys(first).length ? [first] : []),
+          ...reasons.slice(1),
+        ];
       }
-      const reasons = [
-        ...(Object.keys(first).length ? [first] : []),
-        ...(existing?.reason?.slice(1) || []),
-      ];
+      // Each associated Condition is one reference. Only Condition links are
+      // editable; other references and kept entries stay as they were.
+      if (input.reasonConditionIds !== undefined) {
+        const selected = new Set(input.reasonConditionIds);
+        const kept = new Set<string>();
+        reasons = reasons.flatMap((entry) => {
+          const ref = entry.reference?.reference;
+          if (!ref?.startsWith('Condition/')) return [entry];
+          const conditionId = ref.slice(10);
+          if (selected.has(conditionId) && !kept.has(conditionId)) {
+            kept.add(conditionId);
+            return [entry];
+          }
+          const { reference: _removed, ...rest } = entry;
+          return Object.keys(rest).length ? [rest] : [];
+        });
+        for (const conditionId of selected) {
+          if (!kept.has(conditionId))
+            reasons.push({
+              reference: { reference: `Condition/${conditionId}` },
+            });
+        }
+      }
       medicationRequest.reason = reasons.length ? reasons : undefined;
     }
     if (input.notes !== undefined) {
@@ -200,8 +232,7 @@ export async function createOrUpdateTreatment(
         treatId,
         input.consultationId,
         patientId,
-        true,
-        input.documenterName
+        true
       );
     }
 
@@ -241,6 +272,71 @@ export async function getAllTreatments(
 }
 
 /**
+ * Fetches the patient's treatments associated with a condition.
+ */
+export async function getTreatmentsByConditionId(
+  conditionId: string,
+  patientId: string
+): Promise<MedicationRequest[]> {
+  return await fetchMedicationRequestsByReasonConditionId(
+    conditionId,
+    patientId
+  );
+}
+
+/**
+ * The patient's treatments as link options.
+ */
+export async function getTreatmentLinkOptions(
+  patientId: string
+): Promise<{ id: string; label: string }[]> {
+  return (await fetchMedicationRequestsByPatientId(patientId)).flatMap(
+    (treatment) =>
+      treatment.id
+        ? [{ id: treatment.id, label: getTreatmentTitle(treatment) }]
+        : []
+  );
+}
+
+/**
+ * Associates a treatment with a condition, or removes the association.
+ */
+export async function setTreatmentConditionLink(
+  treatmentId: string,
+  conditionId: string,
+  patientId: string,
+  linked: boolean
+): Promise<void> {
+  const treatment = await fetchMedicationRequestById(treatmentId, patientId);
+  if (!treatment) throw new Error(`Treatment ${treatmentId} not found`);
+  const ids = getTreatmentReasonConditionIds(treatment);
+  if (ids.includes(conditionId) === linked) return;
+  await createOrUpdateTreatment({
+    id: treatmentId,
+    patientId,
+    title: getTreatmentTitle(treatment),
+    reasonConditionIds: linked
+      ? [...ids, conditionId]
+      : ids.filter((id) => id !== conditionId),
+  });
+}
+
+/**
+ * IDs of the consultations whose documents list the treatment.
+ */
+export async function getConsultationIdsLinkingTreatment(
+  treatmentId: string,
+  patientId: string
+): Promise<string[]> {
+  return (
+    await fetchConsultationIdsReferencingResource(
+      `MedicationRequest/${treatmentId}`,
+      patientId
+    )
+  ).filter(Boolean);
+}
+
+/**
  * Deletes a treatment and cleans all references in consultation Compositions.
  */
 export async function deleteTreatment(
@@ -257,8 +353,7 @@ export async function deleteTreatment(
 export async function linkTreatmentToConsultation(
   treatmentId: string,
   consultationId: string,
-  patientId: string = DEFAULT_PATIENT_ID,
-  documenterName?: string
+  patientId: string = DEFAULT_PATIENT_ID
 ): Promise<void> {
   const treatment = await fetchMedicationRequestById(treatmentId, patientId);
   if (!treatment) {
@@ -274,8 +369,7 @@ export async function linkTreatmentToConsultation(
       treatmentId,
       consultationId,
       patientId,
-      true,
-      documenterName
+      true
     );
   });
 
@@ -345,8 +439,7 @@ async function addTreatmentToComposition(
   treatmentId: string,
   consultationId: string,
   patientId: string,
-  withinTransaction: boolean,
-  documenterName?: string
+  withinTransaction: boolean
 ): Promise<void> {
   const consultation = await fetchConsultationById(consultationId, patientId);
   if (!consultation) {
@@ -370,11 +463,6 @@ async function addTreatmentToComposition(
     return;
 
   const docId = existingDoc?.id || `comp-${Crypto.randomUUID()}`;
-  if (!existingDoc && !documenterName?.trim()) {
-    throw new Error(
-      'Documenter name is required for a new consultation document'
-    );
-  }
 
   const existingSections = existingDoc?.section || [];
   const isTreatmentsCoding = (c: { system?: string; code?: string }) =>
@@ -464,7 +552,8 @@ async function addTreatmentToComposition(
       reference: `Encounter/${consultationId}`,
     },
     date: existingDoc?.date || now,
-    author: existingDoc?.author || [{ display: documenterName!.trim() }],
+    // The patient records this document themselves.
+    author: existingDoc?.author || [{ reference: `Patient/${patientId}` }],
     section: updatedSections,
   };
 

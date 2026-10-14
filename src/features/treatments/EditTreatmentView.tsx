@@ -12,20 +12,32 @@ import {
   getTreatmentById,
   createOrUpdateTreatment,
   deleteTreatment,
+  getConsultationIdsLinkingTreatment,
+  linkTreatmentToConsultation,
+  unlinkTreatmentFromConsultation,
 } from './treatmentService';
 import {
   getTreatmentTitle,
   getTreatmentInstructions,
   getTreatmentNotes,
   getTreatmentReason,
-  getTreatmentReasonConditionId,
+  getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
+import {
+  getConsultationLinkOptions,
+  getDistinctDoctorNames,
+} from '@/src/features/consultations/consultationService';
 import type { Condition } from 'fhir/r5';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useSync } from '@/src/context/SyncContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
+import { Stethoscope } from 'lucide-react-native';
+import {
+  diffLinkIds,
+  type LinkFieldConfig,
+} from '@/src/components/useLinkFields';
 
 export function EditTreatmentView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,6 +66,8 @@ function EditTreatmentForPatient({
   const [initialValues, setInitialValues] =
     useState<TreatmentFormValues | null>(null);
   const [conditions, setConditions] = useState<Condition[]>([]);
+  const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
+  const [specialists, setSpecialists] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
 
@@ -63,12 +77,31 @@ function EditTreatmentForPatient({
     let isMounted = true;
     (async () => {
       try {
-        const [treatment, patientConditions] = await Promise.all([
+        const [
+          treatment,
+          patientConditions,
+          knownSpecialists,
+          consultationOptions,
+          linkedConsultationIds,
+        ] = await Promise.all([
           getTreatmentById(id, activePatientId),
           getAllConditions(activePatientId),
+          getDistinctDoctorNames(activePatientId),
+          getConsultationLinkOptions(activePatientId),
+          getConsultationIdsLinkingTreatment(id, activePatientId),
         ]);
         if (!isMounted) return;
         setConditions(patientConditions);
+        setSpecialists(knownSpecialists);
+        setLinkFields([
+          {
+            type: 'consultation',
+            label: 'Consultations',
+            icon: Stethoscope,
+            options: consultationOptions,
+            initialIds: linkedConsultationIds,
+          },
+        ]);
         if (!treatment) {
           setNotFound(true);
           return;
@@ -91,8 +124,9 @@ function EditTreatmentForPatient({
           originalAuthoredOn: treatment.authoredOn,
           dosageInstructions: getTreatmentInstructions(treatment) || '',
           reason: getTreatmentReason(treatment) || '',
-          reasonConditionId: getTreatmentReasonConditionId(treatment),
+          reasonConditionIds: getTreatmentReasonConditionIds(treatment),
           notes: getTreatmentNotes(treatment) || '',
+          requesterName: treatment.requester?.display || '',
         });
       } catch (err) {
         console.error('Failed to load treatment for editing:', err);
@@ -135,10 +169,23 @@ function EditTreatmentForPatient({
       authoredDate: formattedDate,
       dosageInstructions: values.dosageInstructions,
       reason: values.reason,
-      reasonConditionId: values.reasonConditionId,
+      reasonConditionIds: values.reasonConditionIds,
       notes: values.notes,
+      requesterName: values.requesterName,
       patientId: activePatientId,
     });
+    const changes = diffLinkIds(
+      linkFields[0].initialIds,
+      values.links?.consultation.ids || []
+    );
+    for (const consultationId of changes.added)
+      await linkTreatmentToConsultation(id, consultationId, activePatientId);
+    for (const consultationId of changes.removed)
+      await unlinkTreatmentFromConsultation(
+        id,
+        consultationId,
+        activePatientId
+      );
 
     triggerSync().catch((err) =>
       console.warn('Background sync failed on edit treatment:', err)
@@ -148,11 +195,8 @@ function EditTreatmentForPatient({
       (document.activeElement as HTMLElement)?.blur?.();
     }
 
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace(`/treatment/${id}`);
-    }
+    // Return to the treatment, including when the form was opened directly.
+    router.dismissTo(`/treatment/${id}`);
   };
 
   const handleDelete = async () => {
@@ -168,6 +212,8 @@ function EditTreatmentForPatient({
     <TreatmentForm
       initialValues={initialValues}
       conditions={conditions}
+      specialistSuggestions={specialists}
+      linkFields={linkFields}
       onSubmit={handleSubmit}
       onDelete={handleDelete}
       isEditing

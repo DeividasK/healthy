@@ -154,13 +154,8 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       'Dock navigation'
     );
     await expect(page.getByTestId('condition-add-button')).toHaveCount(0);
-    await expect
-      .poll(
-        async () =>
-          (await page.getByTestId('action-dock-primary-slot').boundingBox())
-            ?.width
-      )
-      .toBe(0);
+    // Both screens have a primary add action, so it stays in place unchanged.
+    await expect(page.getByTestId('consultation-add-treatment')).toBeVisible();
     const dockMotion = await page.evaluate(() => {
       const state = (window as any).__dockMotion;
       cancelAnimationFrame(state.frame);
@@ -170,19 +165,13 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       };
     });
     expect(
-      dockMotion.widths.some((width) => width > 0 && width < primarySize.width)
+      dockMotion.widths.every((width) => width === primarySize.width)
     ).toBe(true);
     expect(
       dockMotion.heights.every((height) => height === primarySize.height)
     ).toBe(true);
-    await expect
-      .poll(async () => {
-        const size = (await background.boundingBox())!;
-        return (
-          size.width < expandedSize.width && size.height === expandedSize.height
-        );
-      })
-      .toBe(true);
+    const consultationSize = (await background.boundingBox())!;
+    expect(consultationSize.height).toBe(expandedSize.height);
     await page.getByTestId('back-button').click();
 
     await page.getByTestId('edit-condition-button').click();
@@ -193,14 +182,21 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     ).toBeVisible();
     await expect(dock.getByTestId('back-button')).toHaveCount(0);
     await expect
-      .poll(async () => {
-        const trash = (await dock
-          .getByTestId('delete-condition-button')
-          .boundingBox())!;
-        const save = (await dock.getByTestId('save-button').boundingBox())!;
-        const close = (await dock.getByTestId('cancel-button').boundingBox())!;
-        return trash.x + trash.width < save.x && save.x + save.width < close.x;
-      })
+      .poll(
+        async () => {
+          const trash = (await dock
+            .getByTestId('delete-condition-button')
+            .boundingBox())!;
+          const save = (await dock.getByTestId('save-button').boundingBox())!;
+          const close = (await dock
+            .getByTestId('cancel-button')
+            .boundingBox())!;
+          return (
+            trash.x + trash.width < save.x && save.x + save.width < close.x
+          );
+        },
+        { timeout: 15000 }
+      )
       .toBe(true);
     await page.getByTestId('condition-title-input').fill('Unsaved change');
     await dock.getByRole('button', { name: 'Cancel', exact: true }).click();

@@ -9,6 +9,13 @@ import { FormField } from '@/src/components/FormField';
 import type { Condition, MedicationRequest } from 'fhir/r5';
 import { FileText } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { SpecialistField } from '@/src/components/SpecialistField';
+import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -24,12 +31,14 @@ export interface TreatmentFormValues {
   status: MedicationRequest['status'];
   authoredDate?: Date;
   originalAuthoredOn?: string;
-  documenterName?: string;
+  requesterName?: string | null;
   dosageInstructions?: string | null;
   reason?: string | null;
-  /** Condition the treatment is indicated for; null when not linked. */
-  reasonConditionId?: string | null;
+  /** Conditions the treatment is associated with. */
+  reasonConditionIds?: string[];
   notes?: string | null;
+  /** Selected links to other resources, keyed by resource type. */
+  links?: Record<string, LinkSelection>;
 }
 
 export interface TreatmentFormProps {
@@ -39,7 +48,10 @@ export interface TreatmentFormProps {
   onSubmit: (values: TreatmentFormValues) => Promise<void>;
   onDelete?: () => Promise<void>;
   isEditing?: boolean;
-  requireDocumenter?: boolean;
+  /** Known specialists offered as requester suggestions. */
+  specialistSuggestions?: string[];
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 export function TreatmentForm({
@@ -48,8 +60,10 @@ export function TreatmentForm({
   onSubmit,
   onDelete,
   isEditing = false,
-  requireDocumenter = false,
+  specialistSuggestions = [],
+  linkFields = [],
 }: TreatmentFormProps) {
+  const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
   const [intent, setIntent] = useState<MedicationRequest['intent']>(
     initialValues?.intent || 'plan'
@@ -64,50 +78,58 @@ export function TreatmentForm({
     initialValues?.dosageInstructions || ''
   );
   const [reason, setReason] = useState(initialValues?.reason || '');
-  const [reasonConditionId, setReasonConditionId] = useState(
-    initialValues?.reasonConditionId || ''
+  const [reasonConditionIds, setReasonConditionIds] = useState(
+    initialValues?.reasonConditionIds || []
   );
   const [notes, setNotes] = useState(initialValues?.notes || '');
+  const [requesterName, setRequesterName] = useState(
+    initialValues?.requesterName || ''
+  );
   const [visibleFields, setVisibleFields] = useState({
+    requester: Boolean(initialValues?.requesterName),
     instructions: Boolean(initialValues?.dosageInstructions),
     reason: Boolean(initialValues?.reason),
-    reasonCondition: Boolean(initialValues?.reasonConditionId),
+    reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
     notes: Boolean(initialValues?.notes),
   });
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [documenterName, setDocumenterName] = useState('');
   const optionalFields = [
+    { id: 'requester' as const, label: 'Requester (Specialist)' },
     { id: 'instructions' as const, label: 'Dosage Instructions' },
     { id: 'reason' as const, label: 'Reason' },
-    { id: 'reasonCondition' as const, label: 'Reason Condition' },
+    { id: 'reasonCondition' as const, label: 'Associated Conditions' },
     { id: 'notes' as const, label: 'Notes' },
   ];
-  const conditionOptions = [
-    { id: '', label: 'Select condition' },
-    ...conditions.map((condition) => ({
-      id: condition.id!,
-      label: getConditionTitle(condition),
-    })),
-    // Keep an unresolved existing link visible rather than dropping it.
-    ...(reasonConditionId &&
-    !conditions.some((condition) => condition.id === reasonConditionId)
-      ? [{ id: reasonConditionId, label: reasonConditionId }]
-      : []),
+  const conditionOptions = conditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
+  );
+  const options = [
+    ...optionalFields
+      .filter(({ id }) => !visibleFields[id])
+      .map(({ id, label }) => ({
+        id,
+        label,
+        testID: `menu-add-treatment-${id}`,
+        icon: (
+          <FileText
+            size={20}
+            color={COLORS.light.primary}
+            style={{ marginRight: 12 }}
+          />
+        ),
+        onPress: () =>
+          setVisibleFields((fields) => ({ ...fields, [id]: true })),
+      })),
+    ...links.menuOptions,
   ];
-  const options = optionalFields
-    .filter(({ id }) => !visibleFields[id])
-    .map(({ id, label }) => ({
-      id,
-      label,
-      testID: `menu-add-treatment-${id}`,
-      icon: <FileText size={20} color={COLORS.light.primary} />,
-      onPress: () => setVisibleFields((fields) => ({ ...fields, [id]: true })),
-    }));
   const removeField = (id: keyof typeof visibleFields) => {
     setVisibleFields((fields) => ({ ...fields, [id]: false }));
     if (id === 'instructions') setDosageInstructions('');
     else if (id === 'reason') setReason('');
-    else if (id === 'reasonCondition') setReasonConditionId('');
+    else if (id === 'reasonCondition') setReasonConditionIds([]);
+    else if (id === 'requester') setRequesterName('');
     else setNotes('');
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,10 +139,6 @@ export function TreatmentForm({
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setErrorMessage('Treatment name is required');
-      return;
-    }
-    if (requireDocumenter && !documenterName.trim()) {
-      setErrorMessage('Documenter name is required');
       return;
     }
     setErrorMessage(null);
@@ -140,15 +158,18 @@ export function TreatmentForm({
             : authoredDate.getTime() === initialValues?.authoredDate?.getTime())
             ? undefined
             : authoredDate,
-        documenterName: requireDocumenter ? documenterName.trim() : undefined,
+        requesterName: visibleFields.requester
+          ? requesterName.trim() || null
+          : null,
         dosageInstructions: visibleFields.instructions
           ? dosageInstructions.trim() || null
           : null,
         reason: visibleFields.reason ? reason.trim() || null : null,
-        reasonConditionId: visibleFields.reasonCondition
-          ? reasonConditionId || null
-          : null,
+        reasonConditionIds: visibleFields.reasonCondition
+          ? reasonConditionIds
+          : [],
         notes: visibleFields.notes ? notes.trim() || null : null,
+        links: links.values,
       });
     } catch (err: any) {
       console.error('Failed to save treatment:', err);
@@ -228,24 +249,9 @@ export function TreatmentForm({
             testID="treatment-date-picker"
             id="treatment-date-input"
             name="authoredDate"
+            variant="input"
           />
         </FormField>
-        {requireDocumenter && (
-          <FormField
-            label="Documenter name"
-            nativeID="treatment-documenter-input"
-            required
-            inputProps={{
-              id: 'treatment-documenter-input',
-              nativeID: 'treatment-documenter-input',
-              name: 'documenterName',
-              testID: 'treatment-documenter-input',
-              accessibilityLabel: 'Documenter name',
-              value: documenterName,
-              onChangeText: setDocumenterName,
-            }}
-          />
-        )}
         {optionalFields.map(({ id, label }) => {
           if (!visibleFields[id]) return null;
           const fieldProps = {
@@ -253,22 +259,35 @@ export function TreatmentForm({
             onRemove: () => removeField(id),
             removeTestID: `remove-treatment-${id}-button`,
           };
+          if (id === 'requester') {
+            return (
+              <SpecialistField
+                key={id}
+                label={label}
+                inputID="treatment-requester-input"
+                name="requesterName"
+                value={requesterName}
+                onChangeText={setRequesterName}
+                suggestions={specialistSuggestions}
+                onRemove={fieldProps.onRemove}
+                removeTestID={fieldProps.removeTestID}
+              />
+            );
+          }
           if (id === 'reasonCondition') {
             return (
-              <FormField
+              <LinkedResourcesField
                 key={id}
-                {...fieldProps}
-                nativeID="treatment-reason-condition-select"
-              >
-                <NativeSelect
-                  testID="treatment-reason-condition-select"
-                  name="reasonConditionId"
-                  label={label}
-                  value={reasonConditionId}
-                  options={conditionOptions}
-                  onChange={setReasonConditionId}
-                />
-              </FormField>
+                label={label}
+                searchLabel={`Select ${label.toLowerCase()}`}
+                options={conditionOptions}
+                selectedIds={reasonConditionIds}
+                onChange={setReasonConditionIds}
+                onRemove={fieldProps.onRemove}
+                removeTestID={fieldProps.removeTestID}
+                testID="treatment-reason-conditions-field"
+                idPrefix="treatment-"
+              />
             );
           }
           const [value, onChangeText] =
@@ -297,6 +316,7 @@ export function TreatmentForm({
             />
           );
         })}
+        {links.fields}
       </ScrollView>
       <FloatingAddMenu
         visible={showPlusMenu}
