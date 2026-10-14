@@ -25,7 +25,6 @@ export function buildPatientData(
     familyName: overrides?.familyName ?? 'Doe',
     gender: overrides?.gender ?? 'male',
     birthDate: overrides?.birthDate ?? '1990-01-01',
-    syncAccount: overrides?.syncAccount,
   };
 }
 

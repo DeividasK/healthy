@@ -29,7 +29,6 @@ import {
 } from '@/src/features/consultations/consultationService';
 import type { Condition } from 'fhir/r5';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { Stethoscope } from 'lucide-react-native';
@@ -59,7 +58,6 @@ function EditTreatmentForPatient({
   id: string;
   activePatientId: string;
 }) {
-  const { triggerSync } = useSync();
   const router = useRouter();
 
   const [initialValues, setInitialValues] =
@@ -185,10 +183,6 @@ function EditTreatmentForPatient({
         consultationId,
         activePatientId
       );
-
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on edit treatment:', err)
-    );
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();

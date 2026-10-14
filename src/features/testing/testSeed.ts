@@ -7,7 +7,6 @@ export interface SeedPatientOptions {
   familyName?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   birthDate?: string;
-  syncAccount?: string | null;
 }
 
 export interface SeedConditionOptions {
@@ -109,7 +108,6 @@ export async function seedTestPatient(
         familyName: opts?.familyName || 'Doe',
         gender: opts?.gender,
         birthDate: opts?.birthDate,
-        syncAccount: opts?.syncAccount,
       });
     }, options));
   if (freshPage) {

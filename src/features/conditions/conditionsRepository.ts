@@ -9,7 +9,6 @@ import {
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 /**
  * Persists a Condition record using SQLite.
@@ -18,7 +17,6 @@ import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 export async function insertConditionRecord(
   condition: Condition,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!condition.id) {
@@ -57,15 +55,6 @@ export async function insertConditionRecord(
       throw new Error(
         `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
-    }
-
-    // Last-write-wins: during remote sync, if existing record is newer than or same as incoming change, keep existing
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
     }
 
     await db.runAsync(

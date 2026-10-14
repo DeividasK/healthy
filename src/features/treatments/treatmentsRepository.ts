@@ -2,15 +2,10 @@ import type { MedicationRequest, Composition } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import {
   getTreatmentTitle,
   withoutCompositionEntry,
 } from '@/src/utils/fhirUtils';
-import {
-  recordPendingClinicalResourceDeletion,
-  clearPendingClinicalResourceDeletions,
-} from '@/src/services/syncDeletions';
 
 export const VALID_MEDICATION_REQUEST_STATUSES: MedicationRequest['status'][] =
   [
@@ -43,7 +38,6 @@ export const VALID_MEDICATION_REQUEST_INTENTS: MedicationRequest['intent'][] = [
 export async function insertMedicationRequestRecord(
   request: MedicationRequest,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!request.id) {
@@ -157,15 +151,6 @@ export async function insertMedicationRequestRecord(
       );
     }
 
-    // Last-write-wins for remote sync
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
-    }
-
     await db.runAsync(
       `INSERT INTO medication_requests (
          id, patient_id, consultation_id, display_label, status, intent, authored_on, fhir_json, created_at, updated_at
@@ -191,11 +176,6 @@ export async function insertMedicationRequestRecord(
         now,
         incomingTimestamp,
       ]
-    );
-
-    await clearPendingClinicalResourceDeletions(
-      [{ resourceType: 'MedicationRequest', id: reqId, patientId }],
-      true
     );
     didUpdate = true;
   };
@@ -326,8 +306,7 @@ export async function fetchAllMedicationRequestRecords(
 }
 
 /**
- * Deletes a MedicationRequest record by ID, cleans all references in Compositions,
- * and records a deletion tombstone for remote sync.
+ * Deletes a MedicationRequest record by ID and cleans all references in Compositions.
  */
 export async function deleteMedicationRequestRecord(
   id: string,
@@ -350,13 +329,6 @@ export async function deleteMedicationRequestRecord(
       [id, existing.patient_id]
     );
     if (!result.changes) return;
-
-    await recordPendingClinicalResourceDeletion(
-      'MedicationRequest',
-      id,
-      existing.patient_id,
-      true
-    );
 
     // Clean up all Composition entry references referencing MedicationRequest/id
     const targetRef = `MedicationRequest/${id}`;

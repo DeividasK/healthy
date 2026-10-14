@@ -31,18 +31,28 @@ import {
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
 import {
-  backupToGoogleDrive,
-  restoreFromGoogleDrive,
-  deletePatientFromGoogleDrive,
-  syncWithGoogleDrive,
-} from '@/src/services/syncManager';
+  compactNow,
+  createVault,
+  deleteCloudData,
+  listRestorableProfiles,
+  loadVaultKeys,
+  startSyncingPatient,
+  stopSyncingPatient,
+  syncOnce,
+  unlockVault,
+} from '@/src/features/sync/engine';
 import {
-  getPendingDeletedClinicalResources,
-  clearPendingClinicalResourceDeletions,
-} from '@/src/services/syncDeletions';
+  loadGoogleDriveConfig,
+  saveGoogleDriveConfig,
+} from '@/src/features/sync/googleAccount';
+import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
+import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
-import { createOrUpdatePatient } from '@/src/features/profile/patientService';
+import {
+  createOrUpdatePatient,
+  deletePatient,
+} from '@/src/features/profile/patientService';
 import {
   setActivePatientId,
   getActivePatientId,
@@ -51,8 +61,21 @@ import {
 import { createOrUpdateCondition } from '@/src/features/conditions/conditionService';
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
+import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { CBC_MARKERS } from '@/src/data/cbcMarkers';
 import { convertBiomarkerValue } from '@/src/features/lab-results/biomarkerMeasurements';
+
+async function connectedProvider() {
+  const config = await loadGoogleDriveConfig();
+  if (!config) throw new Error('Test sync is not connected');
+  return createGoogleDriveProvider(config.accessToken);
+}
+
+async function vaultKeys() {
+  const keys = await loadVaultKeys();
+  if (!keys) throw new Error('Test vault is locked');
+  return keys;
+}
 
 async function resolvePatientId(
   explicitId?: string
@@ -79,18 +102,90 @@ export function setupTestBridge() {
     saveEncounter: insertConsultationRecord,
     deleteConsultation: deleteConsultationRecord,
     deleteCondition: deleteConditionRecord,
+    deleteReport: deleteDiagnosticReportRecord,
     saveClinicalDocument: insertClinicalDocumentRecord,
     deleteClinicalDocument: deleteClinicalDocumentRecord,
     clearDatabase: clearAllDatabaseTables,
     exportArchive: exportZipArchive,
     restoreArchive: (bytes: number[]) =>
       restoreFromZipBytes(new Uint8Array(bytes)),
-    backupToGoogleDrive,
-    restoreFromGoogleDrive,
-    deletePatientFromGoogleDrive,
-    syncWithGoogleDrive,
-    getPendingDeletedClinicalResources,
-    clearPendingClinicalResourceDeletions,
+    /** Connects synthetic Google credentials and creates or unlocks the vault. */
+    connectSync: async (
+      options: {
+        phrase?: string;
+        accessToken?: string;
+        userSub?: string;
+        userEmail?: string;
+        /** Creates the vault from this hex secret for deterministic phrases. */
+        secretHex?: string;
+      } = {}
+    ) => {
+      await saveGoogleDriveConfig({
+        accessToken: options.accessToken ?? 'synthetic-token',
+        userSub: options.userSub ?? 'synthetic-google-sub',
+        userEmail: options.userEmail,
+      });
+      const provider = await connectedProvider();
+      const phrase = options.phrase
+        ? (await unlockVault(provider, options.phrase), options.phrase)
+        : await createVault(
+            provider,
+            ...(options.secretHex
+              ? [
+                  Uint8Array.from(options.secretHex.match(/../g)!, (b) =>
+                    parseInt(b, 16)
+                  ),
+                ]
+              : [])
+          );
+      // Like connecting from each profile's sync card.
+      const keys = await vaultKeys();
+      for (const patient of await fetchAllPatients())
+        await startSyncingPatient(provider, keys, patient.id!);
+      return phrase;
+    },
+    syncNow: async () => syncOnce(await connectedProvider(), await vaultKeys()),
+    compactNow: async () =>
+      compactNow(await connectedProvider(), await vaultKeys()),
+    deleteCloudData: async () => deleteCloudData(await connectedProvider()),
+    flushLocalChanges: async () => {
+      const db = await getDb();
+      let flushed = 0;
+      await db.withTransactionAsync(async () => {
+        flushed = await flushLocalChanges(db);
+      });
+      return flushed;
+    },
+    deletePatient: (id: string, deviceOnly = false) =>
+      deletePatient(id, { deviceOnly }),
+    listRestorableProfiles,
+    syncProfile: async (patientId: string) =>
+      startSyncingPatient(
+        await connectedProvider(),
+        await vaultKeys(),
+        patientId
+      ),
+    stopSyncingProfile: async (patientId: string, deleteFromCloud = false) =>
+      stopSyncingPatient(
+        await connectedProvider(),
+        await vaultKeys(),
+        patientId,
+        {
+          deleteFromCloud,
+        }
+      ),
+    /** A device choosing every local and cloud profile, then syncing. */
+    syncAllProfiles: async () => {
+      const provider = await connectedProvider();
+      const keys = await vaultKeys();
+      await syncOnce(provider, keys);
+      const ids = [
+        ...(await fetchAllPatients()).map((patient) => patient.id!),
+        ...(await listRestorableProfiles()).map((p) => p.patientId),
+      ];
+      for (const id of ids) await startSyncingPatient(provider, keys, id);
+      return await syncOnce(provider, keys);
+    },
     rollbackClinicalDocumentDeletion: async (id: string, patientId: string) => {
       const db = await getDb();
       await db.withTransactionAsync(async () => {
@@ -111,7 +206,6 @@ export function setupTestBridge() {
       familyName?: string;
       gender?: 'male' | 'female' | 'other' | 'unknown';
       birthDate?: string;
-      syncAccount?: string | null;
     }) => {
       const patient = await createOrUpdatePatient(input);
       if (patient.id) {

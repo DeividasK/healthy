@@ -33,7 +33,6 @@ import {
 } from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { useSync } from '@/src/context/SyncContext';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import {
@@ -131,7 +130,6 @@ export function ConsultationForm({
 }: ConsultationFormProps) {
   const links = useLinkFields(linkFields);
   const router = useRouter();
-  const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
 
   const statusOptions = useMemo(() => {
@@ -307,10 +305,6 @@ export function ConsultationForm({
           notes: showNotes && notes.trim() ? notes.trim() : undefined,
         },
         links.values
-      );
-
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on consultation change:', err)
       );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {

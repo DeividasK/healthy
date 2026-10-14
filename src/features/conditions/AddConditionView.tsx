@@ -6,12 +6,10 @@ import {
   type ConditionInput,
 } from './conditionService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function AddConditionView() {
   const { activePatientId, isLoading } = useActivePatient();
-  const { triggerSync } = useSync();
 
   if (isLoading) {
     return (
@@ -26,9 +24,6 @@ export function AddConditionView() {
       ...values,
       patientId: activePatientId,
     });
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on add condition:', err)
-    );
   };
 
   return <ConditionForm onSave={handleSave} />;

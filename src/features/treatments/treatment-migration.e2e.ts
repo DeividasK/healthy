@@ -81,7 +81,7 @@ for (const scenario of [
         ),
       };
     });
-    expect(after.version[0].user_version).toBe(11);
+    expect(after.version[0].user_version).toBe(12);
     expect(after.rows).toEqual(before);
     expect(after.dates[0].authored_on).toBe('2026-01-02');
     if (scenario.startsWith('legacy')) {
@@ -152,7 +152,7 @@ for (const scenario of [
     const repeated = await page.evaluate(() =>
       (window as any).__HEALTHY_TEST_BRIDGE__.querySql('PRAGMA user_version')
     );
-    expect(repeated[0].user_version).toBe(11);
+    expect(repeated[0].user_version).toBe(12);
 
     await page.goto('/treatment/add');
     await page

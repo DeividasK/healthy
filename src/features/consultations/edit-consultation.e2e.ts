@@ -146,7 +146,7 @@ test.describe('Edit Consultation Flow', () => {
         await confirmBtn.click();
       });
 
-      await test.step('Verify consultation removed from Condition view and pending deletion persisted', async () => {
+      await test.step('Verify consultation removed from Condition view and its deletion recorded for sync', async () => {
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -157,10 +157,14 @@ test.describe('Edit Consultation Flow', () => {
           page.getByTestId('condition-consultations-section')
         ).toHaveCount(0);
 
-        const pendingDeletions = await page.evaluate(() => {
-          return localStorage.getItem('@healthy_pending_deleted_consultations');
+        const deletions = await page.evaluate(async () => {
+          const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+          await bridge.flushLocalChanges();
+          return await bridge.querySql(
+            "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
+          );
         });
-        expect(pendingDeletions).toContain(consultationId);
+        expect(deletions).toEqual([{ resource_id: consultationId }]);
       });
     }
   );

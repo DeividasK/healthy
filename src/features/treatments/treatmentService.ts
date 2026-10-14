@@ -218,12 +218,7 @@ export async function createOrUpdateTreatment(
       };
     }
 
-    await insertMedicationRequestRecord(
-      medicationRequest,
-      patientId,
-      false,
-      true
-    );
+    await insertMedicationRequestRecord(medicationRequest, patientId, true);
 
     // Only explicit creation/linking changes document membership. Origin is
     // provenance and must not silently restore a link removed by the user.
@@ -404,7 +399,7 @@ export async function unlinkTreatmentFromConsultation(
     },
   };
 
-  await insertClinicalDocumentRecord(updatedComp, patientId, false, false);
+  await insertClinicalDocumentRecord(updatedComp, patientId);
 }
 
 /**
@@ -557,10 +552,5 @@ async function addTreatmentToComposition(
     section: updatedSections,
   };
 
-  await insertClinicalDocumentRecord(
-    composition,
-    patientId,
-    false,
-    withinTransaction
-  );
+  await insertClinicalDocumentRecord(composition, patientId, withinTransaction);
 }

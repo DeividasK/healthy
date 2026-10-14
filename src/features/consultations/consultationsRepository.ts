@@ -10,12 +10,6 @@ import {
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
-import {
-  recordPendingConsultationDeletion,
-  clearPendingConsultationDeletions,
-  recordPendingClinicalResourceDeletion,
-} from '@/src/services/syncDeletions';
 
 /**
  * Persists an Encounter (Consultation) record using SQLite.
@@ -24,7 +18,6 @@ import {
 export async function insertConsultationRecord(
   consultation: Encounter,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!consultation.id) {
@@ -97,15 +90,6 @@ export async function insertConsultationRecord(
       );
     }
 
-    // Last-write-wins: during remote sync, if existing record is newer than or same as incoming change, keep existing
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
-    }
-
     for (const conditionId of new Set([
       ...conditionIds,
       ...getConsultationReasonConditionIds(consultation),
@@ -162,7 +146,6 @@ export async function insertConsultationRecord(
   else await db.withTransactionAsync(persist);
 
   if (didUpdate && !withinTransaction) {
-    await clearPendingConsultationDeletions([consId]);
     notifyDatabaseChanged(['consultations', 'consultation_conditions']);
   }
 }
@@ -244,11 +227,6 @@ export async function fetchConsultationById(
 export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
-    const doc = await db.getFirstAsync<{ id: string; patient_id: string }>(
-      `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
-      [id]
-    );
-
     // Retain independent requests and clear their originating encounter in
     // both FHIR and SQL. Failures abort the whole deletion so the projection
     // never diverges from the canonical resource.
@@ -275,20 +253,9 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
       );
     }
 
-    const deleted = await db.runAsync(
-      `DELETE FROM consultations WHERE id = ?;`,
-      [id]
-    );
-    if (doc && deleted.changes) {
-      await recordPendingClinicalResourceDeletion(
-        'Composition',
-        doc.id,
-        doc.patient_id,
-        true
-      );
-    }
+    // The Composition goes with it (ON DELETE CASCADE).
+    await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
   });
-  await recordPendingConsultationDeletion(id);
   notifyDatabaseChanged([
     'consultations',
     'consultation_conditions',

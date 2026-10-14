@@ -1,6 +1,5 @@
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { clearPendingConsultationDeletions } from '@/src/services/syncDeletions';
 import {
   createOrUpdateCondition,
   type ConditionInput,
@@ -70,7 +69,6 @@ export async function createOrUpdateConsultation(
     await db.withTransactionAsync(async () => {
       saved = await createOrUpdateConsultation(input, true);
     });
-    await clearPendingConsultationDeletions([saved!.id!]);
     notifyDatabaseChanged([
       'conditions',
       'consultations',
@@ -289,7 +287,7 @@ export async function createOrUpdateConsultation(
   }
   if (!result.serviceType?.length) delete result.serviceType;
   if (!result.participant?.length) delete result.participant;
-  await insertConsultationRecord(result, patientId, false, withinTransaction);
+  await insertConsultationRecord(result, patientId, withinTransaction);
 
   const existingDoc = await fetchClinicalDocumentByConsultationId(
     consId,
@@ -368,7 +366,6 @@ export async function createOrUpdateConsultation(
     await insertClinicalDocumentRecord(
       composition,
       patientId,
-      false,
       withinTransaction
     );
   } else if (existingDoc && notesSectionIndex >= 0) {
@@ -397,7 +394,6 @@ export async function createOrUpdateConsultation(
       await insertClinicalDocumentRecord(
         updatedComposition,
         patientId,
-        false,
         withinTransaction
       );
     }

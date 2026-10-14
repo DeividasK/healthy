@@ -1,7 +1,5 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
-import { Platform } from 'react-native';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { saveFile } from './fileExport';
 import type {
   Patient,
   DiagnosticReport,
@@ -129,31 +127,11 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
   const dateStr = new Date().toISOString().split('T')[0];
   const fileName = `healthy_backup_${dateStr}.zip`;
 
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    const blob = new Blob([zippedBytes as BlobPart], {
-      type: 'application/zip',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } else {
-    // Native iOS / Android (Expo SDK 57 File API)
-    const file = new File(Paths.cache, fileName);
-    file.create({ overwrite: true });
-    file.write(zippedBytes);
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(file.uri, {
-        mimeType: 'application/zip',
-        dialogTitle: 'Export Health Records',
-        UTI: 'public.zip-archive',
-      });
-    }
-  }
+  await saveFile(zippedBytes, fileName, {
+    mimeType: 'application/zip',
+    dialogTitle: 'Export Health Records',
+    UTI: 'public.zip-archive',
+  });
 
   return {
     patientCount: patients.length,
@@ -327,7 +305,7 @@ export async function restoreFromZipBytes(
 
   for (const { req, patientId } of medicationRequestResources) {
     try {
-      await insertMedicationRequestRecord(req, patientId, true);
+      await insertMedicationRequestRecord(req, patientId);
       restoredMedicationRequests++;
     } catch (err) {
       console.warn('Failed to insert medication request record from zip:', err);

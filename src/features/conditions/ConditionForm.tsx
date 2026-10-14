@@ -34,7 +34,6 @@ import {
 } from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { useSync } from '@/src/context/SyncContext';
 import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConditionStatusOption {
@@ -151,7 +150,6 @@ export function ConditionForm({
 }: ConditionFormProps) {
   const router = useRouter();
   const links = useLinkFields(linkFields);
-  const { triggerSync } = useSync();
 
   const [title, setTitle] = useState(initialValues?.title || '');
 
@@ -265,11 +263,6 @@ export function ConditionForm({
         ).filter((key) => normalize(values[key]) !== normalize(baseline[key]));
       }
       await onSave(values, links.values);
-
-      // Trigger automatic background sync
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on condition change:', err)
-      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();

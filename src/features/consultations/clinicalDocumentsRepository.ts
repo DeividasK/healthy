@@ -2,12 +2,7 @@ import type { Composition } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import { getCompositionEntryReferences } from '@/src/utils/fhirUtils';
-import {
-  recordPendingClinicalResourceDeletion,
-  clearPendingClinicalResourceDeletions,
-} from '@/src/services/syncDeletions';
 
 const VALID_COMPOSITION_STATUSES: Composition['status'][] = [
   'registered',
@@ -30,7 +25,6 @@ const VALID_COMPOSITION_STATUSES: Composition['status'][] = [
 export async function insertClinicalDocumentRecord(
   document: Composition,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!document.id) {
@@ -108,15 +102,6 @@ export async function insertClinicalDocumentRecord(
       );
     }
 
-    // Last-write-wins for remote sync
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
-    }
-
     await db.runAsync(
       `INSERT INTO clinical_documents (id, consultation_id, patient_id, status, fhir_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -135,10 +120,6 @@ export async function insertClinicalDocumentRecord(
         now,
         incomingTimestamp,
       ]
-    );
-    await clearPendingClinicalResourceDeletions(
-      [{ resourceType: 'Composition', id: docId, patientId }],
-      true
     );
     didUpdate = true;
   };
@@ -287,14 +268,7 @@ export async function deleteClinicalDocumentRecord(
       `DELETE FROM clinical_documents WHERE id = ? AND patient_id = ?;`,
       [id, existing.patient_id]
     );
-    if (!result.changes) return;
-    await recordPendingClinicalResourceDeletion(
-      'Composition',
-      id,
-      existing.patient_id,
-      true
-    );
-    didDelete = true;
+    didDelete = result.changes > 0;
   };
 
   if (withinTransaction) {

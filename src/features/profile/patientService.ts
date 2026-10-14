@@ -3,17 +3,17 @@ import type { Patient } from 'fhir/r5';
 import {
   insertPatientRecord,
   fetchAllPatients,
-  fetchAllStoredPatients,
   fetchPatientById,
-  fetchStoredPatientById,
-  type StoredPatient,
   deletePatientRecord,
   getActivePatientId,
   setActivePatientId,
   clearActivePatientId,
-  updatePatientSyncAccount,
   DEFAULT_PATIENT_ID,
 } from './patientRepository';
+import { getPatientDisplayName } from './patientNames';
+import { removePatientFromDevice } from '@/src/features/sync/engine';
+
+export { getPatientDisplayName, getPatientInitials } from './patientNames';
 
 export interface PatientInput {
   id?: string;
@@ -21,40 +21,6 @@ export interface PatientInput {
   familyName?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   birthDate?: string; // YYYY-MM-DD
-  syncAccount?: string | null;
-}
-
-/**
- * Returns a human-friendly display name for a FHIR Patient.
- */
-export function getPatientDisplayName(patient?: Patient | null): string {
-  if (!patient || !patient.name || patient.name.length === 0) {
-    return 'Self';
-  }
-  const name = patient.name[0];
-  const given = name.given?.join(' ') || '';
-  const family = name.family || '';
-  const full = `${given} ${family}`.trim();
-  return full || name.text || 'Self';
-}
-
-/**
- * Returns 1-2 letter initials for the patient avatar.
- */
-export function getPatientInitials(patient?: Patient | null): string {
-  if (!patient || !patient.name || patient.name.length === 0) {
-    return 'S';
-  }
-  const name = patient.name[0];
-  const given = name.given?.[0] || '';
-  const family = name.family || '';
-  if (given && family) {
-    return `${given.charAt(0)}${family.charAt(0)}`.toUpperCase();
-  }
-  if (given) {
-    return given.slice(0, 2).toUpperCase();
-  }
-  return 'S';
 }
 
 /**
@@ -86,7 +52,7 @@ export async function createOrUpdatePatient(
     birthDate: input.birthDate || undefined,
   };
 
-  await insertPatientRecord(patient, input.syncAccount);
+  await insertPatientRecord(patient);
   return patient;
 }
 
@@ -105,30 +71,20 @@ export async function getPatient(id: string): Promise<Patient | null> {
 }
 
 /**
- * Retrieves a stored patient with syncAccount by ID.
- */
-export async function getStoredPatient(
-  id: string
-): Promise<StoredPatient | null> {
-  return await fetchStoredPatientById(id);
-}
-
-/**
- * Retrieves all stored patients with syncAccount.
- */
-export async function getAllStoredPatients(): Promise<StoredPatient[]> {
-  return await fetchAllStoredPatients();
-}
-
-export type { StoredPatient };
-
-/**
  * Deletes a patient by ID and handles switching active patient or clearing if empty.
+ * With `deviceOnly`, the profile is removed from this device but stays in the
+ * cloud and on other synced devices.
  */
 export async function deletePatient(
-  id: string
+  id: string,
+  options: { deviceOnly?: boolean } = {}
 ): Promise<{ remainingCount: number; newActiveId: string | null }> {
-  await deletePatientRecord(id);
+  if (options.deviceOnly) {
+    const patient = await fetchPatientById(id);
+    await removePatientFromDevice(id, getPatientDisplayName(patient));
+  } else {
+    await deletePatientRecord(id);
+  }
   const remaining = await fetchAllPatients();
   const currentActiveId = await getActivePatientId();
 
@@ -180,4 +136,4 @@ export async function switchActivePatient(patientId: string): Promise<void> {
   await setActivePatientId(patientId);
 }
 
-export { DEFAULT_PATIENT_ID, updatePatientSyncAccount };
+export { DEFAULT_PATIENT_ID };

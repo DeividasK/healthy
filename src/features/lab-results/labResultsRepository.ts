@@ -3,7 +3,6 @@ import { DiagnosticReportRecord } from '@/src/database/types';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 import { assertCBCObservation } from './biomarkerMeasurements';
 
 /**
@@ -14,7 +13,7 @@ export async function insertDiagnosticReportRecord(
   report: DiagnosticReport,
   observations: Observation[],
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false
+  withinTransaction: boolean = false
 ): Promise<void> {
   if (!report.id) {
     throw new Error('DiagnosticReport requires an id to be persisted');
@@ -43,7 +42,7 @@ export async function insertDiagnosticReportRecord(
       : null;
 
   let didUpdate = false;
-  await db.withTransactionAsync(async () => {
+  const persist = async () => {
     const existing = await db.getFirstAsync<{
       patient_id: string;
       updated_at: string;
@@ -55,14 +54,6 @@ export async function insertDiagnosticReportRecord(
       throw new Error(
         `Cannot update diagnostic report ${reportId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
-    }
-
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
     }
 
     await db.runAsync(
@@ -105,9 +96,11 @@ export async function insertDiagnosticReportRecord(
     }
 
     didUpdate = true;
-  });
+  };
+  if (withinTransaction) await persist();
+  else await db.withTransactionAsync(persist);
 
-  if (didUpdate) {
+  if (didUpdate && !withinTransaction) {
     notifyDatabaseChanged(['diagnostic_reports', 'observations']);
   }
 }
@@ -197,9 +190,13 @@ export async function deleteDiagnosticReportRecord(
 ): Promise<void> {
   if (!reportId) return;
   const db = await getDb();
-  await db.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
-    reportId,
-  ]);
-  await db.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [reportId]);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM observations WHERE report_id = ?;`, [
+      reportId,
+    ]);
+    await db.runAsync(`DELETE FROM diagnostic_reports WHERE id = ?;`, [
+      reportId,
+    ]);
+  });
   notifyDatabaseChanged(['diagnostic_reports', 'observations']);
 }

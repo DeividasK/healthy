@@ -265,8 +265,14 @@ test('failed reference cleanup rolls back deletion and tombstones; retry cleans 
   const result = await page.evaluate(
     async ({ initial, treatmentId }) => {
       const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+      const deletions = async () => {
+        await b.flushLocalChanges();
+        return await b.querySql(
+          "SELECT resource_type, resource_id FROM sync_changes WHERE op = 'delete'"
+        );
+      };
       await b.saveClinicalDocument(initial, 'integrity-patient');
-      const pendingBefore = await b.getPendingDeletedClinicalResources();
+      const pendingBefore = await deletions();
       await b.executeSql(
         "CREATE TRIGGER fail_treatment_cleanup BEFORE UPDATE ON clinical_documents BEGIN SELECT RAISE(ABORT, 'Synthetic cleanup failure'); END"
       );
@@ -277,7 +283,7 @@ test('failed reference cleanup rolls back deletion and tombstones; retry cleans 
         failed = true;
       }
       const retained = await b.getTreatment(treatmentId, 'integrity-patient');
-      const pendingAfter = await b.getPendingDeletedClinicalResources();
+      const pendingAfter = await deletions();
       const retainedDocument = await b.getClinicalDocumentByConsultationId(
         initial.encounter.reference.slice(10)
       );

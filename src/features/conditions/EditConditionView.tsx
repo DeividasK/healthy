@@ -10,7 +10,6 @@ import {
   type ConditionInput,
 } from './conditionService';
 import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
-import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
 import { Pill, Stethoscope } from 'lucide-react-native';
 import {
@@ -35,7 +34,6 @@ import {
 export function EditConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConditionFormValues | null>(null);
   const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
@@ -206,9 +204,6 @@ export function EditConditionView() {
       await setTreatmentConditionLink(treatmentId, id, patientId, true);
     for (const treatmentId of treatmentChanges.removed)
       await setTreatmentConditionLink(treatmentId, id, patientId, false);
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on edit condition:', err)
-    );
   };
 
   return (
