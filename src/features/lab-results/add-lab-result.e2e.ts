@@ -2,15 +2,13 @@ import { formatLocalDate } from '@/src/utils/dateUtils';
 import {
   test,
   expect,
-  clearAppStorage,
-  createPatientViaUI,
+  seedTestPatient,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(
@@ -33,6 +31,12 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
       await test.step('Search and select Hemoglobin and WBC biomarkers', async () => {
         const searchInput = page.getByTestId('test-search-input');
+        await searchInput.fill('Platelets');
+        await page.getByTestId('autocomplete-item-cbc_platelets').click();
+        await expect(page.getByTestId('marker-card-0')).toBeVisible();
+        await page.getByTestId('remove-marker-0').click();
+        await expect(page.getByTestId('marker-card-0')).toHaveCount(0);
+
         await searchInput.fill('Hemoglobin');
         const hemoglobinOption = page.getByTestId(
           'autocomplete-item-cbc_hemoglobin'
@@ -52,6 +56,12 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(wbcOption).toBeVisible();
         await wbcOption.click();
 
+        const nativeSelect = page
+          .getByTestId('unit-picker-button-1')
+          .locator('select');
+        await expect(nativeSelect).toHaveValue('10*3/uL');
+        await nativeSelect.selectOption('10*9/L');
+        await expect(nativeSelect).toHaveValue('10*9/L');
         const wbcCard = page.getByTestId('marker-card-1');
         await expect(wbcCard).toBeVisible();
         await expect(
@@ -89,32 +99,22 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(page.getByText('14.5')).toBeVisible();
         await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
         await expect(page.getByText('6.8')).toBeVisible();
+        const stored = await page.evaluate(() =>
+          (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+            'SELECT fhir_json FROM observations'
+          )
+        );
+        expect(
+          stored
+            .map((row: { fhir_json: string }) => JSON.parse(row.fhir_json))
+            .find((resource: any) => resource.code.coding[0].code === '6690-2')
+            .valueQuantity.code
+        ).toBe('10*9/L');
+
         await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
       });
     }
   );
-
-  test('should allow removing a test from the active list before saving', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Add Platelets
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Platelets');
-    const plateletsOption = page.getByTestId('autocomplete-item-cbc_platelets');
-    await plateletsOption.click();
-
-    await expect(page.getByTestId('marker-card-0')).toBeVisible();
-
-    // Click remove button (X)
-    const removeBtn = page.getByTestId('remove-marker-0');
-    await removeBtn.click();
-
-    // Verify card is removed
-    await expect(page.getByTestId('marker-card-0')).not.toBeVisible();
-  });
 
   test('should open and update date and time via native dropdown inputs', async ({
     page,
@@ -281,29 +281,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       );
       expect(unitPickerBox.x + unitPickerBox.width).toBeLessThanOrEqual(360);
     }
-  });
-
-  test('should change biomarker unit using native dropdown', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Add WBC (units: '10*3/uL', '10*9/L', '/uL')
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('WBC');
-    await page.getByTestId('autocomplete-item-cbc_wbc').click();
-
-    const unitPicker = page.getByTestId('unit-picker-button-0');
-    await expect(unitPicker).toContainText('10*3/uL');
-
-    // Native select element should exist
-    const nativeSelect = unitPicker.locator('select');
-    await expect(nativeSelect).toBeAttached();
-
-    // Select alternative unit: '10*9/L'
-    await nativeSelect.selectOption('10*9/L');
-    await expect(unitPicker).toContainText('10*9/L');
   });
 
   test('should validate that date and time cannot be set to the future', async ({

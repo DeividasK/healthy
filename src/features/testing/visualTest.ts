@@ -1,4 +1,5 @@
 import { test as chromaticTest, takeSnapshot } from '@chromatic-com/playwright';
+import { mockGoogleIdentityServices } from './mockGoogleDrive';
 
 export const VISUAL_TEST_FIXED_DATE = new Date('2026-10-08T10:00:00Z');
 
@@ -9,6 +10,7 @@ export const VISUAL_TEST_FIXED_DATE = new Date('2026-10-08T10:00:00Z');
  */
 export const test = chromaticTest.extend({
   page: async ({ page }, providePage) => {
+    await mockGoogleIdentityServices(page);
     await page.clock.setFixedTime(VISUAL_TEST_FIXED_DATE);
     await providePage(page);
   },
@@ -16,8 +18,8 @@ export const test = chromaticTest.extend({
 
 export { takeSnapshot };
 export {
-  clearAppStorage,
   seedTestPatient,
+  seedTestResources,
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,

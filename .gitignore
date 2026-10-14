@@ -46,6 +46,8 @@ yarn-error.*
 # Playwright & tests
 test-results/
 playwright-report/
+blob-report/
+all-blob-reports/
 storybook-static/
 
 # Storybook

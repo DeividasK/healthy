@@ -12,6 +12,7 @@ config.resolver.blockList = [
   ...defaultBlockList,
   /.*\.e2e\.[jt]sx?$/,
   /.*\.visual\.[jt]sx?$/,
+  /.*\.unit\.[jt]sx?$/,
 ];
 
 // Enable WebAssembly asset bundling for expo-sqlite web support

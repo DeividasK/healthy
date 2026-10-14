@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -14,7 +13,6 @@ import {
 
 test.describe('View Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -30,8 +28,6 @@ test.describe('View Consultation Flow', () => {
       notes: 'Follow-up next year.',
       status: 'completed',
     });
-    await page.reload();
-
     await page.getByTestId(`consultation-open-${consultation.id}`).click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
@@ -82,54 +78,6 @@ test.describe('View Consultation Flow', () => {
     await expect(
       page.getByTestId(`consultation-card-${consultation.id}`)
     ).toHaveCount(0);
-  });
-
-  test('opens from Condition and can navigate back to the related condition', async ({
-    page,
-  }) => {
-    const condition = await seedTestCondition(page, {
-      id: 'condition-consultation-navigation',
-      title: 'Knee Osteoarthritis',
-      status: 'active',
-    });
-    const consultation = await seedTestConsultation(page, {
-      id: 'consultation-condition-navigation',
-      conditionIds: [condition.id],
-      title: 'Orthopedic Review',
-      doctorName: 'Dr. Sarah Connor',
-      date: '2026-10-04',
-      status: 'completed',
-    });
-    await page.reload();
-
-    await page.getByTestId(`condition-open-${condition.id}`).click();
-    await page
-      .getByTestId(`condition-consultation-item-${consultation.id}`)
-      .click();
-    await expect(page).toHaveURL(
-      new RegExp(`.*consultation\\/${consultation.id}$`)
-    );
-    await expect(page.getByTestId('consultation-title')).toHaveText(
-      'Orthopedic Review'
-    );
-
-    await page.getByTestId('consultation-diagnosis-condition').click();
-    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
-    const conditionView = page
-      .getByTestId('condition-view')
-      .filter({ visible: true });
-    await expect(conditionView.getByTestId('condition-title')).toHaveText(
-      'Knee Osteoarthritis'
-    );
-    // Back retraces the visited screens: consultation, condition, then home.
-    await page.getByTestId('back-button').click();
-    await expect(page).toHaveURL(
-      new RegExp(`.*consultation\\/${consultation.id}$`)
-    );
-    await page.getByTestId('back-button').click();
-    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
-    await page.getByTestId('back-button').click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
   });
 
   test('keeps consultation details available when the linked condition fails to load', async ({

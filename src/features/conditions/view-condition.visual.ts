@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -12,7 +11,6 @@ test.describe('View Condition View - Visual Regression', () => {
   test('Condition View - Details with Consultations', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const cond = await seedTestCondition(page, {
       id: 'cond-view-visual-test',

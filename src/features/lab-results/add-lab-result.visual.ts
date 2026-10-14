@@ -1,13 +1,11 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     await page.goto('/lab-result/add');
   });
@@ -16,11 +14,7 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await page.getByTestId('test-search-input').waitFor();
 
     await takeSnapshot(page, 'Add Report View - Initial Clean Form', testInfo);
-  });
 
-  test('Add Report View - Autocomplete Dropdown Open', async ({
-    page,
-  }, testInfo) => {
     const searchInput = page.getByTestId('test-search-input');
     await searchInput.click();
     await page.getByTestId('autocomplete-item-cbc_hemoglobin').waitFor();
@@ -55,11 +49,10 @@ test.describe('Add Lab Result View - Visual Regression', () => {
       'Add Report View - Populated Biomarkers',
       testInfo
     );
-  });
 
-  test('Add Report View - Expanded Time and Notes', async ({
-    page,
-  }, testInfo) => {
+    // Prepare the existing expanded-state baseline without another app bootstrap.
+    await page.getByTestId('remove-marker-1').click();
+    await page.getByTestId('remove-marker-0').click();
     // Set a previous date so time selection is unrestricted
     const dateInput = page
       .getByTestId('date-picker-button')
@@ -67,7 +60,6 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await dateInput.fill('2026-10-01');
 
     // Add a marker
-    const searchInput = page.getByTestId('test-search-input');
     await searchInput.fill('WBC');
     const wbcOption = page.getByTestId('autocomplete-item-cbc_wbc');
     await wbcOption.click();

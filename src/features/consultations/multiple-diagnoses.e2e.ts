@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -12,7 +11,6 @@ import {
 
 test.describe('Multiple consultation diagnoses', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, { id: 'diagnosis-patient' });
   });
 

@@ -1,14 +1,12 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Consultation View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 

@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -18,7 +17,6 @@ const getConsultation = (page: any, id: string) =>
 
 test.describe('Edit Condition links', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 

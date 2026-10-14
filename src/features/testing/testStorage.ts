@@ -1,4 +1,5 @@
 import { test as baseTest, expect, type Page } from '@playwright/test';
+import { mockGoogleIdentityServices } from './mockGoogleDrive';
 
 export { expect };
 
@@ -14,6 +15,10 @@ export interface ConsoleMonitor {
 }
 
 export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
+  page: async ({ page }, providePage) => {
+    await mockGoogleIdentityServices(page);
+    await providePage(page);
+  },
   consoleMonitor: [
     async ({ page }, use) => {
       const monitor = setupConsoleMonitor(page);
@@ -27,46 +32,6 @@ export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
 export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
 export const DEFAULT_CONDITION_TITLE = 'Test Condition';
-
-/**
- * Resets browser storage (localStorage and sessionStorage) for clean test runs.
- */
-export async function clearAppStorage(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.evaluate(async () => {
-    localStorage.clear();
-    sessionStorage.clear();
-
-    // Clear Origin Private File System (where expo-sqlite / wa-sqlite persists databases)
-    if (typeof navigator !== 'undefined' && navigator.storage?.getDirectory) {
-      try {
-        const root = await navigator.storage.getDirectory();
-        for await (const [name, handle] of root.entries()) {
-          try {
-            await root.removeEntry(name, {
-              recursive: handle.kind === 'directory',
-            });
-          } catch {
-            // Ignore individual handle delete error
-          }
-        }
-      } catch {
-        // Ignore OPFS access errors in restricted contexts
-      }
-    }
-
-    if (typeof indexedDB !== 'undefined' && indexedDB.databases) {
-      try {
-        const dbs = await indexedDB.databases();
-        for (const db of dbs) {
-          if (db.name) indexedDB.deleteDatabase(db.name);
-        }
-      } catch {
-        // Ignore indexedDB deletion errors
-      }
-    }
-  });
-}
 
 /**
  * Deletes the active profile through the standard UI flow.

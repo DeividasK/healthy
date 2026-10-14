@@ -1,8 +1,8 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
+  seedTestResources,
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,
@@ -11,7 +11,6 @@ import {
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -127,23 +126,21 @@ test.describe('Home View - Visual Regression', () => {
   test('Home View - Collapsed and expanded sections', async ({
     page,
   }, testInfo) => {
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestCondition(page, {
+    await seedTestResources(page, {
+      conditions: [1, 2, 3, 4].map((n) => ({
         id: `collapse-condition-${n}`,
         title: `Condition ${n}`,
         onsetDate: `2026-0${n}-01`,
-      });
-    }
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestConsultation(page, {
+      })),
+      consultations: [1, 2, 3, 4].map((n) => ({
         id: `collapse-consultation-${n}`,
         title: `Consultation ${n}`,
         date: `2026-0${n}-15`,
         doctorName: `Specialist ${n}`,
         conditionIds: [`collapse-condition-${n}`],
-      });
-    }
-    await page.goto('/');
+      })),
+    });
+
     await page.getByTestId('conditions-list-toggle').waitFor();
     await takeSnapshot(page, 'Home View - Collapsed sections', testInfo);
     await page.getByTestId('conditions-list-toggle').click();

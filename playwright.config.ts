@@ -8,6 +8,11 @@ export default defineConfig<ChromaticConfig>({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   timeout: 30000,
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ...(process.env.PLAYWRIGHT_BLOB_REPORT ? [['blob'] as const] : []),
+  ],
   use: {
     baseURL: 'http://localhost:8089',
     trace: 'on-first-retry',
@@ -36,6 +41,7 @@ export default defineConfig<ChromaticConfig>({
   ],
   webServer: {
     command: 'pnpm expo start --web --port 8089',
+    env: { EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'playwright-synthetic-client' },
     url: 'http://localhost:8089',
     reuseExistingServer: !process.env.CI,
     timeout: 60000,

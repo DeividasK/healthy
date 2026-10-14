@@ -1,16 +1,13 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
-  createTestConditionViaUI,
   DEFAULT_CONDITION_TITLE,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -74,7 +71,7 @@ test.describe('Edit Condition Flow', () => {
     { tag: ['@smoke'] },
     async ({ page }) => {
       await test.step('Create an initial condition', async () => {
-        await createTestConditionViaUI(page);
+        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
@@ -104,7 +101,7 @@ test.describe('Edit Condition Flow', () => {
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create a condition', async () => {
-        await createTestConditionViaUI(page);
+        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
       });
 
       await test.step('Click condition card to open Condition View', async () => {
@@ -310,7 +307,6 @@ test.describe('Edit Condition Flow', () => {
 test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'preservation-patient' });
   const seeded = await seedTestCondition(page, {
     id: 'preserved-condition',
@@ -454,7 +450,6 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
 test('edits verification independently and roundtrips source and standard categories', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   const condition = await seedTestCondition(page, {
     title: 'Seborėjinis dermatitas',

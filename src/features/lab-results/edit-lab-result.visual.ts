@@ -1,14 +1,12 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Lab Result View - Visual Regression', () => {
   test('Add Report View - Edit Existing Mode', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const bundle = await seedTestReport(page, {
       id: 'report-edit-test',

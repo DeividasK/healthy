@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
@@ -12,7 +11,6 @@ test.describe('View Treatment - Visual Regression', () => {
   test('Long instructions, reason condition and consultation link', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const consultation = await seedTestConsultation(page, {
       title: 'Infectious Disease Clinic',

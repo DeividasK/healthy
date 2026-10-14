@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -9,7 +8,6 @@ import {
 
 test.describe('Edit Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -34,7 +32,6 @@ test.describe('Edit Consultation Flow', () => {
           notes: 'Preliminary assessment.',
         });
         consultationId = cons.id;
-        await page.reload();
       });
 
       await test.step('Open the consultation view from Condition and edit it', async () => {
@@ -49,6 +46,11 @@ test.describe('Edit Consultation Flow', () => {
         await expect(page).toHaveURL(
           new RegExp(`.*consultation\\/${consultationId}$`)
         );
+        await page.getByTestId('consultation-diagnosis-condition').click();
+        await expect(
+          page.locator('[data-testid="condition-title"]:visible')
+        ).toHaveText('Hypertension Monitoring');
+        await page.getByTestId('back-button').click();
         await page.getByTestId('edit-consultation-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*consultation\\/${consultationId}\\/edit`)
@@ -100,7 +102,6 @@ test.describe('Edit Consultation Flow', () => {
           date: '2026-10-02',
         });
         consultationId = cons.id;
-        await page.reload();
       });
 
       await test.step('Open the consultation view and test delete cancellation', async () => {

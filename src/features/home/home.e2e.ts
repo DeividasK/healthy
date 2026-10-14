@@ -1,11 +1,12 @@
 import {
   test,
   expect,
-  clearAppStorage,
   createPatientViaUI,
   createReportViaUI,
   createTestConditionViaUI,
   checkA11y,
+  seedTestPatient,
+  seedTestResources,
   seedTestCondition,
   seedTestConsultation,
   seedTestReport,
@@ -14,26 +15,40 @@ import {
 
 test.describe('Fresh Install Onboarding Redirect', () => {
   test(
-    'should redirect to /profile/new on fresh install when no patients exist',
+    'creates a persistent profile while fresh browser contexts remain isolated',
     { tag: ['@smoke'] },
-    async ({ page }) => {
-      await test.step('Clear storage and navigate to root', async () => {
-        await clearAppStorage(page);
-        await page.goto('/');
-      });
+    async ({ page, browser, baseURL }) => {
+      await page.goto('/');
+      await expect(page).toHaveURL(/profile\/new/);
+      await createPatientViaUI(page);
+      await page.reload();
+      await expect(page.getByTestId('floating-add-button')).toBeVisible();
 
-      await test.step('Verify redirected to /profile/new', async () => {
-        await expect(page).toHaveURL(/.*profile\/new/);
-        await expect(page.getByText('Add Profile')).toBeVisible();
-      });
+      const isolated = await browser.newContext({ baseURL });
+      try {
+        const otherPage = await isolated.newPage();
+        await otherPage.goto('/');
+        await expect(otherPage).toHaveURL(/profile\/new/);
+        await expect(otherPage.getByText('Add Profile')).toBeVisible();
+        await seedTestPatient(otherPage, { givenName: 'Separate' });
+        await otherPage.goto('/profile');
+        await expect(otherPage.getByTestId('profile-display-name')).toHaveText(
+          'Separate Doe'
+        );
+        await page.goto('/profile');
+        await expect(page.getByTestId('profile-display-name')).toHaveText(
+          'John Doe'
+        );
+      } finally {
+        await isolated.close();
+      }
     }
   );
 });
 
 test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test('labels lab results whenever another section precedes them', async ({
@@ -387,31 +402,29 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
 
 test.describe('Home sections: collapsing, counts and chevron navigation', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestCondition(page, {
+    await seedTestPatient(page);
+    await seedTestResources(page, {
+      conditions: [1, 2, 3, 4].map((n) => ({
         id: `c${n}`,
         title: `Condition ${n}`,
         onsetDate: `2026-0${n}-01`,
-      });
-    }
-    for (const n of [1, 2, 3, 4]) {
-      await seedTestConsultation(page, {
+      })),
+      consultations: [1, 2, 3, 4].map((n) => ({
         id: `k${n}`,
         title: `Consultation ${n}`,
         date: `2026-0${n}-15`,
         conditionIds: n === 1 ? ['c1'] : undefined,
         reasonConditionIds: n === 1 ? ['c2'] : undefined,
-      });
-    }
-    await seedTestTreatment(page, {
-      id: 't1',
-      title: 'Treatment 1',
-      reasonConditionIds: ['c1'],
-      consultationId: 'k1',
+      })),
+      treatments: [
+        {
+          id: 't1',
+          title: 'Treatment 1',
+          reasonConditionIds: ['c1'],
+          consultationId: 'k1',
+        },
+      ],
     });
-    await page.goto('/');
   });
 
   test('shows three recent items per section and expands and collapses them', async ({
@@ -491,8 +504,7 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
 
 test.describe('Home add menu keyboard navigation', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test('focuses the first option when opened with Cmd/Ctrl+Enter and cycles with arrows and Tab', async ({
@@ -531,8 +543,7 @@ test.describe('Home add menu keyboard navigation', () => {
 });
 
 test('lists lab results after every other section', async ({ page }) => {
-  await clearAppStorage(page);
-  await createPatientViaUI(page);
+  await seedTestPatient(page);
   await seedTestCondition(page, { title: 'Order condition' });
   await seedTestConsultation(page, { title: 'Order consultation' });
   await seedTestTreatment(page, { title: 'Order treatment' });

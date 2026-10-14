@@ -1,13 +1,11 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 

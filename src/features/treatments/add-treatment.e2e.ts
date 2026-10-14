@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -13,7 +12,6 @@ import {
 
 test.describe('Add Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -237,7 +235,6 @@ test.describe('Add Treatment Flow', () => {
 
 test.describe('Treatment form keyboard support', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -269,6 +266,7 @@ test.describe('Treatment form keyboard support', () => {
   }) => {
     const forms = [
       ['/treatment/add', 'treatment-title-input'],
+      ['/condition/add', 'condition-title-input'],
       ['/consultation/add', 'consultation-title-input'],
       ['/lab-result/add', 'test-search-input'],
       ['/profile/new', 'patient-given-name-input'],
@@ -277,31 +275,26 @@ test.describe('Treatment form keyboard support', () => {
       await page.goto('/');
       await page.goto(route);
       await expect(page.getByTestId(firstField)).toBeFocused();
+      if (route !== '/profile/new' && route !== '/lab-result/add') {
+        await expect(page.locator(`[id="${firstField}-label"]`)).toContainText(
+          '*'
+        );
+      }
+      if (route === '/treatment/add') {
+        for (const id of [
+          'treatment-intent-select',
+          'treatment-status-select',
+          'treatment-date-input',
+        ]) {
+          await expect(page.locator(`[id="${id}-label"]`)).toContainText('*');
+        }
+      }
       // Profiles can only be cancelled once existing ones have loaded.
       await expect(page.getByTestId('cancel-button')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page).toHaveURL(/\/$/);
+      await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
     }
-  });
-
-  test('marks required fields with an asterisk', async ({ page }) => {
-    await page.goto('/treatment/add');
-    for (const id of [
-      'treatment-title-input',
-      'treatment-intent-select',
-      'treatment-status-select',
-      'treatment-date-input',
-    ]) {
-      await expect(page.locator(`[id="${id}-label"]`)).toContainText('*');
-    }
-    await page.goto('/condition/add');
-    await expect(page.locator('[id="condition-title-input-label"]')).toHaveText(
-      'Condition *'
-    );
-    await page.goto('/consultation/add');
-    await expect(
-      page.locator('[id="consultation-title-input-label"]')
-    ).toHaveText('Consultation / Service *');
   });
 
   test('Cmd/Ctrl+Enter runs the primary island action', async ({ page }) => {

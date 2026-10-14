@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestConsultation,
   seedTestTreatment,
@@ -13,7 +12,6 @@ import {
 
 test.describe('View Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -107,7 +105,6 @@ test.describe('View Treatment Flow', () => {
 test('the island ends at the primary edit button with nothing beyond it', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   const treatment = await seedTestTreatment(page, { title: 'Island edge' });
   await page.goto(`/treatment/${treatment.id}`);

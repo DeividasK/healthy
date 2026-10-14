@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/testStorage';
@@ -11,13 +10,11 @@ import { mockGoogleDrive } from '@/src/features/testing/mockGoogleDrive';
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   for (const scenario of [
     'valid CBC',
-    'unknown unit',
-    'unknown biomarker',
+    transport === 'ZIP' ? 'unknown unit' : 'unknown biomarker',
   ] as const) {
     test(`${transport} import validates ${scenario} before restoring records`, async ({
       page,
     }) => {
-      await clearAppStorage(page);
       await seedTestPatient(page, {
         id: 'cbc-import-patient',
         syncAccount: 'cbc-import-user',

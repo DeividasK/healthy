@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestTreatment,
   seedTestConsultation,
@@ -13,7 +12,6 @@ import {
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'integrity-patient' });
 });
 

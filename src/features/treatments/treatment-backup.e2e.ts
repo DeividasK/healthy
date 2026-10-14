@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestTreatment,
   seedTestConsultation,
@@ -13,7 +12,6 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   test(`${transport} preserves complete linked treatments and retains newer local data`, async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, {
       id: 'treatment-backup-patient',
       syncAccount: 'synthetic-google-sub',

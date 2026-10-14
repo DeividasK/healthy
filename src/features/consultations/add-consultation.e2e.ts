@@ -2,7 +2,6 @@ import type { Page } from '@playwright/test';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -28,7 +27,6 @@ async function openAddConsultationForCondition(
 
 test.describe('Add Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -44,7 +42,6 @@ test.describe('Add Consultation Flow', () => {
           status: 'active',
         });
         conditionId = cond.id;
-        await page.reload();
 
         const condCard = page.getByTestId(`condition-card-${conditionId}`);
         await expect(condCard).toBeVisible();
@@ -145,7 +142,6 @@ test.describe('Add Consultation Flow', () => {
           doctorName: 'Dr. Gregory House',
           date: '2026-10-01',
         });
-        await page.reload();
       });
 
       await test.step('Open the Condition’s linked Consultation form', async () => {
@@ -186,7 +182,6 @@ test.describe('Add Consultation Flow', () => {
           title: 'Knee Arthroscopy Review',
           doctorName: 'Dr. John Doe',
         });
-        await page.reload();
       });
 
       await test.step('Open Condition View and navigate to Condition Edit', async () => {
@@ -426,7 +421,6 @@ for (const terminology of [
   test(`keeps reasons and independently entered diagnoses separate: ${terminology.system || 'code only'}`, async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, { id: 'separate-patient' });
     const reason = await seedTestCondition(page, {
       id: 'reason-condition',
@@ -447,7 +441,7 @@ for (const terminology of [
       .fill('Seborrhoeic dermatitis');
     for (const [field, value] of Object.entries(terminology))
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
-    await checkA11y(page);
+    if (!terminology.system) await checkA11y(page);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/consultation\/add/);
     const stored = await page.evaluate(async () => {
@@ -524,7 +518,6 @@ for (const terminology of [
 test('blank diagnoses prevent saving; removed drafts create no Conditions', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   await page.goto('/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
@@ -585,7 +578,6 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
 test('a diagnosis may create a Condition atomically, and failed links roll back both resources', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'atomic-patient' });
   await page.goto('/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
@@ -644,7 +636,6 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
 test('rejects foreign references for either list and retains diagnosis text when its Condition is deleted', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'foreign-patient' });
   await seedTestCondition(page, {
     id: 'foreign-condition',

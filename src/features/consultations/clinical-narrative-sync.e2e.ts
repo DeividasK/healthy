@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestConsultation,
   getTestClinicalDocument,
@@ -13,7 +12,6 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
 test.describe('Clinical Narrative and Composition Sync', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, {
       id: 'patient-narrative-test',
       syncAccount: 'narrative-user-sub',

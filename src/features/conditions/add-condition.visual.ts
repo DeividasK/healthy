@@ -1,13 +1,11 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Condition View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 

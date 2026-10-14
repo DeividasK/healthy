@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestConsultation,
   seedTestCondition,
@@ -13,7 +12,6 @@ import {
 
 test.describe('Edit Treatment links', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -65,7 +63,6 @@ test.describe('Edit Treatment links', () => {
 
 test.describe('Edit Treatment add menu', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -99,7 +96,6 @@ test.describe('Edit Treatment add menu', () => {
 test('hides the link search once every consultation and condition is linked', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   const consultation = await seedTestConsultation(page, {
     title: 'Only visit',
