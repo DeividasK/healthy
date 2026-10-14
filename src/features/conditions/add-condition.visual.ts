@@ -26,6 +26,7 @@ test.describe('Add Condition View - Visual Regression', () => {
     await page.getByTestId('remove-verification-button').click();
     await page.getByTestId('remove-category-button').click();
     await page.getByTestId('add-option-button').click();
+    await page.getByTestId('form-add-menu').waitFor({ state: 'visible' });
     await takeSnapshot(page, 'Condition optional fields menu', testInfo);
   });
 });

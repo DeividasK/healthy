@@ -15,7 +15,7 @@ test.describe('Home View - Visual Regression', () => {
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
-    await page.getByTestId('floating-add-button').waitFor();
+    await page.getByText('Nothing to show yet', { exact: true }).waitFor();
 
     await takeSnapshot(page, 'Home View - Empty State', testInfo);
   });

@@ -5,6 +5,11 @@ import {
   deleteConsultationRecord,
 } from '@/src/features/consultations/consultationsRepository';
 import {
+  fetchClinicalDocumentByConsultationId,
+  insertClinicalDocumentRecord,
+  deleteClinicalDocumentRecord,
+} from '@/src/features/consultations/clinicalDocumentsRepository';
+import {
   deleteConditionRecord,
   fetchConditionById,
   insertConditionRecord,
@@ -16,7 +21,13 @@ import {
 import {
   backupToGoogleDrive,
   restoreFromGoogleDrive,
+  deletePatientFromGoogleDrive,
+  syncWithGoogleDrive,
 } from '@/src/services/syncManager';
+import {
+  getPendingDeletedClinicalResources,
+  clearPendingClinicalResourceDeletions,
+} from '@/src/services/syncDeletions';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
 import { createOrUpdatePatient } from '@/src/features/profile/patientService';
@@ -56,12 +67,25 @@ export function setupTestBridge() {
     saveEncounter: insertConsultationRecord,
     deleteConsultation: deleteConsultationRecord,
     deleteCondition: deleteConditionRecord,
+    saveClinicalDocument: insertClinicalDocumentRecord,
+    deleteClinicalDocument: deleteClinicalDocumentRecord,
     clearDatabase: clearAllDatabaseTables,
     exportArchive: exportZipArchive,
     restoreArchive: (bytes: number[]) =>
       restoreFromZipBytes(new Uint8Array(bytes)),
     backupToGoogleDrive,
     restoreFromGoogleDrive,
+    deletePatientFromGoogleDrive,
+    syncWithGoogleDrive,
+    getPendingDeletedClinicalResources,
+    clearPendingClinicalResourceDeletions,
+    rollbackClinicalDocumentDeletion: async (id: string, patientId: string) => {
+      const db = await getDb();
+      await db.withTransactionAsync(async () => {
+        await deleteClinicalDocumentRecord(id, patientId, true);
+        throw new Error('Intentional deletion rollback');
+      });
+    },
     querySql: async (sql: string, params: string[] = []) =>
       (await getDb()).getAllAsync(sql, params),
     // Prepare database failure scenarios without changing production behavior.
@@ -201,6 +225,9 @@ export function setupTestBridge() {
         notes: input.notes,
         status: input.status || 'completed',
       });
+    },
+    getClinicalDocumentByConsultationId: async (consultationId: string) => {
+      return await fetchClinicalDocumentByConsultationId(consultationId);
     },
   };
 }

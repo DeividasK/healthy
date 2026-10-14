@@ -108,3 +108,18 @@ export async function seedTestConsultation(
     return await (window as any).__HEALTHY_TEST_BRIDGE__.seedConsultation(opts);
   }, options);
 }
+
+/**
+ * Fetches the Composition linked to a Consultation directly via the test bridge.
+ */
+export async function getTestClinicalDocument(
+  page: Page,
+  consultationId: string
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(async (id) => {
+    return await (
+      window as any
+    ).__HEALTHY_TEST_BRIDGE__.getClinicalDocumentByConsultationId(id);
+  }, consultationId);
+}
