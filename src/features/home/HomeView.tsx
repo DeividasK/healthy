@@ -1,7 +1,7 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
-  Clock,
+  Tablets,
   FileText,
   FolderPlus,
   Pencil,
@@ -481,7 +481,7 @@ export function HomeView() {
                           style={styles.instructionsRow}
                           testID={`treatment-card-instructions-${treatId}`}
                         >
-                          <Clock
+                          <Tablets
                             color={COLORS.light.iconMuted}
                             size={14}
                             accessibilityLabel="Dosage"

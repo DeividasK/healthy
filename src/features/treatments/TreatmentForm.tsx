@@ -7,7 +7,13 @@ import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { FormField } from '@/src/components/FormField';
 import type { Condition, MedicationRequest } from 'fhir/r5';
-import { FileText } from 'lucide-react-native';
+import {
+  FileText,
+  FolderPlus,
+  MessageSquareText,
+  Tablets,
+  User,
+} from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { SpecialistField } from '@/src/components/SpecialistField';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
@@ -94,11 +100,19 @@ export function TreatmentForm({
   });
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const optionalFields = [
-    { id: 'requester' as const, label: 'Requester (Specialist)' },
-    { id: 'instructions' as const, label: 'Dosage Instructions' },
-    { id: 'reason' as const, label: 'Reason' },
-    { id: 'reasonCondition' as const, label: 'Associated Conditions' },
-    { id: 'notes' as const, label: 'Notes' },
+    { id: 'requester' as const, label: 'Requester (Specialist)', icon: User },
+    {
+      id: 'instructions' as const,
+      label: 'Dosage Instructions',
+      icon: Tablets,
+    },
+    { id: 'reason' as const, label: 'Reason', icon: MessageSquareText },
+    {
+      id: 'reasonCondition' as const,
+      label: 'Associated Conditions',
+      icon: FolderPlus,
+    },
+    { id: 'notes' as const, label: 'Notes', icon: FileText },
   ];
   const conditionOptions = conditions.flatMap((condition) =>
     condition.id
@@ -108,12 +122,12 @@ export function TreatmentForm({
   const options = [
     ...optionalFields
       .filter(({ id }) => !visibleFields[id])
-      .map(({ id, label }) => ({
+      .map(({ id, label, icon: Icon }) => ({
         id,
         label,
         testID: `menu-add-treatment-${id}`,
         icon: (
-          <FileText
+          <Icon
             size={20}
             color={COLORS.light.primary}
             style={{ marginRight: 12 }}
