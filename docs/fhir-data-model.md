@@ -139,3 +139,62 @@ them still restore.
 v13 is additive and non-breaking: it creates `organizations` with an index on
 `(patient_id, name)` and its sync capture triggers. Its `repair` step re-creates
 the triggers on every start. No existing table or record changes.
+
+## Planned care
+
+Planned investigations, procedures, referrals and follow-ups are FHIR R5
+`ServiceRequest` resources stored in `service_requests`. The service is
+`code.concept.text`; the category is `category[0]` coded in SNOMED CT (lab test
+108252007, imaging 363679005, procedure 71388002, referral 3457005, follow-up
+390906007); an unrecognised existing category stays selectable and unchanged.
+The known planned date is `occurrenceDateTime`; relative timing is never turned
+into a date. Original instructions are kept verbatim in
+`patientInstruction[0].instructionMarkdown`. Indication wording is
+`reason[0].concept.text`, with Condition links in `reason[].reference`; notes
+are `note[0]`; the requester is `requester.display`. Intent defaults to `plan`
+(recommendation) and status to `unknown`; the status value set is the
+request-status one (`revoked`, not `cancelled`). Further categories, reasons,
+notes, instructions, codings and other elements are preserved on edit, and a
+generated narrative is rebuilt on save. Planned care never creates a
+DiagnosticReport or Observation.
+
+A consultation relates to planned care in one of three ways, chosen with a role
+select on the link in either edit form:
+
+- **Origin** (`ServiceRequest.encounter`, 0..1): the consultation it was
+  planned in. Creating planned care from a consultation sets it; a request has
+  at most one origin, so choosing another consultation as origin moves it (the
+  previous one keeps a planned entry). The origin is also listed in its
+  consultation's document.
+- **Planned in** a consultation: an entry in that consultation's Composition,
+  in a section coded LOINC `18776-5` (Plan of care note, the IPS plan of care
+  section).
+- **Based on** (`Encounter.basedOn`): the referral or order that led to the
+  visit. References carry `reference` and `type: 'ServiceRequest'`; `basedOn`
+  references to other request types are preserved. Same-patient ownership is
+  checked when the referenced request is stored; a reference to a request not
+  yet stored is tolerated so restores and sync can apply in any order.
+
+Reference cleanup is transactional:
+
+- Deleting planned care removes its Composition entries (dropping emptied
+  sections) and its `Encounter.basedOn` references.
+- Deleting a consultation clears `encounter` on requests that originated in it
+  (JSON and SQL projection together) and keeps them.
+- Deleting a Condition removes it from `reason[].reference` and keeps the
+  wording.
+
+ZIP archives carry `records/service_request_*.json` envelopes; restore order is
+patients, organizations, conditions, reports, encounters, treatments, planned
+care, then Compositions. Encrypted sync replicates `ServiceRequest` after
+`MedicationRequest` and before `Composition`.
+
+### Migration v14
+
+v14 is additive and non-breaking: it creates `service_requests` (canonical JSON
+plus projected patient, originating consultation, label, status, intent,
+category code, authored and planned dates, and requisition system/value for
+grouped requests), its indexes and its sync capture triggers. The originating
+consultation foreign key is `ON DELETE SET NULL`; deleting a patient cascades.
+`Encounter.basedOn` lives in canonical Encounter JSON and needs no column. No
+existing table or record changes; backup restore remains the recovery path.

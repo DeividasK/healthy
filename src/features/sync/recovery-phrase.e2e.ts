@@ -316,5 +316,32 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'bob@gmail.com'
     );
+
+    // Once Google refuses a token, automatic syncs stop asking for one.
+    const driveRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().startsWith('https://www.googleapis.com/'))
+        driveRequests.push(request.url());
+    });
+    await page.evaluate(() => {
+      (window as any).__tokenRequests = 0;
+      const oauth2 = (window as any).google.accounts.oauth2;
+      const init = oauth2.initTokenClient;
+      oauth2.initTokenClient = (config: any) => {
+        const client = init(config);
+        return {
+          requestAccessToken: (options: any) => {
+            (window as any).__tokenRequests++;
+            client.requestAccessToken(options);
+          },
+        };
+      };
+    });
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.waitForTimeout(2100);
+    }
+    expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(0);
+    expect(driveRequests).toEqual([]);
   });
 });

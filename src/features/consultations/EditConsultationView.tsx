@@ -20,7 +20,7 @@ import {
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { Pill } from 'lucide-react-native';
+import { ClipboardList, Pill } from 'lucide-react-native';
 import {
   diffLinkIds,
   type LinkFieldConfig,
@@ -32,6 +32,13 @@ import {
   linkTreatmentToConsultation,
   unlinkTreatmentFromConsultation,
 } from '@/src/features/treatments/treatmentService';
+import {
+  getConsultationPlannedCareRoles,
+  getPlannedCareLinkOptions,
+  setPlannedCareConsultationRole,
+  PLANNED_CARE_ROLE_OPTIONS,
+  type PlannedCareConsultationRole,
+} from '@/src/features/planned-care/plannedCareService';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,12 +58,19 @@ export function EditConsultationView() {
     let isMounted = true;
     (async () => {
       try {
-        const [encounter, treatmentOptions, linkedTreatments] =
-          await Promise.all([
-            getConsultationById(id, activePatientId),
-            getTreatmentLinkOptions(activePatientId),
-            getLinkedTreatmentsForConsultation(id, activePatientId),
-          ]);
+        const [
+          encounter,
+          treatmentOptions,
+          linkedTreatments,
+          plannedCareOptions,
+          plannedCareRoles,
+        ] = await Promise.all([
+          getConsultationById(id, activePatientId),
+          getTreatmentLinkOptions(activePatientId),
+          getLinkedTreatmentsForConsultation(id, activePatientId),
+          getPlannedCareLinkOptions(activePatientId),
+          getConsultationPlannedCareRoles(id, activePatientId),
+        ]);
         if (!isMounted) return;
         setLinkFields([
           {
@@ -65,6 +79,18 @@ export function EditConsultationView() {
             icon: Pill,
             options: treatmentOptions,
             initialIds: linkedTreatments.map((item) => item.id!),
+          },
+          {
+            type: 'planned-care',
+            label: 'Planned care',
+            icon: ClipboardList,
+            options: plannedCareOptions,
+            initialIds: Object.keys(plannedCareRoles),
+            roles: {
+              options: PLANNED_CARE_ROLE_OPTIONS,
+              initial: plannedCareRoles,
+              defaultRole: 'planned',
+            },
           },
         ]);
         if (!encounter) {
@@ -190,6 +216,28 @@ export function EditConsultationView() {
       await linkTreatmentToConsultation(treatmentId, id, initialPatientId);
     for (const treatmentId of changes.removed)
       await unlinkTreatmentFromConsultation(treatmentId, id, initialPatientId);
+
+    const plannedCare = linkFields[1];
+    const roles = links['planned-care'].roles as Record<
+      string,
+      PlannedCareConsultationRole
+    >;
+    for (const requestId of plannedCare.initialIds)
+      if (!roles[requestId])
+        await setPlannedCareConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          null
+        );
+    for (const [requestId, role] of Object.entries(roles))
+      if (plannedCare.roles?.initial[requestId] !== role)
+        await setPlannedCareConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          role
+        );
   };
 
   return (

@@ -1,4 +1,4 @@
-import type { Encounter, MedicationRequest } from 'fhir/r5';
+import type { Encounter, MedicationRequest, ServiceRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import {
   getConsultationTitle,
@@ -7,6 +7,7 @@ import {
   getConsultationNotes,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
+  getConsultationBasedOnIds,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
@@ -109,6 +110,19 @@ export async function insertConsultationRecord(
       [consultation.serviceProvider?.reference],
       patientId
     );
+
+    // A referenced ServiceRequest must belong to the same patient. One not
+    // stored yet is tolerated, so restores and sync can apply in any order.
+    for (const requestId of getConsultationBasedOnIds(consultation)) {
+      const request = await db.getFirstAsync<{ patient_id: string }>(
+        'SELECT patient_id FROM service_requests WHERE id = ?;',
+        [requestId]
+      );
+      if (request && request.patient_id !== patientId)
+        throw new Error(
+          'Encounter basedOn must reference planned care for the same patient'
+        );
+    }
 
     await db.runAsync(
       `INSERT INTO consultations (id, patient_id, date, doctor_name, service_type, title, notes, status, fhir_json, created_at, updated_at)
@@ -236,27 +250,27 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
     // Retain independent requests and clear their originating encounter in
     // both FHIR and SQL. Failures abort the whole deletion so the projection
     // never diverges from the canonical resource.
-    const originatingTreatments = await db.getAllAsync<{
-      id: string;
-      fhir_json: string;
-    }>(
-      `SELECT id, fhir_json FROM medication_requests WHERE consultation_id = ?;`,
-      [id]
-    );
-
     const now = new Date().toISOString();
-    for (const treatRow of originatingTreatments) {
-      const req: MedicationRequest = JSON.parse(treatRow.fhir_json);
-      delete req.encounter;
-      req.meta = { ...req.meta, lastUpdated: now };
-      await db.runAsync(
-        `UPDATE medication_requests
-         SET consultation_id = NULL,
-             fhir_json = ?,
-             updated_at = ?
-         WHERE id = ?;`,
-        [JSON.stringify(req), now, treatRow.id]
-      );
+    for (const table of ['medication_requests', 'service_requests']) {
+      const originating = await db.getAllAsync<{
+        id: string;
+        fhir_json: string;
+      }>(`SELECT id, fhir_json FROM ${table} WHERE consultation_id = ?;`, [id]);
+      for (const row of originating) {
+        const req: MedicationRequest | ServiceRequest = JSON.parse(
+          row.fhir_json
+        );
+        delete req.encounter;
+        req.meta = { ...req.meta, lastUpdated: now };
+        await db.runAsync(
+          `UPDATE ${table}
+           SET consultation_id = NULL,
+               fhir_json = ?,
+               updated_at = ?
+           WHERE id = ?;`,
+          [JSON.stringify(req), now, row.id]
+        );
+      }
     }
 
     // The Composition goes with it (ON DELETE CASCADE).
@@ -267,6 +281,7 @@ export async function deleteConsultationRecord(id: string): Promise<void> {
     'consultation_conditions',
     'clinical_documents',
     'medication_requests',
+    'service_requests',
   ]);
 }
 

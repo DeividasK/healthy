@@ -424,6 +424,14 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
           consultationId: 'k1',
         },
       ],
+      plannedCare: [
+        {
+          id: 'p1',
+          title: 'Planned care 1',
+          reasonConditionIds: ['c2'],
+          consultationId: 'k1',
+        },
+      ],
     });
   });
 
@@ -483,6 +491,15 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
     await expect(page.getByTestId('treatment-conditions-count-t1')).toHaveText(
       '1'
     );
+    await expect(
+      page.getByTestId('condition-planned-care-count-c2')
+    ).toHaveText('1');
+    await expect(
+      page.getByTestId('consultation-planned-care-count-k1')
+    ).toHaveText('1');
+    await expect(
+      page.getByTestId('planned-care-conditions-count-p1')
+    ).toHaveText('1');
   });
 
   test('opens a condition or consultation by clicking anywhere on its row', async ({

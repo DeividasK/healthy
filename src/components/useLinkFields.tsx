@@ -22,6 +22,11 @@ export interface LinkFieldConfig {
     options: NativeSelectOption[];
     initial: Record<string, string>;
     defaultRole: string;
+    /**
+     * A role at most one link may have. Choosing it for a link moves any
+     * other link with it to `defaultRole`.
+     */
+    single?: string;
   };
 }
 
@@ -97,10 +102,17 @@ export function useLinkFields(configs: LinkFieldConfig[]) {
                 value={typeRoles[id] || config.roles!.defaultRole}
                 options={config.roles!.options}
                 onChange={(role) =>
-                  setRoles((current) => ({
-                    ...current,
-                    [config.type]: { ...current[config.type], [id]: role },
-                  }))
+                  setRoles((current) => {
+                    const next = { ...current[config.type] };
+                    if (role === config.roles!.single)
+                      for (const other of ids)
+                        if (other !== id && next[other] === role)
+                          next[other] = config.roles!.defaultRole;
+                    return {
+                      ...current,
+                      [config.type]: { ...next, [id]: role },
+                    };
+                  })
                 }
               />
             </View>

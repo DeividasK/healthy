@@ -27,6 +27,18 @@ import {
   type TreatmentInput,
 } from '@/src/features/treatments/treatmentService';
 import {
+  fetchServiceRequestById,
+  insertServiceRequestRecord,
+  deleteServiceRequestRecord,
+} from '@/src/features/planned-care/plannedCareRepository';
+import {
+  createOrUpdatePlannedCare,
+  deletePlannedCare,
+  setPlannedCareConsultationRole,
+  savePlannedCareConsultationRoles,
+  type PlannedCareInput,
+} from '@/src/features/planned-care/plannedCareService';
+import {
   exportZipArchive,
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
@@ -309,6 +321,7 @@ export function setupTestBridge() {
       patientId?: string;
       conditionIds?: string[];
       reasonConditionIds?: string[];
+      basedOnServiceRequestIds?: string[];
       title: string;
       doctorName?: string;
       serviceProviderName?: string;
@@ -323,6 +336,7 @@ export function setupTestBridge() {
         patientId,
         conditionIds: input.conditionIds,
         reasonConditionIds: input.reasonConditionIds,
+        basedOnServiceRequestIds: input.basedOnServiceRequestIds,
         title: input.title,
         doctorName: input.doctorName,
         serviceProviderName: input.serviceProviderName,
@@ -367,6 +381,26 @@ export function setupTestBridge() {
         reasonConditionIds: input.reasonConditionIds,
         notes: input.notes,
         requesterName: input.requesterName,
+      });
+    },
+    getPlannedCare: fetchServiceRequestById,
+    updatePlannedCare: createOrUpdatePlannedCare,
+    savePlannedCare: insertServiceRequestRecord,
+    deletePlannedCare,
+    deleteServiceRequest: deleteServiceRequestRecord,
+    setPlannedCareConsultationRole,
+    savePlannedCareConsultationRoles,
+    seedPlannedCare: async (
+      input: Omit<PlannedCareInput, 'authoredDate'> & { authoredOn?: string }
+    ) => {
+      const patientId = await resolvePatientId(input.patientId);
+      return await createOrUpdatePlannedCare({
+        ...input,
+        patientId,
+        intent: input.intent || 'plan',
+        status: input.status || 'unknown',
+        authoredDate:
+          input.authoredOn || new Date().toISOString().split('T')[0],
       });
     },
   };

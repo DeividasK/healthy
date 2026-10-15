@@ -19,6 +19,7 @@ import {
   refreshGoogleAccessToken,
 } from '@/src/features/sync/googleAccount';
 import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
+import { GoogleAuthExpiredError } from '@/src/services/googleDriveService';
 import type { CloudStorageProvider } from '@/src/features/sync/providers/types';
 import {
   VaultAlreadyExistsError,
@@ -151,6 +152,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const inFlightSyncRef = useRef<Promise<void> | null>(null);
   const lastFocusSyncRef = useRef<number>(0);
   const configRef = useRef<GoogleDriveConfig | null>(config);
+  // Set once Google refuses a silent refresh. Automatic syncs then stop
+  // asking Google for tokens (GSI can only open a blocked popup) until the
+  // user syncs manually or reconnects.
+  const authExpiredRef = useRef(false);
+  const markAuthExpired = useCallback((expired: boolean) => {
+    authExpiredRef.current = expired;
+    setIsAuthExpired(expired);
+  }, []);
 
   const updateConfig = useCallback(async (next: GoogleDriveConfig | null) => {
     await saveGoogleDriveConfig(next);
@@ -214,98 +223,107 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     ): Promise<T> => {
       let active = configRef.current;
       if (!active) throw new Error('Google Drive is not connected.');
-      if (
-        active.tokenExpiresAt &&
-        Date.now() >= active.tokenExpiresAt - 60000
-      ) {
-        try {
-          const refreshed = await refreshAccessToken(active);
-          if (refreshed) {
-            active = refreshed;
-            await updateConfig(refreshed);
-          }
-        } catch (err) {
-          console.warn('Preemptive token refresh failed:', err);
+      // At most one refresh per operation; a refused one ends it without
+      // further Drive requests or token prompts.
+      let refreshAttempted = false;
+      const refresh = async (cause: unknown) => {
+        refreshAttempted = true;
+        const refreshed = await refreshAccessToken(active!).catch((err) => {
+          console.warn('Google token refresh failed:', err);
+          return null;
+        });
+        if (!refreshed) {
+          markAuthExpired(true);
+          throw cause instanceof Error && isAuthError(cause)
+            ? cause
+            : new GoogleAuthExpiredError();
         }
-      }
+        active = refreshed;
+        await updateConfig(refreshed);
+      };
+      if (active.tokenExpiresAt && Date.now() >= active.tokenExpiresAt - 60000)
+        await refresh(null);
       try {
         return await operation(createGoogleDriveProvider(active.accessToken));
       } catch (err) {
-        if (!isAuthError(err)) throw err;
-        const refreshed = await refreshAccessToken(active).catch(
-          (refreshErr) => {
-            console.warn('Token refresh retry failed:', refreshErr);
-            return null;
-          }
-        );
-        if (!refreshed) throw err;
-        await updateConfig(refreshed);
-        return await operation(
-          createGoogleDriveProvider(refreshed.accessToken)
-        );
+        if (!isAuthError(err) || refreshAttempted) {
+          if (isAuthError(err)) markAuthExpired(true);
+          throw err;
+        }
+        await refresh(err);
+        return await operation(createGoogleDriveProvider(active.accessToken));
       }
     },
-    [updateConfig]
+    [markAuthExpired, updateConfig]
   );
 
-  const syncNow = useCallback(async (): Promise<void> => {
-    if (!configRef.current) return;
-    if (inFlightSyncRef.current) return inFlightSyncRef.current;
-    if (resetTimerRef.current) {
-      clearTimeout(resetTimerRef.current);
-      resetTimerRef.current = null;
-    }
-
-    const performSync = async () => {
-      const keys = await loadVaultKeys();
-      if (!keys) {
-        setVaultState('locked');
-        return;
+  const runSync = useCallback(
+    async ({ manual = false } = {}): Promise<void> => {
+      if (!configRef.current) return;
+      // Automatic syncs wait for the user once Google has refused a token.
+      if (authExpiredRef.current && !manual) return;
+      if (inFlightSyncRef.current) return inFlightSyncRef.current;
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
       }
-      setSyncState('syncing');
-      setSyncError(null);
-      setIsAuthExpired(false);
-      try {
-        await withProvider((provider) => syncOnce(provider, keys));
-        const now = new Date();
-        if (configRef.current)
-          await updateConfig({
-            ...configRef.current,
-            lastSyncTimestamp: now.toISOString(),
-          });
-        setLastSyncedAt(now);
-        setIsUpToDate(!(await hasUnsyncedLocalChanges()));
-        setSyncState('just_synced');
-        resetTimerRef.current = setTimeout(() => setSyncState('idle'), 1000);
-      } catch (err: unknown) {
-        if (isAuthError(err)) {
-          // A later focus or poll retries once Google issues a fresh token.
-          console.warn('Google Drive session expired; sync will retry:', err);
-          setSyncState('idle');
-          setIsUpToDate(false);
+
+      const performSync = async () => {
+        const keys = await loadVaultKeys();
+        if (!keys) {
+          setVaultState('locked');
           return;
         }
-        if (err instanceof VaultMissingError) {
-          await forgetVaultKey();
-          await updateConfig(null);
-          setVaultState('disconnected');
+        setSyncState('syncing');
+        setSyncError(null);
+        markAuthExpired(false);
+        try {
+          await withProvider((provider) => syncOnce(provider, keys));
+          const now = new Date();
+          if (configRef.current)
+            await updateConfig({
+              ...configRef.current,
+              lastSyncTimestamp: now.toISOString(),
+            });
+          setLastSyncedAt(now);
+          setIsUpToDate(!(await hasUnsyncedLocalChanges()));
+          setSyncState('just_synced');
+          resetTimerRef.current = setTimeout(() => setSyncState('idle'), 1000);
+        } catch (err: unknown) {
+          if (isAuthError(err)) {
+            // Automatic syncs pause until the user syncs or reconnects.
+            markAuthExpired(true);
+            console.warn('Google Drive session expired; sync paused:', err);
+            setSyncState('idle');
+            setIsUpToDate(false);
+            return;
+          }
+          if (err instanceof VaultMissingError) {
+            await forgetVaultKey();
+            await updateConfig(null);
+            setVaultState('disconnected');
+          }
+          console.error('Sync failed:', err);
+          setSyncError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to sync with Google Drive.'
+          );
+          setIsUpToDate(false);
+          setSyncState('error');
         }
-        console.error('Sync failed:', err);
-        setSyncError(
-          err instanceof Error
-            ? err.message
-            : 'Failed to sync with Google Drive.'
-        );
-        setIsUpToDate(false);
-        setSyncState('error');
-      }
-    };
+      };
 
-    inFlightSyncRef.current = performSync().finally(() => {
-      inFlightSyncRef.current = null;
-    });
-    return inFlightSyncRef.current;
-  }, [updateConfig, withProvider]);
+      inFlightSyncRef.current = performSync().finally(() => {
+        inFlightSyncRef.current = null;
+      });
+      return inFlightSyncRef.current;
+    },
+    [markAuthExpired, updateConfig, withProvider]
+  );
+
+  /** A sync the user asked for, which may ask Google for a new token. */
+  const syncNow = useCallback(() => runSync({ manual: true }), [runSync]);
 
   // Upload local edits shortly after they are saved.
   useDatabaseSubscription(
@@ -317,6 +335,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       'consultations',
       'clinical_documents',
       'medication_requests',
+      'service_requests',
       'organizations',
     ],
     (tables) => {
@@ -330,7 +349,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         try {
           if (!(await hasUnsyncedLocalChanges())) return;
           setIsUpToDate(false);
-          if (vaultState === 'unlocked') await syncNow();
+          if (vaultState === 'unlocked') await runSync();
         } catch (err) {
           console.warn('Scheduled upload failed:', err);
         }
@@ -342,10 +361,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   // comes back.
   useEffect(() => {
     if (vaultState !== 'unlocked') return;
-    syncNow();
+    runSync();
 
     const interval = setInterval(() => {
-      if (!inFlightSyncRef.current) syncNow();
+      if (!inFlightSyncRef.current) runSync();
     }, POLL_INTERVAL_MS);
 
     const handleWakeup = () => {
@@ -353,7 +372,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (now - lastFocusSyncRef.current < 2000) return;
       if (inFlightSyncRef.current) return;
       lastFocusSyncRef.current = now;
-      syncNow();
+      runSync();
     };
     const onVisibilityChange = () => {
       if (
@@ -381,7 +400,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       appStateSub.remove();
     };
-  }, [vaultState, syncNow]);
+  }, [vaultState, runSync]);
 
   const connectWithGoogle = useCallback(
     async (
@@ -394,7 +413,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (!exists && !createIfMissing) return 'missing' as const;
       await updateConfig({ ...authData, lastSyncTimestamp: undefined });
       setSyncError(null);
-      setIsAuthExpired(false);
+      markAuthExpired(false);
       let created = false;
       if (!exists) {
         try {
@@ -415,7 +434,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setVaultState('unlocked');
       return 'created' as const;
     },
-    [refreshSyncedProfiles, updateConfig]
+    [markAuthExpired, refreshSyncedProfiles, updateConfig]
   );
 
   const unlockWithPhrase = useCallback(
@@ -448,9 +467,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setLastSyncedAt(null);
       setIsUpToDate(true);
       setSyncError(null);
-      setIsAuthExpired(false);
+      markAuthExpired(false);
     },
-    [updateConfig, withProvider]
+    [markAuthExpired, updateConfig, withProvider]
   );
 
   const setProfileSynced = useCallback(
@@ -478,8 +497,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const clearError = useCallback(() => {
     setSyncError(null);
     setSyncState('idle');
-    setIsAuthExpired(false);
-  }, []);
+    markAuthExpired(false);
+  }, [markAuthExpired]);
 
   return (
     <SyncContext.Provider

@@ -29,7 +29,9 @@ import {
   getConsultationReasonConditionIds,
   getConsultationTitle,
   withoutEncounterReference,
+  withConsultationBasedOn,
 } from '@/src/utils/fhirUtils';
+import { fetchServiceRequestById } from '@/src/features/planned-care/plannedCareRepository';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
 export interface ConsultationDiagnosisInput {
@@ -46,6 +48,8 @@ export interface ConsultationDiagnosisInput {
 export interface ConsultationInput {
   diagnoses?: ConsultationDiagnosisInput[];
   reasonConditionIds?: string[];
+  /** Planned care this consultation is based on; undefined keeps them. */
+  basedOnServiceRequestIds?: string[];
   id?: string;
   patientId?: string;
   conditionIds?: string[];
@@ -257,6 +261,15 @@ export async function createOrUpdateConsultation(
   let result = withConsultationConditions(encounter, conditionIds);
   if (processedInput.reasonConditionIds !== undefined)
     result = withConsultationReasons(result, processedInput.reasonConditionIds);
+  if (processedInput.basedOnServiceRequestIds !== undefined) {
+    for (const requestId of processedInput.basedOnServiceRequestIds)
+      if (!(await fetchServiceRequestById(requestId, patientId)))
+        throw new Error(`Planned care ${requestId} not found`);
+    result = withConsultationBasedOn(
+      result,
+      processedInput.basedOnServiceRequestIds
+    );
+  }
   if (processedInput.diagnoses !== undefined) {
     result.diagnosis = processedInput.diagnoses.map((diagnosis) => {
       if (!diagnosis.title.trim())

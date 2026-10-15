@@ -11,7 +11,7 @@ import {
 } from './conditionService';
 import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { Pill, Stethoscope } from 'lucide-react-native';
+import { ClipboardList, Pill, Stethoscope } from 'lucide-react-native';
 import {
   diffLinkIds,
   type LinkFieldConfig,
@@ -30,6 +30,11 @@ import {
   getTreatmentsByConditionId,
   setTreatmentConditionLink,
 } from '@/src/features/treatments/treatmentService';
+import {
+  getPlannedCareByConditionId,
+  getPlannedCareLinkOptions,
+  setPlannedCareConditionLink,
+} from '@/src/features/planned-care/plannedCareService';
 
 export function EditConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -56,12 +61,16 @@ export function EditConditionView() {
           linkedConsultations,
           treatmentOptions,
           linkedTreatments,
+          plannedCareOptions,
+          linkedPlannedCare,
         ] = await Promise.all([
           getConditionById(id, activePatientId),
           getConsultationLinkOptions(activePatientId),
           getConsultationsByConditionId(id),
           getTreatmentLinkOptions(activePatientId),
           getTreatmentsByConditionId(id, activePatientId),
+          getPlannedCareLinkOptions(activePatientId),
+          getPlannedCareByConditionId(id, activePatientId),
         ]);
         if (!isMounted) return;
         setLinkFields([
@@ -88,6 +97,13 @@ export function EditConditionView() {
             icon: Pill,
             options: treatmentOptions,
             initialIds: linkedTreatments.map((item) => item.id!),
+          },
+          {
+            type: 'planned-care',
+            label: 'Planned care',
+            icon: ClipboardList,
+            options: plannedCareOptions,
+            initialIds: linkedPlannedCare.map((item) => item.id!),
           },
         ]);
         if (!condition) {
@@ -182,7 +198,7 @@ export function EditConditionView() {
   ) => {
     const patientId = activePatientId || initialPatientId!;
     await createOrUpdateCondition({ ...values, id, patientId });
-    const [consultations, treatments] = linkFields;
+    const [consultations, treatments, plannedCare] = linkFields;
     const consultationLinks = links.consultation;
     for (const consultationId of diffLinkIds(
       consultations.initialIds,
@@ -204,6 +220,14 @@ export function EditConditionView() {
       await setTreatmentConditionLink(treatmentId, id, patientId, true);
     for (const treatmentId of treatmentChanges.removed)
       await setTreatmentConditionLink(treatmentId, id, patientId, false);
+    const plannedCareChanges = diffLinkIds(
+      plannedCare.initialIds,
+      links['planned-care'].ids
+    );
+    for (const requestId of plannedCareChanges.added)
+      await setPlannedCareConditionLink(requestId, id, patientId, true);
+    for (const requestId of plannedCareChanges.removed)
+      await setPlannedCareConditionLink(requestId, id, patientId, false);
   };
 
   return (

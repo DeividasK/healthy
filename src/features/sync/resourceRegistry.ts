@@ -8,6 +8,7 @@ import type {
   Observation,
   Organization,
   Patient,
+  ServiceRequest,
 } from 'fhir/r5';
 import type { DatabaseTable } from '@/src/database/dbEvents';
 import { insertPatientRecord } from '@/src/features/profile/patientRepository';
@@ -16,6 +17,7 @@ import { insertConditionRecord } from '@/src/features/conditions/conditionsRepos
 import { insertDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { insertConsultationRecord } from '@/src/features/consultations/consultationsRepository';
 import { insertMedicationRequestRecord } from '@/src/features/treatments/treatmentsRepository';
+import { insertServiceRequestRecord } from '@/src/features/planned-care/plannedCareRepository';
 import { insertClinicalDocumentRecord } from '@/src/features/consultations/clinicalDocumentsRepository';
 import type { SyncResourceType } from './types';
 
@@ -118,6 +120,17 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     put: (resource, patientId) =>
       insertMedicationRequestRecord(
         resource as unknown as MedicationRequest,
+        patientId,
+        true
+      ),
+  },
+  ServiceRequest: {
+    table: 'service_requests',
+    tables: ['service_requests'],
+    read: (db, id) => readJson(db, 'service_requests', id),
+    put: (resource, patientId) =>
+      insertServiceRequestRecord(
+        resource as unknown as ServiceRequest,
         patientId,
         true
       ),

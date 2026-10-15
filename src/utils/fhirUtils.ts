@@ -5,6 +5,7 @@ import type {
   MedicationRequest,
   Composition,
   Reference,
+  ServiceRequest,
 } from 'fhir/r5';
 
 /**
@@ -265,15 +266,22 @@ export function getTreatmentReason(request: MedicationRequest): string | null {
   return request.reason?.[0]?.concept?.text || null;
 }
 
-/** IDs of every Condition a MedicationRequest's reasons reference. */
-export function getTreatmentReasonConditionIds(
-  request: MedicationRequest
-): string[] {
+/** IDs of every Condition a request's reasons reference. */
+export function getReasonConditionIds(request: {
+  reason?: CodeableReference[];
+}): string[] {
   const ids = (request.reason || []).flatMap((reason) => {
     const ref = reason.reference?.reference;
     return ref?.startsWith('Condition/') ? [ref.slice(10)] : [];
   });
   return [...new Set(ids)];
+}
+
+/** IDs of every Condition a MedicationRequest's reasons reference. */
+export function getTreatmentReasonConditionIds(
+  request: MedicationRequest
+): string[] {
+  return getReasonConditionIds(request);
 }
 
 /** Exact resource references in every document section, including nested sections. */
@@ -332,10 +340,9 @@ export function withoutCompositionEntry(
 }
 
 /** Removes one reason reference while keeping any indication wording. */
-export function withoutTreatmentReasonReference(
-  request: MedicationRequest,
-  reference: string
-): MedicationRequest {
+export function withoutReasonReference<
+  T extends { reason?: CodeableReference[] },
+>(request: T, reference: string): T {
   if (!request.reason?.some((r) => r.reference?.reference === reference))
     return request;
   const reason = request.reason.flatMap((entry) => {
@@ -344,7 +351,72 @@ export function withoutTreatmentReasonReference(
     delete retained.reference;
     return retained.concept ? [retained] : [];
   });
-  const updated: MedicationRequest = { ...request, reason };
+  const updated: T = { ...request, reason };
   if (!reason.length) delete updated.reason;
+  return updated;
+}
+
+/** Safely extracts the requested service from a ServiceRequest. */
+export function getPlannedCareTitle(request: ServiceRequest): string {
+  return (
+    request.code?.concept?.text ||
+    request.code?.concept?.coding?.[0]?.display ||
+    'Planned care'
+  );
+}
+
+/** Original patient instructions, kept verbatim. */
+export function getPlannedCareInstructions(
+  request: ServiceRequest
+): string | null {
+  return request.patientInstruction?.[0]?.instructionMarkdown || null;
+}
+
+export function getPlannedCareNotes(request: ServiceRequest): string | null {
+  return request.note?.[0]?.text || null;
+}
+
+export function getPlannedCareReason(request: ServiceRequest): string | null {
+  return request.reason?.[0]?.concept?.text || null;
+}
+
+/** IDs of the ServiceRequests an Encounter is based on. */
+export function getConsultationBasedOnIds(encounter: Encounter): string[] {
+  return [
+    ...new Set(
+      (encounter.basedOn || []).flatMap((reference) =>
+        reference.reference?.startsWith('ServiceRequest/')
+          ? [reference.reference.slice(15)]
+          : []
+      )
+    ),
+  ];
+}
+
+/**
+ * Sets the ServiceRequests an Encounter is based on. References to other
+ * request types and metadata on retained references are preserved.
+ */
+export function withConsultationBasedOn(
+  encounter: Encounter,
+  serviceRequestIds: string[]
+): Encounter {
+  const selected = new Set(serviceRequestIds);
+  const retained = new Set<string>();
+  const basedOn = (encounter.basedOn || []).filter((reference) => {
+    if (!reference.reference?.startsWith('ServiceRequest/')) return true;
+    const id = reference.reference.slice(15);
+    if (!selected.has(id) || retained.has(id)) return false;
+    retained.add(id);
+    return true;
+  });
+  for (const id of selected)
+    if (!retained.has(id))
+      basedOn.push({
+        reference: `ServiceRequest/${id}`,
+        type: 'ServiceRequest',
+      });
+  const updated: Encounter = { ...encounter, basedOn };
+  if (!basedOn.length) delete updated.basedOn;
   return updated;
 }

@@ -4,24 +4,31 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { MapPin, Pill, Stethoscope } from 'lucide-react-native';
+import { ClipboardList, MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import { PlannedCareRelatedRow } from '@/src/features/planned-care/PlannedCareRelatedRow';
 import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
 import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentService';
+import { getPlannedCareByConditionId } from '@/src/features/planned-care/plannedCareService';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { deleteCondition, getConditionById } from './conditionService';
 import { goBackOr } from '@/src/utils/navigation';
-import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
+import type {
+  Condition,
+  Encounter,
+  MedicationRequest,
+  ServiceRequest,
+} from 'fhir/r5';
 
 export function ViewConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -30,6 +37,7 @@ export function ViewConditionView() {
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
+  const [plannedCare, setPlannedCare] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -40,11 +48,12 @@ export function ViewConditionView() {
     const sequence = ++loadSequence.current;
     if (!id || isPatientLoading || !activePatientId) return;
     try {
-      const [conditionData, consultationData, treatmentData] =
+      const [conditionData, consultationData, treatmentData, plannedCareData] =
         await Promise.all([
           getConditionById(id, activePatientId),
           getConsultationsByConditionId(id),
           getTreatmentsByConditionId(id, activePatientId),
+          getPlannedCareByConditionId(id, activePatientId),
         ]);
       if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
@@ -53,11 +62,13 @@ export function ViewConditionView() {
         setCondition(null);
         setConsultations([]);
         setTreatments([]);
+        setPlannedCare([]);
       } else {
         setNotFound(false);
         setCondition(conditionData);
         setConsultations(consultationData);
         setTreatments(treatmentData);
+        setPlannedCare(plannedCareData);
       }
     } catch (error) {
       if (sequence !== loadSequence.current) return;
@@ -70,7 +81,7 @@ export function ViewConditionView() {
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['conditions', 'consultations', 'medication_requests'],
+    ['conditions', 'consultations', 'medication_requests', 'service_requests'],
     loadData
   );
 
@@ -143,6 +154,23 @@ export function ViewConditionView() {
                 onPress: () =>
                   router.push({
                     pathname: '/treatment/add',
+                    params: { conditionId: id },
+                  }),
+              },
+              {
+                id: 'planned-care',
+                label: 'Planned care',
+                testID: 'menu-add-planned-care',
+                icon: (
+                  <ClipboardList
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/planned-care/add',
                     params: { conditionId: id },
                   }),
               },
@@ -293,6 +321,21 @@ export function ViewConditionView() {
           ))}
         </ResourceSection>
       )}
+
+      <ResourceSection
+        icon={ClipboardList}
+        title="Planned care"
+        testID="condition-planned-care-section"
+      >
+        {plannedCare.map((request) => (
+          <PlannedCareRelatedRow
+            key={request.id}
+            request={request}
+            testID={`condition-planned-care-item-${request.id}`}
+            onPress={() => router.push(`/planned-care/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
     </ResourceViewLayout>
   );
 }

@@ -171,12 +171,15 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole('button')).toHaveCount(2);
+    await expect(menu.getByRole('button')).toHaveCount(3);
     await expect(
       menu.getByRole('button', { name: 'Consultation', exact: true })
     ).toBeVisible();
     await expect(
       menu.getByRole('button', { name: 'Treatment', exact: true })
+    ).toBeVisible();
+    await expect(
+      menu.getByRole('button', { name: 'Planned care', exact: true })
     ).toBeVisible();
     await expect(addButton).toHaveAttribute('aria-expanded', 'true');
     await expect(addButton).toHaveAccessibleName('Close add menu');

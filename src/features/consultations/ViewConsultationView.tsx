@@ -2,8 +2,13 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Hash, Plus } from 'lucide-react-native';
-import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
+import { ClipboardList, FolderPlus, Hash, Plus } from 'lucide-react-native';
+import type {
+  Condition,
+  Encounter,
+  MedicationRequest,
+  ServiceRequest,
+} from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
@@ -18,6 +23,11 @@ import {
 import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
+import {
+  getBasedOnPlannedCareForConsultation,
+  getLinkedPlannedCareForConsultation,
+} from '@/src/features/planned-care/plannedCareService';
+import { PlannedCareRelatedRow } from '@/src/features/planned-care/PlannedCareRelatedRow';
 import { RelatedResourceList } from './RelatedResourceList';
 import { getConsultationMeta } from './ConsultationRelatedRow';
 import {
@@ -39,6 +49,8 @@ export function ViewConsultationView() {
   const [linkedTreatments, setLinkedTreatments] = useState<MedicationRequest[]>(
     []
   );
+  const [plannedCare, setPlannedCare] = useState<ServiceRequest[]>([]);
+  const [basedOn, setBasedOn] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -48,19 +60,28 @@ export function ViewConsultationView() {
     const generation = ++loadGeneration.current;
     if (!id || !activePatientId) return;
     try {
-      const [value, treatments] = await Promise.all([
+      const [value, treatments, planned] = await Promise.all([
         getConsultationById(id, activePatientId),
         getLinkedTreatmentsForConsultation(id, activePatientId).catch(() => []),
+        getLinkedPlannedCareForConsultation(id, activePatientId).catch(
+          () => []
+        ),
       ]);
       if (generation !== loadGeneration.current) return;
       if (!value) {
         setConsultation(null);
         setRelatedConditions([]);
         setLinkedTreatments([]);
+        setPlannedCare([]);
+        setBasedOn([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
       }
+      const basedOnRequests = await getBasedOnPlannedCareForConsultation(
+        value,
+        activePatientId
+      ).catch(() => []);
       const conditions = await Promise.all(
         [
           ...new Set([
@@ -82,6 +103,8 @@ export function ViewConsultationView() {
         )
       );
       setLinkedTreatments(treatments);
+      setPlannedCare(planned);
+      setBasedOn(basedOnRequests);
       setNotFound(false);
       setHasLoadError(false);
     } catch (error) {
@@ -98,6 +121,7 @@ export function ViewConsultationView() {
       'consultations',
       'conditions',
       'medication_requests',
+      'service_requests',
       'clinical_documents',
     ],
     loadData
@@ -158,6 +182,23 @@ export function ViewConsultationView() {
                     params: { consultationId: id },
                   }),
               },
+              {
+                id: 'create-planned-care',
+                label: 'Create New Planned Care',
+                testID: 'option-create-new-planned-care',
+                icon: (
+                  <ClipboardList
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/planned-care/add',
+                    params: { consultationId: id },
+                  }),
+              },
             ]}
           />
           <ResourceActionDock
@@ -168,7 +209,7 @@ export function ViewConsultationView() {
             }}
             editTestID="edit-consultation-button"
             onAdd={() => setShowAddMenu((visible) => !visible)}
-            addLabel="Add treatment"
+            addLabel="Add record"
             addMenuExpanded={showAddMenu}
             addTestID="consultation-add-treatment"
             deleteLabel="Delete consultation"
@@ -222,6 +263,20 @@ export function ViewConsultationView() {
             ))}
         </ResourceSection>
       )}
+      <ResourceSection
+        icon={ClipboardList}
+        title="Based on"
+        testID="consultation-based-on"
+      >
+        {basedOn.map((request) => (
+          <PlannedCareRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-based-on-${request.id}`}
+            onPress={() => router.push(`/planned-care/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
       {Boolean(consultation.diagnosis?.length) && (
         <ResourceSection
           icon={FolderPlus}
@@ -271,6 +326,21 @@ export function ViewConsultationView() {
       )}
 
       <RelatedResourceList linkedTreatments={linkedTreatments} />
+
+      <ResourceSection
+        icon={ClipboardList}
+        title="Planned care"
+        testID="consultation-planned-care"
+      >
+        {plannedCare.map((request) => (
+          <PlannedCareRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-planned-care-${request.id}`}
+            onPress={() => router.push(`/planned-care/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
     </ResourceViewLayout>
   );
 }
