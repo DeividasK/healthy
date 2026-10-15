@@ -25,8 +25,11 @@ import {
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { SpecialistField } from '@/src/components/SpecialistField';
-import { getOrganizationNames } from '@/src/features/organizations/organizationService';
-import { getReportServiceProvider } from '@/src/utils/fhirUtils';
+import {
+  getOrganizationNames,
+  getServiceProviderName,
+} from '@/src/features/organizations/organizationService';
+import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -108,6 +111,8 @@ export function LabResultForm({
   const [serviceProviderName, setServiceProviderName] = useState<string | null>(
     null
   );
+  // Whether the loaded report showed a provider, so removing it is explicit.
+  const [hadServiceProvider, setHadServiceProvider] = useState(false);
   const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
     []
   );
@@ -164,7 +169,13 @@ export function LabResultForm({
           }
         }
 
-        setServiceProviderName(getReportServiceProvider(record.report));
+        const providerName = await getServiceProviderName(
+          record.report.performer?.find(isOrganizationReference),
+          activePatientId
+        );
+        if (!isMounted) return;
+        setServiceProviderName(providerName);
+        setHadServiceProvider(providerName !== null);
 
         // Notes
         if (record.report.note && record.report.note.length > 0) {
@@ -227,7 +238,7 @@ export function LabResultForm({
     return () => {
       isMounted = false;
     };
-  }, [reportId]);
+  }, [reportId, activePatientId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -360,7 +371,14 @@ export function LabResultForm({
         date: effectiveDateStr,
         time: testTime || undefined,
         notes: testNotes ? testNotes.trim() : undefined,
-        serviceProviderName: serviceProviderName?.trim() || undefined,
+        // Removing a provider the report had clears it; otherwise an unshown
+        // provider (e.g. a reference with no name) is kept.
+        serviceProviderName:
+          serviceProviderName !== null
+            ? serviceProviderName.trim() || null
+            : hadServiceProvider
+              ? null
+              : undefined,
         items: biomarkers,
       });
 

@@ -79,6 +79,19 @@ export async function fetchOrganizationByName(
   return row ? JSON.parse(row.fhir_json) : null;
 }
 
+/** A patient's Organization by id. */
+export async function fetchOrganizationById(
+  id: string,
+  patientId: string
+): Promise<Organization | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ fhir_json: string }>(
+    'SELECT fhir_json FROM organizations WHERE id = ? AND patient_id = ?;',
+    [id, patientId]
+  );
+  return row ? JSON.parse(row.fhir_json) : null;
+}
+
 /** A patient's Organization names, alphabetically, for autocomplete. */
 export async function fetchOrganizationNames(
   patientId: string

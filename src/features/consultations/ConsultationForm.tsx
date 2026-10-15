@@ -318,9 +318,12 @@ export function ConsultationForm({
           date: fullDate,
           doctorName:
             showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
-          serviceProviderName:
-            showServiceProvider && serviceProviderName.trim()
-              ? serviceProviderName.trim()
+          // Removing a provider the consultation had clears it; otherwise an
+          // unshown provider (e.g. a reference with no name) is kept.
+          serviceProviderName: showServiceProvider
+            ? serviceProviderName.trim() || null
+            : initialValues?.serviceProviderName
+              ? null
               : undefined,
           serviceType:
             showServiceType && serviceType.trim()

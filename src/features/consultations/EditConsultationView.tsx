@@ -1,4 +1,5 @@
 import type { ConsultationInput } from './consultationService';
+import { getServiceProviderName } from '@/src/features/organizations/organizationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
@@ -11,7 +12,6 @@ import {
 import {
   getConsultationTitle,
   getConsultationDoctor,
-  getConsultationServiceProvider,
   getConsultationServiceType,
   getConsultationNotes,
   getConsultationConditionIds,
@@ -95,7 +95,10 @@ export function EditConsultationView() {
         const title = getConsultationTitle(encounter);
         const doctorName = getConsultationDoctor(encounter) || undefined;
         const serviceProviderName =
-          getConsultationServiceProvider(encounter) || undefined;
+          (await getServiceProviderName(
+            encounter.serviceProvider,
+            activePatientId
+          )) || undefined;
         const serviceType = getConsultationServiceType(encounter) || undefined;
         const notes = getConsultationNotes(encounter) || undefined;
         const conditionIds = getConsultationConditionIds(encounter);

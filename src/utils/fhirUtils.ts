@@ -1,7 +1,6 @@
 import type {
   CodeableReference,
   Condition,
-  DiagnosticReport,
   Encounter,
   MedicationRequest,
   Composition,
@@ -97,13 +96,6 @@ export function isOrganizationReference(reference: Reference): boolean {
     reference.type === 'Organization' ||
     Boolean(reference.reference?.startsWith('Organization/'))
   );
-}
-
-/** The service provider: the first Organization performing a DiagnosticReport. */
-export function getReportServiceProvider(
-  report: DiagnosticReport
-): string | null {
-  return report.performer?.find(isOrganizationReference)?.display || null;
 }
 
 /**

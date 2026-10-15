@@ -121,7 +121,10 @@ References carry `reference`, `type: 'Organization'` and `display`, so rows and
 meta lines show the name without a join. Forms submit a name: saving matches the
 patient's existing Organization by case-insensitive name or creates one, in the
 same transaction as the referencing resource. Removing a provider clears the
-reference and keeps the Organization as an autocomplete suggestion. Writes reject
+reference and keeps the Organization as an autocomplete suggestion. Edits only
+change the reference when the user sets or removes the provider: a reference
+without `display` shows the stored Organization's name, and one the form cannot
+name (e.g. identifier-only) is kept as is. Writes reject
 references to Organizations that do not belong to the same patient.
 
 FHIR Organizations have no subject. `organizations.patient_id` is storage

@@ -52,8 +52,11 @@ export interface ConsultationInput {
   date: string; // FHIR date or date-time with timezone offset
   title: string;
   doctorName?: string;
-  /** Service provider (Organization) name; found or created on save. */
-  serviceProviderName?: string;
+  /**
+   * Service provider (Organization) name, found or created on save. Omit to
+   * keep the stored reference; `null` or blank removes it.
+   */
+  serviceProviderName?: string | null;
   serviceType?: string;
   notes?: string;
   status?: string; // 'completed' | 'planned'
@@ -231,11 +234,17 @@ export async function createOrUpdateConsultation(
           };
           return updated.actor || updated.type?.length ? [updated] : [];
         }),
-    serviceProvider: trimmedServiceProvider
-      ? existing?.serviceProvider?.display === trimmedServiceProvider
-        ? existing.serviceProvider
-        : await resolveOrganizationReference(trimmedServiceProvider, patientId)
-      : undefined,
+    serviceProvider:
+      processedInput.serviceProviderName === undefined
+        ? existing?.serviceProvider
+        : trimmedServiceProvider
+          ? existing?.serviceProvider?.display === trimmedServiceProvider
+            ? existing.serviceProvider
+            : await resolveOrganizationReference(
+                trimmedServiceProvider,
+                patientId
+              )
+          : undefined,
     text: trimmedNotes
       ? {
           ...existing?.text,

@@ -38,8 +38,11 @@ export interface CreateReportOptions {
   date: string; // YYYY-MM-DD
   time?: string; // e.g. "09:30"
   notes?: string;
-  /** Service provider (Organization) name; found or created on save. */
-  serviceProviderName?: string;
+  /**
+   * Service provider (Organization) name, found or created on save. Omit to
+   * keep the stored performers; `null` or blank removes the Organization.
+   */
+  serviceProviderName?: string | null;
   items: BiomarkerInputItem[];
 }
 
@@ -250,13 +253,17 @@ export async function createAndSaveDiagnosticReport(
     const performers = existing?.performer || [];
     const providerIndex = performers.findIndex(isOrganizationReference);
     const current = performers[providerIndex];
-    const provider = !providerName
-      ? undefined
-      : current?.display === providerName
-        ? current
-        : await resolveOrganizationReference(providerName, patientId);
-    const updated =
-      providerIndex >= 0
+    const keep = options.serviceProviderName === undefined;
+    const provider = keep
+      ? current
+      : !providerName
+        ? undefined
+        : current?.display === providerName
+          ? current
+          : await resolveOrganizationReference(providerName, patientId);
+    const updated = keep
+      ? performers
+      : providerIndex >= 0
         ? performers.flatMap((performer, index) =>
             index !== providerIndex ? [performer] : provider ? [provider] : []
           )

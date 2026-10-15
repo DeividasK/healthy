@@ -219,4 +219,47 @@ test.describe('Edit Lab Results Flow', () => {
     // Observations live in their own table, never inside the report JSON.
     expect(stored.contained).toBeUndefined();
   });
+
+  test('keeps an Organization performer it cannot name on unrelated edits', async ({
+    page,
+  }) => {
+    const { report } = await seedTestReport(page, {
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+    });
+    const performer = {
+      type: 'Organization',
+      identifier: { system: 'https://example.org/labs', value: 'LAB-1' },
+    };
+    await page.evaluate(
+      async ([id, value]) => {
+        await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+          `UPDATE diagnostic_reports
+             SET fhir_json = json_set(fhir_json, '$.performer', json(?))
+           WHERE id = ?;`,
+          [value, id]
+        );
+      },
+      [report.id, JSON.stringify([performer])]
+    );
+
+    await page.goto(`/lab-result/${report.id}/edit`);
+    await expect(page.getByTestId('marker-value-input-0')).toHaveValue('14.5');
+    await expect(
+      page.getByTestId('lab-result-service-provider-input')
+    ).toHaveCount(0);
+    await page.getByTestId('marker-value-input-0').fill('15.1');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+
+    const stored = await page.evaluate(async () =>
+      JSON.parse(
+        (
+          await (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+            'SELECT fhir_json FROM diagnostic_reports;'
+          )
+        )[0].fhir_json
+      )
+    );
+    expect(stored.performer).toEqual([performer]);
+  });
 });

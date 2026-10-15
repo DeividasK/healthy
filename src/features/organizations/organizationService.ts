@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import type { Organization, Reference } from 'fhir/r5';
 import {
+  fetchOrganizationById,
   fetchOrganizationByName,
   fetchOrganizationNames,
   insertOrganizationRecord,
@@ -39,4 +40,19 @@ export async function getOrganizationNames(
   patientId: string
 ): Promise<string[]> {
   return await fetchOrganizationNames(patientId);
+}
+
+/**
+ * The name shown for a service provider reference: its `display`, or the
+ * stored Organization's name when a reference (e.g. imported) has none.
+ */
+export async function getServiceProviderName(
+  reference: Reference | undefined,
+  patientId: string
+): Promise<string | null> {
+  if (reference?.display) return reference.display;
+  const target = reference?.reference;
+  if (!target?.startsWith('Organization/')) return null;
+  const organization = await fetchOrganizationById(target.slice(13), patientId);
+  return organization?.name?.trim() || null;
 }
