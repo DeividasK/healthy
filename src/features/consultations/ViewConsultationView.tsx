@@ -2,8 +2,13 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Hash, Plus } from 'lucide-react-native';
-import type { Condition, Encounter, MedicationRequest } from 'fhir/r5';
+import { ClipboardList, FolderPlus, Hash, Pill } from 'lucide-react-native';
+import type {
+  Condition,
+  Encounter,
+  MedicationRequest,
+  ServiceRequest,
+} from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
@@ -18,6 +23,11 @@ import {
 import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
+import {
+  getBasedOnServiceRequestsForConsultation,
+  getLinkedServiceRequestsForConsultation,
+} from '@/src/features/service-requests/serviceRequestService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { RelatedResourceList } from './RelatedResourceList';
 import { getConsultationMeta } from './ConsultationRelatedRow';
 import {
@@ -39,6 +49,8 @@ export function ViewConsultationView() {
   const [linkedTreatments, setLinkedTreatments] = useState<MedicationRequest[]>(
     []
   );
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [basedOn, setBasedOn] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -48,19 +60,28 @@ export function ViewConsultationView() {
     const generation = ++loadGeneration.current;
     if (!id || !activePatientId) return;
     try {
-      const [value, treatments] = await Promise.all([
+      const [value, treatments, planned] = await Promise.all([
         getConsultationById(id, activePatientId),
         getLinkedTreatmentsForConsultation(id, activePatientId).catch(() => []),
+        getLinkedServiceRequestsForConsultation(id, activePatientId).catch(
+          () => []
+        ),
       ]);
       if (generation !== loadGeneration.current) return;
       if (!value) {
         setConsultation(null);
         setRelatedConditions([]);
         setLinkedTreatments([]);
+        setServiceRequests([]);
+        setBasedOn([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
       }
+      const basedOnRequests = await getBasedOnServiceRequestsForConsultation(
+        value,
+        activePatientId
+      ).catch(() => []);
       const conditions = await Promise.all(
         [
           ...new Set([
@@ -82,6 +103,8 @@ export function ViewConsultationView() {
         )
       );
       setLinkedTreatments(treatments);
+      setServiceRequests(planned);
+      setBasedOn(basedOnRequests);
       setNotFound(false);
       setHasLoadError(false);
     } catch (error) {
@@ -98,6 +121,7 @@ export function ViewConsultationView() {
       'consultations',
       'conditions',
       'medication_requests',
+      'service_requests',
       'clinical_documents',
     ],
     loadData
@@ -143,10 +167,10 @@ export function ViewConsultationView() {
             options={[
               {
                 id: 'create-treatment',
-                label: 'Create New Treatment',
+                label: 'Treatment',
                 testID: 'option-create-new-treatment',
                 icon: (
-                  <Plus
+                  <Pill
                     color={COLORS.light.primary}
                     size={18}
                     style={{ marginRight: 10 }}
@@ -155,6 +179,23 @@ export function ViewConsultationView() {
                 onPress: () =>
                   router.push({
                     pathname: '/treatment/add',
+                    params: { consultationId: id },
+                  }),
+              },
+              {
+                id: 'create-service-request',
+                label: 'Service Request',
+                testID: 'option-create-new-service-request',
+                icon: (
+                  <ClipboardList
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/service-request/add',
                     params: { consultationId: id },
                   }),
               },
@@ -168,7 +209,7 @@ export function ViewConsultationView() {
             }}
             editTestID="edit-consultation-button"
             onAdd={() => setShowAddMenu((visible) => !visible)}
-            addLabel="Add treatment"
+            addLabel="Add record"
             addMenuExpanded={showAddMenu}
             addTestID="consultation-add-treatment"
             deleteLabel="Delete consultation"
@@ -222,6 +263,20 @@ export function ViewConsultationView() {
             ))}
         </ResourceSection>
       )}
+      <ResourceSection
+        icon={ClipboardList}
+        title="Based on"
+        testID="consultation-based-on"
+      >
+        {basedOn.map((request) => (
+          <ServiceRequestRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-based-on-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
       {Boolean(consultation.diagnosis?.length) && (
         <ResourceSection
           icon={FolderPlus}
@@ -271,6 +326,21 @@ export function ViewConsultationView() {
       )}
 
       <RelatedResourceList linkedTreatments={linkedTreatments} />
+
+      <ResourceSection
+        icon={ClipboardList}
+        title="Service requests"
+        testID="consultation-service-request"
+      >
+        {serviceRequests.map((request) => (
+          <ServiceRequestRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-service-request-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
     </ResourceViewLayout>
   );
 }

@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { MedicationRequest, Composition } from 'fhir/r5';
+import type { MedicationRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
@@ -12,13 +12,15 @@ import {
 } from './treatmentsRepository';
 import {
   fetchClinicalDocumentByConsultationId,
-  insertClinicalDocumentRecord,
   fetchConsultationIdsReferencingResource,
 } from '@/src/features/consultations/clinicalDocumentsRepository';
-import { fetchConsultationById } from '@/src/features/consultations/consultationsRepository';
+import {
+  addEntryToConsultationDocument,
+  removeEntryFromConsultationDocument,
+  type DocumentSectionSpec,
+} from '@/src/features/consultations/consultationDocumentEntries';
 import {
   createNarrativeDiv,
-  withoutCompositionEntry,
   getCompositionEntryReferences,
   getTreatmentTitle,
   getTreatmentInstructions,
@@ -47,8 +49,13 @@ export interface TreatmentInput {
 /** LOINC section code for medications in clinical documents (IPS, C-CDA). */
 export const TREATMENTS_SECTION_LOINC = '10160-0';
 export const TREATMENTS_SECTION_DISPLAY = 'History of Medication use Narrative';
-/** Code written by development builds before 10160-0; read for compatibility. */
-const LEGACY_TREATMENTS_SECTION_LOINC = '18605-6';
+const TREATMENTS_SECTION: DocumentSectionSpec = {
+  title: 'Treatments',
+  loinc: TREATMENTS_SECTION_LOINC,
+  display: TREATMENTS_SECTION_DISPLAY,
+  // Code written by development builds before 10160-0; read for compatibility.
+  legacyLoinc: ['18605-6'],
+};
 
 /**
  * Creates or updates a MedicationRequest resource in SQLite.
@@ -380,26 +387,11 @@ export async function unlinkTreatmentFromConsultation(
   consultationId: string,
   patientId: string = DEFAULT_PATIENT_ID
 ): Promise<void> {
-  const comp = await fetchClinicalDocumentByConsultationId(
+  await removeEntryFromConsultationDocument(
+    `MedicationRequest/${treatmentId}`,
     consultationId,
     patientId
   );
-  if (!comp || !comp.section) return;
-
-  const targetRef = `MedicationRequest/${treatmentId}`;
-  const cleaned = withoutCompositionEntry(comp, targetRef);
-  if (cleaned === comp) return;
-
-  const now = new Date().toISOString();
-  const updatedComp: Composition = {
-    ...cleaned,
-    meta: {
-      ...comp.meta,
-      lastUpdated: now,
-    },
-  };
-
-  await insertClinicalDocumentRecord(updatedComp, patientId);
 }
 
 /**
@@ -436,121 +428,11 @@ async function addTreatmentToComposition(
   patientId: string,
   withinTransaction: boolean
 ): Promise<void> {
-  const consultation = await fetchConsultationById(consultationId, patientId);
-  if (!consultation) {
-    throw new Error(`Consultation ${consultationId} not found`);
-  }
-  if (consultation.subject?.reference !== `Patient/${patientId}`) {
-    throw new Error('Consultation belongs to a different patient');
-  }
-
-  const existingDoc = await fetchClinicalDocumentByConsultationId(
+  await addEntryToConsultationDocument(
+    `MedicationRequest/${treatmentId}`,
     consultationId,
-    patientId
+    patientId,
+    TREATMENTS_SECTION,
+    withinTransaction
   );
-  const now = new Date().toISOString();
-  const targetRef = `MedicationRequest/${treatmentId}`;
-
-  if (
-    existingDoc &&
-    getCompositionEntryReferences(existingDoc).includes(targetRef)
-  )
-    return;
-
-  const docId = existingDoc?.id || `comp-${Crypto.randomUUID()}`;
-
-  const existingSections = existingDoc?.section || [];
-  const isTreatmentsCoding = (c: { system?: string; code?: string }) =>
-    c.system === 'http://loinc.org' &&
-    (c.code === TREATMENTS_SECTION_LOINC ||
-      c.code === LEGACY_TREATMENTS_SECTION_LOINC);
-  const treatSectionIndex = existingSections.findIndex((s) =>
-    s.code?.coding?.some(isTreatmentsCoding)
-  );
-
-  let updatedSections: NonNullable<Composition['section']>;
-
-  if (treatSectionIndex >= 0) {
-    const existingSection = existingSections[treatSectionIndex];
-    const existingEntries = existingSection.entry || [];
-    const alreadyLinked = existingEntries.some(
-      (e) => e.reference === targetRef
-    );
-
-    if (alreadyLinked) {
-      return; // Already present, nothing to do
-    }
-
-    const updatedSection = {
-      ...existingSection,
-      // Replace only the legacy coding; keep any other codings.
-      code: existingSection.code && {
-        ...existingSection.code,
-        coding: existingSection.code.coding?.map((c) =>
-          isTreatmentsCoding(c)
-            ? {
-                ...c,
-                code: TREATMENTS_SECTION_LOINC,
-                display: TREATMENTS_SECTION_DISPLAY,
-              }
-            : c
-        ),
-      },
-      entry: [...existingEntries, { reference: targetRef }],
-    };
-
-    updatedSections = existingSections.map((s, idx) =>
-      idx === treatSectionIndex ? updatedSection : s
-    );
-  } else {
-    const newSection = {
-      title: 'Treatments',
-      code: {
-        coding: [
-          {
-            system: 'http://loinc.org',
-            code: TREATMENTS_SECTION_LOINC,
-            display: TREATMENTS_SECTION_DISPLAY,
-          },
-        ],
-        text: 'Treatments',
-      },
-      entry: [{ reference: targetRef }],
-    };
-    updatedSections = [...existingSections, newSection];
-  }
-
-  const composition: Composition = {
-    ...existingDoc,
-    resourceType: 'Composition',
-    id: docId,
-    meta: {
-      ...existingDoc?.meta,
-      lastUpdated: now,
-    },
-    status: existingDoc?.status || 'preliminary',
-    type: existingDoc?.type || {
-      coding: [
-        {
-          system: 'http://loinc.org',
-          code: '11488-4',
-          display: 'Consultation note',
-        },
-      ],
-      text: 'Consultation note',
-    },
-    title:
-      existingDoc?.title ||
-      `${consultation.type?.[0]?.text || 'Consultation'} Note`,
-    subject: existingDoc?.subject || [{ reference: `Patient/${patientId}` }],
-    encounter: existingDoc?.encounter || {
-      reference: `Encounter/${consultationId}`,
-    },
-    date: existingDoc?.date || now,
-    // The patient records this document themselves.
-    author: existingDoc?.author || [{ reference: `Patient/${patientId}` }],
-    section: updatedSections,
-  };
-
-  await insertClinicalDocumentRecord(composition, patientId, withinTransaction);
 }

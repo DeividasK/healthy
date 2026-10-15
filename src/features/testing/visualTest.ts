@@ -87,4 +87,5 @@ export {
   seedTestConsultation,
   seedTestTreatment,
   getTestTreatment,
+  seedTestServiceRequest,
 } from './testStorage';

@@ -653,7 +653,7 @@ export function ConsultationForm({
                                   value:
                                     diagnosisQueries[index] ??
                                     (diagnosis.createCondition
-                                      ? 'Create new condition'
+                                      ? 'New condition'
                                       : availableConditions.find(
                                           (condition) =>
                                             condition.id ===
@@ -695,7 +695,7 @@ export function ConsultationForm({
                                       },
                                       {
                                         id: '__create__',
-                                        label: 'Create new condition',
+                                        label: 'New condition',
                                       },
                                     ]}
                                     onSelect={(item) => {

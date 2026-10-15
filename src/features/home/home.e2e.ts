@@ -11,6 +11,7 @@ import {
   seedTestConsultation,
   seedTestReport,
   seedTestTreatment,
+  seedTestServiceRequest,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -62,6 +63,12 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await page.getByText('Hemoglobin (Hgb)').waitFor();
     // A lone section needs no heading
     await expect(page.getByText('Lab Results', { exact: true })).toHaveCount(0);
+
+    await seedTestServiceRequest(page, { title: 'Blood panel' });
+    await expect(
+      page.getByText('Service requests', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByText('Lab Results', { exact: true })).toBeVisible();
 
     await seedTestTreatment(page, { title: 'Vitamin D' });
     await expect(page.getByText('Treatments', { exact: true })).toBeVisible();
@@ -424,6 +431,14 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
           consultationId: 'k1',
         },
       ],
+      serviceRequests: [
+        {
+          id: 'p1',
+          title: 'Service request 1',
+          reasonConditionIds: ['c2'],
+          consultationId: 'k1',
+        },
+      ],
     });
   });
 
@@ -483,6 +498,15 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
     await expect(page.getByTestId('treatment-conditions-count-t1')).toHaveText(
       '1'
     );
+    await expect(
+      page.getByTestId('condition-service-request-count-c2')
+    ).toHaveText('1');
+    await expect(
+      page.getByTestId('consultation-service-request-count-k1')
+    ).toHaveText('1');
+    await expect(
+      page.getByTestId('service-request-conditions-count-p1')
+    ).toHaveText('1');
   });
 
   test('opens a condition or consultation by clicking anywhere on its row', async ({

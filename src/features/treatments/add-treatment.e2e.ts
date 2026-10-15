@@ -110,6 +110,7 @@ test.describe('Add Treatment Flow', () => {
     const consultation = await seedTestConsultation(page, {
       title: 'Neurology Consultation',
       doctorName: 'Dr. Julian Bashir',
+      date: '2026-03-02',
     });
 
     await page.goto(`/consultation/${consultation.id}`);
@@ -150,6 +151,8 @@ test.describe('Add Treatment Flow', () => {
     const created = JSON.parse(rows[0].fhir_json);
     expect(created.encounter?.reference).toBe(`Encounter/${consultation.id}`);
     expect(created.requester).toEqual({ display: 'Dr. Julian Bashir' });
+    // The date defaults to the consultation's.
+    expect(created.authoredOn).toBe('2026-03-02');
     const doc = await getTestClinicalDocument(page, consultation.id);
     expect(doc.author).toEqual([{ reference: consultation.subject.reference }]);
     const section = findTreatmentsSection(doc);

@@ -4,6 +4,9 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
+  seedTestServiceRequest,
+  getTestServiceRequest,
+  evaluateBridge,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Consultation Flow', () => {
@@ -242,5 +245,80 @@ test.describe('Edit Consultation Flow', () => {
       type: 'Organization',
       display: 'Smile Clinic',
     });
+  });
+
+  test('records a service request as based on, or moves its single origin here', async ({
+    page,
+  }) => {
+    const referring = await seedTestConsultation(page, {
+      title: 'GP visit',
+    });
+    const visit = await seedTestConsultation(page, {
+      title: 'Cardiology appointment',
+    });
+    const referral = await seedTestServiceRequest(page, {
+      title: 'Cardiology referral',
+      consultationId: referring.id,
+    });
+    const echo = await seedTestServiceRequest(page, {
+      title: 'Echocardiogram',
+      consultationId: referring.id,
+    });
+
+    await page.goto(`/consultation/${visit.id}/edit`);
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-service-request').click();
+    for (const request of [referral, echo]) {
+      await page.getByTestId('link-service-request-search-input').click();
+      await page
+        .getByTestId(`link-service-request-autocomplete-item-${request.id}`)
+        .click();
+    }
+    await page
+      .getByTestId(`link-service-request-role-${referral.id}`)
+      .selectOption('basedOn');
+    await page
+      .getByTestId(`link-service-request-role-${echo.id}`)
+      .selectOption('origin');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/edit$/);
+
+    await page.goto(`/consultation/${visit.id}`);
+    await expect(
+      page.getByTestId(`consultation-based-on-${referral.id}`)
+    ).toBeVisible();
+    await expect(
+      page.getByTestId(`consultation-service-request-${echo.id}`)
+    ).toBeVisible();
+    const stored = await evaluateBridge(
+      page,
+      (b, id) => b.getConsultation(id),
+      visit.id
+    );
+    expect(stored.basedOn).toEqual([
+      { reference: `ServiceRequest/${referral.id}`, type: 'ServiceRequest' },
+    ]);
+    // The origin moved; the earlier consultation still lists the request.
+    expect((await getTestServiceRequest(page, echo.id)).encounter).toEqual({
+      reference: `Encounter/${visit.id}`,
+    });
+    expect((await getTestServiceRequest(page, referral.id)).encounter).toEqual({
+      reference: `Encounter/${referring.id}`,
+    });
+    await page.goto(`/service-request/${echo.id}`);
+    await expect(
+      page.getByTestId(`linked-consultation-${referring.id}`)
+    ).toBeVisible();
+
+    // Removing the origin link clears the origin.
+    await page.goto(`/consultation/${visit.id}/edit`);
+    await page
+      .getByRole('button', { name: 'Remove service-request Echocardiogram' })
+      .click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/edit$/);
+    expect(
+      (await getTestServiceRequest(page, echo.id)).encounter
+    ).toBeUndefined();
   });
 });

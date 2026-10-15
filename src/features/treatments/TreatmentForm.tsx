@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import { StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
@@ -7,6 +7,7 @@ import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { FormField } from '@/src/components/FormField';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import type { Condition, MedicationRequest } from 'fhir/r5';
 import {
   FileText,
@@ -229,13 +230,10 @@ export function TreatmentForm({
             {isEditing ? 'Edit Treatment' : 'Add Treatment'}
           </ScreenHeading>
           {errorMessage && (
-            <View
-              style={styles.errorBanner}
+            <FormErrorBanner
+              message={errorMessage}
               testID="treatment-form-error"
-              accessibilityRole="alert"
-            >
-              <Text style={styles.errorBannerText}>{errorMessage}</Text>
-            </View>
+            />
           )}
           <FormField
             label="Treatment Name"
@@ -388,18 +386,5 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 120,
-  },
-  errorBanner: {
-    backgroundColor: COLORS.light.badgeHighBg,
-    borderWidth: 1,
-    borderColor: COLORS.light.badgeHighBorder,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorBannerText: {
-    color: COLORS.light.destructive,
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

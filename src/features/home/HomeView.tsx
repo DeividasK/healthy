@@ -1,6 +1,7 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   Calendar,
+  ClipboardList,
   FileText,
   FolderPlus,
   Pencil,
@@ -30,6 +31,11 @@ import {
   getAllTreatments,
   getConsultationIdsLinkingTreatment,
 } from '@/src/features/treatments/treatmentService';
+import {
+  getAllServiceRequests,
+  getConsultationIdsLinkingServiceRequest,
+} from '@/src/features/service-requests/serviceRequestService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { CollapsibleList } from './CollapsibleList';
 import {
   ResourceSection,
@@ -45,12 +51,14 @@ import type {
   Condition,
   Encounter,
   MedicationRequest,
+  ServiceRequest,
 } from 'fhir/r5';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
   getTreatmentReasonConditionIds,
+  getReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 
 import { COLORS } from '@/src/theme/colors';
@@ -107,6 +115,11 @@ export function HomeView() {
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [consultationTreatmentCounts, setConsultationTreatmentCounts] =
     useState<Record<string, number>>({});
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [
+    consultationServiceRequestCounts,
+    setConsultationServiceRequestCounts,
+  ] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -161,6 +174,8 @@ export function HomeView() {
     setConsultations([]);
     setTreatments([]);
     setConsultationTreatmentCounts({});
+    setServiceRequests([]);
+    setConsultationServiceRequestCounts({});
     setIsLoading(true);
   }
 
@@ -174,35 +189,52 @@ export function HomeView() {
 
     try {
       setIsLoading(true);
-      const [reportsData, conditionsData, consultationsData, treatmentsData] =
-        await Promise.all([
-          getAllReports(requestedPatientId),
-          getAllConditions(requestedPatientId),
-          getAllConsultations(requestedPatientId),
-          getAllTreatments(requestedPatientId),
-        ]);
+      const [
+        reportsData,
+        conditionsData,
+        consultationsData,
+        treatmentsData,
+        serviceRequestsData,
+      ] = await Promise.all([
+        getAllReports(requestedPatientId),
+        getAllConditions(requestedPatientId),
+        getAllConsultations(requestedPatientId),
+        getAllTreatments(requestedPatientId),
+        getAllServiceRequests(requestedPatientId),
+      ]);
 
-      const treatmentConsultationIds = await Promise.all(
-        treatmentsData.map((treatment) =>
-          treatment.id
-            ? getConsultationIdsLinkingTreatment(
-                treatment.id,
-                requestedPatientId
-              ).catch((error) => {
-                // A failed link lookup only loses that treatment's count.
-                console.warn('Failed to load treatment links:', error);
-                return [] as string[];
-              })
-            : Promise.resolve([])
-        )
-      );
-      const treatmentCounts: Record<string, number> = {};
-      for (const consultationIds of treatmentConsultationIds) {
-        for (const consultationId of new Set(consultationIds)) {
-          treatmentCounts[consultationId] =
-            (treatmentCounts[consultationId] || 0) + 1;
-        }
-      }
+      // Counts each record once per consultation whose document lists it.
+      const countConsultationLinks = async (
+        items: { id?: string }[],
+        lookup: (id: string, patientId: string) => Promise<string[]>
+      ) => {
+        const linkedIds = await Promise.all(
+          items.map((item) =>
+            item.id
+              ? lookup(item.id, requestedPatientId).catch((error) => {
+                  // A failed link lookup only loses that record's count.
+                  console.warn('Failed to load consultation links:', error);
+                  return [] as string[];
+                })
+              : Promise.resolve([])
+          )
+        );
+        const counts: Record<string, number> = {};
+        for (const consultationIds of linkedIds)
+          for (const consultationId of new Set(consultationIds))
+            counts[consultationId] = (counts[consultationId] || 0) + 1;
+        return counts;
+      };
+      const [treatmentCounts, serviceRequestCounts] = await Promise.all([
+        countConsultationLinks(
+          treatmentsData,
+          getConsultationIdsLinkingTreatment
+        ),
+        countConsultationLinks(
+          serviceRequestsData,
+          getConsultationIdsLinkingServiceRequest
+        ),
+      ]);
 
       // Only apply results if this request is still the latest generation and for current patient
       if (
@@ -216,6 +248,8 @@ export function HomeView() {
       setConsultations(consultationsData);
       setTreatments(treatmentsData);
       setConsultationTreatmentCounts(treatmentCounts);
+      setServiceRequests(serviceRequestsData);
+      setConsultationServiceRequestCounts(serviceRequestCounts);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -227,6 +261,7 @@ export function HomeView() {
         setConditions([]);
         setConsultations([]);
         setTreatments([]);
+        setServiceRequests([]);
       }
     } finally {
       if (
@@ -251,6 +286,8 @@ export function HomeView() {
       'observations',
       'consultations',
       'medication_requests',
+      'service_requests',
+      'clinical_documents',
     ],
     () => {
       loadData();
@@ -337,6 +374,10 @@ export function HomeView() {
     treatments.filter((treatment) =>
       getTreatmentReasonConditionIds(treatment).includes(conditionId)
     ).length;
+  const countConditionServiceRequests = (conditionId: string) =>
+    serviceRequests.filter((request) =>
+      getReasonConditionIds(request).includes(conditionId)
+    ).length;
   const countConsultationConditions = (consultation: Encounter) =>
     new Set([
       ...getConsultationConditionIds(consultation),
@@ -347,7 +388,8 @@ export function HomeView() {
     records.length > 0 ||
     conditions.length > 0 ||
     consultations.length > 0 ||
-    treatments.length > 0;
+    treatments.length > 0 ||
+    serviceRequests.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -408,6 +450,12 @@ export function HomeView() {
                               'treatments',
                               `condition-treatments-count-${condId}`
                             ),
+                            countMeta(
+                              ClipboardList,
+                              countConditionServiceRequests(condId),
+                              'service requests',
+                              `condition-service-request-count-${condId}`
+                            ),
                           ])}
                         />
                       </View>
@@ -444,6 +492,45 @@ export function HomeView() {
                             getTreatmentReasonConditionIds(treatment).length,
                             'conditions',
                             `treatment-conditions-count-${treatId}`
+                          ),
+                        ])}
+                      />
+                    </View>
+                  );
+                })}
+              </ResourceSection>
+            )}
+
+            {/* Service Requests Section */}
+            {serviceRequests.length > 0 && (
+              <ResourceSection
+                icon={ClipboardList}
+                title="Service requests"
+                testID="home-service-requests-section"
+              >
+                {serviceRequests.map((request) => {
+                  const requestId = request.id || '';
+                  return (
+                    <View
+                      key={requestId}
+                      testID={`service-request-card-${requestId}`}
+                    >
+                      <ServiceRequestRelatedRow
+                        request={request}
+                        testID={`service-request-open-${requestId}`}
+                        onPress={() => {
+                          blurActiveElement();
+                          router.push({
+                            pathname: '/service-request/[id]',
+                            params: { id: requestId },
+                          });
+                        }}
+                        extraMeta={withoutZeroCounts([
+                          countMeta(
+                            FolderPlus,
+                            getReasonConditionIds(request).length,
+                            'conditions',
+                            `service-request-conditions-count-${requestId}`
                           ),
                         ])}
                       />
@@ -490,6 +577,12 @@ export function HomeView() {
                               'treatments',
                               `consultation-treatments-count-${consId}`
                             ),
+                            countMeta(
+                              ClipboardList,
+                              consultationServiceRequestCounts[consId] || 0,
+                              'service requests',
+                              `consultation-service-request-count-${consId}`
+                            ),
                           ])}
                         />
                       </View>
@@ -504,6 +597,7 @@ export function HomeView() {
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 {(conditions.length > 0 ||
                   treatments.length > 0 ||
+                  serviceRequests.length > 0 ||
                   consultations.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
@@ -669,6 +763,19 @@ export function HomeView() {
                 />
               ),
               onPress: () => router.push('/treatment/add'),
+            },
+            {
+              id: 'service-request',
+              label: 'Service Request',
+              testID: 'menu-add-service-request',
+              icon: (
+                <ClipboardList
+                  color={COLORS.light.primary}
+                  size={18}
+                  style={{ marginRight: 10 }}
+                />
+              ),
+              onPress: () => router.push('/service-request/add'),
             },
             {
               id: 'consultation',

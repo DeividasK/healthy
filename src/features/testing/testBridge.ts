@@ -27,6 +27,18 @@ import {
   type TreatmentInput,
 } from '@/src/features/treatments/treatmentService';
 import {
+  fetchServiceRequestById,
+  insertServiceRequestRecord,
+  deleteServiceRequestRecord,
+} from '@/src/features/service-requests/serviceRequestsRepository';
+import {
+  createOrUpdateServiceRequest,
+  deleteServiceRequest,
+  setServiceRequestConsultationRole,
+  saveServiceRequestConsultationRoles,
+  type ServiceRequestInput,
+} from '@/src/features/service-requests/serviceRequestService';
+import {
   exportZipArchive,
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
@@ -309,6 +321,7 @@ export function setupTestBridge() {
       patientId?: string;
       conditionIds?: string[];
       reasonConditionIds?: string[];
+      basedOnServiceRequestIds?: string[];
       title: string;
       doctorName?: string;
       serviceProviderName?: string;
@@ -323,6 +336,7 @@ export function setupTestBridge() {
         patientId,
         conditionIds: input.conditionIds,
         reasonConditionIds: input.reasonConditionIds,
+        basedOnServiceRequestIds: input.basedOnServiceRequestIds,
         title: input.title,
         doctorName: input.doctorName,
         serviceProviderName: input.serviceProviderName,
@@ -367,6 +381,26 @@ export function setupTestBridge() {
         reasonConditionIds: input.reasonConditionIds,
         notes: input.notes,
         requesterName: input.requesterName,
+      });
+    },
+    getServiceRequest: fetchServiceRequestById,
+    updateServiceRequest: createOrUpdateServiceRequest,
+    saveServiceRequest: insertServiceRequestRecord,
+    deleteServiceRequest,
+    deleteServiceRequestRecord,
+    setServiceRequestConsultationRole,
+    saveServiceRequestConsultationRoles,
+    seedServiceRequest: async (
+      input: Omit<ServiceRequestInput, 'authoredDate'> & { authoredOn?: string }
+    ) => {
+      const patientId = await resolvePatientId(input.patientId);
+      return await createOrUpdateServiceRequest({
+        ...input,
+        patientId,
+        intent: input.intent || 'plan',
+        status: input.status || 'unknown',
+        authoredDate:
+          input.authoredOn || new Date().toISOString().split('T')[0],
       });
     },
   };

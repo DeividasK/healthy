@@ -1,5 +1,5 @@
 import { test, type Page } from '@playwright/test';
-import type { MedicationRequest } from 'fhir/r5';
+import type { MedicationRequest, ServiceRequest } from 'fhir/r5';
 
 export interface SeedPatientOptions {
   id?: string;
@@ -34,6 +34,7 @@ export interface SeedReportOptions {
 
 export interface SeedConsultationOptions {
   reasonConditionIds?: string[];
+  basedOnServiceRequestIds?: string[];
   id?: string;
   patientId?: string;
   conditionIds?: string[];
@@ -61,6 +62,24 @@ export interface SeedTreatmentOptions {
   requesterName?: string;
 }
 
+export interface SeedServiceRequestOptions {
+  id?: string;
+  patientId?: string;
+  consultationId?: string;
+  title: string;
+  /** SNOMED category code from SERVICE_REQUEST_CATEGORIES. */
+  category?: string;
+  intent?: ServiceRequest['intent'];
+  status?: ServiceRequest['status'];
+  authoredOn?: string;
+  plannedDate?: string;
+  instructions?: string;
+  reason?: string;
+  reasonConditionIds?: string[];
+  notes?: string;
+  requesterName?: string;
+}
+
 /** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
 export async function seedTestResources(
   page: Page,
@@ -68,6 +87,7 @@ export async function seedTestResources(
     conditions?: SeedConditionOptions[];
     consultations?: SeedConsultationOptions[];
     treatments?: SeedTreatmentOptions[];
+    serviceRequests?: SeedServiceRequestOptions[];
     reports?: SeedReportOptions[];
   }
 ): Promise<void> {
@@ -81,6 +101,8 @@ export async function seedTestResources(
         await bridge.seedConsultation(input);
       for (const input of resources.treatments ?? [])
         await bridge.seedTreatment(input);
+      for (const input of resources.serviceRequests ?? [])
+        await bridge.seedServiceRequest(input);
       for (const input of resources.reports ?? [])
         await bridge.seedReport(input);
     }, resources);
@@ -218,3 +240,60 @@ export function findTreatmentsSection(document: any): any {
     )
   );
 }
+
+/** Seeds service request (ServiceRequest) through the real service. */
+export async function seedTestServiceRequest(
+  page: Page,
+  options: SeedServiceRequestOptions
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(async (opts) => {
+    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedServiceRequest(
+      opts
+    );
+  }, options);
+}
+
+/** Fetches stored service request (ServiceRequest) via the test bridge. */
+export async function getTestServiceRequest(
+  page: Page,
+  id: string,
+  patientId?: string
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    async ({ requestId, patId }) =>
+      await (window as any).__HEALTHY_TEST_BRIDGE__.getServiceRequest(
+        requestId,
+        patId
+      ),
+    { requestId: id, patId: patientId }
+  );
+}
+
+/** LOINC code of the consultation document section that lists service request. */
+export const SERVICE_REQUESTS_SECTION_CODE = '18776-5';
+
+/** Returns the service request section of a consultation Composition, if any. */
+export function findServiceRequestSection(document: any): any {
+  return document?.section?.find((section: any) =>
+    section.code?.coding?.some(
+      (coding: any) => coding.code === SERVICE_REQUESTS_SECTION_CODE
+    )
+  );
+}
+
+/** Runs a function against the test bridge inside the page. */
+export const evaluateBridge = <T>(
+  page: Page,
+  run: (b: any, arg: any) => T | Promise<T>,
+  arg?: unknown
+): Promise<T> =>
+  page.evaluate(
+    ({ source, arg }) =>
+      new Function('b', 'arg', `return (${source})(b, arg);`)(
+        (window as any).__HEALTHY_TEST_BRIDGE__,
+        arg
+      ),
+    { source: run.toString(), arg }
+  );

@@ -316,5 +316,56 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'bob@gmail.com'
     );
+
+    // Once Google refuses a token, automatic syncs stop asking for one.
+    const driveRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().startsWith('https://www.googleapis.com/'))
+        driveRequests.push(request.url());
+    });
+    await page.evaluate(() => {
+      (window as any).__tokenRequests = 0;
+      const oauth2 = (window as any).google.accounts.oauth2;
+      const init = oauth2.initTokenClient;
+      oauth2.initTokenClient = (config: any) => {
+        const client = init(config);
+        return {
+          requestAccessToken: (options: any) => {
+            (window as any).__tokenRequests++;
+            client.requestAccessToken(options);
+          },
+        };
+      };
+    });
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.waitForTimeout(2100);
+    }
+    expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(0);
+    expect(driveRequests).toEqual([]);
+  });
+
+  test('does not contact Google in the background when no profile syncs', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    await connectTestSync(page, { userEmail: 'bob@gmail.com' });
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'UPDATE sync_profiles SET synced = 0;'
+      )
+    );
+    const googleRequests: string[] = [];
+    page.on('request', (request) => {
+      if (/googleapis\.com|accounts\.google\.com/.test(request.url()))
+        googleRequests.push(request.url());
+    });
+    await page.goto('/');
+    await page.getByTestId('floating-add-button').waitFor();
+    for (let i = 0; i < 2; i++) {
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.waitForTimeout(2100);
+    }
+    expect(googleRequests).toEqual([]);
   });
 });

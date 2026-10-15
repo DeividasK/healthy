@@ -6,6 +6,7 @@ export const SYNC_RESOURCE_TYPES = [
   'DiagnosticReport',
   'Encounter',
   'MedicationRequest',
+  'ServiceRequest',
   'Composition',
 ] as const;
 

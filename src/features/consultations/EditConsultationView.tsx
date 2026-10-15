@@ -20,7 +20,7 @@ import {
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { Pill } from 'lucide-react-native';
+import { ClipboardList, Pill } from 'lucide-react-native';
 import {
   diffLinkIds,
   type LinkFieldConfig,
@@ -32,6 +32,13 @@ import {
   linkTreatmentToConsultation,
   unlinkTreatmentFromConsultation,
 } from '@/src/features/treatments/treatmentService';
+import {
+  getConsultationServiceRequestRoles,
+  getServiceRequestLinkOptions,
+  setServiceRequestConsultationRole,
+  SERVICE_REQUEST_ROLE_OPTIONS,
+  type ServiceRequestConsultationRole,
+} from '@/src/features/service-requests/serviceRequestService';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,12 +58,19 @@ export function EditConsultationView() {
     let isMounted = true;
     (async () => {
       try {
-        const [encounter, treatmentOptions, linkedTreatments] =
-          await Promise.all([
-            getConsultationById(id, activePatientId),
-            getTreatmentLinkOptions(activePatientId),
-            getLinkedTreatmentsForConsultation(id, activePatientId),
-          ]);
+        const [
+          encounter,
+          treatmentOptions,
+          linkedTreatments,
+          serviceRequestOptions,
+          serviceRequestRoles,
+        ] = await Promise.all([
+          getConsultationById(id, activePatientId),
+          getTreatmentLinkOptions(activePatientId),
+          getLinkedTreatmentsForConsultation(id, activePatientId),
+          getServiceRequestLinkOptions(activePatientId),
+          getConsultationServiceRequestRoles(id, activePatientId),
+        ]);
         if (!isMounted) return;
         setLinkFields([
           {
@@ -65,6 +79,18 @@ export function EditConsultationView() {
             icon: Pill,
             options: treatmentOptions,
             initialIds: linkedTreatments.map((item) => item.id!),
+          },
+          {
+            type: 'service-request',
+            label: 'Service requests',
+            icon: ClipboardList,
+            options: serviceRequestOptions,
+            initialIds: Object.keys(serviceRequestRoles),
+            roles: {
+              options: SERVICE_REQUEST_ROLE_OPTIONS,
+              initial: serviceRequestRoles,
+              defaultRole: 'planned',
+            },
           },
         ]);
         if (!encounter) {
@@ -190,6 +216,28 @@ export function EditConsultationView() {
       await linkTreatmentToConsultation(treatmentId, id, initialPatientId);
     for (const treatmentId of changes.removed)
       await unlinkTreatmentFromConsultation(treatmentId, id, initialPatientId);
+
+    const serviceRequests = linkFields[1];
+    const roles = links['service-request'].roles as Record<
+      string,
+      ServiceRequestConsultationRole
+    >;
+    for (const requestId of serviceRequests.initialIds)
+      if (!roles[requestId])
+        await setServiceRequestConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          null
+        );
+    for (const [requestId, role] of Object.entries(roles))
+      if (serviceRequests.roles?.initial[requestId] !== role)
+        await setServiceRequestConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          role
+        );
   };
 
   return (

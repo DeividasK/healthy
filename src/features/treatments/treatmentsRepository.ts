@@ -1,11 +1,9 @@
-import type { MedicationRequest, Composition } from 'fhir/r5';
+import type { MedicationRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import {
-  getTreatmentTitle,
-  withoutCompositionEntry,
-} from '@/src/utils/fhirUtils';
+import { getTreatmentTitle } from '@/src/utils/fhirUtils';
+import { removeEntryFromAllDocuments } from '@/src/features/consultations/consultationDocumentEntries';
 
 export const VALID_MEDICATION_REQUEST_STATUSES: MedicationRequest['status'][] =
   [
@@ -330,30 +328,8 @@ export async function deleteMedicationRequestRecord(
     );
     if (!result.changes) return;
 
-    // Clean up all Composition entry references referencing MedicationRequest/id
-    const targetRef = `MedicationRequest/${id}`;
-    const compRows = await db.getAllAsync<{
-      id: string;
-      fhir_json: string;
-      patient_id: string;
-    }>(
-      `SELECT id, fhir_json, patient_id FROM clinical_documents
-       WHERE fhir_json LIKE ?;`,
-      [`%${targetRef}%`]
-    );
-
-    const now = new Date().toISOString();
-    for (const compRow of compRows) {
-      const comp: Composition = JSON.parse(compRow.fhir_json);
-      const cleaned = withoutCompositionEntry(comp, targetRef);
-      if (cleaned === comp) continue;
-      cleaned.meta = { ...cleaned.meta, lastUpdated: now };
-      // Do not catch failures: deletion and reference cleanup must commit together.
-      await db.runAsync(
-        `UPDATE clinical_documents SET fhir_json = ?, updated_at = ? WHERE id = ?;`,
-        [JSON.stringify(cleaned), now, compRow.id]
-      );
-    }
+    // Deletion and reference cleanup must commit together.
+    await removeEntryFromAllDocuments(db, `MedicationRequest/${id}`);
 
     didDelete = true;
   };

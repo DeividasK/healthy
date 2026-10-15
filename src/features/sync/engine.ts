@@ -63,6 +63,7 @@ const CLINICAL_TABLES: DatabaseTable[] = [
   'consultation_conditions',
   'clinical_documents',
   'medication_requests',
+  'service_requests',
   'organizations',
 ];
 

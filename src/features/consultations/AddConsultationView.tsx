@@ -8,7 +8,11 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 
 export function AddConsultationView() {
-  const { conditionId } = useLocalSearchParams<{ conditionId?: string }>();
+  const { conditionId, basedOnId } = useLocalSearchParams<{
+    conditionId?: string;
+    /** Service request that led to this visit (`Encounter.basedOn`). */
+    basedOnId?: string;
+  }>();
   const { activePatientId, isLoading } = useActivePatient();
 
   if (isLoading) {
@@ -23,6 +27,7 @@ export function AddConsultationView() {
     await createOrUpdateConsultation({
       ...values,
       patientId: activePatientId,
+      ...(basedOnId ? { basedOnServiceRequestIds: [basedOnId] } : {}),
     });
   };
 
