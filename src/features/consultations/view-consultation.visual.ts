@@ -28,6 +28,7 @@ test.describe('View Consultation - Visual Regression', () => {
       reasonConditionIds: [condition.id],
       title: 'Orthopedic Evaluation',
       doctorName: 'Dr. Sarah Connor',
+      serviceProviderName: 'City Hospital',
       serviceType: 'Orthopedics',
       date: '2026-10-04',
       notes: 'MRI recommended for ligament check.',

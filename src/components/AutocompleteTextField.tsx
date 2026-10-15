@@ -4,40 +4,52 @@ import { AutocompleteDropdown } from './AutocompleteDropdown';
 import { FormField } from './FormField';
 import { useDismissOnBlur } from './useDismissOnBlur';
 
-interface SpecialistFieldProps {
-  label?: string;
-  /** Form field name; defaults to `specialistName`. */
-  name?: string;
+interface AutocompleteTextFieldProps {
+  label: string;
+  /** Form field name. */
+  name: string;
   /** Used as the input's id, nativeID and testID. */
   inputID: string;
   value: string;
   onChangeText: (value: string) => void;
-  /** Known specialists offered as suggestions; any other name may be typed. */
+  /** Values offered as suggestions; any other text may be typed. */
   suggestions: string[];
   required?: boolean;
+  placeholder?: string;
+  /** Accessible name of the input; defaults to `label`. */
+  accessibilityLabel?: string;
   onRemove?: () => void;
   removeTestID?: string;
+  /** Accessible name of the remove button; defaults to "Remove <label>". */
+  removeLabel?: string;
+  /** Prefix of the suggestion list (`-list`) and item (`-item-N`) test IDs. */
   autocompleteTestID?: string;
 }
 
-/** Free-text specialist name with autocomplete from known specialists. */
-export function SpecialistField({
-  label = 'Specialist',
-  name = 'specialistName',
+/**
+ * Free-text form field that suggests matching known values (specialists,
+ * service providers, service types). Any other text may be typed.
+ */
+export function AutocompleteTextField({
+  label,
+  name,
   inputID,
   value,
   onChangeText,
   suggestions,
   required,
+  placeholder,
+  accessibilityLabel = label,
   onRemove,
   removeTestID,
+  removeLabel = `Remove ${label.toLowerCase()}`,
   autocompleteTestID = `${inputID}-autocomplete`,
-}: SpecialistFieldProps) {
+}: AutocompleteTextFieldProps) {
   const suggestionsState = useDismissOnBlur();
   const matches = useMemo(() => {
     const query = value.trim().toLowerCase();
     return query
-      ? suggestions.filter((name) => name.toLowerCase().includes(query))
+      ? suggestions.filter((item) => item.toLowerCase().includes(query))
       : suggestions;
   }, [value, suggestions]);
   const isOpen = suggestionsState.isOpen && matches.length > 0;
@@ -56,14 +68,14 @@ export function SpecialistField({
         required={required}
         onRemove={onRemove}
         removeTestID={removeTestID}
-        removeLabel={`Remove ${label.toLowerCase()}`}
+        removeLabel={removeLabel}
         inputProps={{
           testID: inputID,
           id: inputID,
           nativeID: inputID,
           name,
-          accessibilityLabel: label,
-          placeholder: 'e.g. Dr. Sarah Adams',
+          accessibilityLabel,
+          placeholder,
           value,
           onChangeText: (text) => {
             onChangeText(text);
@@ -77,9 +89,9 @@ export function SpecialistField({
           <AutocompleteDropdown
             testID={`${autocompleteTestID}-list`}
             itemTestIDPrefix={`${autocompleteTestID}-item-`}
-            items={matches.map((name, index) => ({
+            items={matches.map((item, index) => ({
               id: String(index),
-              label: name,
+              label: item,
             }))}
             onSelect={(item) => {
               onChangeText(item.label);

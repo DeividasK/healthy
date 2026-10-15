@@ -1,6 +1,7 @@
 /** FHIR resource types replicated by sync, in dependency (apply) order. */
 export const SYNC_RESOURCE_TYPES = [
   'Patient',
+  'Organization',
   'Condition',
   'DiagnosticReport',
   'Encounter',

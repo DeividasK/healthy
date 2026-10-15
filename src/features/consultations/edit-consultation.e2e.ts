@@ -168,4 +168,79 @@ test.describe('Edit Consultation Flow', () => {
       });
     }
   );
+
+  test('edits and removes the service provider', async ({ page }) => {
+    const consultation = await seedTestConsultation(page, {
+      title: 'Dental check',
+      serviceProviderName: 'Smile Clinic',
+    });
+
+    await page.goto(`/consultation/${consultation.id}/edit`);
+    const input = page.getByTestId('consultation-service-provider-input');
+    await expect(input).toHaveValue('Smile Clinic');
+    await page.getByTestId('remove-service-provider-button').click();
+    await expect(input).toHaveCount(0);
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    await page.goto(`/consultation/${consultation.id}`);
+    await expect(page.getByTestId('consultation-title')).toBeVisible();
+    await expect(page.getByTestId('consultation-service-provider')).toHaveCount(
+      0
+    );
+
+    const stored = await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        encounter: JSON.parse(
+          (await bridge.querySql('SELECT fhir_json FROM consultations;'))[0]
+            .fhir_json
+        ),
+        organizations: await bridge.querySql('SELECT name FROM organizations;'),
+      };
+    });
+    expect(stored.encounter.serviceProvider).toBeUndefined();
+    // The Organization stays available as a suggestion.
+    expect(stored.organizations).toEqual([{ name: 'Smile Clinic' }]);
+  });
+
+  test('keeps a service provider reference that has no display name', async ({
+    page,
+  }) => {
+    const consultation = await seedTestConsultation(page, {
+      title: 'Dental check',
+      serviceProviderName: 'Smile Clinic',
+    });
+    const encounter = async () =>
+      JSON.parse(
+        (
+          await page.evaluate(() =>
+            (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+              'SELECT fhir_json FROM consultations;'
+            )
+          )
+        )[0].fhir_json
+      );
+    // Imported or synced references may carry only `reference`.
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        "UPDATE consultations SET fhir_json = json_remove(fhir_json, '$.serviceProvider.display');"
+      )
+    );
+    const { reference } = (await encounter()).serviceProvider;
+
+    await page.goto(`/consultation/${consultation.id}/edit`);
+    // The name comes from the stored Organization.
+    await expect(
+      page.getByTestId('consultation-service-provider-input')
+    ).toHaveValue('Smile Clinic');
+    await page.getByTestId('consultation-title-input').fill('Dental review');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+
+    expect((await encounter()).serviceProvider).toEqual({
+      reference,
+      type: 'Organization',
+      display: 'Smile Clinic',
+    });
+  });
 });

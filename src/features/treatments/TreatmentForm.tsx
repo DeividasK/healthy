@@ -16,7 +16,11 @@ import {
   User,
 } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
-import { SpecialistField } from '@/src/components/SpecialistField';
+import {
+  FieldRevealProvider,
+  useFieldReveal,
+} from '@/src/components/FieldReveal';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
 import {
   useLinkFields,
@@ -210,163 +214,169 @@ export function TreatmentForm({
     }
   };
 
+  const { reveal, scrollViewProps } = useFieldReveal();
+
   return (
-    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        testID="treatment-form"
-      >
-        <ScreenHeading testID="treatment-form-title">
-          {isEditing ? 'Edit Treatment' : 'Add Treatment'}
-        </ScreenHeading>
-        {errorMessage && (
-          <View
-            style={styles.errorBanner}
-            testID="treatment-form-error"
-            accessibilityRole="alert"
-          >
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-          </View>
-        )}
-        <FormField
-          label="Treatment Name"
-          nativeID="treatment-title-input"
-          required
-          inputProps={{
-            id: 'treatment-title-input',
-            nativeID: 'treatment-title-input',
-            name: 'title',
-            testID: 'treatment-title-input',
-            autoFocus: !isEditing,
-            accessibilityLabel: 'Treatment Name',
-            placeholder: 'e.g. Amoxicillin 500mg',
-            value: title,
-            onChangeText: (text) => {
-              setTitle(text);
-              if (errorMessage) setErrorMessage(null);
-            },
-          }}
-        />
-        <FormField label="Intent" nativeID="treatment-intent-select" required>
-          <NativeSelect
-            testID="treatment-intent-select"
-            name="intent"
-            label="Intent"
-            value={intent}
-            options={getTreatmentIntentOptions(intent)}
-            onChange={(value) =>
-              setIntent(value as MedicationRequest['intent'])
-            }
-          />
-        </FormField>
-        <FormField label="Status" nativeID="treatment-status-select" required>
-          <NativeSelect
-            testID="treatment-status-select"
-            name="status"
-            label="Status"
-            value={status}
-            options={getTreatmentStatusOptions(status)}
-            onChange={(value) =>
-              setStatus(value as MedicationRequest['status'])
-            }
-          />
-        </FormField>
-        <FormField label="Date" nativeID="treatment-date-input" required>
-          <NativeDatePicker
-            value={authoredDate}
-            onChange={(date) => {
-              if (date) setAuthoredDate(date);
+    <FieldRevealProvider value={reveal}>
+      <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+        <ScrollView
+          {...scrollViewProps}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          testID="treatment-form"
+        >
+          <ScreenHeading testID="treatment-form-title">
+            {isEditing ? 'Edit Treatment' : 'Add Treatment'}
+          </ScreenHeading>
+          {errorMessage && (
+            <View
+              style={styles.errorBanner}
+              testID="treatment-form-error"
+              accessibilityRole="alert"
+            >
+              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            </View>
+          )}
+          <FormField
+            label="Treatment Name"
+            nativeID="treatment-title-input"
+            required
+            inputProps={{
+              id: 'treatment-title-input',
+              nativeID: 'treatment-title-input',
+              name: 'title',
+              testID: 'treatment-title-input',
+              autoFocus: !isEditing,
+              accessibilityLabel: 'Treatment Name',
+              placeholder: 'e.g. Amoxicillin 500mg',
+              value: title,
+              onChangeText: (text) => {
+                setTitle(text);
+                if (errorMessage) setErrorMessage(null);
+              },
             }}
-            testID="treatment-date-picker"
-            id="treatment-date-input"
-            name="authoredDate"
-            variant="input"
           />
-        </FormField>
-        {optionalFields.map(({ id, label }) => {
-          if (!visibleFields[id]) return null;
-          const fieldProps = {
-            label,
-            onRemove: () => removeField(id),
-            removeTestID: `remove-treatment-${id}-button`,
-          };
-          if (id === 'requester') {
-            return (
-              <SpecialistField
-                key={id}
-                label={label}
-                inputID="treatment-requester-input"
-                name="requesterName"
-                value={requesterName}
-                onChangeText={setRequesterName}
-                suggestions={specialistSuggestions}
-                onRemove={fieldProps.onRemove}
-                removeTestID={fieldProps.removeTestID}
-              />
-            );
-          }
-          if (id === 'reasonCondition') {
-            return (
-              <LinkedResourcesField
-                key={id}
-                label={label}
-                searchLabel={`Select ${label.toLowerCase()}`}
-                options={conditionOptions}
-                selectedIds={reasonConditionIds}
-                onChange={setReasonConditionIds}
-                onRemove={fieldProps.onRemove}
-                removeTestID={fieldProps.removeTestID}
-                testID="treatment-reason-conditions-field"
-                idPrefix="treatment-"
-              />
-            );
-          }
-          const [value, onChangeText] =
-            id === 'instructions'
-              ? [dosageInstructions, setDosageInstructions]
-              : id === 'reason'
-                ? [reason, setReason]
-                : [notes, setNotes];
-          return (
-            <FormField
-              key={id}
-              {...fieldProps}
-              nativeID={`treatment-${id}-input`}
-              inputProps={{
-                id: `treatment-${id}-input`,
-                nativeID: `treatment-${id}-input`,
-                name: id === 'instructions' ? 'dosageInstructions' : id,
-                testID: `treatment-${id}-input`,
-                accessibilityLabel: label,
-                value,
-                onChangeText,
-                multiline: id !== 'reason',
-                numberOfLines:
-                  id === 'instructions' ? 4 : id === 'notes' ? 3 : 1,
-              }}
+          <FormField label="Intent" nativeID="treatment-intent-select" required>
+            <NativeSelect
+              testID="treatment-intent-select"
+              name="intent"
+              label="Intent"
+              value={intent}
+              options={getTreatmentIntentOptions(intent)}
+              onChange={(value) =>
+                setIntent(value as MedicationRequest['intent'])
+              }
             />
-          );
-        })}
-        {links.fields}
-      </ScrollView>
-      <FloatingAddMenu
-        visible={showPlusMenu}
-        onClose={() => setShowPlusMenu(false)}
-        options={options}
-        testID="form-add-menu"
-      />
-      <FormActionDock
-        onAdd={() => setShowPlusMenu((visible) => !visible)}
-        addExpanded={showPlusMenu}
-        addDisabled={!options.length}
-        saveLabel={isEditing ? 'Save changes' : 'Save treatment'}
-        onSave={handleSubmit}
-        isSaving={isSubmitting}
-        hasChanges={hasChanges}
-        saveTestID="save-treatment-button"
-      />
-    </SafeAreaView>
+          </FormField>
+          <FormField label="Status" nativeID="treatment-status-select" required>
+            <NativeSelect
+              testID="treatment-status-select"
+              name="status"
+              label="Status"
+              value={status}
+              options={getTreatmentStatusOptions(status)}
+              onChange={(value) =>
+                setStatus(value as MedicationRequest['status'])
+              }
+            />
+          </FormField>
+          <FormField label="Date" nativeID="treatment-date-input" required>
+            <NativeDatePicker
+              value={authoredDate}
+              onChange={(date) => {
+                if (date) setAuthoredDate(date);
+              }}
+              testID="treatment-date-picker"
+              id="treatment-date-input"
+              name="authoredDate"
+              variant="input"
+            />
+          </FormField>
+          {optionalFields.map(({ id, label }) => {
+            if (!visibleFields[id]) return null;
+            const fieldProps = {
+              label,
+              onRemove: () => removeField(id),
+              removeTestID: `remove-treatment-${id}-button`,
+            };
+            if (id === 'requester') {
+              return (
+                <AutocompleteTextField
+                  key={id}
+                  label={label}
+                  inputID="treatment-requester-input"
+                  name="requesterName"
+                  placeholder="e.g. Dr. Sarah Adams"
+                  value={requesterName}
+                  onChangeText={setRequesterName}
+                  suggestions={specialistSuggestions}
+                  onRemove={fieldProps.onRemove}
+                  removeTestID={fieldProps.removeTestID}
+                />
+              );
+            }
+            if (id === 'reasonCondition') {
+              return (
+                <LinkedResourcesField
+                  key={id}
+                  label={label}
+                  searchLabel={`Select ${label.toLowerCase()}`}
+                  options={conditionOptions}
+                  selectedIds={reasonConditionIds}
+                  onChange={setReasonConditionIds}
+                  onRemove={fieldProps.onRemove}
+                  removeTestID={fieldProps.removeTestID}
+                  testID="treatment-reason-conditions-field"
+                  idPrefix="treatment-"
+                />
+              );
+            }
+            const [value, onChangeText] =
+              id === 'instructions'
+                ? [dosageInstructions, setDosageInstructions]
+                : id === 'reason'
+                  ? [reason, setReason]
+                  : [notes, setNotes];
+            return (
+              <FormField
+                key={id}
+                {...fieldProps}
+                nativeID={`treatment-${id}-input`}
+                inputProps={{
+                  id: `treatment-${id}-input`,
+                  nativeID: `treatment-${id}-input`,
+                  name: id === 'instructions' ? 'dosageInstructions' : id,
+                  testID: `treatment-${id}-input`,
+                  accessibilityLabel: label,
+                  value,
+                  onChangeText,
+                  multiline: id !== 'reason',
+                  numberOfLines:
+                    id === 'instructions' ? 4 : id === 'notes' ? 3 : 1,
+                }}
+              />
+            );
+          })}
+          {links.fields}
+        </ScrollView>
+        <FloatingAddMenu
+          visible={showPlusMenu}
+          onClose={() => setShowPlusMenu(false)}
+          options={options}
+          testID="form-add-menu"
+        />
+        <FormActionDock
+          onAdd={() => setShowPlusMenu((visible) => !visible)}
+          addExpanded={showPlusMenu}
+          addDisabled={!options.length}
+          saveLabel={isEditing ? 'Save changes' : 'Save treatment'}
+          onSave={handleSubmit}
+          isSaving={isSubmitting}
+          hasChanges={hasChanges}
+          saveTestID="save-treatment-button"
+        />
+      </SafeAreaView>
+    </FieldRevealProvider>
   );
 }
 

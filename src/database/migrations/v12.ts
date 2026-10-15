@@ -1,4 +1,5 @@
 import type { DatabaseMigration } from './types';
+import { captureTriggers, markDirty, NOW_MS } from './syncTriggers';
 
 // Canonical clinical tables replicated by sync, with the FHIR type they store
 // and the column naming the owning patient.
@@ -11,33 +12,12 @@ const replicatedTables = [
   ['clinical_documents', 'Composition', 'patient_id'],
 ] as const;
 
-const NOW_MS = `CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)`;
-
-// Marks a resource as changed. A later step stamps it with an HLC and reads
-// its current JSON, so cascades and raw SQL writes can never be missed.
-const markDirty = (type: string, id: string, patientId: string) => `
-  INSERT INTO sync_dirty (resource_type, resource_id, patient_id, changed_ms)
-  VALUES ('${type}', ${id}, ${patientId}, ${NOW_MS})
-  ON CONFLICT (resource_type, resource_id) DO UPDATE SET
-    changed_ms = excluded.changed_ms,
-    patient_id = COALESCE(excluded.patient_id, sync_dirty.patient_id);`;
-
-const triggers = replicatedTables
-  .flatMap(([table, type, patientColumn]) =>
-    (['INSERT', 'UPDATE', 'DELETE'] as const).map((event) => {
-      const row = event === 'DELETE' ? 'OLD' : 'NEW';
-      return `
-    CREATE TRIGGER IF NOT EXISTS sync_${table}_${event.toLowerCase()} AFTER ${event} ON ${table}
-    WHEN NOT EXISTS (SELECT 1 FROM sync_suppress)
-    BEGIN${markDirty(type, `${row}.id`, `${row}.${patientColumn}`)}
-    END;`;
-    })
-  )
-  .concat(
-    // Observations travel inside their DiagnosticReport (`contained`).
-    (['INSERT', 'UPDATE', 'DELETE'] as const).map((event) => {
-      const row = event === 'DELETE' ? 'OLD' : 'NEW';
-      return `
+const triggers = [
+  captureTriggers(replicatedTables),
+  // Observations travel inside their DiagnosticReport (`contained`).
+  ...(['INSERT', 'UPDATE', 'DELETE'] as const).map((event) => {
+    const row = event === 'DELETE' ? 'OLD' : 'NEW';
+    return `
     CREATE TRIGGER IF NOT EXISTS sync_observations_${event.toLowerCase()} AFTER ${event} ON observations
     WHEN NOT EXISTS (SELECT 1 FROM sync_suppress)
     BEGIN${markDirty(
@@ -46,9 +26,8 @@ const triggers = replicatedTables
       `(SELECT patient_id FROM diagnostic_reports WHERE id = ${row}.report_id)`
     )}
     END;`;
-    })
-  )
-  .join('\n');
+  }),
+].join('\n');
 
 const backfill = replicatedTables
   .map(

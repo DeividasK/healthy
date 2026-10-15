@@ -102,3 +102,40 @@ it to rebuild tables left by pre-release builds with a different column layout:
 projection columns are recomputed from `fhir_json`, while `fhir_json` and the
 storage timestamps are copied verbatim. If canonical columns are missing the
 repair aborts and rolls back, leaving the original table for backup and restore.
+
+## Service providers
+
+The clinic, practice or hospital that provided a service is a FHIR R5
+`Organization` stored in `organizations`. Users record a name only (org-1
+requires a name or an identifier); other Organization elements, such as
+`contact[]` with addresses and telecoms, are preserved when imported or synced
+but not edited.
+
+- Consultations reference it from `Encounter.serviceProvider`.
+- Lab results reference it from `DiagnosticReport.performer`, the R5 element
+  for the organization responsible for a report (DiagnosticReport has no
+  `serviceProvider`). The form edits the first Organization performer; other
+  performers are kept.
+
+References carry `reference`, `type: 'Organization'` and `display`, so rows and
+meta lines show the name without a join. Forms submit a name: saving matches the
+patient's existing Organization by case-insensitive name or creates one, in the
+same transaction as the referencing resource. Removing a provider clears the
+reference and keeps the Organization as an autocomplete suggestion. Edits only
+change the reference when the user sets or removes the provider: a reference
+without `display` shows the stored Organization's name, and one the form cannot
+name (e.g. identifier-only) is kept as is. Writes reject
+references to Organizations that do not belong to the same patient.
+
+FHIR Organizations have no subject. `organizations.patient_id` is storage
+ownership: it scopes suggestions, deletes them with their profile and lets sync
+replicate them per profile. Sync applies Organizations before the resources
+that reference them, and ZIP archives carry them as
+`records/organization_*.json` envelopes naming the patient; archives without
+them still restore.
+
+### Migration v13
+
+v13 is additive and non-breaking: it creates `organizations` with an index on
+`(patient_id, name)` and its sync capture triggers. Its `repair` step re-creates
+the triggers on every start. No existing table or record changes.

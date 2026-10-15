@@ -53,7 +53,14 @@ test.describe('Add Consultation View - Visual Regression', () => {
       .fill('Dermatology review');
     await page.getByTestId('condition-search-input').fill('Androgenic');
     await page.getByTestId('condition-autocomplete-item-add-second').waitFor();
-    await takeSnapshot(page, 'Consultation View - Conditions search', testInfo);
+    await takeSnapshot(
+      page,
+      'Consultation View - Conditions search',
+      testInfo,
+      {
+        keepFocus: true,
+      }
+    );
     await page.getByTestId('condition-autocomplete-item-add-second').click();
     await page.getByTestId('selected-condition-add-second').waitFor();
     await takeSnapshot(

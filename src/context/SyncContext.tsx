@@ -317,6 +317,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       'consultations',
       'clinical_documents',
       'medication_requests',
+      'organizations',
     ],
     (tables) => {
       // A profile deleted here or remotely no longer syncs.

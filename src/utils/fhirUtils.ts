@@ -4,6 +4,7 @@ import type {
   Encounter,
   MedicationRequest,
   Composition,
+  Reference,
 } from 'fhir/r5';
 
 /**
@@ -80,6 +81,21 @@ export function getConsultationTitle(encounter: Encounter): string {
  */
 export function getConsultationDoctor(encounter: Encounter): string | null {
   return encounter.participant?.[0]?.actor?.display || null;
+}
+
+/** The service provider (Organization) name of an Encounter. */
+export function getConsultationServiceProvider(
+  encounter: Encounter
+): string | null {
+  return encounter.serviceProvider?.display || null;
+}
+
+/** Whether a Reference points to an Organization. */
+export function isOrganizationReference(reference: Reference): boolean {
+  return (
+    reference.type === 'Organization' ||
+    Boolean(reference.reference?.startsWith('Organization/'))
+  );
 }
 
 /**

@@ -28,6 +28,10 @@ import {
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
+  FieldRevealProvider,
+  useFieldReveal,
+} from '@/src/components/FieldReveal';
+import {
   useLinkFields,
   type LinkFieldConfig,
   type LinkSelection,
@@ -375,258 +379,265 @@ export function ConditionForm({
   }
   plusMenuOptions.push(...links.menuOptions);
 
+  const { reveal, scrollViewProps } = useFieldReveal();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-      <View style={styles.keyboardContainer}>
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeading>
-            {isEdit ? 'Edit Condition' : 'New Condition'}
-          </ScreenHeading>
-          {/* Condition Name Section (Required) */}
-          <FormField
-            label="Condition"
-            required
-            nativeID="condition-title-input"
-            inputProps={{
-              testID: 'condition-title-input',
-              id: 'condition-title-input',
-              nativeID: 'condition-title-input',
-              name: 'title',
-              autoFocus: !isEdit,
-              accessibilityLabel: 'Condition Name',
-              placeholder: 'Left Knee Pain',
-              value: title,
-              onChangeText: setTitle,
-            }}
+    <FieldRevealProvider value={reveal}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <View style={styles.keyboardContainer}>
+          <ScrollView
+            {...scrollViewProps}
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <ScreenHeading>
+              {isEdit ? 'Edit Condition' : 'New Condition'}
+            </ScreenHeading>
+            {/* Condition Name Section (Required) */}
+            <FormField
+              label="Condition"
+              required
+              nativeID="condition-title-input"
+              inputProps={{
+                testID: 'condition-title-input',
+                id: 'condition-title-input',
+                nativeID: 'condition-title-input',
+                name: 'title',
+                autoFocus: !isEdit,
+                accessibilityLabel: 'Condition Name',
+                placeholder: 'Left Knee Pain',
+                value: title,
+                onChangeText: setTitle,
+              }}
+            />
+
+            <FormField label="Status" nativeID="status-picker-select" required>
+              <NativeSelect
+                testID="status-picker-select"
+                name="status"
+                label="Condition status"
+                value={selectedStatus.id}
+                options={CONDITION_STATUS_OPTIONS.map(({ id, label }) => ({
+                  id,
+                  label,
+                }))}
+                onChange={(value) => {
+                  const found = CONDITION_STATUS_OPTIONS.find(
+                    (option) => option.id === value
+                  );
+                  if (found) setSelectedStatus(found);
+                }}
+              />
+            </FormField>
+
+            <FormField
+              label="Onset date"
+              nativeID="condition-onset-date"
+              required
+            >
+              <NativeDatePicker
+                value={onsetDate}
+                onChange={(date) => {
+                  if (date) setOnsetDate(date);
+                }}
+                testID="date-picker-button"
+                id="condition-onset-date"
+                name="onsetDate"
+                variant="input"
+              />
+            </FormField>
+
+            {showVerification && (
+              <FormField
+                label="Verification status"
+                nativeID="verification-picker-button"
+                removeTestID="remove-verification-button"
+                removeLabel="Remove verification status"
+                onRemove={() => {
+                  setShowVerification(false);
+                  setVerificationStatus('');
+                }}
+              >
+                <NativeSelect
+                  testID="verification-picker-button"
+                  name="verificationStatus"
+                  label="Verification status"
+                  value={verificationStatus}
+                  options={VERIFICATION_OPTIONS}
+                  onChange={setVerificationStatus}
+                />
+              </FormField>
+            )}
+            {showCategory && (
+              <FormField
+                label="Category"
+                nativeID="condition-category-input"
+                removeTestID="remove-category-button"
+                removeLabel="Remove category"
+                onRemove={() => {
+                  setShowCategory(false);
+                  setCategory('');
+                }}
+              >
+                <NativeSelect
+                  testID="condition-category-input"
+                  name="category"
+                  label="Category"
+                  value={category}
+                  options={[
+                    { id: '', label: 'Not specified' },
+                    ...CATEGORY_OPTIONS.map((option) => ({
+                      id: option.label,
+                      label: option.label,
+                    })),
+                    ...(category &&
+                    !CATEGORY_OPTIONS.some(
+                      (option) => option.label === category
+                    )
+                      ? [{ id: category, label: category }]
+                      : []),
+                  ]}
+                  onChange={setCategory}
+                />
+              </FormField>
+            )}
+
+            {/* Severity Section if toggled */}
+            {showSeverity && (
+              <FormField
+                label="Severity"
+                removeTestID="remove-severity-button"
+                onRemove={() => {
+                  setShowSeverity(false);
+                  setSeverity(undefined);
+                }}
+              >
+                <View style={styles.severityRow}>
+                  {SEVERITY_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      testID={`severity-option-${opt.value}`}
+                      style={[
+                        styles.severityPill,
+                        severity === opt.value && styles.severityPillSelected,
+                      ]}
+                      onPress={() => setSeverity(opt.value)}
+                      activeOpacity={0.8}
+                    >
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: opt.dotColor },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.severityPillText,
+                          severity === opt.value &&
+                            styles.severityPillTextSelected,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </FormField>
+            )}
+
+            {/* Body Site Section if toggled */}
+            {showBodySite && (
+              <FormField
+                label="Body Site"
+                nativeID="condition-body-site-input"
+                removeTestID="remove-body-site-button"
+                onRemove={() => {
+                  setShowBodySite(false);
+                  setBodySite('');
+                }}
+                inputProps={{
+                  testID: 'condition-body-site-input',
+                  id: 'condition-body-site-input',
+                  nativeID: 'condition-body-site-input',
+                  name: 'bodySite',
+                  accessibilityLabel: 'Body Site',
+                  placeholder: 'e.g. Left knee, Lower back',
+                  value: bodySite,
+                  onChangeText: setBodySite,
+                }}
+              />
+            )}
+
+            {/* Resolution Date Section if toggled */}
+            {showAbatementDate && (
+              <FormField
+                label="Resolution Date"
+                removeTestID="remove-abatement-date-button"
+                onRemove={() => {
+                  setShowAbatementDate(false);
+                  setAbatementDate(undefined);
+                }}
+              >
+                <View style={styles.datePickerContainer}>
+                  <NativeDatePicker
+                    value={abatementDate || new Date()}
+                    onChange={(date) => setAbatementDate(date || undefined)}
+                    testID="abatement-date-picker-button"
+                  />
+                </View>
+              </FormField>
+            )}
+
+            {/* Notes Textarea if toggled */}
+            {showNotes && (
+              <FormField
+                label="Notes"
+                nativeID="condition-notes-input"
+                removeTestID="remove-notes-button"
+                onRemove={() => {
+                  setShowNotes(false);
+                  setNotes('');
+                }}
+                inputProps={{
+                  testID: 'condition-notes-input',
+                  id: 'condition-notes-input',
+                  nativeID: 'condition-notes-input',
+                  name: 'notes',
+                  accessibilityLabel: 'Notes',
+                  placeholder: 'Add notes...',
+                  multiline: true,
+                  numberOfLines: 4,
+                  value: notes,
+                  onChangeText: setNotes,
+                }}
+              />
+            )}
+
+            {links.fields}
+          </ScrollView>
+
+          {/* Bottom Save Action */}
+          <FormActionDock
+            onAdd={() => setShowPlusMenu((visible) => !visible)}
+            addExpanded={showPlusMenu}
+            addDisabled={plusMenuOptions.length === 0}
+            addTestID="add-option-button"
+            onSave={handleSubmit}
+            isSaving={isSaving}
+            hasChanges={hasChanges}
           />
 
-          <FormField label="Status" nativeID="status-picker-select" required>
-            <NativeSelect
-              testID="status-picker-select"
-              name="status"
-              label="Condition status"
-              value={selectedStatus.id}
-              options={CONDITION_STATUS_OPTIONS.map(({ id, label }) => ({
-                id,
-                label,
-              }))}
-              onChange={(value) => {
-                const found = CONDITION_STATUS_OPTIONS.find(
-                  (option) => option.id === value
-                );
-                if (found) setSelectedStatus(found);
-              }}
-            />
-          </FormField>
-
-          <FormField
-            label="Onset date"
-            nativeID="condition-onset-date"
-            required
-          >
-            <NativeDatePicker
-              value={onsetDate}
-              onChange={(date) => {
-                if (date) setOnsetDate(date);
-              }}
-              testID="date-picker-button"
-              id="condition-onset-date"
-              name="onsetDate"
-              variant="input"
-            />
-          </FormField>
-
-          {showVerification && (
-            <FormField
-              label="Verification status"
-              nativeID="verification-picker-button"
-              removeTestID="remove-verification-button"
-              removeLabel="Remove verification status"
-              onRemove={() => {
-                setShowVerification(false);
-                setVerificationStatus('');
-              }}
-            >
-              <NativeSelect
-                testID="verification-picker-button"
-                name="verificationStatus"
-                label="Verification status"
-                value={verificationStatus}
-                options={VERIFICATION_OPTIONS}
-                onChange={setVerificationStatus}
-              />
-            </FormField>
-          )}
-          {showCategory && (
-            <FormField
-              label="Category"
-              nativeID="condition-category-input"
-              removeTestID="remove-category-button"
-              removeLabel="Remove category"
-              onRemove={() => {
-                setShowCategory(false);
-                setCategory('');
-              }}
-            >
-              <NativeSelect
-                testID="condition-category-input"
-                name="category"
-                label="Category"
-                value={category}
-                options={[
-                  { id: '', label: 'Not specified' },
-                  ...CATEGORY_OPTIONS.map((option) => ({
-                    id: option.label,
-                    label: option.label,
-                  })),
-                  ...(category &&
-                  !CATEGORY_OPTIONS.some((option) => option.label === category)
-                    ? [{ id: category, label: category }]
-                    : []),
-                ]}
-                onChange={setCategory}
-              />
-            </FormField>
-          )}
-
-          {/* Severity Section if toggled */}
-          {showSeverity && (
-            <FormField
-              label="Severity"
-              removeTestID="remove-severity-button"
-              onRemove={() => {
-                setShowSeverity(false);
-                setSeverity(undefined);
-              }}
-            >
-              <View style={styles.severityRow}>
-                {SEVERITY_OPTIONS.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    testID={`severity-option-${opt.value}`}
-                    style={[
-                      styles.severityPill,
-                      severity === opt.value && styles.severityPillSelected,
-                    ]}
-                    onPress={() => setSeverity(opt.value)}
-                    activeOpacity={0.8}
-                  >
-                    <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: opt.dotColor },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.severityPillText,
-                        severity === opt.value &&
-                          styles.severityPillTextSelected,
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </FormField>
-          )}
-
-          {/* Body Site Section if toggled */}
-          {showBodySite && (
-            <FormField
-              label="Body Site"
-              nativeID="condition-body-site-input"
-              removeTestID="remove-body-site-button"
-              onRemove={() => {
-                setShowBodySite(false);
-                setBodySite('');
-              }}
-              inputProps={{
-                testID: 'condition-body-site-input',
-                id: 'condition-body-site-input',
-                nativeID: 'condition-body-site-input',
-                name: 'bodySite',
-                accessibilityLabel: 'Body Site',
-                placeholder: 'e.g. Left knee, Lower back',
-                value: bodySite,
-                onChangeText: setBodySite,
-              }}
-            />
-          )}
-
-          {/* Resolution Date Section if toggled */}
-          {showAbatementDate && (
-            <FormField
-              label="Resolution Date"
-              removeTestID="remove-abatement-date-button"
-              onRemove={() => {
-                setShowAbatementDate(false);
-                setAbatementDate(undefined);
-              }}
-            >
-              <View style={styles.datePickerContainer}>
-                <NativeDatePicker
-                  value={abatementDate || new Date()}
-                  onChange={(date) => setAbatementDate(date || undefined)}
-                  testID="abatement-date-picker-button"
-                />
-              </View>
-            </FormField>
-          )}
-
-          {/* Notes Textarea if toggled */}
-          {showNotes && (
-            <FormField
-              label="Notes"
-              nativeID="condition-notes-input"
-              removeTestID="remove-notes-button"
-              onRemove={() => {
-                setShowNotes(false);
-                setNotes('');
-              }}
-              inputProps={{
-                testID: 'condition-notes-input',
-                id: 'condition-notes-input',
-                nativeID: 'condition-notes-input',
-                name: 'notes',
-                accessibilityLabel: 'Notes',
-                placeholder: 'Add notes...',
-                multiline: true,
-                numberOfLines: 4,
-                value: notes,
-                onChangeText: setNotes,
-              }}
-            />
-          )}
-
-          {links.fields}
-        </ScrollView>
-
-        {/* Bottom Save Action */}
-        <FormActionDock
-          onAdd={() => setShowPlusMenu((visible) => !visible)}
-          addExpanded={showPlusMenu}
-          addDisabled={plusMenuOptions.length === 0}
-          addTestID="add-option-button"
-          onSave={handleSubmit}
-          isSaving={isSaving}
-          hasChanges={hasChanges}
-        />
-
-        {/* Plus Action Modal */}
-        <FloatingAddMenu
-          testID="form-add-menu"
-          visible={showPlusMenu}
-          onClose={() => setShowPlusMenu(false)}
-          options={plusMenuOptions}
-        />
-      </View>
-    </SafeAreaView>
+          {/* Plus Action Modal */}
+          <FloatingAddMenu
+            testID="form-add-menu"
+            visible={showPlusMenu}
+            onClose={() => setShowPlusMenu(false)}
+            options={plusMenuOptions}
+          />
+        </View>
+      </SafeAreaView>
+    </FieldRevealProvider>
   );
 }
 

@@ -1,5 +1,12 @@
-import React from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import {
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -11,6 +18,7 @@ import {
 } from 'react-native';
 import { COLORS } from '@/src/theme/colors';
 import { X } from 'lucide-react-native';
+import { useFieldRevealContext } from './FieldReveal';
 
 export interface FormFieldProps {
   label: string;
@@ -29,16 +37,63 @@ export interface FormFieldProps {
   testID?: string;
 }
 
+interface FieldInputRegistry {
+  register(input: TextInput): void;
+  unregister(input: TextInput | null): void;
+}
+
+/** Collects the first text input inside a FormField, focused on reveal. */
+const FieldInputContext = createContext<FieldInputRegistry | null>(null);
+
 /** The standard bordered text input used by every form field. */
 export function FormTextInput({ style, multiline, ...props }: TextInputProps) {
+  const fieldInput = useContext(FieldInputContext);
+  const ownRef = useRef<TextInput | null>(null);
   return (
     <TextInput
       placeholderTextColor={COLORS.light.placeholder}
       multiline={multiline}
       {...props}
+      ref={(node) => {
+        if (node) {
+          ownRef.current = node;
+          fieldInput?.register(node);
+        } else {
+          fieldInput?.unregister(ownRef.current);
+          ownRef.current = null;
+        }
+      }}
       style={[styles.input, multiline && styles.textArea, style]}
     />
   );
+}
+
+/**
+ * Scrolls a field that a `+` menu just added into view and focuses its
+ * control (see `useFieldReveal`). Fields present on first render are left
+ * alone, since no menu choice is pending for them.
+ */
+function useRevealWhenAdded(
+  container: React.RefObject<View | null>,
+  input: React.RefObject<TextInput | null>
+) {
+  const reveal = useFieldRevealContext();
+  useEffect(() => {
+    const field = container.current;
+    if (!reveal?.claim() || !field) return;
+    reveal.scrollIntoView(field);
+    if (Platform.OS === 'web') {
+      // Covers text inputs and native selects, date and time inputs alike;
+      // scrolling is left to scrollIntoView so the field clears the dock.
+      (field as unknown as HTMLElement)
+        .querySelector<HTMLElement>('input, textarea, select')
+        ?.focus({ preventScroll: true });
+    } else {
+      input.current?.focus();
+    }
+    // Runs once, when the field mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
 
 /**
@@ -58,33 +113,55 @@ export function FormField({
   removeLabel,
   testID,
 }: FormFieldProps) {
+  const containerRef = useRef<View>(null);
+  const inputRef = useRef<TextInput | null>(null);
+  const inputRegistry = useMemo<FieldInputRegistry>(
+    () => ({
+      register(input) {
+        inputRef.current ??= input;
+      },
+      unregister(input) {
+        if (inputRef.current === input) inputRef.current = null;
+      },
+    }),
+    []
+  );
+  useRevealWhenAdded(containerRef, inputRef);
   return (
-    <View style={[styles.container, style]} testID={testID}>
-      <View style={styles.header}>
-        <Text
-          nativeID={nativeID ? `${nativeID}-label` : undefined}
-          style={styles.label}
-        >
-          {label}
-          {required && <Text style={styles.required}> *</Text>}
-        </Text>
-        {onRemove && (
-          <TouchableOpacity
-            onPress={onRemove}
-            testID={removeTestID}
-            accessibilityRole="button"
-            accessibilityLabel={removeLabel || `Remove ${label.toLowerCase()}`}
-            hitSlop={10}
-            activeOpacity={0.7}
+    <FieldInputContext.Provider value={inputRegistry}>
+      <View
+        ref={containerRef}
+        style={[styles.container, style]}
+        testID={testID}
+      >
+        <View style={styles.header}>
+          <Text
+            nativeID={nativeID ? `${nativeID}-label` : undefined}
+            style={styles.label}
           >
-            <X size={16} color={COLORS.light.iconClear} />
-          </TouchableOpacity>
-        )}
+            {label}
+            {required && <Text style={styles.required}> *</Text>}
+          </Text>
+          {onRemove && (
+            <TouchableOpacity
+              onPress={onRemove}
+              testID={removeTestID}
+              accessibilityRole="button"
+              accessibilityLabel={
+                removeLabel || `Remove ${label.toLowerCase()}`
+              }
+              hitSlop={10}
+              activeOpacity={0.7}
+            >
+              <X size={16} color={COLORS.light.iconClear} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {inputProps && <FormTextInput {...inputProps} />}
+        {children}
+        {Boolean(error) && <Text style={styles.errorText}>{error}</Text>}
       </View>
-      {inputProps && <FormTextInput {...inputProps} />}
-      {children}
-      {Boolean(error) && <Text style={styles.errorText}>{error}</Text>}
-    </View>
+    </FieldInputContext.Provider>
   );
 }
 

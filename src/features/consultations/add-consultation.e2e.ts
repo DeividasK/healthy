@@ -702,3 +702,122 @@ test('rejects foreign references for either list and retains diagnosis text when
   );
   await expect(page.getByTestId('consultation-reasons')).toHaveCount(0);
 });
+
+test('records a service provider and reuses its Organization', async ({
+  page,
+}) => {
+  await seedTestPatient(page);
+  const stored = async () =>
+    await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        organizations: await bridge.querySql(
+          'SELECT id, name FROM organizations;'
+        ),
+        providers: (
+          await bridge.querySql(
+            'SELECT fhir_json FROM consultations ORDER BY created_at;'
+          )
+        ).map(
+          (row: { fhir_json: string }) =>
+            JSON.parse(row.fhir_json).serviceProvider
+        ),
+      };
+    });
+
+  await test.step('Add a new service provider', async () => {
+    await page.goto('/consultation/add');
+    await page.getByTestId('consultation-title-input').fill('Annual check-up');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+    await page
+      .getByTestId('consultation-service-provider-input')
+      .fill('City Hospital');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/consultation\/add/);
+  });
+
+  await test.step('Store an Organization reference', async () => {
+    const { organizations, providers } = await stored();
+    expect(organizations).toEqual([
+      { id: expect.stringMatching(/^org-/), name: 'City Hospital' },
+    ]);
+    expect(providers).toEqual([
+      {
+        reference: `Organization/${organizations[0].id}`,
+        type: 'Organization',
+        display: 'City Hospital',
+      },
+    ]);
+  });
+
+  await test.step('Show it on the consultation view', async () => {
+    const [{ id }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM consultations;'
+      )
+    );
+    await page.goto(`/consultation/${id}`);
+    await expect(
+      page.getByTestId('consultation-service-provider')
+    ).toContainText('City Hospital');
+  });
+
+  await test.step('Reuse it from autocomplete', async () => {
+    await page.goto('/consultation/add');
+    await page.getByTestId('consultation-title-input').fill('Follow-up');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await page.getByTestId('consultation-service-provider-input').fill('city');
+    const suggestion = page.getByTestId('service-provider-autocomplete-item-0');
+    await expect(suggestion).toHaveText('City Hospital');
+    await suggestion.click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/consultation\/add/);
+
+    const { organizations, providers } = await stored();
+    expect(organizations).toHaveLength(1);
+    expect(providers.map((p: { reference: string }) => p.reference)).toEqual([
+      `Organization/${organizations[0].id}`,
+      `Organization/${organizations[0].id}`,
+    ]);
+  });
+});
+
+test('scrolls a field added from the + menu into view and focuses it', async ({
+  page,
+}) => {
+  await seedTestPatient(page);
+  await page.goto('/consultation/add');
+  const addField = async (testID: string) => {
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('form-add-menu').getByTestId(testID).click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+  };
+  const expectRevealed = async (field: ReturnType<typeof page.getByTestId>) => {
+    await expect(field).toBeFocused();
+    await expect(field).toBeInViewport({ ratio: 1 });
+    // The floating action dock must not cover it.
+    await expect
+      .poll(async () => {
+        const box = await field.boundingBox();
+        const dock = await page.getByTestId('add-option-button').boundingBox();
+        return box!.y + box!.height <= dock!.y;
+      })
+      .toBe(true);
+  };
+
+  // Two diagnoses make the form taller than the viewport.
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-0-title-input')).toBeFocused();
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-1-title-input')).toBeFocused();
+
+  await addField('menu-add-notes');
+  await expectRevealed(page.getByTestId('consultation-notes-input'));
+
+  // Non-text controls are focused too.
+  await addField('menu-add-time');
+  await expectRevealed(page.getByTestId('time-picker-button').locator('input'));
+});

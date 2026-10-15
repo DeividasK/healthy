@@ -1,5 +1,11 @@
 import React from 'react';
-import { Activity, Calendar, CircleDot, User } from 'lucide-react-native';
+import {
+  Activity,
+  Calendar,
+  CircleDot,
+  Hospital,
+  User,
+} from 'lucide-react-native';
 import type { Encounter } from 'fhir/r5';
 import {
   ResourceRow,
@@ -9,6 +15,7 @@ import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConsultationDoctor,
   getConsultationNotes,
+  getConsultationServiceProvider,
   getConsultationServiceType,
   getConsultationTitle,
 } from '@/src/utils/fhirUtils';
@@ -29,12 +36,22 @@ export function getConsultationMeta(
   const date =
     consultation.actualPeriod?.start || consultation.plannedStartDate;
   const doctor = getConsultationDoctor(consultation);
+  const serviceProvider = getConsultationServiceProvider(consultation);
   const serviceType = getConsultationServiceType(consultation);
   return [
     ...(date ? [{ icon: Calendar, text: formatDisplayDateTime(date) }] : []),
     { icon: CircleDot, text: getConsultationStatusLabel(consultation) },
     ...(doctor
       ? [{ icon: User, text: doctor, testID: id('consultation-doctor') }]
+      : []),
+    ...(serviceProvider
+      ? [
+          {
+            icon: Hospital,
+            text: serviceProvider,
+            testID: id('consultation-service-provider'),
+          },
+        ]
       : []),
     ...(serviceType
       ? [

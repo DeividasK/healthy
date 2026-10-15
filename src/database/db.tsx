@@ -157,6 +157,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM consultation_conditions;
     DELETE FROM consultations;
     DELETE FROM conditions;
+    DELETE FROM organizations;
     DELETE FROM app_settings;
     DELETE FROM patients;
     -- A reset device starts with no sync history and a new device identity.
@@ -178,6 +179,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     'consultations',
     'consultation_conditions',
     'conditions',
+    'organizations',
     'patients',
     'app_settings',
   ]);

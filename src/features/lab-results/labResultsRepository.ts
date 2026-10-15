@@ -4,6 +4,7 @@ import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { assertCBCObservation } from './biomarkerMeasurements';
+import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
@@ -55,6 +56,11 @@ export async function insertDiagnosticReportRecord(
         `Cannot update diagnostic report ${reportId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
     }
+
+    await assertOrganizationReferences(
+      (report.performer || []).map((performer) => performer.reference),
+      patientId
+    );
 
     await db.runAsync(
       `INSERT INTO diagnostic_reports (id, patient_id, effective_date, status, notes, fhir_json, created_at, updated_at)

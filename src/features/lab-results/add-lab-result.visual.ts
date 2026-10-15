@@ -78,9 +78,18 @@ test.describe('Add Lab Result View - Visual Regression', () => {
 
     await page.getByTestId('notes-input').waitFor();
 
+    // Open plus menu and add Service provider; every optional field is shown,
+    // so the + is disabled.
+    await plusBtn.click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await waitForMenuToggle(page, 'plus-menu-button', false);
+    await page
+      .getByTestId('lab-result-service-provider-input')
+      .fill('City Laboratory');
+
     await takeSnapshot(
       page,
-      'Add Report View - Expanded Time and Notes',
+      'Add Report View - Expanded Optional Fields',
       testInfo
     );
   });

@@ -4,6 +4,7 @@ import {
   createOrUpdateCondition,
   type ConditionInput,
 } from '@/src/features/conditions/conditionService';
+import { resolveOrganizationReference } from '@/src/features/organizations/organizationService';
 import * as Crypto from 'expo-crypto';
 import type { Encounter, CodeableReference, Composition } from 'fhir/r5';
 import {
@@ -51,6 +52,11 @@ export interface ConsultationInput {
   date: string; // FHIR date or date-time with timezone offset
   title: string;
   doctorName?: string;
+  /**
+   * Service provider (Organization) name, found or created on save. Omit to
+   * keep the stored reference; `null` or blank removes it.
+   */
+  serviceProviderName?: string | null;
   serviceType?: string;
   notes?: string;
   status?: string; // 'completed' | 'planned'
@@ -71,6 +77,7 @@ export async function createOrUpdateConsultation(
     });
     notifyDatabaseChanged([
       'conditions',
+      'organizations',
       'consultations',
       'consultation_conditions',
       'clinical_documents',
@@ -113,6 +120,8 @@ export async function createOrUpdateConsultation(
   if (!trimmedTitle) throw new Error('Consultation title is required');
   const trimmedDoctor = processedInput.doctorName?.trim() || undefined;
   const trimmedServiceType = processedInput.serviceType?.trim() || undefined;
+  const trimmedServiceProvider =
+    processedInput.serviceProviderName?.trim() || undefined;
   const trimmedNotes = processedInput.notes?.trim() || undefined;
   const existing = processedInput.id
     ? await fetchConsultationById(processedInput.id)
@@ -225,6 +234,17 @@ export async function createOrUpdateConsultation(
           };
           return updated.actor || updated.type?.length ? [updated] : [];
         }),
+    serviceProvider:
+      processedInput.serviceProviderName === undefined
+        ? existing?.serviceProvider
+        : trimmedServiceProvider
+          ? existing?.serviceProvider?.display === trimmedServiceProvider
+            ? existing.serviceProvider
+            : await resolveOrganizationReference(
+                trimmedServiceProvider,
+                patientId
+              )
+          : undefined,
     text: trimmedNotes
       ? {
           ...existing?.text,
@@ -287,6 +307,7 @@ export async function createOrUpdateConsultation(
   }
   if (!result.serviceType?.length) delete result.serviceType;
   if (!result.participant?.length) delete result.participant;
+  if (!result.serviceProvider) delete result.serviceProvider;
   await insertConsultationRecord(result, patientId, withinTransaction);
 
   const existingDoc = await fetchClinicalDocumentByConsultationId(

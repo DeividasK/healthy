@@ -22,6 +22,7 @@ import type { AddOptionItem } from './AddOptionsModal';
 import { COLORS } from '@/src/theme/colors';
 import { isKeyboardInput } from '@/src/utils/inputModality';
 import { focusWhenReady } from '@/src/utils/focus';
+import { useFieldRevealContext } from './FieldReveal';
 import { useEscapeKey } from '@/src/utils/escapeKey';
 
 const backdropEntry = FadeIn.duration(180).reduceMotion(ReduceMotion.System);
@@ -51,6 +52,8 @@ export function FloatingAddMenu({
 }: FloatingAddMenuProps) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
+  // Read here, inside the form: the options render through AppOverlay.
+  const fieldReveal = useFieldRevealContext();
   const itemRefs = useRef<(View | null)[]>([]);
   // Center the menu on the + that opened it, keeping a 16px screen gutter.
   const anchor = useDockMenuAnchor();
@@ -152,6 +155,8 @@ export function FloatingAddMenu({
               style={styles.item}
               onPress={() => {
                 onClose();
+                // In a form, the field this option adds is revealed and focused.
+                fieldReveal?.expectField();
                 option.onPress();
               }}
               activeOpacity={0.7}
