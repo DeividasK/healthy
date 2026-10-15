@@ -344,4 +344,28 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(0);
     expect(driveRequests).toEqual([]);
   });
+
+  test('does not contact Google in the background when no profile syncs', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    await connectTestSync(page, { userEmail: 'bob@gmail.com' });
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'UPDATE sync_profiles SET synced = 0;'
+      )
+    );
+    const googleRequests: string[] = [];
+    page.on('request', (request) => {
+      if (/googleapis\.com|accounts\.google\.com/.test(request.url()))
+        googleRequests.push(request.url());
+    });
+    await page.goto('/');
+    await page.getByTestId('floating-add-button').waitFor();
+    for (let i = 0; i < 2; i++) {
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await page.waitForTimeout(2100);
+    }
+    expect(googleRequests).toEqual([]);
+  });
 });

@@ -141,6 +141,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<GoogleDriveConfig | null>(null);
   const [vaultState, setVaultState] = useState<VaultState>('disconnected');
   const [syncedProfileIds, setSyncedProfileIds] = useState<string[]>([]);
+  const hasSyncedProfiles = syncedProfileIds.length > 0;
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isUpToDate, setIsUpToDate] = useState<boolean>(true);
@@ -349,7 +350,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         try {
           if (!(await hasUnsyncedLocalChanges())) return;
           setIsUpToDate(false);
-          if (vaultState === 'unlocked') await runSync();
+          if (vaultState === 'unlocked' && hasSyncedProfiles) await runSync();
         } catch (err) {
           console.warn('Scheduled upload failed:', err);
         }
@@ -360,7 +361,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   // Pull other devices' changes on start, periodically and when the app
   // comes back.
   useEffect(() => {
-    if (vaultState !== 'unlocked') return;
+    // An account with no synced profile has nothing to sync in the
+    // background; manual syncs (e.g. restoring profiles) still run.
+    if (vaultState !== 'unlocked' || !hasSyncedProfiles) return;
     runSync();
 
     const interval = setInterval(() => {
@@ -400,7 +403,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }
       appStateSub.remove();
     };
-  }, [vaultState, runSync]);
+  }, [vaultState, hasSyncedProfiles, runSync]);
 
   const connectWithGoogle = useCallback(
     async (
