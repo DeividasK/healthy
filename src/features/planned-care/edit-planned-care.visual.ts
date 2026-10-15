@@ -7,7 +7,7 @@ import {
   seedTestPlannedCare,
 } from '@/src/features/testing/visualTest';
 
-test.describe('Edit Planned Care - Visual Regression', () => {
+test.describe('Edit Service Request - Visual Regression', () => {
   test('Populated form with consultation roles', async ({ page }, testInfo) => {
     await seedTestPatient(page);
     const condition = await seedTestCondition(page, { title: 'Gallstones' });
@@ -38,6 +38,6 @@ test.describe('Edit Planned Care - Visual Regression', () => {
 
     await page.goto(`/planned-care/${request.id}/edit`);
     await page.getByTestId('planned-care-form-title').waitFor();
-    await takeSnapshot(page, 'Planned Care - Edit Form Populated', testInfo);
+    await takeSnapshot(page, 'Service Request - Edit Form Populated', testInfo);
   });
 });

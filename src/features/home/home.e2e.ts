@@ -427,7 +427,7 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
       plannedCare: [
         {
           id: 'p1',
-          title: 'Planned care 1',
+          title: 'Service request 1',
           reasonConditionIds: ['c2'],
           consultationId: 'k1',
         },

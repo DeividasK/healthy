@@ -299,7 +299,7 @@ test.describe('Biomarker detail', () => {
     );
     await page.getByTestId('floating-add-button').click();
     await expect(page.getByTestId('menu-add-lab-results')).toHaveText(
-      'Add Lab Results'
+      'Lab Results'
     );
     await page.getByTestId('floating-add-menu-backdrop').click();
     await expect(

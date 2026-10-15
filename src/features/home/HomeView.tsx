@@ -451,7 +451,7 @@ export function HomeView() {
                             countMeta(
                               ClipboardList,
                               countConditionPlannedCare(condId),
-                              'planned care',
+                              'service requests',
                               `condition-planned-care-count-${condId}`
                             ),
                           ])}
@@ -499,11 +499,11 @@ export function HomeView() {
               </ResourceSection>
             )}
 
-            {/* Planned Care Section */}
+            {/* Service Requests Section */}
             {plannedCare.length > 0 && (
               <ResourceSection
                 icon={ClipboardList}
-                title="Planned care"
+                title="Service requests"
                 testID="home-planned-care-section"
               >
                 {plannedCare.map((request) => {
@@ -578,7 +578,7 @@ export function HomeView() {
                             countMeta(
                               ClipboardList,
                               consultationPlannedCareCounts[consId] || 0,
-                              'planned care',
+                              'service requests',
                               `consultation-planned-care-count-${consId}`
                             ),
                           ])}
@@ -763,7 +763,7 @@ export function HomeView() {
             },
             {
               id: 'planned-care',
-              label: 'Planned care',
+              label: 'Service Request',
               testID: 'menu-add-planned-care',
               icon: (
                 <ClipboardList

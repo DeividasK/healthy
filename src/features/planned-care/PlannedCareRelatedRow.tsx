@@ -81,7 +81,7 @@ export function PlannedCareRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View planned care: ${title}`}
+      accessibilityLabel={`View service request: ${title}`}
       meta={[...getPlannedCareMeta(request), ...extraMeta]}
       onPress={onPress}
     />

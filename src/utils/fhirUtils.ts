@@ -361,7 +361,7 @@ export function getPlannedCareTitle(request: ServiceRequest): string {
   return (
     request.code?.concept?.text ||
     request.code?.concept?.coding?.[0]?.display ||
-    'Planned care'
+    'Service request'
   );
 }
 

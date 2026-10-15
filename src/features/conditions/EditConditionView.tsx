@@ -100,7 +100,7 @@ export function EditConditionView() {
           },
           {
             type: 'planned-care',
-            label: 'Planned care',
+            label: 'Service requests',
             icon: ClipboardList,
             options: plannedCareOptions,
             initialIds: linkedPlannedCare.map((item) => item.id!),

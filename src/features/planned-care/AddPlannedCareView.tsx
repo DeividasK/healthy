@@ -11,7 +11,7 @@ import type { Condition } from 'fhir/r5';
 import { PlannedCareForm, type PlannedCareFormValues } from './PlannedCareForm';
 import { createOrUpdatePlannedCare } from './plannedCareService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import {
   getConsultationById,
   getDistinctDoctorNames,
@@ -55,8 +55,10 @@ function AddPlannedCareForPatient({
   );
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [specialists, setSpecialists] = useState<string[]>([]);
-  // Added through a consultation, it defaults to that specialist.
+  // Added through a consultation, it defaults to that visit's date and
+  // specialist.
   const [consultationSpecialist, setConsultationSpecialist] = useState('');
+  const [consultationDate, setConsultationDate] = useState<Date>();
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -73,6 +75,9 @@ function AddPlannedCareForPatient({
         setConsultationSpecialist(
           (consultation && getConsultationDoctor(consultation)) || ''
         );
+        const date =
+          consultation?.actualPeriod?.start || consultation?.plannedStartDate;
+        setConsultationDate(date ? parseLocalDate(date) : undefined);
         setLoadState('ready');
       })
       .catch(() => {
@@ -85,7 +90,7 @@ function AddPlannedCareForPatient({
   const router = useRouter();
 
   if (loadState === 'error')
-    return <Text>Failed to load planned care form.</Text>;
+    return <Text>Failed to load service request form.</Text>;
   if (loadState === 'loading') {
     return (
       <View style={styles.loadingContainer}>
@@ -134,6 +139,7 @@ function AddPlannedCareForPatient({
       conditions={conditions}
       initialValues={{
         requesterName: consultationSpecialist,
+        authoredDate: consultationDate,
         reasonConditionIds: conditionId ? [conditionId] : [],
       }}
       specialistSuggestions={specialists}

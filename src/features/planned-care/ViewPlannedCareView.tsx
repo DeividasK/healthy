@@ -127,7 +127,7 @@ function PlannedCareForPatient({
       });
     } catch (err) {
       if (sequence !== loadSequence.current) return;
-      console.error('Failed to load planned care view data:', err);
+      console.error('Failed to load service request view data:', err);
       setHasLoadError(true);
     } finally {
       if (sequence === loadSequence.current) setIsLoading(false);
@@ -153,8 +153,8 @@ function PlannedCareForPatient({
         testID="planned-care-view"
         error={
           hasLoadError
-            ? 'Failed to load planned care.'
-            : 'Planned care not found.'
+            ? 'Failed to load service request.'
+            : 'Service request not found.'
         }
       />
     );
@@ -199,7 +199,7 @@ function PlannedCareForPatient({
             ]}
           />
           <ResourceActionDock
-            editLabel="Edit planned care"
+            editLabel="Edit service request"
             onEdit={() => {
               setShowAddMenu(false);
               router.push(`/planned-care/${id}/edit`);
@@ -209,12 +209,12 @@ function PlannedCareForPatient({
             addMenuExpanded={showAddMenu}
             editTestID="edit-planned-care-button"
             addTestID="planned-care-add-button"
-            deleteLabel="Delete planned care"
+            deleteLabel="Delete service request"
             deleteTestID="delete-planned-care-button"
             deleteConfirmation={{
-              title: 'Delete Planned Care',
+              title: 'Delete Service Request',
               message:
-                'Are you sure you want to delete this planned care? This action cannot be undone.',
+                'Are you sure you want to delete this service request? This action cannot be undone.',
               onConfirm: async () => {
                 await deletePlannedCare(id, activePatientId);
                 goBackOr(router, '/');

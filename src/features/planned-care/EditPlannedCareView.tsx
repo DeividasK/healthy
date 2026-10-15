@@ -128,7 +128,7 @@ function EditPlannedCareForPatient({
           requesterName: request.requester?.display || '',
         });
       } catch (err) {
-        console.error('Failed to load planned care for editing:', err);
+        console.error('Failed to load service request for editing:', err);
         if (isMounted) setNotFound(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -153,7 +153,7 @@ function EditPlannedCareForPatient({
         style={styles.notFoundContainer}
         testID="edit-planned-care-not-found"
       >
-        <Text style={styles.notFoundText}>Planned care not found</Text>
+        <Text style={styles.notFoundText}>Service request not found</Text>
       </View>
     );
   }

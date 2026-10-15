@@ -179,7 +179,7 @@ test.describe('Edit Condition Flow', () => {
       menu.getByRole('button', { name: 'Treatment', exact: true })
     ).toBeVisible();
     await expect(
-      menu.getByRole('button', { name: 'Planned care', exact: true })
+      menu.getByRole('button', { name: 'Service Request', exact: true })
     ).toBeVisible();
     await expect(addButton).toHaveAttribute('aria-expanded', 'true');
     await expect(addButton).toHaveAccessibleName('Close add menu');

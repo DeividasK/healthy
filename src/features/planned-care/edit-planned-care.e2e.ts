@@ -11,7 +11,7 @@ import {
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
-test.describe('Edit Planned Care', () => {
+test.describe('Edit Service Request', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });

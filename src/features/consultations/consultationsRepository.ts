@@ -120,7 +120,7 @@ export async function insertConsultationRecord(
       );
       if (request && request.patient_id !== patientId)
         throw new Error(
-          'Encounter basedOn must reference planned care for the same patient'
+          'Encounter basedOn must reference a service request for the same patient'
         );
     }
 

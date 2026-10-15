@@ -235,8 +235,8 @@ export function PlannedCareForm({
         links: links.values,
       });
     } catch (err: any) {
-      console.error('Failed to save planned care:', err);
-      setErrorMessage(err.message || 'Failed to save planned care');
+      console.error('Failed to save service request:', err);
+      setErrorMessage(err.message || 'Failed to save service request');
     } finally {
       setIsSubmitting(false);
     }
@@ -254,7 +254,7 @@ export function PlannedCareForm({
           testID="planned-care-form"
         >
           <ScreenHeading testID="planned-care-form-title">
-            {isEditing ? 'Edit Planned Care' : 'Add Planned Care'}
+            {isEditing ? 'Edit Service Request' : 'Add Service Request'}
           </ScreenHeading>
           {errorMessage && (
             <FormErrorBanner
@@ -427,7 +427,7 @@ export function PlannedCareForm({
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
-          saveLabel={isEditing ? 'Save changes' : 'Save planned care'}
+          saveLabel={isEditing ? 'Save changes' : 'Save service request'}
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}

@@ -247,7 +247,7 @@ test.describe('Edit Consultation Flow', () => {
     });
   });
 
-  test('records planned care as based on, or moves its single origin here', async ({
+  test('records a service request as based on, or moves its single origin here', async ({
     page,
   }) => {
     const referring = await seedTestConsultation(page, {

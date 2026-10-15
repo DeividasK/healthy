@@ -10,12 +10,12 @@ import {
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
-test.describe('Add Planned Care Flow', () => {
+test.describe('Add Service Request Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
 
-  test('creates standalone planned care from Home with every optional field', async ({
+  test('creates a standalone service request from Home with every optional field', async ({
     page,
   }) => {
     const condition = await seedTestCondition(page, {
@@ -82,7 +82,9 @@ test.describe('Add Planned Care Flow', () => {
     await expect(page).toHaveURL(/.*(\/|#)$/);
     await expect(page.getByTestId('home-planned-care-section')).toBeVisible();
     await page
-      .getByRole('button', { name: 'View planned care: Abdominal ultrasound' })
+      .getByRole('button', {
+        name: 'View service request: Abdominal ultrasound',
+      })
       .click();
     await expect(page.getByTestId('planned-care-title')).toHaveText(
       'Abdominal ultrasound'
@@ -146,15 +148,23 @@ test.describe('Add Planned Care Flow', () => {
     expect(results[0].n).toBe(0);
   });
 
-  test('creates planned care from a consultation as its origin', async ({
+  test('creates a service request from a consultation as its origin', async ({
     page,
   }) => {
     const consultation = await seedTestConsultation(page, {
       title: 'Gastroenterology review',
       doctorName: 'Dr. Julian Bashir',
+      date: '2026-03-02',
     });
     await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-add-treatment').click();
+    // Menu options name what they add, without verbs.
+    await expect(page.getByTestId('option-create-new-treatment')).toHaveText(
+      'Treatment'
+    );
+    await expect(page.getByTestId('option-create-new-planned-care')).toHaveText(
+      'Service Request'
+    );
     await page.getByTestId('option-create-new-planned-care').click();
     await expect(page).toHaveURL(
       new RegExp(`.*planned-care\\/add\\?consultationId=${consultation.id}`)
@@ -191,6 +201,9 @@ test.describe('Add Planned Care Flow', () => {
       reference: `Encounter/${consultation.id}`,
     });
     expect(created.occurrenceDateTime).toBeUndefined();
+    // Date and specialist default to the consultation's.
+    expect(created.authoredOn).toBe('2026-03-02');
+    expect(created.requester).toEqual({ display: 'Dr. Julian Bashir' });
     const section = findPlannedCareSection(
       await getTestClinicalDocument(page, consultation.id)
     );
@@ -204,7 +217,7 @@ test.describe('Add Planned Care Flow', () => {
     ]);
   });
 
-  test('creates planned care from a condition, associated with it', async ({
+  test('creates a service request from a condition, associated with it', async ({
     page,
   }) => {
     const condition = await seedTestCondition(page, { title: 'Hypertension' });

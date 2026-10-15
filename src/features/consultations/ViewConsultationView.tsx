@@ -2,7 +2,7 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ClipboardList, FolderPlus, Hash, Plus } from 'lucide-react-native';
+import { ClipboardList, FolderPlus, Hash, Pill } from 'lucide-react-native';
 import type {
   Condition,
   Encounter,
@@ -167,10 +167,10 @@ export function ViewConsultationView() {
             options={[
               {
                 id: 'create-treatment',
-                label: 'Create New Treatment',
+                label: 'Treatment',
                 testID: 'option-create-new-treatment',
                 icon: (
-                  <Plus
+                  <Pill
                     color={COLORS.light.primary}
                     size={18}
                     style={{ marginRight: 10 }}
@@ -184,7 +184,7 @@ export function ViewConsultationView() {
               },
               {
                 id: 'create-planned-care',
-                label: 'Create New Planned Care',
+                label: 'Service Request',
                 testID: 'option-create-new-planned-care',
                 icon: (
                   <ClipboardList
@@ -329,7 +329,7 @@ export function ViewConsultationView() {
 
       <ResourceSection
         icon={ClipboardList}
-        title="Planned care"
+        title="Service requests"
         testID="consultation-planned-care"
       >
         {plannedCare.map((request) => (

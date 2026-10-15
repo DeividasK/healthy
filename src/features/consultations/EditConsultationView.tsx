@@ -82,7 +82,7 @@ export function EditConsultationView() {
           },
           {
             type: 'planned-care',
-            label: 'Planned care',
+            label: 'Service requests',
             icon: ClipboardList,
             options: plannedCareOptions,
             initialIds: Object.keys(plannedCareRoles),

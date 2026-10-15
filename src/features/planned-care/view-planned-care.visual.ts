@@ -7,7 +7,7 @@ import {
   seedTestPlannedCare,
 } from '@/src/features/testing/visualTest';
 
-test.describe('View Planned Care - Visual Regression', () => {
+test.describe('View Service Request - Visual Regression', () => {
   test('Long instructions and every related section', async ({
     page,
   }, testInfo) => {
@@ -64,9 +64,9 @@ test.describe('View Planned Care - Visual Regression', () => {
 
     await page.goto(`/planned-care/${request.id}`);
     await page.getByTestId('planned-care-title').waitFor();
-    await takeSnapshot(page, 'Planned Care View - Details', testInfo);
+    await takeSnapshot(page, 'Service Request View - Details', testInfo);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await takeSnapshot(page, 'Planned Care View - Wide layout', testInfo);
+    await takeSnapshot(page, 'Service Request View - Wide layout', testInfo);
   });
 });

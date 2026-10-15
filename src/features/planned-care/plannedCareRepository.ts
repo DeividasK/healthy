@@ -111,7 +111,7 @@ export async function insertServiceRequestRecord(
       );
       if (!condition || condition.patient_id !== patientId) {
         throw new Error(
-          'Planned care reason must reference a condition for the same patient'
+          'Service request reason must reference a condition for the same patient'
         );
       }
     }

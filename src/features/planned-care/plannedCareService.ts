@@ -321,7 +321,7 @@ export async function setPlannedCareConditionLink(
   linked: boolean
 ): Promise<void> {
   const request = await fetchServiceRequestById(requestId, patientId);
-  if (!request) throw new Error(`Planned care ${requestId} not found`);
+  if (!request) throw new Error(`Service request ${requestId} not found`);
   const ids = getReasonConditionIds(request);
   if (ids.includes(conditionId) === linked) return;
   await createOrUpdatePlannedCare({
@@ -432,7 +432,7 @@ async function applyConsultationRole(
   role: PlannedCareConsultationRole | null
 ): Promise<void> {
   const request = await fetchServiceRequestById(requestId, patientId);
-  if (!request) throw new Error(`Planned care ${requestId} not found`);
+  if (!request) throw new Error(`Service request ${requestId} not found`);
   const consultation = await fetchConsultationById(consultationId, patientId);
   if (!consultation)
     throw new Error(`Consultation ${consultationId} not found`);
@@ -509,7 +509,7 @@ export async function savePlannedCareConsultationRoles(
 ): Promise<void> {
   const origins = Object.values(roles).filter((role) => role === 'origin');
   if (origins.length > 1) {
-    throw new Error('Planned care can originate in only one consultation');
+    throw new Error('A service request can originate in only one consultation');
   }
   const current = await getPlannedCareConsultationRoles(requestId, patientId);
   const db = await getDb();

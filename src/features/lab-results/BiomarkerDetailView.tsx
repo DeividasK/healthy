@@ -214,7 +214,7 @@ export function BiomarkerDetailView() {
           options={[
             {
               id: 'lab-results',
-              label: 'Add Lab Results',
+              label: 'Lab Results',
               testID: 'menu-add-lab-results',
               icon: (
                 <FileText

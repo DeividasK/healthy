@@ -9,7 +9,7 @@ import {
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
-test.describe('View Planned Care', () => {
+test.describe('View Service Request', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
@@ -115,7 +115,7 @@ test.describe('View Planned Care', () => {
     await bridge(page, (b, id) => b.setActivePatient(id), other.id);
     await page.goto(`/planned-care/${request.id}`);
     await expect(page.getByTestId('planned-care-view')).toContainText(
-      'Planned care not found.'
+      'Service request not found.'
     );
     await page.goto('/');
     await expect(page.getByTestId('home-planned-care-section')).toHaveCount(0);

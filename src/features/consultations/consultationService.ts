@@ -264,7 +264,7 @@ export async function createOrUpdateConsultation(
   if (processedInput.basedOnServiceRequestIds !== undefined) {
     for (const requestId of processedInput.basedOnServiceRequestIds)
       if (!(await fetchServiceRequestById(requestId, patientId)))
-        throw new Error(`Planned care ${requestId} not found`);
+        throw new Error(`Service request ${requestId} not found`);
     result = withConsultationBasedOn(
       result,
       processedInput.basedOnServiceRequestIds

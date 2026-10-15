@@ -140,10 +140,10 @@ v13 is additive and non-breaking: it creates `organizations` with an index on
 `(patient_id, name)` and its sync capture triggers. Its `repair` step re-creates
 the triggers on every start. No existing table or record changes.
 
-## Planned care
+## Service requests
 
-Planned investigations, procedures, referrals and follow-ups are FHIR R5
-`ServiceRequest` resources stored in `service_requests`. The service is
+Service requests (planned lab tests, imaging, procedures, referrals and
+follow-ups) are FHIR R5 `ServiceRequest` resources stored in `service_requests`. The service is
 `code.concept.text`; the category is `category[0]` coded in SNOMED CT (lab test
 108252007, imaging 363679005, procedure 71388002, referral 3457005, follow-up
 390906007); an unrecognised existing category stays selectable and unchanged.
@@ -155,14 +155,14 @@ are `note[0]`; the requester is `requester.display`. Intent defaults to `plan`
 (recommendation) and status to `unknown`; the status value set is the
 request-status one (`revoked`, not `cancelled`). Further categories, reasons,
 notes, instructions, codings and other elements are preserved on edit, and a
-generated narrative is rebuilt on save. Planned care never creates a
+generated narrative is rebuilt on save. A service request never creates a
 DiagnosticReport or Observation.
 
-A consultation relates to planned care in one of three ways, chosen with a role
+A consultation relates to a service request in one of three ways, chosen with a role
 select on the link in either edit form:
 
 - **Origin** (`ServiceRequest.encounter`, 0..1): the consultation it was
-  planned in. Creating planned care from a consultation sets it; a request has
+  requested in. Creating a service request from a consultation sets it; a request has
   at most one origin, so choosing another consultation as origin moves it (the
   previous one keeps a planned entry). The origin is also listed in its
   consultation's document.
@@ -177,7 +177,7 @@ select on the link in either edit form:
 
 Reference cleanup is transactional:
 
-- Deleting planned care removes its Composition entries (dropping emptied
+- Deleting a service request removes its Composition entries (dropping emptied
   sections) and its `Encounter.basedOn` references.
 - Deleting a consultation clears `encounter` on requests that originated in it
   (JSON and SQL projection together) and keeps them.
@@ -185,8 +185,8 @@ Reference cleanup is transactional:
   wording.
 
 ZIP archives carry `records/service_request_*.json` envelopes; restore order is
-patients, organizations, conditions, reports, encounters, treatments, planned
-care, then Compositions. Encrypted sync replicates `ServiceRequest` after
+patients, organizations, conditions, reports, encounters, treatments, service
+requests, then Compositions. Encrypted sync replicates `ServiceRequest` after
 `MedicationRequest` and before `Composition`.
 
 ### Migration v14

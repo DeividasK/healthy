@@ -159,7 +159,7 @@ export function ViewConditionView() {
               },
               {
                 id: 'planned-care',
-                label: 'Planned care',
+                label: 'Service Request',
                 testID: 'menu-add-planned-care',
                 icon: (
                   <ClipboardList
@@ -324,7 +324,7 @@ export function ViewConditionView() {
 
       <ResourceSection
         icon={ClipboardList}
-        title="Planned care"
+        title="Service requests"
         testID="condition-planned-care-section"
       >
         {plannedCare.map((request) => (

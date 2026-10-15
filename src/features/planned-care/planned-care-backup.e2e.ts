@@ -14,7 +14,7 @@ import {
 const PATIENT = 'planned-care-backup-patient';
 
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
-  test(`${transport} preserves planned care, its origin and basedOn references`, async ({
+  test(`${transport} preserves service requests, their origin and basedOn references`, async ({
     page,
   }) => {
     await seedTestPatient(page, { id: PATIENT });
