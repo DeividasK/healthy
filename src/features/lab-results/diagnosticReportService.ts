@@ -185,23 +185,10 @@ export async function createAndSaveDiagnosticReport(
     ? 'Complete blood count (hemogram) panel - Blood by Automated count'
     : 'Laboratory report';
 
-  // Start from the stored report so elements the form does not edit survive.
-  // Observations are stored separately; drop any `contained` copy left by
-  // older ZIP restores.
-  const stored = options.reportId
-    ? (await getReportById(options.reportId))?.report
-    : undefined;
-  const existing = stored ? { ...stored } : undefined;
-  delete existing?.contained;
-
-  const report: DiagnosticReport = {
-    ...existing,
+  // Elements the form edits; everything else comes from the stored report.
+  const fields: DiagnosticReport = {
     resourceType: 'DiagnosticReport',
     id: reportId,
-    meta: {
-      ...existing?.meta,
-      lastUpdated: now,
-    },
     status: 'final',
     category: [
       {
@@ -236,21 +223,30 @@ export async function createAndSaveDiagnosticReport(
       display: obs.code.coding?.[0]?.display || obs.code.text,
     })),
   };
-
-  if (options.notes && options.notes.trim()) {
-    report.note = [
-      {
-        text: options.notes.trim(),
-        time: now,
-      },
-    ];
-  } else {
-    delete report.note;
-  }
-
+  const notes = options.notes?.trim();
   const providerName = options.serviceProviderName?.trim();
+
   const db = await getDb();
+  let report!: DiagnosticReport;
+  // Read and merge the stored report in the saving transaction, so a sync
+  // change applied meanwhile is never overwritten by a stale copy.
   await db.withTransactionAsync(async () => {
+    const stored = options.reportId
+      ? (await getReportById(options.reportId))?.report
+      : undefined;
+    const existing = stored ? { ...stored } : undefined;
+    // Observations are stored separately; drop any `contained` copy left by
+    // older ZIP restores.
+    delete existing?.contained;
+
+    report = {
+      ...existing,
+      ...fields,
+      meta: { ...existing?.meta, lastUpdated: now },
+    };
+    if (notes) report.note = [{ text: notes, time: now }];
+    else delete report.note;
+
     const performers = existing?.performer || [];
     const providerIndex = performers.findIndex(isOrganizationReference);
     const current = performers[providerIndex];

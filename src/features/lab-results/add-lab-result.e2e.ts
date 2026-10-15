@@ -173,9 +173,13 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await page.getByTestId('menu-add-notes').click();
     await expect(page.getByTestId('notes-input')).toBeVisible();
 
-    // Add Service provider
+    // Add Service provider once the previous menu has closed
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
     await plusBtn.click();
-    await page.getByTestId('menu-add-service-provider').click();
+    await page
+      .getByTestId('form-add-menu')
+      .getByTestId('menu-add-service-provider')
+      .click();
     await expect(
       page.getByTestId('lab-result-service-provider-input')
     ).toBeVisible();
