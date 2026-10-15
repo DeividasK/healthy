@@ -784,3 +784,40 @@ test('records a service provider and reuses its Organization', async ({
     ]);
   });
 });
+
+test('scrolls a field added from the + menu into view and focuses it', async ({
+  page,
+}) => {
+  await seedTestPatient(page);
+  await page.goto('/consultation/add');
+  const addField = async (testID: string) => {
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('form-add-menu').getByTestId(testID).click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+  };
+  const expectRevealed = async (field: ReturnType<typeof page.getByTestId>) => {
+    await expect(field).toBeFocused();
+    await expect(field).toBeInViewport({ ratio: 1 });
+    // The floating action dock must not cover it.
+    await expect
+      .poll(async () => {
+        const box = await field.boundingBox();
+        const dock = await page.getByTestId('add-option-button').boundingBox();
+        return box!.y + box!.height <= dock!.y;
+      })
+      .toBe(true);
+  };
+
+  // Two diagnoses make the form taller than the viewport.
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-0-title-input')).toBeFocused();
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-1-title-input')).toBeFocused();
+
+  await addField('menu-add-notes');
+  await expectRevealed(page.getByTestId('consultation-notes-input'));
+
+  // Non-text controls are focused too.
+  await addField('menu-add-time');
+  await expectRevealed(page.getByTestId('time-picker-button').locator('input'));
+});
