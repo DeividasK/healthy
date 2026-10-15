@@ -62,6 +62,31 @@ an optional link to a same-patient Condition is `reason[0].reference`. Notes are
 `note[0]`. Intent defaults to `plan` (recommendation) and status to `unknown`.
 Further dosage entries, reasons, notes and codings are preserved on edit.
 
+Dosing is either free text (`dosageInstruction[0].text`) or a structured
+regimen, never both: the form offers one or the other, and the service rejects
+a save that supplies both. A regimen is a list of `Dosage` entries:
+
+- **Phases** are `Dosage.sequence`. Doses taken together (e.g. 2 tablets in the
+  morning and 1 in the evening) share a sequence number; later phases (e.g.
+  maintenance after an initial course) follow in increasing numbers. No dates
+  are invented for later phases.
+- **Dose** is `doseAndRate[0].doseQuantity`, or `doseRange` for "2–3", with a
+  UCUM unit (`{tablet}`, `mg`, `mL`…).
+- **Timing** is `timing.repeat`: `frequency`/`frequencyMax` per
+  `period`/`periodUnit`, one `when` code (MORN, NOON, AFT, EVE, HS) and the
+  course length as `boundsDuration` (not `duration`, which is the length of
+  one administration).
+- **Route** is a SNOMED CT route code; **body site** is `site.text`;
+  **patient instructions** are `patientInstruction`.
+- **Quantity to dispense** is `dispenseRequest.quantity`, separate from the
+  dose.
+
+Editing changes only those elements: other Dosage data (`maxDosePerPeriod`,
+`timing.code`, `timeOfDay`, further `doseAndRate` entries, extensions) and
+Dosage entries the editor does not show are kept. Records that already carry
+both text and structure (e.g. imported) keep their text alongside the regimen
+until the user replaces it.
+
 The narrative (`text`) is rebuilt on every save while its status is
 `generated`; narratives with any other status are treated as authored and kept.
 

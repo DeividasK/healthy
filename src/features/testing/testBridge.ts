@@ -377,6 +377,8 @@ export function setupTestBridge() {
         authoredDate:
           input.authoredOn || new Date().toISOString().split('T')[0],
         dosageInstructions: input.dosageInstructions,
+        regimen: input.regimen,
+        dispenseQuantity: input.dispenseQuantity,
         reason: input.reason,
         reasonConditionIds: input.reasonConditionIds,
         notes: input.notes,

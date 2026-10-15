@@ -67,20 +67,15 @@ test.describe('Add Treatment Flow', () => {
     await checkA11y(page, { include: '[data-testid="treatment-form"]' });
     await page.getByTestId('save-treatment-button').click();
 
-    // Returns to Home, which lists the treatment
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await page
-      .getByRole('button', {
-        name: 'View treatment: Amoxicillin 500mg Capsule',
-      })
-      .click();
+    // Opens the new treatment
+    await expect(page).toHaveURL(/\/treatment\/[^/]+$/);
     await expect(page.getByTestId('treatment-title')).toHaveText(
       'Amoxicillin 500mg Capsule'
     );
     await expect(page.getByTestId('treatment-intent')).toContainText(
       'Prescription'
     );
-    await expect(page.getByTestId('treatment-instructions')).toContainText(
+    await expect(page.getByTestId('treatment-dosage')).toContainText(
       'Complete full course.'
     );
     // Wording and the linked Condition are both shown
@@ -132,6 +127,11 @@ test.describe('Add Treatment Flow', () => {
       .fill('Take 1 tablet at onset of migraine.');
     await page.getByTestId('save-treatment-button').click();
 
+    // Opens the new treatment; going back returns to the consultation
+    await expect(page.getByTestId('treatment-title')).toHaveText(
+      'Sumatriptan 50mg'
+    );
+    await page.goBack();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
     );
@@ -212,9 +212,6 @@ test.describe('Add Treatment Flow', () => {
     // A specialist not seen before can be entered
     await requester.fill('Dr. New Specialist');
     await page.getByTestId('save-treatment-button').click();
-    await page
-      .getByRole('button', { name: 'View treatment: Ibuprofen 400mg' })
-      .click();
     await expect(page.getByTestId('treatment-requester')).toContainText(
       'Dr. New Specialist'
     );
@@ -311,7 +308,142 @@ test.describe('Treatment form keyboard support', () => {
     await page.goto('/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Keyboard saved');
     await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByTestId('treatment-title')).toHaveText(
+      'Keyboard saved'
+    );
+  });
+
+  test('records split doses, a later phase and a dispense quantity as a structured regimen', async ({
+    page,
+  }) => {
+    await page.goto('/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Prednisolone 5mg');
+    const openMenu = async () => {
+      await page.getByTestId('add-option-button').click();
+      await expect(page.getByTestId('form-add-menu')).toBeVisible();
+    };
+    const addField = async (field: string) => {
+      await openMenu();
+      await page.getByTestId(`menu-add-treatment-${field}`).click();
+      await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
+    };
+    await addField('regimen');
+    // The added regimen's first field takes focus
+    await expect(
+      page.getByTestId('treatment-regimen-p1-d1-amount-input')
+    ).toBeFocused();
+    // Text instructions and a regimen are alternatives
+    await openMenu();
+    await expect(
+      page.getByTestId('menu-add-treatment-instructions')
+    ).toHaveCount(0);
+    await page.getByTestId('menu-add-treatment-dispenseQuantity').click();
+    await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
+
+    const dose = (phase: number, index: number, field: string) =>
+      page.getByTestId(`treatment-regimen-p${phase}-d${index}-${field}`);
+    // A phase's + adds doses and phases; a dose's + adds its optional
+    // fields, both from a centered menu.
+    const addFrom = async (button: string, option: string) => {
+      await page.getByTestId(`treatment-regimen-${button}-add`).click();
+      await page.getByTestId(`treatment-regimen-option-${option}`).click();
+      await expect(page.getByTestId('regimen-options-menu')).toHaveCount(0);
+    };
+    await dose(1, 1, 'amount-input').fill('2');
+    await dose(1, 1, 'frequency-input').fill('1');
+    await addFrom('p1-d1', 'route');
+    await expect(dose(1, 1, 'route-select')).toHaveValue('26643006');
+    await addFrom('p1-d1', 'when');
+    await expect(dose(1, 1, 'when-select')).toBeFocused();
+    await dose(1, 1, 'when-select').selectOption('MORN');
+    await addFrom('p1-d1', 'bounds');
+    await dose(1, 1, 'boundsValue-input').fill('7');
+    // A removed optional field goes back to the menu
+    await dose(1, 1, 'bounds-remove').click();
+    await expect(dose(1, 1, 'boundsValue-input')).toHaveCount(0);
+    await addFrom('p1-d1', 'bounds');
+    await expect(dose(1, 1, 'boundsValue-input')).toHaveValue('');
+    await dose(1, 1, 'boundsValue-input').fill('7');
+
+    await addFrom('p1', 'dose');
+    await expect(dose(1, 2, 'amount-input')).toBeFocused();
+    await dose(1, 2, 'amount-input').fill('1');
+    await dose(1, 2, 'frequency-input').fill('1');
+    await addFrom('p1-d2', 'route');
+    await addFrom('p1-d2', 'when');
+    await dose(1, 2, 'when-select').selectOption('EVE');
+    await addFrom('p1-d2', 'bounds');
+    await dose(1, 2, 'boundsValue-input').fill('7');
+
+    await addFrom('p1', 'phase');
+    await dose(2, 1, 'amount-input').fill('1');
+    await dose(2, 1, 'frequency-input').fill('3');
+    await addFrom('p2-d1', 'frequencyMax');
+    await dose(2, 1, 'frequencyMax-input').fill('2');
+    await page.getByTestId('treatment-dispenseQuantity-input').fill('30');
+
+    // An inverted frequency range is refused before anything is written
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-form-error')).toHaveText(
+      'Phase 2: Max times must be more than min times'
+    );
+    const countRows = () =>
+      page.evaluate(() =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+          'SELECT id FROM medication_requests'
+        )
+      );
+    expect(await countRows()).toHaveLength(0);
+
+    await dose(2, 1, 'frequency-input').fill('1');
+    await checkA11y(page, { include: '[data-testid="treatment-form"]' });
+    await page.getByTestId('save-treatment-button').click();
     await expect(page).not.toHaveURL(/treatment\/add/);
-    await expect(page.getByText('Keyboard saved')).toBeVisible();
+
+    const [{ id }] = await countRows();
+    const stored = await getTestTreatment(page, id);
+    const dosages = stored.dosageInstruction;
+    expect(dosages.map((dosage: any) => dosage.sequence)).toEqual([1, 1, 2]);
+    expect(dosages.some((dosage: any) => 'text' in dosage)).toBe(false);
+    expect(dosages[0].doseAndRate[0].doseQuantity).toEqual({
+      value: 2,
+      unit: 'tablet',
+      system: 'http://unitsofmeasure.org',
+      code: '{tablet}',
+    });
+    expect(dosages[0].route.coding[0].code).toBe('26643006');
+    expect(dosages[0].timing.repeat).toMatchObject({
+      frequency: 1,
+      period: 1,
+      periodUnit: 'd',
+      when: ['MORN'],
+    });
+    expect(dosages[1].timing.repeat.when).toEqual(['EVE']);
+    expect(dosages[1].timing.repeat.boundsDuration).toMatchObject({
+      value: 7,
+      code: 'd',
+    });
+    expect(dosages[2].timing.repeat).toEqual({
+      frequency: 1,
+      frequencyMax: 2,
+      period: 1,
+      periodUnit: 'd',
+    });
+    expect(stored.dispenseRequest.quantity).toMatchObject({
+      value: 30,
+      code: '{tablet}',
+    });
+
+    await page.goto(`/treatment/${id}`);
+    await expect(page.getByTestId('treatment-dosage')).toHaveText(
+      [
+        'Phase 1: 2 tablets oral, once a day, in the morning, for 7 days',
+        'Phase 1: 1 tablet oral, once a day, in the evening, for 7 days',
+        'Phase 2: 1 tablet, 1–2 times a day',
+      ].join('\n')
+    );
+    await expect(page.getByTestId('treatment-dispense-quantity')).toHaveText(
+      '30 tablets'
+    );
   });
 });

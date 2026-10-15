@@ -25,6 +25,7 @@ import {
   getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
+import { formatQuantityText, formatRegimenLines } from './regimen';
 
 export function ViewTreatmentView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -181,9 +182,18 @@ function TreatmentForPatient({
   }
 
   const title = getTreatmentTitle(treatment);
-  const instructions = getTreatmentInstructions(treatment);
   const notes = getTreatmentNotes(treatment);
   const reasonText = getTreatmentReason(treatment);
+  // Free text or regimen lines; imported records may carry both.
+  const dosage = [
+    getTreatmentInstructions(treatment),
+    ...formatRegimenLines(treatment),
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const dispenseQuantity = formatQuantityText(
+    treatment.dispenseRequest?.quantity
+  );
 
   return (
     <>
@@ -220,12 +230,19 @@ function TreatmentForPatient({
               testID="treatment-reason-section"
             />
           )}
-          {Boolean(instructions) && (
+          {Boolean(dosage) && (
             <ResourceTextSection
-              title="Dosage Instructions"
-              text={instructions!}
-              testID="treatment-instructions-section"
-              textTestID="treatment-instructions"
+              title="Dosage"
+              text={dosage}
+              testID="treatment-dosage-section"
+              textTestID="treatment-dosage"
+            />
+          )}
+          {Boolean(dispenseQuantity) && (
+            <InfoRow
+              label="Quantity to Dispense"
+              value={dispenseQuantity!}
+              testID="treatment-dispense-quantity"
             />
           )}
           {Boolean(notes) && (

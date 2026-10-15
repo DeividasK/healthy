@@ -19,7 +19,6 @@ import { getConsultationDoctor } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
 import { COLORS } from '@/src/theme/colors';
-import { goBackOr } from '@/src/utils/navigation';
 
 export function AddTreatmentView() {
   const { consultationId, conditionId } = useLocalSearchParams<{
@@ -110,6 +109,8 @@ function AddTreatmentForPatient({
       status: values.status,
       authoredDate: formattedDate,
       dosageInstructions: values.dosageInstructions,
+      regimen: values.regimen,
+      dispenseQuantity: values.dispenseQuantity,
       reason: values.reason,
       reasonConditionIds: values.reasonConditionIds,
       notes: values.notes,
@@ -122,13 +123,8 @@ function AddTreatmentForPatient({
       (document.activeElement as HTMLElement)?.blur?.();
     }
 
-    if (originId) {
-      router.dismissTo(`/consultation/${originId}`);
-    } else if (conditionId) {
-      router.dismissTo(`/condition/${conditionId}`);
-    } else {
-      goBackOr(router, `/treatment/${created.id}`);
-    }
+    // Open the new treatment; going back returns to where it was added.
+    router.replace(`/treatment/${created.id}`);
   };
 
   return (
