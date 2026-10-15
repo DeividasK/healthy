@@ -35,6 +35,7 @@ const CLINICAL_TABLES = [
   'consultation_conditions',
   'clinical_documents',
   'medication_requests',
+  'organizations',
 ];
 
 /** Every canonical row on a device, for comparing two devices. */
@@ -69,6 +70,7 @@ async function seedLinkedRecord(page: Page) {
         conditionIds: ['asthma'],
         reasonConditionIds: ['eczema'],
         notes: 'Confidential narrative',
+        serviceProviderName: 'Private Clinic',
       },
     ],
     treatments: [
@@ -82,6 +84,7 @@ async function seedLinkedRecord(page: Page) {
     reports: [
       {
         id: 'cbc',
+        serviceProviderName: 'Private Clinic',
         biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
       },
     ],
@@ -100,6 +103,7 @@ test.describe('Sync between devices', () => {
     for (const secret of [
       'Private asthma diagnosis',
       'Confidential narrative',
+      'Private Clinic',
       'Alice',
     ])
       expect(contents).not.toContain(secret);
@@ -311,7 +315,8 @@ test.describe('Sync between devices', () => {
         UNION ALL SELECT 'DiagnosticReport', id FROM diagnostic_reports
         UNION ALL SELECT 'Encounter', id FROM consultations
         UNION ALL SELECT 'MedicationRequest', id FROM medication_requests
-        UNION ALL SELECT 'Composition', id FROM clinical_documents`);
+        UNION ALL SELECT 'Composition', id FROM clinical_documents
+        UNION ALL SELECT 'Organization', id FROM organizations`);
       const versions = await b.querySql(
         'SELECT resource_type AS type, resource_id AS id, deleted FROM sync_row_versions'
       );

@@ -239,6 +239,7 @@ export function setupTestBridge() {
       patientId?: string;
       date?: string;
       notes?: string;
+      serviceProviderName?: string;
       biomarkers: {
         name: string;
         value: number | string;
@@ -299,6 +300,7 @@ export function setupTestBridge() {
         patientId,
         date: input.date || new Date().toISOString().split('T')[0],
         notes: input.notes,
+        serviceProviderName: input.serviceProviderName,
         items,
       });
     },
@@ -309,6 +311,7 @@ export function setupTestBridge() {
       reasonConditionIds?: string[];
       title: string;
       doctorName?: string;
+      serviceProviderName?: string;
       serviceType?: string;
       date?: string;
       notes?: string;
@@ -322,6 +325,7 @@ export function setupTestBridge() {
         reasonConditionIds: input.reasonConditionIds,
         title: input.title,
         doctorName: input.doctorName,
+        serviceProviderName: input.serviceProviderName,
         serviceType: input.serviceType,
         date: input.date || new Date().toISOString().split('T')[0],
         notes: input.notes,

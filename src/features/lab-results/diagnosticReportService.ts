@@ -11,6 +11,10 @@ import {
   deleteDiagnosticReportRecord,
 } from './labResultsRepository';
 import { DiagnosticReportRecord } from '@/src/database/types';
+import { getDb } from '@/src/database/db';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { resolveOrganizationReference } from '@/src/features/organizations/organizationService';
+import { isOrganizationReference } from '@/src/utils/fhirUtils';
 
 export interface DiagnosticReportBundle {
   report: DiagnosticReport;
@@ -34,6 +38,8 @@ export interface CreateReportOptions {
   date: string; // YYYY-MM-DD
   time?: string; // e.g. "09:30"
   notes?: string;
+  /** Service provider (Organization) name; found or created on save. */
+  serviceProviderName?: string;
   items: BiomarkerInputItem[];
 }
 
@@ -179,10 +185,17 @@ export async function createAndSaveDiagnosticReport(
     ? 'Complete blood count (hemogram) panel - Blood by Automated count'
     : 'Laboratory report';
 
+  // Start from the stored report so elements the form does not edit survive.
+  const existing = options.reportId
+    ? (await getReportById(options.reportId))?.report
+    : undefined;
+
   const report: DiagnosticReport = {
+    ...existing,
     resourceType: 'DiagnosticReport',
     id: reportId,
     meta: {
+      ...existing?.meta,
       lastUpdated: now,
     },
     status: 'final',
@@ -227,9 +240,39 @@ export async function createAndSaveDiagnosticReport(
         time: now,
       },
     ];
+  } else {
+    delete report.note;
   }
 
-  await insertDiagnosticReportRecord(report, observations, patientId);
+  const providerName = options.serviceProviderName?.trim();
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    const performers = existing?.performer || [];
+    const providerIndex = performers.findIndex(isOrganizationReference);
+    const current = performers[providerIndex];
+    const provider = !providerName
+      ? undefined
+      : current?.display === providerName
+        ? current
+        : await resolveOrganizationReference(providerName, patientId);
+    const updated =
+      providerIndex >= 0
+        ? performers.flatMap((performer, index) =>
+            index !== providerIndex ? [performer] : provider ? [provider] : []
+          )
+        : provider
+          ? [provider, ...performers]
+          : performers;
+    if (updated.length) report.performer = updated;
+    else delete report.performer;
+
+    await insertDiagnosticReportRecord(report, observations, patientId, true);
+  });
+  notifyDatabaseChanged([
+    'organizations',
+    'diagnostic_reports',
+    'observations',
+  ]);
 
   return { report, observations };
 }

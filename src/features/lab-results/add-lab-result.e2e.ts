@@ -173,6 +173,13 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await page.getByTestId('menu-add-notes').click();
     await expect(page.getByTestId('notes-input')).toBeVisible();
 
+    // Add Service provider
+    await plusBtn.click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await expect(
+      page.getByTestId('lab-result-service-provider-input')
+    ).toBeVisible();
+
     // 4. Keep the primary add action in place, disabled when all fields are present
     await expect(plusBtn).toBeDisabled();
 
@@ -362,5 +369,45 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await expect(page.getByTestId('time-picker-button')).not.toContainText(
       '23:55'
     );
+  });
+
+  test('records a service provider as an Organization performer', async ({
+    page,
+  }) => {
+    await page.goto('/lab-result/add');
+    await page.getByTestId('test-search-input').fill('Hemoglobin');
+    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
+    await page.getByTestId('marker-value-input-0').fill('14.5');
+    await page.getByTestId('plus-menu-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await page
+      .getByTestId('lab-result-service-provider-input')
+      .fill('City Laboratory');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/lab-result\/add/);
+
+    const stored = await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        report: JSON.parse(
+          (
+            await bridge.querySql('SELECT fhir_json FROM diagnostic_reports;')
+          )[0].fhir_json
+        ),
+        organizations: await bridge.querySql(
+          'SELECT id, name FROM organizations;'
+        ),
+      };
+    });
+    expect(stored.organizations).toEqual([
+      { id: expect.stringMatching(/^org-/), name: 'City Laboratory' },
+    ]);
+    expect(stored.report.performer).toEqual([
+      {
+        reference: `Organization/${stored.organizations[0].id}`,
+        type: 'Organization',
+        display: 'City Laboratory',
+      },
+    ]);
   });
 });

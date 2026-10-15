@@ -17,6 +17,7 @@ import {
   FileText,
   FolderPlus,
   User,
+  Hospital,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
@@ -25,6 +26,7 @@ import type { AddOptionItem } from '@/src/components/AddOptionsModal';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
 import { SpecialistField } from '@/src/components/SpecialistField';
+import { getOrganizationNames } from '@/src/features/organizations/organizationService';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
 import {
   useLinkFields,
@@ -94,6 +96,7 @@ export interface ConsultationFormValues {
   date: Date;
   time?: string | null;
   doctorName?: string;
+  serviceProviderName?: string;
   serviceType?: string;
   conditionIds?: string[];
   reasonConditionIds?: string[];
@@ -174,6 +177,13 @@ export function ConsultationForm({
   );
   const [doctorName, setDoctorName] = useState(initialValues?.doctorName || '');
 
+  const [showServiceProvider, setShowServiceProvider] = useState<boolean>(
+    Boolean(initialValues?.serviceProviderName)
+  );
+  const [serviceProviderName, setServiceProviderName] = useState(
+    initialValues?.serviceProviderName || ''
+  );
+
   const [showServiceType, setShowServiceType] = useState<boolean>(
     Boolean(initialValues?.serviceType)
   );
@@ -197,6 +207,9 @@ export function ConsultationForm({
     []
   );
   const [knownDoctors, setKnownDoctors] = useState<string[]>([]);
+  const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
+    []
+  );
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
   const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
@@ -211,6 +224,7 @@ export function ConsultationForm({
     date,
     time,
     doctorName,
+    serviceProviderName,
     serviceType,
     notes,
     selectedConditionIds,
@@ -228,13 +242,17 @@ export function ConsultationForm({
       getAllConditions(activePatientId),
       getDistinctDoctorNames(activePatientId),
       getDistinctServiceTypes(activePatientId),
+      getOrganizationNames(activePatientId),
     ])
-      .then(([conditionsData, doctorsData, serviceTypesData]) => {
-        if (!isMounted) return;
-        setAvailableConditions(conditionsData);
-        setKnownDoctors(doctorsData);
-        setKnownServiceTypes(serviceTypesData);
-      })
+      .then(
+        ([conditionsData, doctorsData, serviceTypesData, providersData]) => {
+          if (!isMounted) return;
+          setAvailableConditions(conditionsData);
+          setKnownDoctors(doctorsData);
+          setKnownServiceProviders(providersData);
+          setKnownServiceTypes(serviceTypesData);
+        }
+      )
       .catch((err) => {
         console.warn('Failed to load consultation context data:', err);
       });
@@ -296,6 +314,10 @@ export function ConsultationForm({
           date: fullDate,
           doctorName:
             showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
+          serviceProviderName:
+            showServiceProvider && serviceProviderName.trim()
+              ? serviceProviderName.trim()
+              : undefined,
           serviceType:
             showServiceType && serviceType.trim()
               ? serviceType.trim()
@@ -390,6 +412,21 @@ export function ConsultationForm({
       ),
       testID: 'menu-add-doctor',
       onPress: () => setShowDoctor(true),
+    });
+  }
+  if (!showServiceProvider) {
+    plusMenuOptions.push({
+      id: 'add-service-provider',
+      label: 'Service provider',
+      icon: (
+        <Hospital
+          color={COLORS.light.primary}
+          size={20}
+          style={{ marginRight: 12 }}
+        />
+      ),
+      testID: 'menu-add-service-provider',
+      onPress: () => setShowServiceProvider(true),
     });
   }
   if (!showServiceType) {
@@ -754,6 +791,24 @@ export function ConsultationForm({
               onRemove={() => {
                 setShowDoctor(false);
                 setDoctorName('');
+              }}
+            />
+          )}
+
+          {showServiceProvider && (
+            <SpecialistField
+              label="Service provider"
+              name="serviceProviderName"
+              placeholder="e.g. City Hospital"
+              inputID="consultation-service-provider-input"
+              autocompleteTestID="service-provider-autocomplete"
+              value={serviceProviderName}
+              onChangeText={setServiceProviderName}
+              suggestions={knownServiceProviders}
+              removeTestID="remove-service-provider-button"
+              onRemove={() => {
+                setShowServiceProvider(false);
+                setServiceProviderName('');
               }}
             />
           )}

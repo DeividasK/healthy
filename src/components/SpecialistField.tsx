@@ -15,12 +15,16 @@ interface SpecialistFieldProps {
   /** Known specialists offered as suggestions; any other name may be typed. */
   suggestions: string[];
   required?: boolean;
+  placeholder?: string;
   onRemove?: () => void;
   removeTestID?: string;
   autocompleteTestID?: string;
 }
 
-/** Free-text specialist name with autocomplete from known specialists. */
+/**
+ * Free-text name with autocomplete from known names: specialists, and
+ * service providers via `label`, `name` and `placeholder`.
+ */
 export function SpecialistField({
   label = 'Specialist',
   name = 'specialistName',
@@ -29,6 +33,7 @@ export function SpecialistField({
   onChangeText,
   suggestions,
   required,
+  placeholder = 'e.g. Dr. Sarah Adams',
   onRemove,
   removeTestID,
   autocompleteTestID = `${inputID}-autocomplete`,
@@ -63,7 +68,7 @@ export function SpecialistField({
           nativeID: inputID,
           name,
           accessibilityLabel: label,
-          placeholder: 'e.g. Dr. Sarah Adams',
+          placeholder,
           value,
           onChangeText: (text) => {
             onChangeText(text);

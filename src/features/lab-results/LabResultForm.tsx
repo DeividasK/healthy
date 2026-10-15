@@ -15,11 +15,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Clock, FileText } from 'lucide-react-native';
+import { X, Clock, FileText, Hospital } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { SpecialistField } from '@/src/components/SpecialistField';
+import { getOrganizationNames } from '@/src/features/organizations/organizationService';
+import { getReportServiceProvider } from '@/src/utils/fhirUtils';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -98,6 +101,12 @@ export function LabResultForm({
   const [testTime, setTestTime] = useState<string | null>(null);
   const [testNotes, setTestNotes] = useState<string | null>(null);
   const [showNotesInput, setShowNotesInput] = useState(false);
+  const [serviceProviderName, setServiceProviderName] = useState<string | null>(
+    null
+  );
+  const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
+    []
+  );
 
   // Plus menu dropdown
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -110,6 +119,7 @@ export function LabResultForm({
       selectedDate,
       testTime,
       testNotes,
+      serviceProviderName,
       activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
         id,
         valueStr,
@@ -149,6 +159,8 @@ export function LabResultForm({
             setTestTime(null);
           }
         }
+
+        setServiceProviderName(getReportServiceProvider(record.report));
 
         // Notes
         if (record.report.note && record.report.note.length > 0) {
@@ -213,6 +225,18 @@ export function LabResultForm({
     };
   }, [reportId]);
 
+  useEffect(() => {
+    let isMounted = true;
+    getOrganizationNames(activePatientId)
+      .then((names) => {
+        if (isMounted) setKnownServiceProviders(names);
+      })
+      .catch((err) => console.warn('Failed to load service providers:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [activePatientId]);
+
   // Autocomplete matching items
   const autocompleteResults = useMemo(() => {
     const existingLoincs = new Set(
@@ -229,7 +253,8 @@ export function LabResultForm({
 
   const hasTime = testTime !== null;
   const hasNotes = showNotesInput;
-  const showPlusButton = !hasTime || !hasNotes;
+  const hasServiceProvider = serviceProviderName !== null;
+  const showPlusButton = !hasTime || !hasNotes || !hasServiceProvider;
 
   const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
@@ -331,6 +356,7 @@ export function LabResultForm({
         date: effectiveDateStr,
         time: testTime || undefined,
         notes: testNotes ? testNotes.trim() : undefined,
+        serviceProviderName: serviceProviderName?.trim() || undefined,
         items: biomarkers,
       });
 
@@ -438,6 +464,21 @@ export function LabResultForm({
                 name="time"
               />
             </FormField>
+          )}
+
+          {hasServiceProvider && (
+            <SpecialistField
+              label="Service provider"
+              name="serviceProviderName"
+              placeholder="e.g. City Laboratory"
+              inputID="lab-result-service-provider-input"
+              autocompleteTestID="service-provider-autocomplete"
+              value={serviceProviderName}
+              onChangeText={setServiceProviderName}
+              suggestions={knownServiceProviders}
+              removeTestID="remove-service-provider-button"
+              onRemove={() => setServiceProviderName(null)}
+            />
           )}
 
           {/* Optional Notes Section if added */}
@@ -624,7 +665,7 @@ export function LabResultForm({
           }
         />
 
-        {/* Plus Action Overlay ("Add Time", "Add Notes") */}
+        {/* Plus Action Overlay ("Add Time", "Add Service provider", "Add Notes") */}
         <FloatingAddMenu
           testID="form-add-menu"
           visible={showPlusMenu}
@@ -649,6 +690,23 @@ export function LabResultForm({
                       const m = now.getMinutes().toString().padStart(2, '0');
                       setTestTime(`${h}:${m}`);
                     },
+                  },
+                ]
+              : []),
+            ...(!hasServiceProvider
+              ? [
+                  {
+                    id: 'add-service-provider',
+                    label: 'Service provider',
+                    icon: (
+                      <Hospital
+                        color={COLORS.light.primary}
+                        size={20}
+                        style={{ marginRight: 12 }}
+                      />
+                    ),
+                    testID: 'menu-add-service-provider',
+                    onPress: () => setServiceProviderName(''),
                   },
                 ]
               : []),

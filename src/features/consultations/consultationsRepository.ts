@@ -10,6 +10,7 @@ import {
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
 
 /**
  * Persists an Encounter (Consultation) record using SQLite.
@@ -103,6 +104,11 @@ export async function insertConsultationRecord(
           'Diagnosis must reference an existing condition belonging to the same patient'
         );
     }
+
+    await assertOrganizationReferences(
+      [consultation.serviceProvider?.reference],
+      patientId
+    );
 
     await db.runAsync(
       `INSERT INTO consultations (id, patient_id, date, doctor_name, service_type, title, notes, status, fhir_json, created_at, updated_at)

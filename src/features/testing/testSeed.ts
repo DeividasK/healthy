@@ -24,6 +24,7 @@ export interface SeedReportOptions {
   patientId?: string;
   date?: string;
   notes?: string;
+  serviceProviderName?: string;
   biomarkers: {
     name: string;
     value: number | string;
@@ -38,6 +39,7 @@ export interface SeedConsultationOptions {
   conditionIds?: string[];
   title: string;
   doctorName?: string;
+  serviceProviderName?: string;
   serviceType?: string;
   date?: string;
   notes?: string;

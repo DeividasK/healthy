@@ -6,10 +6,12 @@ import type {
   Encounter,
   MedicationRequest,
   Observation,
+  Organization,
   Patient,
 } from 'fhir/r5';
 import type { DatabaseTable } from '@/src/database/dbEvents';
 import { insertPatientRecord } from '@/src/features/profile/patientRepository';
+import { insertOrganizationRecord } from '@/src/features/organizations/organizationsRepository';
 import { insertConditionRecord } from '@/src/features/conditions/conditionsRepository';
 import { insertDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { insertConsultationRecord } from '@/src/features/consultations/consultationsRepository';
@@ -52,6 +54,17 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     read: (db, id) => readJson(db, 'patients', id),
     put: (resource) =>
       insertPatientRecord(resource as unknown as Patient, true),
+  },
+  Organization: {
+    table: 'organizations',
+    tables: ['organizations'],
+    read: (db, id) => readJson(db, 'organizations', id),
+    put: (resource, patientId) =>
+      insertOrganizationRecord(
+        resource as unknown as Organization,
+        patientId,
+        true
+      ),
   },
   Condition: {
     table: 'conditions',

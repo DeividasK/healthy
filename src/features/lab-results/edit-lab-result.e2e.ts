@@ -2,6 +2,7 @@ import {
   test,
   expect,
   seedTestPatient,
+  seedTestReport,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
@@ -174,4 +175,45 @@ test.describe('Edit Lab Results Flow', () => {
       });
     }
   );
+
+  test('edits the service provider and keeps unexposed report elements', async ({
+    page,
+  }) => {
+    const { report } = await seedTestReport(page, {
+      serviceProviderName: 'City Laboratory',
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+    });
+    const practitioner = { reference: 'Practitioner/p1', display: 'Dr. Lab' };
+    await page.evaluate(
+      async ([id, performer]) => {
+        await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+          `UPDATE diagnostic_reports SET fhir_json = json_set(fhir_json,
+             '$.performer', json_insert(json_extract(fhir_json, '$.performer'), '$[#]', json(?)),
+             '$.conclusion', 'Within range') WHERE id = ?;`,
+          [performer, id]
+        );
+      },
+      [report.id, JSON.stringify(practitioner)]
+    );
+
+    await page.goto(`/lab-result/${report.id}/edit`);
+    const input = page.getByTestId('lab-result-service-provider-input');
+    await expect(input).toHaveValue('City Laboratory');
+    await page.getByTestId('remove-service-provider-button').click();
+    await expect(input).toHaveCount(0);
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+
+    const stored = await page.evaluate(async () =>
+      JSON.parse(
+        (
+          await (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+            'SELECT fhir_json FROM diagnostic_reports;'
+          )
+        )[0].fhir_json
+      )
+    );
+    expect(stored.performer).toEqual([practitioner]);
+    expect(stored.conclusion).toBe('Within range');
+  });
 });

@@ -11,6 +11,7 @@ import {
 import {
   getConsultationTitle,
   getConsultationDoctor,
+  getConsultationServiceProvider,
   getConsultationServiceType,
   getConsultationNotes,
   getConsultationConditionIds,
@@ -93,6 +94,8 @@ export function EditConsultationView() {
 
         const title = getConsultationTitle(encounter);
         const doctorName = getConsultationDoctor(encounter) || undefined;
+        const serviceProviderName =
+          getConsultationServiceProvider(encounter) || undefined;
         const serviceType = getConsultationServiceType(encounter) || undefined;
         const notes = getConsultationNotes(encounter) || undefined;
         const conditionIds = getConsultationConditionIds(encounter);
@@ -134,6 +137,7 @@ export function EditConsultationView() {
           date: dateObj,
           time: timeStr,
           doctorName,
+          serviceProviderName,
           serviceType,
           conditionIds,
           reasonConditionIds: getConsultationReasonConditionIds(encounter),
