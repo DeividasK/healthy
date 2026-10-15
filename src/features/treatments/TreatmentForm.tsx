@@ -20,7 +20,7 @@ import {
   FieldRevealProvider,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
-import { SpecialistField } from '@/src/components/SpecialistField';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
 import {
   useLinkFields,
@@ -301,11 +301,12 @@ export function TreatmentForm({
             };
             if (id === 'requester') {
               return (
-                <SpecialistField
+                <AutocompleteTextField
                   key={id}
                   label={label}
                   inputID="treatment-requester-input"
                   name="requesterName"
+                  placeholder="e.g. Dr. Sarah Adams"
                   value={requesterName}
                   onChangeText={setRequesterName}
                   suggestions={specialistSuggestions}

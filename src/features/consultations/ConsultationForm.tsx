@@ -29,7 +29,7 @@ import {
 import type { AddOptionItem } from '@/src/components/AddOptionsModal';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
-import { SpecialistField } from '@/src/components/SpecialistField';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
 import { getOrganizationNames } from '@/src/features/organizations/organizationService';
 import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
 import {
@@ -215,7 +215,6 @@ export function ConsultationForm({
     []
   );
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
-  const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
     initialValues?.diagnoses || []
   );
@@ -266,17 +265,11 @@ export function ConsultationForm({
     };
   }, [activePatientId]);
 
-  // Autocomplete matching service types
-  const matchingServiceTypes = useMemo(() => {
-    const all = Array.from(
-      new Set([...knownServiceTypes, ...COMMON_SERVICE_TYPES])
-    );
-    const trimmed = serviceType.trim().toLowerCase();
-    if (!trimmed) {
-      return all;
-    }
-    return all.filter((st) => st.toLowerCase().includes(trimmed));
-  }, [serviceType, knownServiceTypes]);
+  // Previously used service types first, then common ones.
+  const serviceTypeSuggestions = useMemo(
+    () => Array.from(new Set([...knownServiceTypes, ...COMMON_SERVICE_TYPES])),
+    [knownServiceTypes]
+  );
 
   const conditionOptions = availableConditions.flatMap((condition) =>
     condition.id
@@ -749,51 +742,30 @@ export function ConsultationForm({
 
             {/* Service Type / Specialty Section (Optional) */}
             {showServiceType && (
-              <FormField
+              <AutocompleteTextField
                 label="Specialty / Service Type"
-                style={isServiceTypeFocused && styles.raised}
-                nativeID="consultation-service-type-input"
+                name="serviceType"
+                placeholder="e.g. Cardiology, General practice"
+                accessibilityLabel="Specialty or Service Type"
+                inputID="consultation-service-type-input"
+                autocompleteTestID="service-type-autocomplete"
+                value={serviceType}
+                onChangeText={setServiceType}
+                suggestions={serviceTypeSuggestions}
                 removeTestID="remove-service-type-button"
                 removeLabel="Remove service type"
                 onRemove={() => {
                   setShowServiceType(false);
                   setServiceType('');
                 }}
-                inputProps={{
-                  testID: 'consultation-service-type-input',
-                  id: 'consultation-service-type-input',
-                  nativeID: 'consultation-service-type-input',
-                  name: 'serviceType',
-                  accessibilityLabel: 'Specialty or Service Type',
-                  placeholder: 'e.g. Cardiology, General practice',
-                  value: serviceType,
-                  onChangeText: (text) => {
-                    setServiceType(text);
-                    setIsServiceTypeFocused(true);
-                  },
-                  onFocus: () => setIsServiceTypeFocused(true),
-                }}
-              >
-                {/* Service Type Autocomplete Suggestions */}
-                {isServiceTypeFocused && matchingServiceTypes.length > 0 && (
-                  <AutocompleteDropdown
-                    testID="service-type-autocomplete-list"
-                    itemTestIDPrefix="service-type-autocomplete-item-"
-                    items={matchingServiceTypes.map((st, idx) => ({
-                      id: String(idx),
-                      label: st,
-                    }))}
-                    onSelect={(item) => {
-                      setServiceType(item.label);
-                      setIsServiceTypeFocused(false);
-                    }}
-                  />
-                )}
-              </FormField>
+              />
             )}
 
             {showDoctor && (
-              <SpecialistField
+              <AutocompleteTextField
+                label="Specialist"
+                name="specialistName"
+                placeholder="e.g. Dr. Sarah Adams"
                 inputID="consultation-doctor-input"
                 autocompleteTestID="doctor-autocomplete"
                 value={doctorName}
@@ -808,7 +780,7 @@ export function ConsultationForm({
             )}
 
             {showServiceProvider && (
-              <SpecialistField
+              <AutocompleteTextField
                 label="Service provider"
                 name="serviceProviderName"
                 placeholder="e.g. City Hospital"

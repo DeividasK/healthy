@@ -24,7 +24,7 @@ import {
   FieldRevealProvider,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
-import { SpecialistField } from '@/src/components/SpecialistField';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
 import {
   getOrganizationNames,
   getServiceProviderName,
@@ -494,7 +494,7 @@ export function LabResultForm({
             )}
 
             {hasServiceProvider && (
-              <SpecialistField
+              <AutocompleteTextField
                 label="Service provider"
                 name="serviceProviderName"
                 placeholder="e.g. City Laboratory"
