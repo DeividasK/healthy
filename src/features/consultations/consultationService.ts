@@ -31,7 +31,7 @@ import {
   withoutEncounterReference,
   withConsultationBasedOn,
 } from '@/src/utils/fhirUtils';
-import { fetchServiceRequestById } from '@/src/features/planned-care/plannedCareRepository';
+import { fetchServiceRequestById } from '@/src/features/service-requests/serviceRequestsRepository';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
 export interface ConsultationDiagnosisInput {
@@ -48,7 +48,7 @@ export interface ConsultationDiagnosisInput {
 export interface ConsultationInput {
   diagnoses?: ConsultationDiagnosisInput[];
   reasonConditionIds?: string[];
-  /** Planned care this consultation is based on; undefined keeps them. */
+  /** Service request this consultation is based on; undefined keeps them. */
   basedOnServiceRequestIds?: string[];
   id?: string;
   patientId?: string;

@@ -30,14 +30,14 @@ import {
   fetchServiceRequestById,
   insertServiceRequestRecord,
   deleteServiceRequestRecord,
-} from '@/src/features/planned-care/plannedCareRepository';
+} from '@/src/features/service-requests/serviceRequestsRepository';
 import {
-  createOrUpdatePlannedCare,
-  deletePlannedCare,
-  setPlannedCareConsultationRole,
-  savePlannedCareConsultationRoles,
-  type PlannedCareInput,
-} from '@/src/features/planned-care/plannedCareService';
+  createOrUpdateServiceRequest,
+  deleteServiceRequest,
+  setServiceRequestConsultationRole,
+  saveServiceRequestConsultationRoles,
+  type ServiceRequestInput,
+} from '@/src/features/service-requests/serviceRequestService';
 import {
   exportZipArchive,
   restoreFromZipBytes,
@@ -383,18 +383,18 @@ export function setupTestBridge() {
         requesterName: input.requesterName,
       });
     },
-    getPlannedCare: fetchServiceRequestById,
-    updatePlannedCare: createOrUpdatePlannedCare,
-    savePlannedCare: insertServiceRequestRecord,
-    deletePlannedCare,
-    deleteServiceRequest: deleteServiceRequestRecord,
-    setPlannedCareConsultationRole,
-    savePlannedCareConsultationRoles,
-    seedPlannedCare: async (
-      input: Omit<PlannedCareInput, 'authoredDate'> & { authoredOn?: string }
+    getServiceRequest: fetchServiceRequestById,
+    updateServiceRequest: createOrUpdateServiceRequest,
+    saveServiceRequest: insertServiceRequestRecord,
+    deleteServiceRequest,
+    deleteServiceRequestRecord,
+    setServiceRequestConsultationRole,
+    saveServiceRequestConsultationRoles,
+    seedServiceRequest: async (
+      input: Omit<ServiceRequestInput, 'authoredDate'> & { authoredOn?: string }
     ) => {
       const patientId = await resolvePatientId(input.patientId);
-      return await createOrUpdatePlannedCare({
+      return await createOrUpdateServiceRequest({
         ...input,
         patientId,
         intent: input.intent || 'plan',

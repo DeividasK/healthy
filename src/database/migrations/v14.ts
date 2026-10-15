@@ -6,7 +6,7 @@ const triggers = captureTriggers([
 ]);
 
 /**
- * Adds ServiceRequest storage for planned care (investigations, procedures,
+ * Adds ServiceRequest storage for service request (investigations, procedures,
  * referrals and follow-ups).
  *
  * Non-breaking and additive: creates a new table, its indexes and sync

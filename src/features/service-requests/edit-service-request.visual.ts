@@ -4,7 +4,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Service Request - Visual Regression', () => {
@@ -15,7 +15,7 @@ test.describe('Edit Service Request - Visual Regression', () => {
       title: 'Gastroenterology review',
       date: '2026-03-02',
     });
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'Abdominal ultrasound',
       category: '363679005',
       intent: 'order',
@@ -36,8 +36,8 @@ test.describe('Edit Service Request - Visual Regression', () => {
       basedOnServiceRequestIds: [request.id],
     });
 
-    await page.goto(`/planned-care/${request.id}/edit`);
-    await page.getByTestId('planned-care-form-title').waitFor();
+    await page.goto(`/service-request/${request.id}/edit`);
+    await page.getByTestId('service-request-form-title').waitFor();
     await takeSnapshot(page, 'Service Request - Edit Form Populated', testInfo);
   });
 });

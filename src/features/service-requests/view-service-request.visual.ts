@@ -4,7 +4,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Service Request - Visual Regression', () => {
@@ -28,7 +28,7 @@ test.describe('View Service Request - Visual Regression', () => {
       '3. Avoid caffeine for 24 hours before the monitor is fitted.',
       '4. Keep a diary of symptoms while wearing the monitor.',
     ].join('\n\n');
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: '24-hour Holter monitor',
       category: '71388002',
       intent: 'order',
@@ -44,7 +44,9 @@ test.describe('View Service Request - Visual Regression', () => {
     });
     await page.evaluate(
       ({ requestId, consultationId, patientId }) =>
-        (window as any).__HEALTHY_TEST_BRIDGE__.setPlannedCareConsultationRole(
+        (
+          window as any
+        ).__HEALTHY_TEST_BRIDGE__.setServiceRequestConsultationRole(
           requestId,
           consultationId,
           patientId,
@@ -62,8 +64,8 @@ test.describe('View Service Request - Visual Regression', () => {
       basedOnServiceRequestIds: [request.id],
     });
 
-    await page.goto(`/planned-care/${request.id}`);
-    await page.getByTestId('planned-care-title').waitFor();
+    await page.goto(`/service-request/${request.id}`);
+    await page.getByTestId('service-request-title').waitFor();
     await takeSnapshot(page, 'Service Request View - Details', testInfo);
 
     await page.setViewportSize({ width: 1280, height: 900 });

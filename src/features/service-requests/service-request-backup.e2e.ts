@@ -4,14 +4,14 @@ import {
   expect,
   seedTestPatient,
   seedTestConsultation,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
   connectTestSync,
   syncTestDevice,
   driveContents,
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
-const PATIENT = 'planned-care-backup-patient';
+const PATIENT = 'service-request-backup-patient';
 
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   test(`${transport} preserves service requests, their origin and basedOn references`, async ({
@@ -19,14 +19,14 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   }) => {
     await seedTestPatient(page, { id: PATIENT });
     await seedTestConsultation(page, {
-      id: 'planned-care-origin-visit',
+      id: 'service-request-origin-visit',
       title: 'Referring visit',
     });
-    const original = await seedTestPlannedCare(page, {
+    const original = await seedTestServiceRequest(page, {
       id: 'backed-up-request',
       title: 'Request to back up',
       category: '3457005',
-      consultationId: 'planned-care-origin-visit',
+      consultationId: 'service-request-origin-visit',
       instructions: 'First line\nSecond line',
       plannedDate: '2099-05-01',
     });
@@ -34,11 +34,11 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
     original.priority = 'urgent';
     await bridge(
       page,
-      (b, { request, patientId }) => b.savePlannedCare(request, patientId),
+      (b, { request, patientId }) => b.saveServiceRequest(request, patientId),
       { request: original, patientId: PATIENT }
     );
     await seedTestConsultation(page, {
-      id: 'planned-care-based-visit',
+      id: 'service-request-based-visit',
       title: 'Resulting visit',
       basedOnServiceRequestIds: ['backed-up-request'],
     });
@@ -61,15 +61,15 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         if (transport === 'ZIP') await b.restoreArchive(archive);
         else await b.syncAllProfiles();
         return {
-          request: await b.getPlannedCare('backed-up-request'),
+          request: await b.getServiceRequest('backed-up-request'),
           row: (
             await b.querySql(
               'SELECT consultation_id, requisition_system, requisition_value FROM service_requests;'
             )
           )[0],
-          visit: await b.getConsultation('planned-care-based-visit'),
+          visit: await b.getConsultation('service-request-based-visit'),
           document: await b.getClinicalDocumentByConsultationId(
-            'planned-care-origin-visit'
+            'service-request-origin-visit'
           ),
         };
       },
@@ -77,7 +77,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
     );
     expect(restored.request).toEqual(original);
     expect(restored.row).toEqual({
-      consultation_id: 'planned-care-origin-visit',
+      consultation_id: 'service-request-origin-visit',
       requisition_system: 'https://example.org/req',
       requisition_value: 'R-1',
     });
@@ -93,13 +93,13 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       const afterDelete = await bridge(
         page,
         async (b, patientId) => {
-          await b.deletePlannedCare('backed-up-request', patientId);
+          await b.deleteServiceRequest('backed-up-request', patientId);
           await b.syncNow();
           await b.clearDatabase();
           await b.syncAllProfiles();
           return {
-            request: await b.getPlannedCare('backed-up-request'),
-            visit: await b.getConsultation('planned-care-based-visit'),
+            request: await b.getServiceRequest('backed-up-request'),
+            visit: await b.getConsultation('service-request-based-visit'),
           };
         },
         PATIENT

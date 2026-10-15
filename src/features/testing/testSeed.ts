@@ -62,12 +62,12 @@ export interface SeedTreatmentOptions {
   requesterName?: string;
 }
 
-export interface SeedPlannedCareOptions {
+export interface SeedServiceRequestOptions {
   id?: string;
   patientId?: string;
   consultationId?: string;
   title: string;
-  /** SNOMED category code from PLANNED_CARE_CATEGORIES. */
+  /** SNOMED category code from SERVICE_REQUEST_CATEGORIES. */
   category?: string;
   intent?: ServiceRequest['intent'];
   status?: ServiceRequest['status'];
@@ -87,7 +87,7 @@ export async function seedTestResources(
     conditions?: SeedConditionOptions[];
     consultations?: SeedConsultationOptions[];
     treatments?: SeedTreatmentOptions[];
-    plannedCare?: SeedPlannedCareOptions[];
+    serviceRequests?: SeedServiceRequestOptions[];
     reports?: SeedReportOptions[];
   }
 ): Promise<void> {
@@ -101,8 +101,8 @@ export async function seedTestResources(
         await bridge.seedConsultation(input);
       for (const input of resources.treatments ?? [])
         await bridge.seedTreatment(input);
-      for (const input of resources.plannedCare ?? [])
-        await bridge.seedPlannedCare(input);
+      for (const input of resources.serviceRequests ?? [])
+        await bridge.seedServiceRequest(input);
       for (const input of resources.reports ?? [])
         await bridge.seedReport(input);
     }, resources);
@@ -241,19 +241,21 @@ export function findTreatmentsSection(document: any): any {
   );
 }
 
-/** Seeds planned care (ServiceRequest) through the real service. */
-export async function seedTestPlannedCare(
+/** Seeds service request (ServiceRequest) through the real service. */
+export async function seedTestServiceRequest(
   page: Page,
-  options: SeedPlannedCareOptions
+  options: SeedServiceRequestOptions
 ): Promise<any> {
   await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedPlannedCare(opts);
+    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedServiceRequest(
+      opts
+    );
   }, options);
 }
 
-/** Fetches stored planned care (ServiceRequest) via the test bridge. */
-export async function getTestPlannedCare(
+/** Fetches stored service request (ServiceRequest) via the test bridge. */
+export async function getTestServiceRequest(
   page: Page,
   id: string,
   patientId?: string
@@ -261,7 +263,7 @@ export async function getTestPlannedCare(
   await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return await page.evaluate(
     async ({ requestId, patId }) =>
-      await (window as any).__HEALTHY_TEST_BRIDGE__.getPlannedCare(
+      await (window as any).__HEALTHY_TEST_BRIDGE__.getServiceRequest(
         requestId,
         patId
       ),
@@ -269,14 +271,14 @@ export async function getTestPlannedCare(
   );
 }
 
-/** LOINC code of the consultation document section that lists planned care. */
-export const PLANNED_CARE_SECTION_CODE = '18776-5';
+/** LOINC code of the consultation document section that lists service request. */
+export const SERVICE_REQUESTS_SECTION_CODE = '18776-5';
 
-/** Returns the planned care section of a consultation Composition, if any. */
-export function findPlannedCareSection(document: any): any {
+/** Returns the service request section of a consultation Composition, if any. */
+export function findServiceRequestSection(document: any): any {
   return document?.section?.find((section: any) =>
     section.code?.coding?.some(
-      (coding: any) => coding.code === PLANNED_CARE_SECTION_CODE
+      (coding: any) => coding.code === SERVICE_REQUESTS_SECTION_CODE
     )
   );
 }

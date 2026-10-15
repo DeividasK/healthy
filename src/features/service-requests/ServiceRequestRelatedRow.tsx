@@ -16,55 +16,61 @@ import {
   formatDisplayDate,
   formatDisplayDateTime,
 } from '@/src/utils/dateUtils';
-import { getPlannedCareTitle } from '@/src/utils/fhirUtils';
+import { getServiceRequestTitle } from '@/src/utils/fhirUtils';
 import {
-  getPlannedCareCategoryLabel,
-  getPlannedCareIntentLabel,
-  getPlannedCareStatusLabel,
-} from './plannedCareLabels';
+  getServiceRequestCategoryLabel,
+  getServiceRequestIntentLabel,
+  getServiceRequestStatusLabel,
+} from './serviceRequestLabels';
 
 const formatDate = (date: string) =>
   date.includes('T') ? formatDisplayDateTime(date) : formatDisplayDate(date);
 
-/** Meta line shared by planned care rows and the planned care view heading. */
-export function getPlannedCareMeta(
+/** Meta line shared by service request rows and the service request view heading. */
+export function getServiceRequestMeta(
   request: ServiceRequest,
   { withTestIDs = false } = {}
 ): ResourceMeta[] {
   const id = (testID: string) => (withTestIDs ? testID : undefined);
   const requester = request.requester?.display;
-  const category = getPlannedCareCategoryLabel(request.category?.[0]);
+  const category = getServiceRequestCategoryLabel(request.category?.[0]);
   const planned = request.occurrenceDateTime;
   return [
     ...(request.authoredOn
       ? [{ icon: Calendar, text: formatDate(request.authoredOn) }]
       : []),
-    { icon: CircleDot, text: getPlannedCareStatusLabel(request.status) },
+    { icon: CircleDot, text: getServiceRequestStatusLabel(request.status) },
     ...(requester
-      ? [{ icon: User, text: requester, testID: id('planned-care-requester') }]
+      ? [
+          {
+            icon: User,
+            text: requester,
+            testID: id('service-request-requester'),
+          },
+        ]
       : []),
     ...(category
-      ? [{ icon: Tag, text: category, testID: id('planned-care-category') }]
+      ? [{ icon: Tag, text: category, testID: id('service-request-category') }]
       : []),
     {
       icon: Target,
-      text: getPlannedCareIntentLabel(request.intent),
-      testID: id('planned-care-intent'),
+      text: getServiceRequestIntentLabel(request.intent),
+      testID: id('service-request-intent'),
     },
     ...(planned
       ? [
           {
             icon: CalendarClock,
             text: `Planned ${formatDate(planned)}`,
-            testID: id('planned-care-planned-date'),
+            testID: id('service-request-planned-date'),
           },
         ]
       : []),
   ];
 }
 
-/** Planned care listed on another resource's view page. */
-export function PlannedCareRelatedRow({
+/** Service request listed on another resource's view page. */
+export function ServiceRequestRelatedRow({
   request,
   testID,
   onPress,
@@ -76,13 +82,13 @@ export function PlannedCareRelatedRow({
   /** Further meta items appended to the row, e.g. association counts. */
   extraMeta?: ResourceMeta[];
 }) {
-  const title = getPlannedCareTitle(request);
+  const title = getServiceRequestTitle(request);
   return (
     <ResourceRow
       testID={testID}
       title={title}
       accessibilityLabel={`View service request: ${title}`}
-      meta={[...getPlannedCareMeta(request), ...extraMeta]}
+      meta={[...getServiceRequestMeta(request), ...extraMeta]}
       onPress={onPress}
     />
   );

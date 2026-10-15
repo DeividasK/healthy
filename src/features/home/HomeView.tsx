@@ -32,10 +32,10 @@ import {
   getConsultationIdsLinkingTreatment,
 } from '@/src/features/treatments/treatmentService';
 import {
-  getAllPlannedCare,
-  getConsultationIdsLinkingPlannedCare,
-} from '@/src/features/planned-care/plannedCareService';
-import { PlannedCareRelatedRow } from '@/src/features/planned-care/PlannedCareRelatedRow';
+  getAllServiceRequests,
+  getConsultationIdsLinkingServiceRequest,
+} from '@/src/features/service-requests/serviceRequestService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { CollapsibleList } from './CollapsibleList';
 import {
   ResourceSection,
@@ -115,9 +115,11 @@ export function HomeView() {
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [consultationTreatmentCounts, setConsultationTreatmentCounts] =
     useState<Record<string, number>>({});
-  const [plannedCare, setPlannedCare] = useState<ServiceRequest[]>([]);
-  const [consultationPlannedCareCounts, setConsultationPlannedCareCounts] =
-    useState<Record<string, number>>({});
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [
+    consultationServiceRequestCounts,
+    setConsultationServiceRequestCounts,
+  ] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -172,8 +174,8 @@ export function HomeView() {
     setConsultations([]);
     setTreatments([]);
     setConsultationTreatmentCounts({});
-    setPlannedCare([]);
-    setConsultationPlannedCareCounts({});
+    setServiceRequests([]);
+    setConsultationServiceRequestCounts({});
     setIsLoading(true);
   }
 
@@ -192,13 +194,13 @@ export function HomeView() {
         conditionsData,
         consultationsData,
         treatmentsData,
-        plannedCareData,
+        serviceRequestsData,
       ] = await Promise.all([
         getAllReports(requestedPatientId),
         getAllConditions(requestedPatientId),
         getAllConsultations(requestedPatientId),
         getAllTreatments(requestedPatientId),
-        getAllPlannedCare(requestedPatientId),
+        getAllServiceRequests(requestedPatientId),
       ]);
 
       // Counts each record once per consultation whose document lists it.
@@ -223,14 +225,14 @@ export function HomeView() {
             counts[consultationId] = (counts[consultationId] || 0) + 1;
         return counts;
       };
-      const [treatmentCounts, plannedCareCounts] = await Promise.all([
+      const [treatmentCounts, serviceRequestCounts] = await Promise.all([
         countConsultationLinks(
           treatmentsData,
           getConsultationIdsLinkingTreatment
         ),
         countConsultationLinks(
-          plannedCareData,
-          getConsultationIdsLinkingPlannedCare
+          serviceRequestsData,
+          getConsultationIdsLinkingServiceRequest
         ),
       ]);
 
@@ -246,8 +248,8 @@ export function HomeView() {
       setConsultations(consultationsData);
       setTreatments(treatmentsData);
       setConsultationTreatmentCounts(treatmentCounts);
-      setPlannedCare(plannedCareData);
-      setConsultationPlannedCareCounts(plannedCareCounts);
+      setServiceRequests(serviceRequestsData);
+      setConsultationServiceRequestCounts(serviceRequestCounts);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -259,7 +261,7 @@ export function HomeView() {
         setConditions([]);
         setConsultations([]);
         setTreatments([]);
-        setPlannedCare([]);
+        setServiceRequests([]);
       }
     } finally {
       if (
@@ -372,8 +374,8 @@ export function HomeView() {
     treatments.filter((treatment) =>
       getTreatmentReasonConditionIds(treatment).includes(conditionId)
     ).length;
-  const countConditionPlannedCare = (conditionId: string) =>
-    plannedCare.filter((request) =>
+  const countConditionServiceRequests = (conditionId: string) =>
+    serviceRequests.filter((request) =>
       getReasonConditionIds(request).includes(conditionId)
     ).length;
   const countConsultationConditions = (consultation: Encounter) =>
@@ -387,7 +389,7 @@ export function HomeView() {
     conditions.length > 0 ||
     consultations.length > 0 ||
     treatments.length > 0 ||
-    plannedCare.length > 0;
+    serviceRequests.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -450,9 +452,9 @@ export function HomeView() {
                             ),
                             countMeta(
                               ClipboardList,
-                              countConditionPlannedCare(condId),
+                              countConditionServiceRequests(condId),
                               'service requests',
-                              `condition-planned-care-count-${condId}`
+                              `condition-service-request-count-${condId}`
                             ),
                           ])}
                         />
@@ -500,26 +502,26 @@ export function HomeView() {
             )}
 
             {/* Service Requests Section */}
-            {plannedCare.length > 0 && (
+            {serviceRequests.length > 0 && (
               <ResourceSection
                 icon={ClipboardList}
                 title="Service requests"
-                testID="home-planned-care-section"
+                testID="home-service-requests-section"
               >
-                {plannedCare.map((request) => {
+                {serviceRequests.map((request) => {
                   const requestId = request.id || '';
                   return (
                     <View
                       key={requestId}
-                      testID={`planned-care-card-${requestId}`}
+                      testID={`service-request-card-${requestId}`}
                     >
-                      <PlannedCareRelatedRow
+                      <ServiceRequestRelatedRow
                         request={request}
-                        testID={`planned-care-open-${requestId}`}
+                        testID={`service-request-open-${requestId}`}
                         onPress={() => {
                           blurActiveElement();
                           router.push({
-                            pathname: '/planned-care/[id]',
+                            pathname: '/service-request/[id]',
                             params: { id: requestId },
                           });
                         }}
@@ -528,7 +530,7 @@ export function HomeView() {
                             FolderPlus,
                             getReasonConditionIds(request).length,
                             'conditions',
-                            `planned-care-conditions-count-${requestId}`
+                            `service-request-conditions-count-${requestId}`
                           ),
                         ])}
                       />
@@ -577,9 +579,9 @@ export function HomeView() {
                             ),
                             countMeta(
                               ClipboardList,
-                              consultationPlannedCareCounts[consId] || 0,
+                              consultationServiceRequestCounts[consId] || 0,
                               'service requests',
-                              `consultation-planned-care-count-${consId}`
+                              `consultation-service-request-count-${consId}`
                             ),
                           ])}
                         />
@@ -595,6 +597,7 @@ export function HomeView() {
               <View style={[styles.sectionContainer, styles.maxWidthSection]}>
                 {(conditions.length > 0 ||
                   treatments.length > 0 ||
+                  serviceRequests.length > 0 ||
                   consultations.length > 0) && (
                   <Text style={styles.sectionTitle}>Lab Results</Text>
                 )}
@@ -762,9 +765,9 @@ export function HomeView() {
               onPress: () => router.push('/treatment/add'),
             },
             {
-              id: 'planned-care',
+              id: 'service-request',
               label: 'Service Request',
-              testID: 'menu-add-planned-care',
+              testID: 'menu-add-service-request',
               icon: (
                 <ClipboardList
                   color={COLORS.light.primary}
@@ -772,7 +775,7 @@ export function HomeView() {
                   style={{ marginRight: 10 }}
                 />
               ),
-              onPress: () => router.push('/planned-care/add'),
+              onPress: () => router.push('/service-request/add'),
             },
             {
               id: 'consultation',

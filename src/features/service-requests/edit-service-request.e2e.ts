@@ -4,10 +4,10 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  seedTestPlannedCare,
-  getTestPlannedCare,
+  seedTestServiceRequest,
+  getTestServiceRequest,
   getTestClinicalDocument,
-  findPlannedCareSection,
+  findServiceRequestSection,
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
@@ -19,7 +19,7 @@ test.describe('Edit Service Request', () => {
   test('edits fields, keeps unexposed data and labels uncommon codes', async ({
     page,
   }) => {
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'Blood panel',
       category: '108252007',
       instructions: 'Fasting sample.',
@@ -29,8 +29,8 @@ test.describe('Edit Service Request', () => {
     await bridge(
       page,
       async (b, id) => {
-        const stored = await b.getPlannedCare(id);
-        await b.savePlannedCare(
+        const stored = await b.getServiceRequest(id);
+        await b.saveServiceRequest(
           {
             ...stored,
             intent: 'directive',
@@ -51,27 +51,27 @@ test.describe('Edit Service Request', () => {
       request.id
     );
 
-    await page.goto(`/planned-care/${request.id}`);
-    await expect(page.getByTestId('planned-care-intent')).toContainText(
+    await page.goto(`/service-request/${request.id}`);
+    await expect(page.getByTestId('service-request-intent')).toContainText(
       'Directive'
     );
-    await page.getByTestId('edit-planned-care-button').click();
-    await expect(page.getByTestId('planned-care-status-select')).toHaveValue(
+    await page.getByTestId('edit-service-request-button').click();
+    await expect(page.getByTestId('service-request-status-select')).toHaveValue(
       'draft'
     );
     await page
-      .getByTestId('planned-care-title-input')
+      .getByTestId('service-request-title-input')
       .fill('Comprehensive metabolic panel');
     await page
-      .getByTestId('planned-care-status-select')
+      .getByTestId('service-request-status-select')
       .selectOption('completed');
-    await page.getByTestId('remove-planned-care-plannedDate-button').click();
-    await page.getByTestId('save-planned-care-button').click();
+    await page.getByTestId('remove-service-request-plannedDate-button').click();
+    await page.getByTestId('save-service-request-button').click();
 
-    await expect(page.getByTestId('planned-care-title')).toHaveText(
+    await expect(page.getByTestId('service-request-title')).toHaveText(
       'Comprehensive metabolic panel'
     );
-    const stored = await getTestPlannedCare(page, request.id);
+    const stored = await getTestServiceRequest(page, request.id);
     expect(stored.status).toBe('completed');
     expect(stored.intent).toBe('directive');
     expect(stored.priority).toBe('urgent');
@@ -101,7 +101,7 @@ test.describe('Edit Service Request', () => {
       title: 'Cardiology appointment',
       date: '2026-03-10',
     });
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'Cardiology referral',
       category: '3457005',
       consultationId: first.id,
@@ -113,7 +113,7 @@ test.describe('Edit Service Request', () => {
       page,
       async (b, { requestId, ids, patientId }) => {
         for (const id of ids)
-          await b.setPlannedCareConsultationRole(
+          await b.setServiceRequestConsultationRole(
             requestId,
             id,
             patientId,
@@ -127,7 +127,7 @@ test.describe('Edit Service Request', () => {
       }
     );
 
-    await page.goto(`/planned-care/${request.id}/edit`);
+    await page.goto(`/service-request/${request.id}/edit`);
     await expect(
       page.getByTestId(`link-consultation-role-${first.id}`)
     ).toHaveValue('origin');
@@ -144,11 +144,11 @@ test.describe('Edit Service Request', () => {
     await page
       .getByTestId(`link-consultation-role-${followUp.id}`)
       .selectOption('basedOn');
-    await page.getByTestId('save-planned-care-button').click();
+    await page.getByTestId('save-service-request-button').click();
 
     await expect(
       page
-        .getByTestId('planned-care-origin-consultation')
+        .getByTestId('service-request-origin-consultation')
         .getByText('Specialist review')
     ).toBeVisible();
     await expect(
@@ -158,11 +158,11 @@ test.describe('Edit Service Request', () => {
       page.getByTestId(`based-on-consultation-${followUp.id}`)
     ).toBeVisible();
 
-    const stored = await getTestPlannedCare(page, request.id);
+    const stored = await getTestServiceRequest(page, request.id);
     expect(stored.encounter).toEqual({ reference: `Encounter/${second.id}` });
     for (const consultation of [first, second])
       expect(
-        findPlannedCareSection(
+        findServiceRequestSection(
           await getTestClinicalDocument(page, consultation.id)
         ).entry
       ).toEqual([{ reference: `ServiceRequest/${request.id}` }]);
@@ -175,18 +175,20 @@ test.describe('Edit Service Request', () => {
       { reference: `ServiceRequest/${request.id}`, type: 'ServiceRequest' },
     ]);
     expect(
-      findPlannedCareSection(await getTestClinicalDocument(page, followUp.id))
+      findServiceRequestSection(
+        await getTestClinicalDocument(page, followUp.id)
+      )
     ).toBeUndefined();
 
     // Unlinking every consultation clears the origin and all references.
-    await page.getByTestId('edit-planned-care-button').click();
+    await page.getByTestId('edit-service-request-button').click();
     await page.getByTestId('remove-link-consultation-button').click();
-    await page.getByTestId('save-planned-care-button').click();
-    await expect(page.getByTestId('planned-care-title')).toBeVisible();
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-title')).toBeVisible();
     await expect(
-      page.getByTestId('planned-care-origin-consultation')
+      page.getByTestId('service-request-origin-consultation')
     ).toHaveCount(0);
-    const cleared = await getTestPlannedCare(page, request.id);
+    const cleared = await getTestServiceRequest(page, request.id);
     expect(cleared.encounter).toBeUndefined();
     expect(
       (await bridge(page, (b, id) => b.getConsultation(id), followUp.id))
@@ -198,35 +200,39 @@ test.describe('Edit Service Request', () => {
     page,
   }) => {
     const condition = await seedTestCondition(page, { title: 'Anaemia' });
-    const request = await seedTestPlannedCare(page, { title: 'Iron studies' });
+    const request = await seedTestServiceRequest(page, {
+      title: 'Iron studies',
+    });
 
     await page.goto(`/condition/${condition.id}/edit`);
     await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-link-planned-care').click();
-    await page.getByTestId('link-planned-care-search-input').click();
+    await page.getByTestId('menu-link-service-request').click();
+    await page.getByTestId('link-service-request-search-input').click();
     await page
-      .getByTestId(`link-planned-care-autocomplete-item-${request.id}`)
+      .getByTestId(`link-service-request-autocomplete-item-${request.id}`)
       .click();
     await page.getByTestId('save-button').click();
     await expect(
-      page.getByTestId(`condition-planned-care-count-${condition.id}`)
+      page.getByTestId(`condition-service-request-count-${condition.id}`)
     ).toBeVisible();
     await page.goto(`/condition/${condition.id}`);
     await expect(
-      page.getByTestId(`condition-planned-care-item-${request.id}`)
+      page.getByTestId(`condition-service-request-item-${request.id}`)
     ).toBeVisible();
-    expect((await getTestPlannedCare(page, request.id)).reason).toEqual([
+    expect((await getTestServiceRequest(page, request.id)).reason).toEqual([
       { reference: { reference: `Condition/${condition.id}` } },
     ]);
 
-    await page.goto(`/planned-care/${request.id}/edit`);
+    await page.goto(`/service-request/${request.id}/edit`);
     await page
-      .getByTestId('remove-planned-care-reasonCondition-button')
+      .getByTestId('remove-service-request-reasonCondition-button')
       .click();
-    await page.getByTestId('save-planned-care-button').click();
+    await page.getByTestId('save-service-request-button').click();
     await expect(
-      page.getByTestId('planned-care-reason-conditions-section')
+      page.getByTestId('service-request-reason-conditions-section')
     ).toHaveCount(0);
-    expect((await getTestPlannedCare(page, request.id)).reason).toBeUndefined();
+    expect(
+      (await getTestServiceRequest(page, request.id)).reason
+    ).toBeUndefined();
   });
 });

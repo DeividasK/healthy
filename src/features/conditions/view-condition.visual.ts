@@ -5,7 +5,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestTreatment,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Condition View - Visual Regression', () => {
@@ -55,7 +55,7 @@ test.describe('View Condition View - Visual Regression', () => {
       reasonConditionIds: [cond.id],
       requesterName: 'Dr. Sarah Connor',
     });
-    await seedTestPlannedCare(page, {
+    await seedTestServiceRequest(page, {
       id: 'planned-cond-view-visual',
       title: 'Physiotherapy referral',
       category: '3457005',

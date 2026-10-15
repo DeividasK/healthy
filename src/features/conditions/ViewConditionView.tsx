@@ -10,14 +10,14 @@ import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
-import { PlannedCareRelatedRow } from '@/src/features/planned-care/PlannedCareRelatedRow';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
 import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentService';
-import { getPlannedCareByConditionId } from '@/src/features/planned-care/plannedCareService';
+import { getServiceRequestsByConditionId } from '@/src/features/service-requests/serviceRequestService';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -37,7 +37,7 @@ export function ViewConditionView() {
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
-  const [plannedCare, setPlannedCare] = useState<ServiceRequest[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -48,13 +48,17 @@ export function ViewConditionView() {
     const sequence = ++loadSequence.current;
     if (!id || isPatientLoading || !activePatientId) return;
     try {
-      const [conditionData, consultationData, treatmentData, plannedCareData] =
-        await Promise.all([
-          getConditionById(id, activePatientId),
-          getConsultationsByConditionId(id),
-          getTreatmentsByConditionId(id, activePatientId),
-          getPlannedCareByConditionId(id, activePatientId),
-        ]);
+      const [
+        conditionData,
+        consultationData,
+        treatmentData,
+        serviceRequestsData,
+      ] = await Promise.all([
+        getConditionById(id, activePatientId),
+        getConsultationsByConditionId(id),
+        getTreatmentsByConditionId(id, activePatientId),
+        getServiceRequestsByConditionId(id, activePatientId),
+      ]);
       if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
       if (!conditionData) {
@@ -62,13 +66,13 @@ export function ViewConditionView() {
         setCondition(null);
         setConsultations([]);
         setTreatments([]);
-        setPlannedCare([]);
+        setServiceRequests([]);
       } else {
         setNotFound(false);
         setCondition(conditionData);
         setConsultations(consultationData);
         setTreatments(treatmentData);
-        setPlannedCare(plannedCareData);
+        setServiceRequests(serviceRequestsData);
       }
     } catch (error) {
       if (sequence !== loadSequence.current) return;
@@ -158,9 +162,9 @@ export function ViewConditionView() {
                   }),
               },
               {
-                id: 'planned-care',
+                id: 'service-request',
                 label: 'Service Request',
-                testID: 'menu-add-planned-care',
+                testID: 'menu-add-service-request',
                 icon: (
                   <ClipboardList
                     color={COLORS.light.primary}
@@ -170,7 +174,7 @@ export function ViewConditionView() {
                 ),
                 onPress: () =>
                   router.push({
-                    pathname: '/planned-care/add',
+                    pathname: '/service-request/add',
                     params: { conditionId: id },
                   }),
               },
@@ -325,14 +329,14 @@ export function ViewConditionView() {
       <ResourceSection
         icon={ClipboardList}
         title="Service requests"
-        testID="condition-planned-care-section"
+        testID="condition-service-request-section"
       >
-        {plannedCare.map((request) => (
-          <PlannedCareRelatedRow
+        {serviceRequests.map((request) => (
+          <ServiceRequestRelatedRow
             key={request.id}
             request={request}
-            testID={`condition-planned-care-item-${request.id}`}
-            onPress={() => router.push(`/planned-care/${request.id}`)}
+            testID={`condition-service-request-item-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
           />
         ))}
       </ResourceSection>

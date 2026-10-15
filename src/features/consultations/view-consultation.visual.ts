@@ -5,7 +5,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestTreatment,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Consultation - Visual Regression', () => {
@@ -23,7 +23,7 @@ test.describe('View Consultation - Visual Regression', () => {
       id: 'second-diagnosis-visual',
       title: 'Ligament injury with a long original diagnosis description',
     });
-    const referral = await seedTestPlannedCare(page, {
+    const referral = await seedTestServiceRequest(page, {
       id: 'referral-view-visual',
       title: 'Orthopaedic referral',
       category: '3457005',
@@ -49,7 +49,7 @@ test.describe('View Consultation - Visual Regression', () => {
       consultationId: consultation.id,
       dosageInstructions: 'Complete original instructions.',
     });
-    await seedTestPlannedCare(page, {
+    await seedTestServiceRequest(page, {
       id: 'planned-view-visual',
       title: 'Knee MRI',
       category: '363679005',

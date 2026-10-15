@@ -24,10 +24,10 @@ import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
 import {
-  getBasedOnPlannedCareForConsultation,
-  getLinkedPlannedCareForConsultation,
-} from '@/src/features/planned-care/plannedCareService';
-import { PlannedCareRelatedRow } from '@/src/features/planned-care/PlannedCareRelatedRow';
+  getBasedOnServiceRequestsForConsultation,
+  getLinkedServiceRequestsForConsultation,
+} from '@/src/features/service-requests/serviceRequestService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { RelatedResourceList } from './RelatedResourceList';
 import { getConsultationMeta } from './ConsultationRelatedRow';
 import {
@@ -49,7 +49,7 @@ export function ViewConsultationView() {
   const [linkedTreatments, setLinkedTreatments] = useState<MedicationRequest[]>(
     []
   );
-  const [plannedCare, setPlannedCare] = useState<ServiceRequest[]>([]);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [basedOn, setBasedOn] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
@@ -63,7 +63,7 @@ export function ViewConsultationView() {
       const [value, treatments, planned] = await Promise.all([
         getConsultationById(id, activePatientId),
         getLinkedTreatmentsForConsultation(id, activePatientId).catch(() => []),
-        getLinkedPlannedCareForConsultation(id, activePatientId).catch(
+        getLinkedServiceRequestsForConsultation(id, activePatientId).catch(
           () => []
         ),
       ]);
@@ -72,13 +72,13 @@ export function ViewConsultationView() {
         setConsultation(null);
         setRelatedConditions([]);
         setLinkedTreatments([]);
-        setPlannedCare([]);
+        setServiceRequests([]);
         setBasedOn([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
       }
-      const basedOnRequests = await getBasedOnPlannedCareForConsultation(
+      const basedOnRequests = await getBasedOnServiceRequestsForConsultation(
         value,
         activePatientId
       ).catch(() => []);
@@ -103,7 +103,7 @@ export function ViewConsultationView() {
         )
       );
       setLinkedTreatments(treatments);
-      setPlannedCare(planned);
+      setServiceRequests(planned);
       setBasedOn(basedOnRequests);
       setNotFound(false);
       setHasLoadError(false);
@@ -183,9 +183,9 @@ export function ViewConsultationView() {
                   }),
               },
               {
-                id: 'create-planned-care',
+                id: 'create-service-request',
                 label: 'Service Request',
-                testID: 'option-create-new-planned-care',
+                testID: 'option-create-new-service-request',
                 icon: (
                   <ClipboardList
                     color={COLORS.light.primary}
@@ -195,7 +195,7 @@ export function ViewConsultationView() {
                 ),
                 onPress: () =>
                   router.push({
-                    pathname: '/planned-care/add',
+                    pathname: '/service-request/add',
                     params: { consultationId: id },
                   }),
               },
@@ -269,11 +269,11 @@ export function ViewConsultationView() {
         testID="consultation-based-on"
       >
         {basedOn.map((request) => (
-          <PlannedCareRelatedRow
+          <ServiceRequestRelatedRow
             key={request.id}
             request={request}
             testID={`consultation-based-on-${request.id}`}
-            onPress={() => router.push(`/planned-care/${request.id}`)}
+            onPress={() => router.push(`/service-request/${request.id}`)}
           />
         ))}
       </ResourceSection>
@@ -330,14 +330,14 @@ export function ViewConsultationView() {
       <ResourceSection
         icon={ClipboardList}
         title="Service requests"
-        testID="consultation-planned-care"
+        testID="consultation-service-request"
       >
-        {plannedCare.map((request) => (
-          <PlannedCareRelatedRow
+        {serviceRequests.map((request) => (
+          <ServiceRequestRelatedRow
             key={request.id}
             request={request}
-            testID={`consultation-planned-care-${request.id}`}
-            onPress={() => router.push(`/planned-care/${request.id}`)}
+            testID={`consultation-service-request-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
           />
         ))}
       </ResourceSection>

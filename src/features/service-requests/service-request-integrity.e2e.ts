@@ -4,13 +4,13 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  seedTestPlannedCare,
-  getTestPlannedCare,
+  seedTestServiceRequest,
+  getTestServiceRequest,
   getTestClinicalDocument,
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
-const PATIENT = 'planned-care-integrity-patient';
+const PATIENT = 'service-request-integrity-patient';
 
 test.beforeEach(async ({ page }) => {
   await seedTestPatient(page, { id: PATIENT });
@@ -33,7 +33,7 @@ test('v14 creates the service request table with sync capture', async ({
     'sync_service_requests_insert',
     'sync_service_requests_update',
   ]);
-  const request = await seedTestPlannedCare(page, { title: 'Chest X-ray' });
+  const request = await seedTestServiceRequest(page, { title: 'Chest X-ray' });
   const dirty = await bridge(
     page,
     (b, id) =>
@@ -52,7 +52,7 @@ test('deleting the origin consultation keeps the request and clears its origin',
   const consultation = await seedTestConsultation(page, {
     title: 'Orthopaedic review',
   });
-  const request = await seedTestPlannedCare(page, {
+  const request = await seedTestServiceRequest(page, {
     title: 'Knee MRI',
     consultationId: consultation.id,
   });
@@ -74,13 +74,13 @@ test('deleting a reason condition keeps the request and its wording', async ({
   page,
 }) => {
   const condition = await seedTestCondition(page, { title: 'Back pain' });
-  const request = await seedTestPlannedCare(page, {
+  const request = await seedTestServiceRequest(page, {
     title: 'Physiotherapy referral',
     reason: 'Persistent lower back pain',
     reasonConditionIds: [condition.id],
   });
   await bridge(page, (b, id) => b.deleteCondition(id), condition.id);
-  const cleaned = await getTestPlannedCare(page, request.id);
+  const cleaned = await getTestServiceRequest(page, request.id);
   expect(cleaned.reason).toEqual([
     { concept: { text: 'Persistent lower back pain' } },
   ]);
@@ -88,7 +88,7 @@ test('deleting a reason condition keeps the request and its wording', async ({
 
 test('failed reference cleanup rolls back the deletion', async ({ page }) => {
   const origin = await seedTestConsultation(page, { title: 'Rollback visit' });
-  const request = await seedTestPlannedCare(page, {
+  const request = await seedTestServiceRequest(page, {
     title: 'Rollback request',
     consultationId: origin.id,
   });
@@ -105,14 +105,14 @@ test('failed reference cleanup rolls back the deletion', async ({ page }) => {
       );
       let failed = false;
       try {
-        await b.deletePlannedCare(requestId, patientId);
+        await b.deleteServiceRequest(requestId, patientId);
       } catch {
         failed = true;
       }
       await b.executeSql('DROP TRIGGER fail_basedon_cleanup');
       return {
         failed,
-        retained: await b.getPlannedCare(requestId, patientId),
+        retained: await b.getServiceRequest(requestId, patientId),
         visit: await b.getConsultation(visitId),
       };
     },
@@ -129,21 +129,21 @@ test('failed reference cleanup rolls back the deletion', async ({ page }) => {
 test('rejects foreign references and a second origin without saving', async ({
   page,
 }) => {
-  await seedTestPatient(page, { id: 'foreign-planned-care-patient' });
+  await seedTestPatient(page, { id: 'foreign-service-request-patient' });
   await bridge(page, async (b) => {
     await b.seedCondition({
       id: 'foreign-reason',
-      patientId: 'foreign-planned-care-patient',
+      patientId: 'foreign-service-request-patient',
       title: 'Foreign condition',
     });
     await b.seedConsultation({
       id: 'foreign-visit',
-      patientId: 'foreign-planned-care-patient',
+      patientId: 'foreign-service-request-patient',
       title: 'Foreign visit',
     });
-    await b.seedPlannedCare({
+    await b.seedServiceRequest({
       id: 'foreign-request',
-      patientId: 'foreign-planned-care-patient',
+      patientId: 'foreign-service-request-patient',
       title: 'Foreign request',
     });
   });
@@ -155,7 +155,7 @@ test('rejects foreign references and a second origin without saving', async ({
     patientId: PATIENT,
     title: 'Other own visit',
   });
-  const own = await seedTestPlannedCare(page, {
+  const own = await seedTestServiceRequest(page, {
     patientId: PATIENT,
     title: 'Own request',
   });
@@ -176,7 +176,7 @@ test('rejects foreign references and a second origin without saving', async ({
         { consultationId: 'foreign-visit' },
       ])
         await attempt(() =>
-          b.updatePlannedCare({
+          b.updateServiceRequest({
             id: 'rejected-request',
             patientId,
             title: 'Rejected reference',
@@ -191,18 +191,18 @@ test('rejects foreign references and a second origin without saving', async ({
         })
       );
       await attempt(() =>
-        b.savePlannedCareConsultationRoles(ownId, patientId, {
+        b.saveServiceRequestConsultationRoles(ownId, patientId, {
           [firstId]: 'origin',
           [secondId]: 'origin',
         })
       );
       return {
         errors,
-        rejected: await b.getPlannedCare('rejected-request'),
+        rejected: await b.getServiceRequest('rejected-request'),
         consultations: await b.querySql(
           "SELECT id FROM consultations WHERE title = 'Based on a foreign request';"
         ),
-        own: await b.getPlannedCare(ownId),
+        own: await b.getServiceRequest(ownId),
       };
     },
     {

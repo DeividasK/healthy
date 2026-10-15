@@ -17,7 +17,7 @@ import { insertConditionRecord } from '@/src/features/conditions/conditionsRepos
 import { insertDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { insertConsultationRecord } from '@/src/features/consultations/consultationsRepository';
 import { insertMedicationRequestRecord } from '@/src/features/treatments/treatmentsRepository';
-import { insertServiceRequestRecord } from '@/src/features/planned-care/plannedCareRepository';
+import { insertServiceRequestRecord } from '@/src/features/service-requests/serviceRequestsRepository';
 import { insertClinicalDocumentRecord } from '@/src/features/consultations/clinicalDocumentsRepository';
 import type { SyncResourceType } from './types';
 

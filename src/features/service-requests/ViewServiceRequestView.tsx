@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FolderPlus, Stethoscope } from 'lucide-react-native';
 import type { Condition, Encounter, ServiceRequest } from 'fhir/r5';
-import { getPlannedCareMeta } from './PlannedCareRelatedRow';
+import { getServiceRequestMeta } from './ServiceRequestRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
@@ -14,31 +14,31 @@ import { ConsultationRelatedRow } from '@/src/features/consultations/Consultatio
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
-  deletePlannedCare,
-  getConsultationIdsBasedOnPlannedCare,
-  getConsultationIdsLinkingPlannedCare,
-  getPlannedCareById,
-  getPlannedCareOriginId,
-} from './plannedCareService';
+  deleteServiceRequest,
+  getConsultationIdsBasedOnServiceRequest,
+  getConsultationIdsLinkingServiceRequest,
+  getServiceRequestById,
+  getServiceRequestOriginId,
+} from './serviceRequestService';
 import { getConsultationById } from '@/src/features/consultations/consultationService';
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import {
-  getPlannedCareInstructions,
-  getPlannedCareNotes,
-  getPlannedCareReason,
-  getPlannedCareTitle,
+  getServiceRequestInstructions,
+  getServiceRequestNotes,
+  getServiceRequestReason,
+  getServiceRequestTitle,
   getReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { goBackOr } from '@/src/utils/navigation';
 
-export function ViewPlannedCareView() {
+export function ViewServiceRequestView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading } = useActivePatient();
   if (isLoading)
-    return <ResourceViewLayout testID="planned-care-view" isLoading />;
+    return <ResourceViewLayout testID="service-request-view" isLoading />;
   return (
-    <PlannedCareForPatient
+    <ServiceRequestForPatient
       key={`${activePatientId}:${id}`}
       id={id}
       activePatientId={activePatientId}
@@ -67,7 +67,7 @@ async function loadConsultations(ids: string[], patientId: string) {
   return consultations.filter((c): c is Encounter => Boolean(c));
 }
 
-function PlannedCareForPatient({
+function ServiceRequestForPatient({
   id,
   activePatientId,
 }: {
@@ -88,7 +88,7 @@ function PlannedCareForPatient({
     if (!id || !activePatientId) return;
     setHasLoadError(false);
     try {
-      const loaded = await getPlannedCareById(id, activePatientId);
+      const loaded = await getServiceRequestById(id, activePatientId);
       if (sequence !== loadSequence.current) return;
       if (!loaded) {
         setNotFound(true);
@@ -96,7 +96,7 @@ function PlannedCareForPatient({
         setRelated(NO_RELATED);
         return;
       }
-      const originId = getPlannedCareOriginId(loaded);
+      const originId = getServiceRequestOriginId(loaded);
       const [conditions, origin, linkedIds, basedOnIds] = await Promise.all([
         Promise.all(
           getReasonConditionIds(loaded).map((conditionId) =>
@@ -106,8 +106,8 @@ function PlannedCareForPatient({
         originId
           ? getConsultationById(originId, activePatientId).catch(() => null)
           : null,
-        getConsultationIdsLinkingPlannedCare(id, activePatientId),
-        getConsultationIdsBasedOnPlannedCare(id, activePatientId),
+        getConsultationIdsLinkingServiceRequest(id, activePatientId),
+        getConsultationIdsBasedOnServiceRequest(id, activePatientId),
       ]);
       const [linked, basedOn] = await Promise.all([
         loadConsultations(
@@ -144,13 +144,13 @@ function PlannedCareForPatient({
     isLoading ||
     (request && request.subject?.reference !== `Patient/${activePatientId}`)
   ) {
-    return <ResourceViewLayout testID="planned-care-view" isLoading />;
+    return <ResourceViewLayout testID="service-request-view" isLoading />;
   }
 
   if (hasLoadError || notFound || !request) {
     return (
       <ResourceViewLayout
-        testID="planned-care-view"
+        testID="service-request-view"
         error={
           hasLoadError
             ? 'Failed to load service request.'
@@ -160,24 +160,24 @@ function PlannedCareForPatient({
     );
   }
 
-  const reason = getPlannedCareReason(request);
-  const instructions = getPlannedCareInstructions(request);
-  const notes = getPlannedCareNotes(request);
+  const reason = getServiceRequestReason(request);
+  const instructions = getServiceRequestInstructions(request);
+  const notes = getServiceRequestNotes(request);
   const openConsultation = (consultation: Encounter) =>
     router.push(`/consultation/${consultation.id}`);
 
   return (
     <ResourceViewLayout
-      testID="planned-care-view"
-      title={getPlannedCareTitle(request)}
-      titleTestID="planned-care-title"
-      meta={getPlannedCareMeta(request, { withTestIDs: true })}
+      testID="service-request-view"
+      title={getServiceRequestTitle(request)}
+      titleTestID="service-request-title"
+      meta={getServiceRequestMeta(request, { withTestIDs: true })}
       actions={
         <>
           <FloatingAddMenu
             visible={showAddMenu}
             onClose={() => setShowAddMenu(false)}
-            testID="planned-care-add-menu"
+            testID="service-request-add-menu"
             options={[
               {
                 id: 'consultation',
@@ -202,21 +202,21 @@ function PlannedCareForPatient({
             editLabel="Edit service request"
             onEdit={() => {
               setShowAddMenu(false);
-              router.push(`/planned-care/${id}/edit`);
+              router.push(`/service-request/${id}/edit`);
             }}
             onAdd={() => setShowAddMenu((visible) => !visible)}
             addLabel="Add record"
             addMenuExpanded={showAddMenu}
-            editTestID="edit-planned-care-button"
-            addTestID="planned-care-add-button"
+            editTestID="edit-service-request-button"
+            addTestID="service-request-add-button"
             deleteLabel="Delete service request"
-            deleteTestID="delete-planned-care-button"
+            deleteTestID="delete-service-request-button"
             deleteConfirmation={{
               title: 'Delete Service Request',
               message:
                 'Are you sure you want to delete this service request? This action cannot be undone.',
               onConfirm: async () => {
-                await deletePlannedCare(id, activePatientId);
+                await deleteServiceRequest(id, activePatientId);
                 goBackOr(router, '/');
               },
             }}
@@ -229,24 +229,24 @@ function PlannedCareForPatient({
           <ResourceTextSection
             title="Reason"
             text={reason!}
-            testID="planned-care-reason-section"
-            textTestID="planned-care-reason"
+            testID="service-request-reason-section"
+            textTestID="service-request-reason"
           />
         )}
         {Boolean(instructions) && (
           <ResourceTextSection
             title="Instructions"
             text={instructions!}
-            testID="planned-care-instructions-section"
-            textTestID="planned-care-instructions"
+            testID="service-request-instructions-section"
+            textTestID="service-request-instructions"
           />
         )}
         {Boolean(notes) && (
           <ResourceTextSection
             title="Notes"
             text={notes!}
-            testID="planned-care-notes-section"
-            textTestID="planned-care-notes"
+            testID="service-request-notes-section"
+            textTestID="service-request-notes"
           />
         )}
       </View>
@@ -254,13 +254,13 @@ function PlannedCareForPatient({
       <ResourceSection
         icon={FolderPlus}
         title="Associated Conditions"
-        testID="planned-care-reason-conditions-section"
+        testID="service-request-reason-conditions-section"
       >
         {related.conditions.map((condition) => (
           <ConditionRelatedRow
             key={condition.id}
             condition={condition}
-            testID={`planned-care-condition-${condition.id}`}
+            testID={`service-request-condition-${condition.id}`}
             onPress={() => router.push(`/condition/${condition.id}`)}
           />
         ))}
@@ -269,7 +269,7 @@ function PlannedCareForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Originating Consultation"
-        testID="planned-care-origin-consultation"
+        testID="service-request-origin-consultation"
       >
         {related.origin && (
           <ConsultationRelatedRow
@@ -283,7 +283,7 @@ function PlannedCareForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Linked Consultations"
-        testID="planned-care-linked-consultations"
+        testID="service-request-linked-consultations"
       >
         {related.linked.map((consultation) => (
           <ConsultationRelatedRow
@@ -298,7 +298,7 @@ function PlannedCareForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Visits Based on This"
-        testID="planned-care-based-on-consultations"
+        testID="service-request-based-on-consultations"
       >
         {related.basedOn.map((consultation) => (
           <ConsultationRelatedRow

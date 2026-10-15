@@ -41,7 +41,7 @@ import {
 import {
   fetchAllServiceRequestRecords,
   insertServiceRequestRecord,
-} from '@/src/features/planned-care/plannedCareRepository';
+} from '@/src/features/service-requests/serviceRequestsRepository';
 import {
   fetchAllOrganizationRecords,
   insertOrganizationRecord,
@@ -125,7 +125,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     zipFiles[`records/medication_request_${req.id}.json`] = strToU8(jsonStr);
   }
 
-  // Export Service Requests (planned care) as plain JSON
+  // Export Service Requests (service request) as plain JSON
   for (const { request, patientId } of serviceRequests) {
     const jsonStr = JSON.stringify({ resource: request, patientId }, null, 2);
     zipFiles[`records/service_request_${request.id}.json`] = strToU8(jsonStr);

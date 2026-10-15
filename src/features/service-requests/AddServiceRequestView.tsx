@@ -8,8 +8,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { Condition } from 'fhir/r5';
-import { PlannedCareForm, type PlannedCareFormValues } from './PlannedCareForm';
-import { createOrUpdatePlannedCare } from './plannedCareService';
+import {
+  ServiceRequestForm,
+  type ServiceRequestFormValues,
+} from './ServiceRequestForm';
+import { createOrUpdateServiceRequest } from './serviceRequestService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import {
@@ -21,7 +24,7 @@ import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { COLORS } from '@/src/theme/colors';
 import { goBackOr } from '@/src/utils/navigation';
 
-export function AddPlannedCareView() {
+export function AddServiceRequestView() {
   const { consultationId, conditionId } = useLocalSearchParams<{
     consultationId?: string;
     conditionId?: string;
@@ -30,7 +33,7 @@ export function AddPlannedCareView() {
   if (isLoading)
     return <ActivityIndicator accessibilityLabel="Loading patient" />;
   return (
-    <AddPlannedCareForPatient
+    <AddServiceRequestForPatient
       key={`${activePatientId}:${consultationId || ''}:${conditionId || ''}`}
       activePatientId={activePatientId}
       consultationId={consultationId}
@@ -39,7 +42,7 @@ export function AddPlannedCareView() {
   );
 }
 
-function AddPlannedCareForPatient({
+function AddServiceRequestForPatient({
   activePatientId,
   consultationId,
   conditionId,
@@ -59,6 +62,8 @@ function AddPlannedCareForPatient({
   // specialist.
   const [consultationSpecialist, setConsultationSpecialist] = useState('');
   const [consultationDate, setConsultationDate] = useState<Date>();
+  // Only a consultation that loaded for the active patient is the origin.
+  const [originId, setOriginId] = useState<string>();
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -78,6 +83,7 @@ function AddPlannedCareForPatient({
         const date =
           consultation?.actualPeriod?.start || consultation?.plannedStartDate;
         setConsultationDate(date ? parseLocalDate(date) : undefined);
+        setOriginId(consultation?.id);
         setLoadState('ready');
       })
       .catch(() => {
@@ -99,8 +105,8 @@ function AddPlannedCareForPatient({
     );
   }
 
-  const handleSubmit = async (values: PlannedCareFormValues) => {
-    const created = await createOrUpdatePlannedCare({
+  const handleSubmit = async (values: ServiceRequestFormValues) => {
+    const created = await createOrUpdateServiceRequest({
       title: values.title,
       category: values.category,
       intent: values.intent,
@@ -117,24 +123,24 @@ function AddPlannedCareForPatient({
       notes: values.notes,
       requesterName: values.requesterName,
       patientId: activePatientId,
-      consultationId: consultationId || undefined,
+      consultationId: originId,
     });
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();
     }
 
-    if (consultationId) {
-      router.dismissTo(`/consultation/${consultationId}`);
+    if (originId) {
+      router.dismissTo(`/consultation/${originId}`);
     } else if (conditionId) {
       router.dismissTo(`/condition/${conditionId}`);
     } else {
-      goBackOr(router, `/planned-care/${created.id}`);
+      goBackOr(router, `/service-request/${created.id}`);
     }
   };
 
   return (
-    <PlannedCareForm
+    <ServiceRequestForm
       onSubmit={handleSubmit}
       conditions={conditions}
       initialValues={{

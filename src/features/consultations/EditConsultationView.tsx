@@ -33,12 +33,12 @@ import {
   unlinkTreatmentFromConsultation,
 } from '@/src/features/treatments/treatmentService';
 import {
-  getConsultationPlannedCareRoles,
-  getPlannedCareLinkOptions,
-  setPlannedCareConsultationRole,
-  PLANNED_CARE_ROLE_OPTIONS,
-  type PlannedCareConsultationRole,
-} from '@/src/features/planned-care/plannedCareService';
+  getConsultationServiceRequestRoles,
+  getServiceRequestLinkOptions,
+  setServiceRequestConsultationRole,
+  SERVICE_REQUEST_ROLE_OPTIONS,
+  type ServiceRequestConsultationRole,
+} from '@/src/features/service-requests/serviceRequestService';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -62,14 +62,14 @@ export function EditConsultationView() {
           encounter,
           treatmentOptions,
           linkedTreatments,
-          plannedCareOptions,
-          plannedCareRoles,
+          serviceRequestOptions,
+          serviceRequestRoles,
         ] = await Promise.all([
           getConsultationById(id, activePatientId),
           getTreatmentLinkOptions(activePatientId),
           getLinkedTreatmentsForConsultation(id, activePatientId),
-          getPlannedCareLinkOptions(activePatientId),
-          getConsultationPlannedCareRoles(id, activePatientId),
+          getServiceRequestLinkOptions(activePatientId),
+          getConsultationServiceRequestRoles(id, activePatientId),
         ]);
         if (!isMounted) return;
         setLinkFields([
@@ -81,14 +81,14 @@ export function EditConsultationView() {
             initialIds: linkedTreatments.map((item) => item.id!),
           },
           {
-            type: 'planned-care',
+            type: 'service-request',
             label: 'Service requests',
             icon: ClipboardList,
-            options: plannedCareOptions,
-            initialIds: Object.keys(plannedCareRoles),
+            options: serviceRequestOptions,
+            initialIds: Object.keys(serviceRequestRoles),
             roles: {
-              options: PLANNED_CARE_ROLE_OPTIONS,
-              initial: plannedCareRoles,
+              options: SERVICE_REQUEST_ROLE_OPTIONS,
+              initial: serviceRequestRoles,
               defaultRole: 'planned',
             },
           },
@@ -217,22 +217,22 @@ export function EditConsultationView() {
     for (const treatmentId of changes.removed)
       await unlinkTreatmentFromConsultation(treatmentId, id, initialPatientId);
 
-    const plannedCare = linkFields[1];
-    const roles = links['planned-care'].roles as Record<
+    const serviceRequests = linkFields[1];
+    const roles = links['service-request'].roles as Record<
       string,
-      PlannedCareConsultationRole
+      ServiceRequestConsultationRole
     >;
-    for (const requestId of plannedCare.initialIds)
+    for (const requestId of serviceRequests.initialIds)
       if (!roles[requestId])
-        await setPlannedCareConsultationRole(
+        await setServiceRequestConsultationRole(
           requestId,
           id,
           initialPatientId!,
           null
         );
     for (const [requestId, role] of Object.entries(roles))
-      if (plannedCare.roles?.initial[requestId] !== role)
-        await setPlannedCareConsultationRole(
+      if (serviceRequests.roles?.initial[requestId] !== role)
+        await setServiceRequestConsultationRole(
           requestId,
           id,
           initialPatientId!,

@@ -33,13 +33,13 @@ import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import {
-  getPlannedCareCategoryId,
-  getPlannedCareCategoryOptions,
-  getPlannedCareIntentOptions,
-  getPlannedCareStatusOptions,
-} from './plannedCareLabels';
+  getServiceRequestCategoryId,
+  getServiceRequestCategoryOptions,
+  getServiceRequestIntentOptions,
+  getServiceRequestStatusOptions,
+} from './serviceRequestLabels';
 
-export interface PlannedCareFormValues {
+export interface ServiceRequestFormValues {
   id?: string;
   title: string;
   /** Category option id: a SNOMED code or '' for none; undefined keeps. */
@@ -60,13 +60,13 @@ export interface PlannedCareFormValues {
   links?: Record<string, LinkSelection>;
 }
 
-export interface PlannedCareFormProps {
-  initialValues?: Partial<PlannedCareFormValues>;
+export interface ServiceRequestFormProps {
+  initialValues?: Partial<ServiceRequestFormValues>;
   /** The stored category, so unrecognised wording stays selectable. */
   initialCategory?: CodeableConcept;
   /** The active patient's conditions, offered as associated conditions. */
   conditions?: Condition[];
-  onSubmit: (values: PlannedCareFormValues) => Promise<void>;
+  onSubmit: (values: ServiceRequestFormValues) => Promise<void>;
   isEditing?: boolean;
   /** Known specialists offered as requester suggestions. */
   specialistSuggestions?: string[];
@@ -74,7 +74,7 @@ export interface PlannedCareFormProps {
   linkFields?: LinkFieldConfig[];
 }
 
-export function PlannedCareForm({
+export function ServiceRequestForm({
   initialValues,
   initialCategory,
   conditions = [],
@@ -82,10 +82,10 @@ export function PlannedCareForm({
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
-}: PlannedCareFormProps) {
+}: ServiceRequestFormProps) {
   const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
-  const initialCategoryId = getPlannedCareCategoryId(initialCategory);
+  const initialCategoryId = getServiceRequestCategoryId(initialCategory);
   const [category, setCategory] = useState(initialCategoryId);
   const [intent, setIntent] = useState<ServiceRequest['intent']>(
     initialValues?.intent || 'plan'
@@ -162,7 +162,7 @@ export function PlannedCareForm({
       .map(({ id, label, icon: Icon }) => ({
         id,
         label,
-        testID: `menu-add-planned-care-${id}`,
+        testID: `menu-add-service-request-${id}`,
         icon: (
           <Icon
             size={20}
@@ -251,26 +251,26 @@ export function PlannedCareForm({
           {...scrollViewProps}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          testID="planned-care-form"
+          testID="service-request-form"
         >
-          <ScreenHeading testID="planned-care-form-title">
+          <ScreenHeading testID="service-request-form-title">
             {isEditing ? 'Edit Service Request' : 'Add Service Request'}
           </ScreenHeading>
           {errorMessage && (
             <FormErrorBanner
               message={errorMessage}
-              testID="planned-care-form-error"
+              testID="service-request-form-error"
             />
           )}
           <FormField
             label="Service"
-            nativeID="planned-care-title-input"
+            nativeID="service-request-title-input"
             required
             inputProps={{
-              id: 'planned-care-title-input',
-              nativeID: 'planned-care-title-input',
+              id: 'service-request-title-input',
+              nativeID: 'service-request-title-input',
               name: 'title',
-              testID: 'planned-care-title-input',
+              testID: 'service-request-title-input',
               autoFocus: !isEditing,
               accessibilityLabel: 'Service',
               placeholder: 'e.g. Abdominal ultrasound',
@@ -281,52 +281,59 @@ export function PlannedCareForm({
               },
             }}
           />
-          <FormField label="Category" nativeID="planned-care-category-select">
+          <FormField
+            label="Category"
+            nativeID="service-request-category-select"
+          >
             <NativeSelect
-              testID="planned-care-category-select"
+              testID="service-request-category-select"
               name="category"
               label="Category"
               value={category}
-              options={getPlannedCareCategoryOptions(initialCategory)}
+              options={getServiceRequestCategoryOptions(initialCategory)}
               onChange={setCategory}
             />
           </FormField>
           <FormField
             label="Intent"
-            nativeID="planned-care-intent-select"
+            nativeID="service-request-intent-select"
             required
           >
             <NativeSelect
-              testID="planned-care-intent-select"
+              testID="service-request-intent-select"
               name="intent"
               label="Intent"
               value={intent}
-              options={getPlannedCareIntentOptions(intent)}
+              options={getServiceRequestIntentOptions(intent)}
               onChange={(value) => setIntent(value as ServiceRequest['intent'])}
             />
           </FormField>
           <FormField
             label="Status"
-            nativeID="planned-care-status-select"
+            nativeID="service-request-status-select"
             required
           >
             <NativeSelect
-              testID="planned-care-status-select"
+              testID="service-request-status-select"
               name="status"
               label="Status"
               value={status}
-              options={getPlannedCareStatusOptions(status)}
+              options={getServiceRequestStatusOptions(status)}
               onChange={(value) => setStatus(value as ServiceRequest['status'])}
             />
           </FormField>
-          <FormField label="Date" nativeID="planned-care-date-input" required>
+          <FormField
+            label="Date"
+            nativeID="service-request-date-input"
+            required
+          >
             <NativeDatePicker
               value={authoredDate}
               onChange={(date) => {
                 if (date) setAuthoredDate(date);
               }}
-              testID="planned-care-date-picker"
-              id="planned-care-date-input"
+              testID="service-request-date-picker"
+              id="service-request-date-input"
               name="authoredDate"
               variant="input"
             />
@@ -336,20 +343,20 @@ export function PlannedCareForm({
             const fieldProps = {
               label,
               onRemove: () => removeField(id),
-              removeTestID: `remove-planned-care-${id}-button`,
+              removeTestID: `remove-service-request-${id}-button`,
             };
             if (id === 'plannedDate') {
               return (
                 <FormField
                   key={id}
                   {...fieldProps}
-                  nativeID="planned-care-planned-date-input"
+                  nativeID="service-request-planned-date-input"
                 >
                   <NativeDatePicker
                     value={plannedDate}
                     onChange={setPlannedDate}
-                    testID="planned-care-planned-date-picker"
-                    id="planned-care-planned-date-input"
+                    testID="service-request-planned-date-picker"
+                    id="service-request-planned-date-input"
                     name="plannedDate"
                     variant="input"
                     allowFuture
@@ -362,7 +369,7 @@ export function PlannedCareForm({
                 <AutocompleteTextField
                   key={id}
                   label={label}
-                  inputID="planned-care-requester-input"
+                  inputID="service-request-requester-input"
                   name="requesterName"
                   placeholder="e.g. Dr. Sarah Adams"
                   value={requesterName}
@@ -384,8 +391,8 @@ export function PlannedCareForm({
                   onChange={setReasonConditionIds}
                   onRemove={fieldProps.onRemove}
                   removeTestID={fieldProps.removeTestID}
-                  testID="planned-care-reason-conditions-field"
-                  idPrefix="planned-care-"
+                  testID="service-request-reason-conditions-field"
+                  idPrefix="service-request-"
                 />
               );
             }
@@ -399,12 +406,12 @@ export function PlannedCareForm({
               <FormField
                 key={id}
                 {...fieldProps}
-                nativeID={`planned-care-${id}-input`}
+                nativeID={`service-request-${id}-input`}
                 inputProps={{
-                  id: `planned-care-${id}-input`,
-                  nativeID: `planned-care-${id}-input`,
+                  id: `service-request-${id}-input`,
+                  nativeID: `service-request-${id}-input`,
                   name: id,
-                  testID: `planned-care-${id}-input`,
+                  testID: `service-request-${id}-input`,
                   accessibilityLabel: label,
                   value,
                   onChangeText,
@@ -431,7 +438,7 @@ export function PlannedCareForm({
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}
-          saveTestID="save-planned-care-button"
+          saveTestID="save-service-request-button"
         />
       </SafeAreaView>
     </FieldRevealProvider>

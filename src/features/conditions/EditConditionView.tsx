@@ -31,10 +31,10 @@ import {
   setTreatmentConditionLink,
 } from '@/src/features/treatments/treatmentService';
 import {
-  getPlannedCareByConditionId,
-  getPlannedCareLinkOptions,
-  setPlannedCareConditionLink,
-} from '@/src/features/planned-care/plannedCareService';
+  getServiceRequestsByConditionId,
+  getServiceRequestLinkOptions,
+  setServiceRequestConditionLink,
+} from '@/src/features/service-requests/serviceRequestService';
 
 export function EditConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -61,16 +61,16 @@ export function EditConditionView() {
           linkedConsultations,
           treatmentOptions,
           linkedTreatments,
-          plannedCareOptions,
-          linkedPlannedCare,
+          serviceRequestOptions,
+          linkedServiceRequests,
         ] = await Promise.all([
           getConditionById(id, activePatientId),
           getConsultationLinkOptions(activePatientId),
           getConsultationsByConditionId(id),
           getTreatmentLinkOptions(activePatientId),
           getTreatmentsByConditionId(id, activePatientId),
-          getPlannedCareLinkOptions(activePatientId),
-          getPlannedCareByConditionId(id, activePatientId),
+          getServiceRequestLinkOptions(activePatientId),
+          getServiceRequestsByConditionId(id, activePatientId),
         ]);
         if (!isMounted) return;
         setLinkFields([
@@ -99,11 +99,11 @@ export function EditConditionView() {
             initialIds: linkedTreatments.map((item) => item.id!),
           },
           {
-            type: 'planned-care',
+            type: 'service-request',
             label: 'Service requests',
             icon: ClipboardList,
-            options: plannedCareOptions,
-            initialIds: linkedPlannedCare.map((item) => item.id!),
+            options: serviceRequestOptions,
+            initialIds: linkedServiceRequests.map((item) => item.id!),
           },
         ]);
         if (!condition) {
@@ -198,7 +198,7 @@ export function EditConditionView() {
   ) => {
     const patientId = activePatientId || initialPatientId!;
     await createOrUpdateCondition({ ...values, id, patientId });
-    const [consultations, treatments, plannedCare] = linkFields;
+    const [consultations, treatments, serviceRequests] = linkFields;
     const consultationLinks = links.consultation;
     for (const consultationId of diffLinkIds(
       consultations.initialIds,
@@ -220,14 +220,14 @@ export function EditConditionView() {
       await setTreatmentConditionLink(treatmentId, id, patientId, true);
     for (const treatmentId of treatmentChanges.removed)
       await setTreatmentConditionLink(treatmentId, id, patientId, false);
-    const plannedCareChanges = diffLinkIds(
-      plannedCare.initialIds,
-      links['planned-care'].ids
+    const serviceRequestChanges = diffLinkIds(
+      serviceRequests.initialIds,
+      links['service-request'].ids
     );
-    for (const requestId of plannedCareChanges.added)
-      await setPlannedCareConditionLink(requestId, id, patientId, true);
-    for (const requestId of plannedCareChanges.removed)
-      await setPlannedCareConditionLink(requestId, id, patientId, false);
+    for (const requestId of serviceRequestChanges.added)
+      await setServiceRequestConditionLink(requestId, id, patientId, true);
+    for (const requestId of serviceRequestChanges.removed)
+      await setServiceRequestConditionLink(requestId, id, patientId, false);
   };
 
   return (

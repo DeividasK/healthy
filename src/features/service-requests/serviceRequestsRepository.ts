@@ -3,7 +3,7 @@ import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import {
-  getPlannedCareTitle,
+  getServiceRequestTitle,
   withConsultationBasedOn,
   getConsultationBasedOnIds,
 } from '@/src/utils/fhirUtils';
@@ -84,7 +84,7 @@ export async function insertServiceRequestRecord(
     consultationId = encounterRef.slice(10);
   }
 
-  const displayLabel = getPlannedCareTitle(request);
+  const displayLabel = getServiceRequestTitle(request);
   if (!displayLabel.trim()) {
     throw new Error('ServiceRequest requires a service description');
   }

@@ -7,7 +7,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestTreatment,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
@@ -42,8 +42,8 @@ test.describe('Home View - Visual Regression', () => {
       title: 'Lisinopril 10mg',
       dosageInstructions: 'Take 1 tablet daily.',
     });
-    await seedTestPlannedCare(page, {
-      id: 'home-planned-care',
+    await seedTestServiceRequest(page, {
+      id: 'home-service-request',
       title: 'Knee MRI',
       category: '363679005',
       authoredOn: '2026-10-04',

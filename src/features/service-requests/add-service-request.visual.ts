@@ -8,8 +8,8 @@ import {
 test.describe('Add Service Request - Visual Regression', () => {
   test('Empty form and optional fields menu', async ({ page }, testInfo) => {
     await seedTestPatient(page);
-    await page.goto('/planned-care/add');
-    await page.getByTestId('planned-care-form-title').waitFor();
+    await page.goto('/service-request/add');
+    await page.getByTestId('service-request-form-title').waitFor();
     await takeSnapshot(page, 'Service Request - Add Form Empty', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').waitFor();

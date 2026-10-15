@@ -11,6 +11,7 @@ import {
   seedTestConsultation,
   seedTestReport,
   seedTestTreatment,
+  seedTestServiceRequest,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Fresh Install Onboarding Redirect', () => {
@@ -62,6 +63,12 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await page.getByText('Hemoglobin (Hgb)').waitFor();
     // A lone section needs no heading
     await expect(page.getByText('Lab Results', { exact: true })).toHaveCount(0);
+
+    await seedTestServiceRequest(page, { title: 'Blood panel' });
+    await expect(
+      page.getByText('Service requests', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByText('Lab Results', { exact: true })).toBeVisible();
 
     await seedTestTreatment(page, { title: 'Vitamin D' });
     await expect(page.getByText('Treatments', { exact: true })).toBeVisible();
@@ -424,7 +431,7 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
           consultationId: 'k1',
         },
       ],
-      plannedCare: [
+      serviceRequests: [
         {
           id: 'p1',
           title: 'Service request 1',
@@ -492,13 +499,13 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
       '1'
     );
     await expect(
-      page.getByTestId('condition-planned-care-count-c2')
+      page.getByTestId('condition-service-request-count-c2')
     ).toHaveText('1');
     await expect(
-      page.getByTestId('consultation-planned-care-count-k1')
+      page.getByTestId('consultation-service-request-count-k1')
     ).toHaveText('1');
     await expect(
-      page.getByTestId('planned-care-conditions-count-p1')
+      page.getByTestId('service-request-conditions-count-p1')
     ).toHaveText('1');
   });
 

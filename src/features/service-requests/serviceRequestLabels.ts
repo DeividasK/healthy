@@ -38,8 +38,8 @@ const OFFERED_STATUSES: Status[] = [
   'unknown',
 ];
 
-/** Planned care categories (SNOMED CT, the example ServiceRequest binding). */
-export const PLANNED_CARE_CATEGORIES = [
+/** Service request categories (SNOMED CT, the example ServiceRequest binding). */
+export const SERVICE_REQUEST_CATEGORIES = [
   { code: '108252007', display: 'Laboratory procedure', label: 'Lab test' },
   { code: '363679005', display: 'Imaging', label: 'Imaging' },
   { code: '71388002', display: 'Procedure', label: 'Procedure' },
@@ -47,41 +47,48 @@ export const PLANNED_CARE_CATEGORIES = [
   { code: '390906007', display: 'Follow-up encounter', label: 'Follow-up' },
 ] as const;
 
-export function getPlannedCareIntentLabel(intent: Intent | undefined): string {
+export function getServiceRequestIntentLabel(
+  intent: Intent | undefined
+): string {
   return (intent && INTENT_LABELS[intent]) || intent || 'Unknown';
 }
 
-export function getPlannedCareStatusLabel(status: Status | undefined): string {
+export function getServiceRequestStatusLabel(
+  status: Status | undefined
+): string {
   return (status && STATUS_LABELS[status]) || status || 'Unknown';
 }
 
 /** Offered intents, plus the current value when a record uses another code. */
-export function getPlannedCareIntentOptions(
+export function getServiceRequestIntentOptions(
   current: Intent
 ): NativeSelectOption[] {
   const intents = OFFERED_INTENTS.includes(current)
     ? OFFERED_INTENTS
     : [...OFFERED_INTENTS, current];
-  return intents.map((id) => ({ id, label: getPlannedCareIntentLabel(id) }));
+  return intents.map((id) => ({ id, label: getServiceRequestIntentLabel(id) }));
 }
 
 /** Offered statuses, plus the current value when a record uses another code. */
-export function getPlannedCareStatusOptions(
+export function getServiceRequestStatusOptions(
   current: Status
 ): NativeSelectOption[] {
   const statuses = OFFERED_STATUSES.includes(current)
     ? OFFERED_STATUSES
     : [...OFFERED_STATUSES, current];
-  return statuses.map((id) => ({ id, label: getPlannedCareStatusLabel(id) }));
+  return statuses.map((id) => ({
+    id,
+    label: getServiceRequestStatusLabel(id),
+  }));
 }
 
 /** Label for a category: a known SNOMED code, else its source wording. */
-export function getPlannedCareCategoryLabel(
+export function getServiceRequestCategoryLabel(
   category: CodeableConcept | undefined
 ): string | null {
   if (!category) return null;
   const coding = category.coding?.find((c) => c.system === SNOMED_SYSTEM);
-  const known = PLANNED_CARE_CATEGORIES.find((c) => c.code === coding?.code);
+  const known = SERVICE_REQUEST_CATEGORIES.find((c) => c.code === coding?.code);
   return (
     known?.label ||
     category.text ||
@@ -92,28 +99,28 @@ export function getPlannedCareCategoryLabel(
 }
 
 /** Option id for a category: its SNOMED code, or `current` for other wording. */
-export function getPlannedCareCategoryId(
+export function getServiceRequestCategoryId(
   category: CodeableConcept | undefined
 ): string {
   if (!category) return '';
   const code = category.coding?.find((c) => c.system === SNOMED_SYSTEM)?.code;
-  return PLANNED_CARE_CATEGORIES.some((c) => c.code === code)
+  return SERVICE_REQUEST_CATEGORIES.some((c) => c.code === code)
     ? code!
     : 'current';
 }
 
 /** Category options; an unrecognised existing category stays selectable. */
-export function getPlannedCareCategoryOptions(
+export function getServiceRequestCategoryOptions(
   current: CodeableConcept | undefined
 ): NativeSelectOption[] {
   const options: NativeSelectOption[] = [
     { id: '', label: 'Not specified' },
-    ...PLANNED_CARE_CATEGORIES.map((c) => ({ id: c.code, label: c.label })),
+    ...SERVICE_REQUEST_CATEGORIES.map((c) => ({ id: c.code, label: c.label })),
   ];
-  if (getPlannedCareCategoryId(current) === 'current')
+  if (getServiceRequestCategoryId(current) === 'current')
     options.push({
       id: 'current',
-      label: getPlannedCareCategoryLabel(current) || 'Current category',
+      label: getServiceRequestCategoryLabel(current) || 'Current category',
     });
   return options;
 }

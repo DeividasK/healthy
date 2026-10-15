@@ -357,7 +357,7 @@ export function withoutReasonReference<
 }
 
 /** Safely extracts the requested service from a ServiceRequest. */
-export function getPlannedCareTitle(request: ServiceRequest): string {
+export function getServiceRequestTitle(request: ServiceRequest): string {
   return (
     request.code?.concept?.text ||
     request.code?.concept?.coding?.[0]?.display ||
@@ -366,17 +366,19 @@ export function getPlannedCareTitle(request: ServiceRequest): string {
 }
 
 /** Original patient instructions, kept verbatim. */
-export function getPlannedCareInstructions(
+export function getServiceRequestInstructions(
   request: ServiceRequest
 ): string | null {
   return request.patientInstruction?.[0]?.instructionMarkdown || null;
 }
 
-export function getPlannedCareNotes(request: ServiceRequest): string | null {
+export function getServiceRequestNotes(request: ServiceRequest): string | null {
   return request.note?.[0]?.text || null;
 }
 
-export function getPlannedCareReason(request: ServiceRequest): string | null {
+export function getServiceRequestReason(
+  request: ServiceRequest
+): string | null {
   return request.reason?.[0]?.concept?.text || null;
 }
 

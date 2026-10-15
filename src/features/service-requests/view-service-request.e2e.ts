@@ -3,9 +3,9 @@ import {
   expect,
   seedTestPatient,
   seedTestConsultation,
-  seedTestPlannedCare,
+  seedTestServiceRequest,
   getTestClinicalDocument,
-  findPlannedCareSection,
+  findServiceRequestSection,
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
@@ -19,16 +19,16 @@ test.describe('View Service Request', () => {
       { length: 8 },
       (_, i) => `${i + 1}. Step ${i + 1} of the preparation, exactly as given.`
     ).join('\n');
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'MRI of the lumbar spine',
       instructions,
     });
-    await page.goto(`/planned-care/${request.id}`);
-    await expect(page.getByTestId('planned-care-instructions')).toHaveText(
+    await page.goto(`/service-request/${request.id}`);
+    await expect(page.getByTestId('service-request-instructions')).toHaveText(
       instructions
     );
     await page.reload();
-    await expect(page.getByTestId('planned-care-instructions')).toHaveText(
+    await expect(page.getByTestId('service-request-instructions')).toHaveText(
       instructions
     );
   });
@@ -36,12 +36,12 @@ test.describe('View Service Request', () => {
   test('records a consultation based on it and lists both ways', async ({
     page,
   }) => {
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'Dermatology referral',
       category: '3457005',
     });
-    await page.goto(`/planned-care/${request.id}`);
-    await page.getByTestId('planned-care-add-button').click();
+    await page.goto(`/service-request/${request.id}`);
+    await page.getByTestId('service-request-add-button').click();
     await page.getByTestId('menu-add-consultation').click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/add\\?basedOnId=${request.id}`)
@@ -66,7 +66,7 @@ test.describe('View Service Request', () => {
       .getByTestId('consultation-based-on')
       .getByText('Dermatology referral')
       .click();
-    await expect(page).toHaveURL(new RegExp(`planned-care/${request.id}$`));
+    await expect(page).toHaveURL(new RegExp(`service-request/${request.id}$`));
     await expect(
       page.getByTestId(`based-on-consultation-${consultation.id}`)
     ).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('View Service Request', () => {
     page,
   }) => {
     const origin = await seedTestConsultation(page, { title: 'GP visit' });
-    const request = await seedTestPlannedCare(page, {
+    const request = await seedTestServiceRequest(page, {
       title: 'Echocardiogram',
       consultationId: origin.id,
     });
@@ -85,17 +85,19 @@ test.describe('View Service Request', () => {
       basedOnServiceRequestIds: [request.id],
     });
 
-    await page.goto(`/planned-care/${request.id}`);
+    await page.goto(`/service-request/${request.id}`);
     await page.clock.install();
-    await page.getByTestId('delete-planned-care-button').click();
+    await page.getByTestId('delete-service-request-button').click();
     await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
     await page.clock.runFor(5000);
     await page.getByTestId('delete-modal-confirm-button').click();
     await expect(page.getByTestId('home-consultations-section')).toBeVisible();
-    await expect(page.getByTestId('home-planned-care-section')).toHaveCount(0);
+    await expect(page.getByTestId('home-service-requests-section')).toHaveCount(
+      0
+    );
 
     expect(
-      findPlannedCareSection(await getTestClinicalDocument(page, origin.id))
+      findServiceRequestSection(await getTestClinicalDocument(page, origin.id))
     ).toBeUndefined();
     const stored = await bridge(
       page,
@@ -107,17 +109,21 @@ test.describe('View Service Request', () => {
   });
 
   test('is not shown to another profile', async ({ page }) => {
-    const request = await seedTestPlannedCare(page, { title: 'Allergy test' });
+    const request = await seedTestServiceRequest(page, {
+      title: 'Allergy test',
+    });
     const other = await seedTestPatient(page, {
       id: 'other-patient',
       givenName: 'Jane',
     });
     await bridge(page, (b, id) => b.setActivePatient(id), other.id);
-    await page.goto(`/planned-care/${request.id}`);
-    await expect(page.getByTestId('planned-care-view')).toContainText(
+    await page.goto(`/service-request/${request.id}`);
+    await expect(page.getByTestId('service-request-view')).toContainText(
       'Service request not found.'
     );
     await page.goto('/');
-    await expect(page.getByTestId('home-planned-care-section')).toHaveCount(0);
+    await expect(page.getByTestId('home-service-requests-section')).toHaveCount(
+      0
+    );
   });
 });

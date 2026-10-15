@@ -9,20 +9,23 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { CodeableConcept, Condition } from 'fhir/r5';
 import { Stethoscope } from 'lucide-react-native';
-import { PlannedCareForm, type PlannedCareFormValues } from './PlannedCareForm';
 import {
-  createOrUpdatePlannedCare,
-  getPlannedCareById,
-  getPlannedCareConsultationRoles,
-  savePlannedCareConsultationRoles,
-  PLANNED_CARE_ROLE_OPTIONS,
-  type PlannedCareConsultationRole,
-} from './plannedCareService';
+  ServiceRequestForm,
+  type ServiceRequestFormValues,
+} from './ServiceRequestForm';
 import {
-  getPlannedCareInstructions,
-  getPlannedCareNotes,
-  getPlannedCareReason,
-  getPlannedCareTitle,
+  createOrUpdateServiceRequest,
+  getServiceRequestById,
+  getServiceRequestConsultationRoles,
+  saveServiceRequestConsultationRoles,
+  SERVICE_REQUEST_ROLE_OPTIONS,
+  type ServiceRequestConsultationRole,
+} from './serviceRequestService';
+import {
+  getServiceRequestInstructions,
+  getServiceRequestNotes,
+  getServiceRequestReason,
+  getServiceRequestTitle,
   getReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
@@ -35,13 +38,13 @@ import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import type { LinkFieldConfig } from '@/src/components/useLinkFields';
 
-export function EditPlannedCareView() {
+export function EditServiceRequestView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading } = useActivePatient();
   if (isLoading)
     return <ActivityIndicator accessibilityLabel="Loading patient" />;
   return (
-    <EditPlannedCareForPatient
+    <EditServiceRequestForPatient
       key={`${activePatientId}:${id}`}
       id={id}
       activePatientId={activePatientId}
@@ -49,7 +52,7 @@ export function EditPlannedCareView() {
   );
 }
 
-function EditPlannedCareForPatient({
+function EditServiceRequestForPatient({
   id,
   activePatientId,
 }: {
@@ -58,7 +61,7 @@ function EditPlannedCareForPatient({
 }) {
   const router = useRouter();
   const [initialValues, setInitialValues] =
-    useState<PlannedCareFormValues | null>(null);
+    useState<ServiceRequestFormValues | null>(null);
   const [initialCategory, setInitialCategory] = useState<CodeableConcept>();
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
@@ -78,11 +81,11 @@ function EditPlannedCareForPatient({
           consultationOptions,
           roles,
         ] = await Promise.all([
-          getPlannedCareById(id, activePatientId),
+          getServiceRequestById(id, activePatientId),
           getAllConditions(activePatientId),
           getDistinctDoctorNames(activePatientId),
           getConsultationLinkOptions(activePatientId),
-          getPlannedCareConsultationRoles(id, activePatientId),
+          getServiceRequestConsultationRoles(id, activePatientId),
         ]);
         if (!isMounted) return;
         if (!request) {
@@ -99,7 +102,7 @@ function EditPlannedCareForPatient({
             options: consultationOptions,
             initialIds: Object.keys(roles),
             roles: {
-              options: PLANNED_CARE_ROLE_OPTIONS,
+              options: SERVICE_REQUEST_ROLE_OPTIONS,
               initial: roles,
               defaultRole: 'planned',
               single: 'origin',
@@ -110,7 +113,7 @@ function EditPlannedCareForPatient({
         setInitialCategory(request.category?.[0]);
         setInitialValues({
           id: request.id,
-          title: getPlannedCareTitle(request),
+          title: getServiceRequestTitle(request),
           intent: request.intent,
           status: request.status,
           authoredDate: request.authoredOn
@@ -121,10 +124,10 @@ function EditPlannedCareForPatient({
             ? parseLocalDate(request.occurrenceDateTime)
             : null,
           originalPlannedDate: request.occurrenceDateTime,
-          instructions: getPlannedCareInstructions(request) || '',
-          reason: getPlannedCareReason(request) || '',
+          instructions: getServiceRequestInstructions(request) || '',
+          reason: getServiceRequestReason(request) || '',
           reasonConditionIds: getReasonConditionIds(request),
-          notes: getPlannedCareNotes(request) || '',
+          notes: getServiceRequestNotes(request) || '',
           requesterName: request.requester?.display || '',
         });
       } catch (err) {
@@ -151,15 +154,15 @@ function EditPlannedCareForPatient({
     return (
       <View
         style={styles.notFoundContainer}
-        testID="edit-planned-care-not-found"
+        testID="edit-service-request-not-found"
       >
         <Text style={styles.notFoundText}>Service request not found</Text>
       </View>
     );
   }
 
-  const handleSubmit = async (values: PlannedCareFormValues) => {
-    await createOrUpdatePlannedCare({
+  const handleSubmit = async (values: ServiceRequestFormValues) => {
+    await createOrUpdateServiceRequest({
       id: values.id,
       title: values.title,
       category: values.category,
@@ -181,23 +184,23 @@ function EditPlannedCareForPatient({
       requesterName: values.requesterName,
       patientId: activePatientId,
     });
-    await savePlannedCareConsultationRoles(
+    await saveServiceRequestConsultationRoles(
       id,
       activePatientId,
       (values.links?.consultation.roles || {}) as Record<
         string,
-        PlannedCareConsultationRole
+        ServiceRequestConsultationRole
       >
     );
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();
     }
-    router.dismissTo(`/planned-care/${id}`);
+    router.dismissTo(`/service-request/${id}`);
   };
 
   return (
-    <PlannedCareForm
+    <ServiceRequestForm
       initialValues={initialValues}
       initialCategory={initialCategory}
       conditions={conditions}

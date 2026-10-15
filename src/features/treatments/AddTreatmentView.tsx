@@ -58,6 +58,8 @@ function AddTreatmentForPatient({
   // date and specialist.
   const [consultationSpecialist, setConsultationSpecialist] = useState('');
   const [consultationDate, setConsultationDate] = useState<Date>();
+  // Only a consultation that loaded for the active patient is the origin.
+  const [originId, setOriginId] = useState<string>();
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -77,6 +79,7 @@ function AddTreatmentForPatient({
         const date =
           consultation?.actualPeriod?.start || consultation?.plannedStartDate;
         setConsultationDate(date ? parseLocalDate(date) : undefined);
+        setOriginId(consultation?.id);
         setLoadState('ready');
       })
       .catch(() => {
@@ -111,7 +114,7 @@ function AddTreatmentForPatient({
       reasonConditionIds: values.reasonConditionIds,
       notes: values.notes,
       patientId: activePatientId,
-      consultationId: consultationId || undefined,
+      consultationId: originId,
       requesterName: values.requesterName,
     });
 
@@ -119,8 +122,8 @@ function AddTreatmentForPatient({
       (document.activeElement as HTMLElement)?.blur?.();
     }
 
-    if (consultationId) {
-      router.dismissTo(`/consultation/${consultationId}`);
+    if (originId) {
+      router.dismissTo(`/consultation/${originId}`);
     } else if (conditionId) {
       router.dismissTo(`/condition/${conditionId}`);
     } else {

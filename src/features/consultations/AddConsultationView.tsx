@@ -10,7 +10,7 @@ import { COLORS } from '@/src/theme/colors';
 export function AddConsultationView() {
   const { conditionId, basedOnId } = useLocalSearchParams<{
     conditionId?: string;
-    /** Planned care that led to this visit (`Encounter.basedOn`). */
+    /** Service request that led to this visit (`Encounter.basedOn`). */
     basedOnId?: string;
   }>();
   const { activePatientId, isLoading } = useActivePatient();

@@ -4,9 +4,9 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  getTestPlannedCare,
+  getTestServiceRequest,
   getTestClinicalDocument,
-  findPlannedCareSection,
+  findServiceRequestSection,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
@@ -23,22 +23,26 @@ test.describe('Add Service Request Flow', () => {
     });
     await page.goto('/');
     await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-planned-care').click();
-    await expect(page).toHaveURL(/.*planned-care\/add$/);
+    await page.getByTestId('menu-add-service-request').click();
+    await expect(page).toHaveURL(/.*service-request\/add$/);
 
-    await page.getByTestId('save-planned-care-button').click();
-    await expect(page.getByTestId('planned-care-form-error')).toContainText(
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-form-error')).toContainText(
       'Service is required'
     );
 
     await page
-      .getByTestId('planned-care-title-input')
+      .getByTestId('service-request-title-input')
       .fill('Abdominal ultrasound');
     await page
-      .getByTestId('planned-care-category-select')
+      .getByTestId('service-request-category-select')
       .selectOption('363679005');
-    await page.getByTestId('planned-care-intent-select').selectOption('order');
-    await page.getByTestId('planned-care-status-select').selectOption('active');
+    await page
+      .getByTestId('service-request-intent-select')
+      .selectOption('order');
+    await page
+      .getByTestId('service-request-status-select')
+      .selectOption('active');
 
     for (const field of [
       'plannedDate',
@@ -49,73 +53,77 @@ test.describe('Add Service Request Flow', () => {
       'notes',
     ]) {
       await page.getByTestId('add-option-button').click();
-      await page.getByTestId(`menu-add-planned-care-${field}`).click();
+      await page.getByTestId(`menu-add-service-request-${field}`).click();
       await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
     }
     await page
-      .getByTestId('planned-care-planned-date-picker')
+      .getByTestId('service-request-planned-date-picker')
       .locator('input')
       .fill('2099-03-14');
     await page
-      .getByTestId('planned-care-requester-input')
+      .getByTestId('service-request-requester-input')
       .fill('Dr. Leonard McCoy');
     // Relative timing stays as the original wording; no date is inferred.
     const instructions =
       'Fast for 8 hours beforehand.\nBook within 2 weeks of this visit.\nBring previous scans.';
     await page
-      .getByTestId('planned-care-instructions-input')
+      .getByTestId('service-request-instructions-input')
       .fill(instructions);
     await page
-      .getByTestId('planned-care-reason-input')
+      .getByTestId('service-request-reason-input')
       .fill('Right upper pain');
-    await page.getByTestId('planned-care-condition-search-input').click();
+    await page.getByTestId('service-request-condition-search-input').click();
     await page
-      .getByTestId(`planned-care-condition-autocomplete-item-${condition.id}`)
+      .getByTestId(
+        `service-request-condition-autocomplete-item-${condition.id}`
+      )
       .click();
     await page
-      .getByTestId('planned-care-notes-input')
+      .getByTestId('service-request-notes-input')
       .fill('Referral letter given.');
 
-    await checkA11y(page, { include: '[data-testid="planned-care-form"]' });
-    await page.getByTestId('save-planned-care-button').click();
+    await checkA11y(page, { include: '[data-testid="service-request-form"]' });
+    await page.getByTestId('save-service-request-button').click();
 
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByTestId('home-planned-care-section')).toBeVisible();
+    await expect(
+      page.getByTestId('home-service-requests-section')
+    ).toBeVisible();
     await page
       .getByRole('button', {
         name: 'View service request: Abdominal ultrasound',
       })
       .click();
-    await expect(page.getByTestId('planned-care-title')).toHaveText(
+    await expect(page.getByTestId('service-request-title')).toHaveText(
       'Abdominal ultrasound'
     );
-    await expect(page.getByTestId('planned-care-category')).toContainText(
+    await expect(page.getByTestId('service-request-category')).toContainText(
       'Imaging'
     );
-    await expect(page.getByTestId('planned-care-intent')).toContainText(
+    await expect(page.getByTestId('service-request-intent')).toContainText(
       'Order'
     );
-    await expect(page.getByTestId('planned-care-requester')).toContainText(
+    await expect(page.getByTestId('service-request-requester')).toContainText(
       'Dr. Leonard McCoy'
     );
-    await expect(page.getByTestId('planned-care-planned-date')).toContainText(
-      '2099'
-    );
-    await expect(page.getByTestId('planned-care-instructions')).toHaveText(
+    await expect(
+      page.getByTestId('service-request-planned-date')
+    ).toContainText('2099');
+    await expect(page.getByTestId('service-request-instructions')).toHaveText(
       instructions
     );
-    await expect(page.getByTestId('planned-care-reason')).toHaveText(
+    await expect(page.getByTestId('service-request-reason')).toHaveText(
       'Right upper pain'
     );
     await expect(
-      page.getByTestId('planned-care-reason-conditions-section')
+      page.getByTestId('service-request-reason-conditions-section')
     ).toContainText('Gallstones');
-    await expect(page.getByTestId('planned-care-notes')).toHaveText(
+    await expect(page.getByTestId('service-request-notes')).toHaveText(
       'Referral letter given.'
     );
 
     const id = page.url().split('/').pop()!;
-    const stored = await getTestPlannedCare(page, id);
+    const stored = await getTestServiceRequest(page, id);
     expect(stored.resourceType).toBe('ServiceRequest');
     expect(stored.code).toEqual({ concept: { text: 'Abdominal ultrasound' } });
     expect(stored.category).toEqual([
@@ -162,30 +170,30 @@ test.describe('Add Service Request Flow', () => {
     await expect(page.getByTestId('option-create-new-treatment')).toHaveText(
       'Treatment'
     );
-    await expect(page.getByTestId('option-create-new-planned-care')).toHaveText(
-      'Service Request'
-    );
-    await page.getByTestId('option-create-new-planned-care').click();
+    await expect(
+      page.getByTestId('option-create-new-service-request')
+    ).toHaveText('Service Request');
+    await page.getByTestId('option-create-new-service-request').click();
     await expect(page).toHaveURL(
-      new RegExp(`.*planned-care\\/add\\?consultationId=${consultation.id}`)
+      new RegExp(`.*service-request\\/add\\?consultationId=${consultation.id}`)
     );
 
-    await page.getByTestId('planned-care-title-input').fill('Colonoscopy');
+    await page.getByTestId('service-request-title-input').fill('Colonoscopy');
     await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-planned-care-instructions').click();
-    await expect(page.getByTestId('planned-care-requester-input')).toHaveValue(
-      'Dr. Julian Bashir'
-    );
+    await page.getByTestId('menu-add-service-request-instructions').click();
+    await expect(
+      page.getByTestId('service-request-requester-input')
+    ).toHaveValue('Dr. Julian Bashir');
     await page
-      .getByTestId('planned-care-instructions-input')
+      .getByTestId('service-request-instructions-input')
       .fill('Repeat in 3 months.');
-    await page.getByTestId('save-planned-care-button').click();
+    await page.getByTestId('save-service-request-button').click();
 
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
     );
     await expect(
-      page.getByTestId('consultation-planned-care').getByText('Colonoscopy')
+      page.getByTestId('consultation-service-request').getByText('Colonoscopy')
     ).toBeVisible();
 
     const rows = await page.evaluate(() =>
@@ -204,7 +212,7 @@ test.describe('Add Service Request Flow', () => {
     // Date and specialist default to the consultation's.
     expect(created.authoredOn).toBe('2026-03-02');
     expect(created.requester).toEqual({ display: 'Dr. Julian Bashir' });
-    const section = findPlannedCareSection(
+    const section = findServiceRequestSection(
       await getTestClinicalDocument(page, consultation.id)
     );
     expect(section.code.coding[0]).toEqual({
@@ -223,16 +231,16 @@ test.describe('Add Service Request Flow', () => {
     const condition = await seedTestCondition(page, { title: 'Hypertension' });
     await page.goto(`/condition/${condition.id}`);
     await page.getByTestId('condition-add-button').click();
-    await page.getByTestId('menu-add-planned-care').click();
+    await page.getByTestId('menu-add-service-request').click();
     await page
-      .getByTestId('planned-care-title-input')
+      .getByTestId('service-request-title-input')
       .fill('Ambulatory blood pressure monitoring');
-    await page.getByTestId('save-planned-care-button').click();
+    await page.getByTestId('save-service-request-button').click();
 
     await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
     await expect(
       page
-        .getByTestId('condition-planned-care-section')
+        .getByTestId('condition-service-request-section')
         .getByText('Ambulatory blood pressure monitoring')
     ).toBeVisible();
   });

@@ -9,7 +9,7 @@ import {
   fetchServiceRequestsByPatientId,
   fetchServiceRequestsByReasonConditionId,
   deleteServiceRequestRecord,
-} from './plannedCareRepository';
+} from './serviceRequestsRepository';
 import {
   fetchClinicalDocumentByConsultationId,
   fetchConsultationIdsReferencingResource,
@@ -27,16 +27,19 @@ import {
   createNarrativeDiv,
   getCompositionEntryReferences,
   getConsultationBasedOnIds,
-  getPlannedCareInstructions,
-  getPlannedCareNotes,
-  getPlannedCareReason,
-  getPlannedCareTitle,
+  getServiceRequestInstructions,
+  getServiceRequestNotes,
+  getServiceRequestReason,
+  getServiceRequestTitle,
   getReasonConditionIds,
   withConsultationBasedOn,
 } from '@/src/utils/fhirUtils';
-import { PLANNED_CARE_CATEGORIES, SNOMED_SYSTEM } from './plannedCareLabels';
+import {
+  SERVICE_REQUEST_CATEGORIES,
+  SNOMED_SYSTEM,
+} from './serviceRequestLabels';
 
-export interface PlannedCareInput {
+export interface ServiceRequestInput {
   id?: string;
   patientId?: string;
   /** Originating consultation (when created from one). */
@@ -60,11 +63,11 @@ export interface PlannedCareInput {
   requesterName?: string | null;
 }
 
-/** How a planned care item relates to a consultation. */
-export type PlannedCareConsultationRole = 'origin' | 'planned' | 'basedOn';
+/** How a service request relates to a consultation. */
+export type ServiceRequestConsultationRole = 'origin' | 'planned' | 'basedOn';
 
-export const PLANNED_CARE_ROLE_OPTIONS: {
-  id: PlannedCareConsultationRole;
+export const SERVICE_REQUEST_ROLE_OPTIONS: {
+  id: ServiceRequestConsultationRole;
   label: string;
 }[] = [
   { id: 'origin', label: 'Originated here' },
@@ -73,10 +76,10 @@ export const PLANNED_CARE_ROLE_OPTIONS: {
 ];
 
 /** LOINC "Plan of care note" (the IPS plan of care section). */
-export const PLANNED_CARE_SECTION_LOINC = '18776-5';
-const PLANNED_CARE_SECTION: DocumentSectionSpec = {
-  title: 'Planned care',
-  loinc: PLANNED_CARE_SECTION_LOINC,
+export const SERVICE_REQUESTS_SECTION_LOINC = '18776-5';
+const SERVICE_REQUESTS_SECTION: DocumentSectionSpec = {
+  title: 'Service requests',
+  loinc: SERVICE_REQUESTS_SECTION_LOINC,
   display: 'Plan of care note',
 };
 
@@ -88,8 +91,8 @@ const hasTimeWithoutZone = (value?: string | null) =>
  * supplied, it is recorded as `encounter` and the request is added to the
  * consultation's Composition in the same transaction.
  */
-export async function createOrUpdatePlannedCare(
-  input: PlannedCareInput,
+export async function createOrUpdateServiceRequest(
+  input: ServiceRequestInput,
   withinTransaction: boolean = false
 ): Promise<ServiceRequest> {
   if (!input.title?.trim()) {
@@ -137,7 +140,7 @@ export async function createOrUpdatePlannedCare(
 
     if (input.category !== undefined && input.category !== 'current') {
       const rest = existing?.category?.slice(1) || [];
-      const known = PLANNED_CARE_CATEGORIES.find(
+      const known = SERVICE_REQUEST_CATEGORIES.find(
         (c) => c.code === input.category
       );
       const categories = known
@@ -246,10 +249,10 @@ export async function createOrUpdatePlannedCare(
         status: 'generated',
         div: createNarrativeDiv(
           [
-            getPlannedCareTitle(request),
-            getPlannedCareInstructions(request),
-            getPlannedCareReason(request),
-            getPlannedCareNotes(request),
+            getServiceRequestTitle(request),
+            getServiceRequestInstructions(request),
+            getServiceRequestReason(request),
+            getServiceRequestNotes(request),
           ]
             .filter(Boolean)
             .join('\n\n')
@@ -264,7 +267,7 @@ export async function createOrUpdatePlannedCare(
         `ServiceRequest/${requestId}`,
         input.consultationId,
         patientId,
-        PLANNED_CARE_SECTION,
+        SERVICE_REQUESTS_SECTION,
         true
       );
     }
@@ -281,40 +284,40 @@ export async function createOrUpdatePlannedCare(
   return result;
 }
 
-export async function getPlannedCareById(
+export async function getServiceRequestById(
   id: string,
   patientId?: string
 ): Promise<ServiceRequest | null> {
   return await fetchServiceRequestById(id, patientId);
 }
 
-export async function getAllPlannedCare(
+export async function getAllServiceRequests(
   patientId: string = DEFAULT_PATIENT_ID
 ): Promise<ServiceRequest[]> {
   return await fetchServiceRequestsByPatientId(patientId);
 }
 
-export async function getPlannedCareByConditionId(
+export async function getServiceRequestsByConditionId(
   conditionId: string,
   patientId: string
 ): Promise<ServiceRequest[]> {
   return await fetchServiceRequestsByReasonConditionId(conditionId, patientId);
 }
 
-/** The patient's planned care as link options. */
-export async function getPlannedCareLinkOptions(
+/** The patient's service requests as link options. */
+export async function getServiceRequestLinkOptions(
   patientId: string
 ): Promise<{ id: string; label: string }[]> {
   return (await fetchServiceRequestsByPatientId(patientId)).flatMap(
     (request) =>
       request.id
-        ? [{ id: request.id, label: getPlannedCareTitle(request) }]
+        ? [{ id: request.id, label: getServiceRequestTitle(request) }]
         : []
   );
 }
 
-/** Associates planned care with a condition, or removes the association. */
-export async function setPlannedCareConditionLink(
+/** Associates a service request with a condition, or removes the association. */
+export async function setServiceRequestConditionLink(
   requestId: string,
   conditionId: string,
   patientId: string,
@@ -324,18 +327,18 @@ export async function setPlannedCareConditionLink(
   if (!request) throw new Error(`Service request ${requestId} not found`);
   const ids = getReasonConditionIds(request);
   if (ids.includes(conditionId) === linked) return;
-  await createOrUpdatePlannedCare({
+  await createOrUpdateServiceRequest({
     id: requestId,
     patientId,
-    title: getPlannedCareTitle(request),
+    title: getServiceRequestTitle(request),
     reasonConditionIds: linked
       ? [...ids, conditionId]
       : ids.filter((id) => id !== conditionId),
   });
 }
 
-/** IDs of the consultations whose documents list the planned care. */
-export async function getConsultationIdsLinkingPlannedCare(
+/** IDs of the consultations whose documents list the service request. */
+export async function getConsultationIdsLinkingServiceRequest(
   requestId: string,
   patientId: string
 ): Promise<string[]> {
@@ -347,8 +350,8 @@ export async function getConsultationIdsLinkingPlannedCare(
   ).filter(Boolean);
 }
 
-/** IDs of the patient's consultations based on the planned care. */
-export async function getConsultationIdsBasedOnPlannedCare(
+/** IDs of the patient's consultations based on the service request. */
+export async function getConsultationIdsBasedOnServiceRequest(
   requestId: string,
   patientId: string
 ): Promise<string[]> {
@@ -367,61 +370,63 @@ export async function getConsultationIdsBasedOnPlannedCare(
 }
 
 /**
- * How each consultation relates to the planned care. Where data records
+ * How each consultation relates to the service request. Where data records
  * more than one relationship, origin wins over planned, then basedOn.
  */
-export async function getPlannedCareConsultationRoles(
+export async function getServiceRequestConsultationRoles(
   requestId: string,
   patientId: string
-): Promise<Record<string, PlannedCareConsultationRole>> {
+): Promise<Record<string, ServiceRequestConsultationRole>> {
   const request = await fetchServiceRequestById(requestId, patientId);
   if (!request) return {};
-  const roles: Record<string, PlannedCareConsultationRole> = {};
-  for (const id of await getConsultationIdsBasedOnPlannedCare(
+  const roles: Record<string, ServiceRequestConsultationRole> = {};
+  for (const id of await getConsultationIdsBasedOnServiceRequest(
     requestId,
     patientId
   ))
     roles[id] = 'basedOn';
-  for (const id of await getConsultationIdsLinkingPlannedCare(
+  for (const id of await getConsultationIdsLinkingServiceRequest(
     requestId,
     patientId
   ))
     roles[id] = 'planned';
-  const origin = getPlannedCareOriginId(request);
+  const origin = getServiceRequestOriginId(request);
   if (origin) roles[origin] = 'origin';
   return roles;
 }
 
-/** How each planned care item relates to the consultation. */
-export async function getConsultationPlannedCareRoles(
+/** How each service request relates to the consultation. */
+export async function getConsultationServiceRequestRoles(
   consultationId: string,
   patientId: string
-): Promise<Record<string, PlannedCareConsultationRole>> {
-  const roles: Record<string, PlannedCareConsultationRole> = {};
+): Promise<Record<string, ServiceRequestConsultationRole>> {
+  const roles: Record<string, ServiceRequestConsultationRole> = {};
   const consultation = await fetchConsultationById(consultationId, patientId);
   if (!consultation) return roles;
   for (const id of getConsultationBasedOnIds(consultation))
     roles[id] = 'basedOn';
-  for (const request of await getLinkedPlannedCareForConsultation(
+  for (const request of await getLinkedServiceRequestsForConsultation(
     consultationId,
     patientId
   ))
     if (request.id) roles[request.id] = 'planned';
   for (const request of await fetchServiceRequestsByPatientId(patientId))
-    if (request.id && getPlannedCareOriginId(request) === consultationId)
+    if (request.id && getServiceRequestOriginId(request) === consultationId)
       roles[request.id] = 'origin';
   return roles;
 }
 
-export function getPlannedCareOriginId(request: ServiceRequest): string | null {
+export function getServiceRequestOriginId(
+  request: ServiceRequest
+): string | null {
   const ref = request.encounter?.reference;
   return ref?.startsWith('Encounter/') ? ref.slice(10) : null;
 }
 
 /**
- * Records one relationship between planned care and a consultation inside
+ * Records one relationship between a service request and a consultation inside
  * the caller's transaction, replacing any other relationship between the
- * pair. `null` removes them all. Planned care has at most one origin: making
+ * pair. `null` removes them all. A service request has at most one origin: making
  * this consultation the origin replaces the previous one, which keeps its
  * document entry.
  */
@@ -429,7 +434,7 @@ async function applyConsultationRole(
   requestId: string,
   consultationId: string,
   patientId: string,
-  role: PlannedCareConsultationRole | null
+  role: ServiceRequestConsultationRole | null
 ): Promise<void> {
   const request = await fetchServiceRequestById(requestId, patientId);
   if (!request) throw new Error(`Service request ${requestId} not found`);
@@ -439,7 +444,7 @@ async function applyConsultationRole(
   const reference = `ServiceRequest/${requestId}`;
   const now = new Date().toISOString();
 
-  const isOrigin = getPlannedCareOriginId(request) === consultationId;
+  const isOrigin = getServiceRequestOriginId(request) === consultationId;
   if ((role === 'origin') !== isOrigin) {
     const updated: ServiceRequest = {
       ...request,
@@ -456,7 +461,7 @@ async function applyConsultationRole(
       reference,
       consultationId,
       patientId,
-      PLANNED_CARE_SECTION,
+      SERVICE_REQUESTS_SECTION,
       true
     );
   else
@@ -480,12 +485,12 @@ async function applyConsultationRole(
   }
 }
 
-/** Sets how one planned care item relates to one consultation. */
-export async function setPlannedCareConsultationRole(
+/** Sets how one service request relates to one consultation. */
+export async function setServiceRequestConsultationRole(
   requestId: string,
   consultationId: string,
   patientId: string,
-  role: PlannedCareConsultationRole | null
+  role: ServiceRequestConsultationRole | null
 ): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(() =>
@@ -499,19 +504,22 @@ export async function setPlannedCareConsultationRole(
 }
 
 /**
- * Replaces all consultation relationships of a planned care item in one
+ * Replaces all consultation relationships of a service request in one
  * transaction. At most one consultation may be the origin.
  */
-export async function savePlannedCareConsultationRoles(
+export async function saveServiceRequestConsultationRoles(
   requestId: string,
   patientId: string,
-  roles: Record<string, PlannedCareConsultationRole>
+  roles: Record<string, ServiceRequestConsultationRole>
 ): Promise<void> {
   const origins = Object.values(roles).filter((role) => role === 'origin');
   if (origins.length > 1) {
     throw new Error('A service request can originate in only one consultation');
   }
-  const current = await getPlannedCareConsultationRoles(requestId, patientId);
+  const current = await getServiceRequestConsultationRoles(
+    requestId,
+    patientId
+  );
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     for (const consultationId of Object.keys(current))
@@ -532,8 +540,8 @@ export async function savePlannedCareConsultationRoles(
   ]);
 }
 
-/** Planned care listed in the consultation's document. */
-export async function getLinkedPlannedCareForConsultation(
+/** Service requests listed in the consultation's document. */
+export async function getLinkedServiceRequestsForConsultation(
   consultationId: string,
   patientId: string = DEFAULT_PATIENT_ID
 ): Promise<ServiceRequest[]> {
@@ -552,8 +560,8 @@ export async function getLinkedPlannedCareForConsultation(
   return Array.from(requests.values());
 }
 
-/** Planned care the consultation is based on (`Encounter.basedOn`). */
-export async function getBasedOnPlannedCareForConsultation(
+/** Service requests the consultation is based on (`Encounter.basedOn`). */
+export async function getBasedOnServiceRequestsForConsultation(
   consultation: Encounter,
   patientId: string
 ): Promise<ServiceRequest[]> {
@@ -566,10 +574,10 @@ export async function getBasedOnPlannedCareForConsultation(
 }
 
 /**
- * Deletes planned care and removes its document entries and
+ * Deletes a service request and removes its document entries and
  * `Encounter.basedOn` references.
  */
-export async function deletePlannedCare(
+export async function deleteServiceRequest(
   id: string,
   patientId?: string
 ): Promise<void> {
