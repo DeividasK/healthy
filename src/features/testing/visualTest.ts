@@ -32,12 +32,26 @@ export const test = chromaticTest.extend({
 /**
  * Captures a Chromatic snapshot. Set `VISUAL_PNG_DIR` to also save a local
  * full-page PNG per snapshot, for comparing states without publishing.
+ *
+ * Snapshots show no focused or hovered field. Chromatic re-renders the
+ * captured page and does not reliably keep focus, so a focus ring would land
+ * on different fields between builds. Pass `keepFocus` only when the snapshot
+ * is about a focus-driven state (a keyboard focus ring, an open autocomplete).
  */
 export async function takeSnapshot(
   page: Page,
   name: string,
-  testInfo: TestInfo
+  testInfo: TestInfo,
+  { keepFocus = false }: { keepFocus?: boolean } = {}
 ): Promise<void> {
+  // A resting pointer leaves hover styles on whatever is now under it.
+  await page.mouse.move(0, 0);
+  if (!keepFocus) {
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await expect(page.locator(':focus')).toHaveCount(0);
+    // Blur handlers close suggestion lists after a short delay (useDismissOnBlur).
+    await page.waitForTimeout(200);
+  }
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {

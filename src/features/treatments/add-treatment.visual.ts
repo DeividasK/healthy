@@ -20,6 +20,8 @@ test.describe('Add Treatment - Visual Regression', () => {
     await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('treatment-title-input').focus();
     await page.keyboard.press('Tab');
-    await takeSnapshot(page, 'Treatment - Select Keyboard Focus', testInfo);
+    await takeSnapshot(page, 'Treatment - Select Keyboard Focus', testInfo, {
+      keepFocus: true,
+    });
   });
 });
