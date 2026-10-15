@@ -189,7 +189,8 @@ test.describe('Edit Lab Results Flow', () => {
         await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
           `UPDATE diagnostic_reports SET fhir_json = json_set(fhir_json,
              '$.performer', json_insert(json_extract(fhir_json, '$.performer'), '$[#]', json(?)),
-             '$.conclusion', 'Within range') WHERE id = ?;`,
+             '$.conclusion', 'Within range',
+             '$.contained', json('[{"resourceType":"Observation","id":"stale"}]')) WHERE id = ?;`,
           [performer, id]
         );
       },
@@ -215,5 +216,7 @@ test.describe('Edit Lab Results Flow', () => {
     );
     expect(stored.performer).toEqual([practitioner]);
     expect(stored.conclusion).toBe('Within range');
+    // Observations live in their own table, never inside the report JSON.
+    expect(stored.contained).toBeUndefined();
   });
 });

@@ -186,9 +186,13 @@ export async function createAndSaveDiagnosticReport(
     : 'Laboratory report';
 
   // Start from the stored report so elements the form does not edit survive.
-  const existing = options.reportId
+  // Observations are stored separately; drop any `contained` copy left by
+  // older ZIP restores.
+  const stored = options.reportId
     ? (await getReportById(options.reportId))?.report
     : undefined;
+  const existing = stored ? { ...stored } : undefined;
+  delete existing?.contained;
 
   const report: DiagnosticReport = {
     ...existing,
