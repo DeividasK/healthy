@@ -516,12 +516,13 @@ export async function saveServiceRequestConsultationRoles(
   if (origins.length > 1) {
     throw new Error('A service request can originate in only one consultation');
   }
-  const current = await getServiceRequestConsultationRoles(
-    requestId,
-    patientId
-  );
   const db = await getDb();
   await db.withTransactionAsync(async () => {
+    // Read the current roles in the same transaction that replaces them.
+    const current = await getServiceRequestConsultationRoles(
+      requestId,
+      patientId
+    );
     for (const consultationId of Object.keys(current))
       if (!roles[consultationId])
         await applyConsultationRole(requestId, consultationId, patientId, null);
