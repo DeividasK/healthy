@@ -57,6 +57,9 @@ import {
   loadGoogleDriveConfig,
   saveGoogleDriveConfig,
 } from '@/src/features/sync/googleAccount';
+import { setTreatmentLog } from '@/src/features/actions/treatmentLogService';
+import { fetchMedicationAdministrationById } from '@/src/features/actions/medicationAdministrationsRepository';
+import type { TreatmentLogAnswer } from '@/src/features/actions/actionDays';
 import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
 import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
@@ -384,6 +387,37 @@ export function setupTestBridge() {
         notes: input.notes,
         requesterName: input.requesterName,
       });
+    },
+    seedTreatmentLog: async (input: {
+      treatmentId: string;
+      date: string;
+      /** `null` clears the day's answer. */
+      answer: TreatmentLogAnswer | null;
+      patientId?: string;
+    }) => {
+      const patientId = await resolvePatientId(input.patientId);
+      if (!patientId) throw new Error('No patient to log a treatment for');
+      const treatment = await fetchMedicationRequestById(
+        input.treatmentId,
+        patientId
+      );
+      if (!treatment)
+        throw new Error(`Treatment ${input.treatmentId} not found`);
+      const existing = await fetchMedicationAdministrationById(
+        `${input.treatmentId}-${input.date}`,
+        patientId
+      );
+      await setTreatmentLog(
+        treatment,
+        input.date,
+        input.answer,
+        patientId,
+        existing ?? undefined
+      );
+    },
+    getTreatmentLog: async (id: string, patientId?: string) => {
+      const resolved = await resolvePatientId(patientId);
+      return resolved ? fetchMedicationAdministrationById(id, resolved) : null;
     },
     getServiceRequest: fetchServiceRequestById,
     updateServiceRequest: createOrUpdateServiceRequest,

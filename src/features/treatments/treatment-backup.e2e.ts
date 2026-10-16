@@ -64,6 +64,19 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         ),
       original
     );
+    // Its logs travel too: one kept, one cleared before the backup.
+    const log = await page.evaluate(async () => {
+      const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+      const input = { treatmentId: 'backed-up-treatment', answer: 'taken' };
+      await b.seedTreatmentLog({ ...input, date: '2026-10-07' });
+      await b.seedTreatmentLog({ ...input, date: '2026-10-08' });
+      await b.seedTreatmentLog({
+        ...input,
+        date: '2026-10-08',
+        answer: null,
+      });
+      return await b.getTreatmentLog('backed-up-treatment-2026-10-07');
+    });
     let archive: number[] = [];
     if (transport === 'ZIP') {
       const download = page.waitForEvent('download');
@@ -85,6 +98,8 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         else await b.syncAllProfiles();
         return {
           request: await b.getTreatment('backed-up-treatment'),
+          log: await b.getTreatmentLog('backed-up-treatment-2026-10-07'),
+          clearedLog: await b.getTreatmentLog('backed-up-treatment-2026-10-08'),
           document: await b.getClinicalDocumentByConsultationId(
             'treatment-backup-visit'
           ),
@@ -93,6 +108,14 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       { transport, archive }
     );
     expect(restored.request).toEqual(original);
+    expect(restored.log).toEqual(log);
+    expect(restored.log).toMatchObject({
+      resourceType: 'MedicationAdministration',
+      status: 'completed',
+      occurenceDateTime: '2026-10-07',
+      request: { reference: 'MedicationRequest/backed-up-treatment' },
+    });
+    expect(restored.clearedLog).toBeNull();
     expect(restored.document.section[0].entry).toContainEqual({
       reference: 'MedicationRequest/backed-up-treatment',
     });

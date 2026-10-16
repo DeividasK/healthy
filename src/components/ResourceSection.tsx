@@ -47,6 +47,8 @@ interface ResourceRowProps {
   note?: string | null;
   /** Opens the resource; without it the row shows no chevron. */
   onPress?: () => void;
+  /** Controls shown at the end of a row that does not open, e.g. log buttons. */
+  accessory?: React.ReactNode;
   /** Accessible name of the open button, e.g. "View condition: Migraine". */
   accessibilityLabel?: string;
   /** Test ID of the pressable row (or of the plain row when it cannot be opened). */
@@ -89,6 +91,7 @@ export function ResourceRow({
   meta = [],
   note,
   onPress,
+  accessory,
   accessibilityLabel,
   testID,
 }: ResourceRowProps) {
@@ -99,10 +102,12 @@ export function ResourceRow({
           <Text style={styles.rowTitle}>{title}</Text>
           <ResourceMetaLine meta={meta} />
         </View>
-        {onPress && (
+        {onPress ? (
           <View style={styles.chevron}>
             <ChevronRight color={COLORS.light.muted} size={18} />
           </View>
+        ) : (
+          accessory
         )}
       </View>
       {note && <Text style={styles.note}>&quot;{note}&quot;</Text>}

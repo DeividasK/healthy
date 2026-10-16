@@ -223,3 +223,36 @@ grouped requests), its indexes and its sync capture triggers. The originating
 consultation foreign key is `ON DELETE SET NULL`; deleting a patient cascades.
 `Encounter.basedOn` lives in canonical Encounter JSON and needs no column. No
 existing table or record changes; backup restore remains the recovery path.
+
+## Treatment logs
+
+The homepage's "My actions" section and the `/actions` screen record, day by
+day, whether each treatment was taken. Each answer is a FHIR R5
+`MedicationAdministration`:
+
+- `status`: `completed` when taken, `not-done` when not taken. Clearing an
+  answer deletes the resource.
+- `occurenceDateTime`: the local day, at date precision (`2026-10-16`). R5
+  spells this element `occurence[x]`.
+- `request`: the treatment's `MedicationRequest`; `medication` is copied from
+  it, because R5 requires it; `subject` is the patient.
+- One resource per treatment and day, with the id `<treatment id>-<day>`, so
+  answers given on several devices update the same resource and sync keeps the
+  latest. Updating an answer keeps fields the screen does not show.
+
+A day lists active treatments authored on or before it, plus any treatment
+already answered that day, so history stays visible after a treatment ends. A
+day is complete once every listed treatment is answered. Logs are not compared
+with the regimen's expected doses.
+
+Deleting a treatment or patient deletes its logs by cascade, which sync records
+as deletions. ZIP archives carry `records/medication_administration_*.json`
+envelopes, restored after treatments and before service requests. Encrypted
+sync replicates `MedicationAdministration` after `MedicationRequest`.
+
+### Migration v15
+
+v15 is additive and non-breaking: it creates `medication_administrations`
+(canonical JSON plus projected patient, treatment, status and day), its indexes
+and its sync capture triggers. The treatment and patient foreign keys cascade on
+delete. No existing table or record changes.

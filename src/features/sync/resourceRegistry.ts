@@ -4,6 +4,7 @@ import type {
   Condition,
   DiagnosticReport,
   Encounter,
+  MedicationAdministration,
   MedicationRequest,
   Observation,
   Organization,
@@ -17,6 +18,7 @@ import { insertConditionRecord } from '@/src/features/conditions/conditionsRepos
 import { insertDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { insertConsultationRecord } from '@/src/features/consultations/consultationsRepository';
 import { insertMedicationRequestRecord } from '@/src/features/treatments/treatmentsRepository';
+import { insertMedicationAdministrationRecord } from '@/src/features/actions/medicationAdministrationsRepository';
 import { insertServiceRequestRecord } from '@/src/features/service-requests/serviceRequestsRepository';
 import { insertClinicalDocumentRecord } from '@/src/features/consultations/clinicalDocumentsRepository';
 import type { SyncResourceType } from './types';
@@ -115,11 +117,23 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
   },
   MedicationRequest: {
     table: 'medication_requests',
-    tables: ['medication_requests'],
+    // Deleting a treatment cascades to its logs.
+    tables: ['medication_requests', 'medication_administrations'],
     read: (db, id) => readJson(db, 'medication_requests', id),
     put: (resource, patientId) =>
       insertMedicationRequestRecord(
         resource as unknown as MedicationRequest,
+        patientId,
+        true
+      ),
+  },
+  MedicationAdministration: {
+    table: 'medication_administrations',
+    tables: ['medication_administrations'],
+    read: (db, id) => readJson(db, 'medication_administrations', id),
+    put: (resource, patientId) =>
+      insertMedicationAdministrationRecord(
+        resource as unknown as MedicationAdministration,
         patientId,
         true
       ),

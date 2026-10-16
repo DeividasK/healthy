@@ -36,6 +36,7 @@ const CLINICAL_TABLES = [
   'clinical_documents',
   'medication_requests',
   'service_requests',
+  'medication_administrations',
   'organizations',
 ];
 
@@ -316,6 +317,7 @@ test.describe('Sync between devices', () => {
         UNION ALL SELECT 'DiagnosticReport', id FROM diagnostic_reports
         UNION ALL SELECT 'Encounter', id FROM consultations
         UNION ALL SELECT 'MedicationRequest', id FROM medication_requests
+        UNION ALL SELECT 'MedicationAdministration', id FROM medication_administrations
         UNION ALL SELECT 'ServiceRequest', id FROM service_requests
         UNION ALL SELECT 'Composition', id FROM clinical_documents
         UNION ALL SELECT 'Organization', id FROM organizations`);
