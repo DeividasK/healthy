@@ -91,6 +91,8 @@ export interface SeedTreatmentLogOptions {
   /** Local day, YYYY-MM-DD. */
   date: string;
   answer: 'taken' | 'not-taken' | null;
+  /** Index in `dosageInstruction` of a scheduled dose to answer. */
+  doseIndex?: number;
   patientId?: string;
 }
 

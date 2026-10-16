@@ -7,6 +7,11 @@ interface ResourceSectionProps {
   icon: LucideIcon;
   title: string;
   testID?: string;
+  /** Makes the heading a button with a chevron, e.g. opening the whole section. */
+  onPress?: () => void;
+  /** Accessible name of the heading button, e.g. "Open journal". */
+  pressLabel?: string;
+  pressTestID?: string;
   children?: React.ReactNode;
 }
 
@@ -15,18 +20,40 @@ export function ResourceSection({
   icon: Icon,
   title,
   testID,
+  onPress,
+  pressLabel,
+  pressTestID,
   children,
 }: ResourceSectionProps) {
   // Sections with no related resources are left out entirely.
   if (React.Children.toArray(children).length === 0) return null;
+  const heading = (
+    <>
+      <Icon size={18} color={COLORS.light.primary} />
+      <Text style={styles.title} accessibilityRole="header">
+        {title}
+      </Text>
+    </>
+  );
   return (
     <View style={[styles.section, styles.list]} testID={testID}>
-      <View style={styles.heading}>
-        <Icon size={18} color={COLORS.light.primary} />
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-      </View>
+      {onPress ? (
+        <TouchableOpacity
+          testID={pressTestID}
+          accessibilityRole="button"
+          accessibilityLabel={pressLabel ?? title}
+          style={[styles.heading, styles.pressableHeading]}
+          activeOpacity={0.6}
+          onPress={onPress}
+        >
+          {heading}
+          <View style={styles.headingChevron}>
+            <ChevronRight color={COLORS.light.muted} size={18} />
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.heading}>{heading}</View>
+      )}
       {children}
     </View>
   );
@@ -146,6 +173,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 8,
+  },
+  // Spans the section, so tapping anywhere on the heading line opens it.
+  pressableHeading: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  // Lines up with the chevrons of resource rows.
+  headingChevron: {
+    marginLeft: 'auto',
+    marginRight: 0,
   },
   title: {
     fontSize: 18,

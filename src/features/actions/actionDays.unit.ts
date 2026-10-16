@@ -1,12 +1,15 @@
 import { test, expect } from '@playwright/test';
-import type { MedicationAdministration, MedicationRequest } from 'fhir/r5';
+import type {
+  Dosage,
+  MedicationAdministration,
+  MedicationRequest,
+} from 'fhir/r5';
 import {
   addDays,
   buildActionDay,
   daysEndingOn,
-  formatActionsHeading,
   formatDayLabel,
-  getDayWindow,
+  getStripEnd,
   isDayComplete,
 } from './actionDays';
 
@@ -52,10 +55,13 @@ test('days run across month and year boundaries', () => {
   ]);
 });
 
-test('the window is the week ending today until an older day is selected', () => {
-  expect(getDayWindow('2026-10-04', '2026-10-08').at(-1)).toBe('2026-10-08');
-  expect(getDayWindow('2026-10-02', '2026-10-08').at(-1)).toBe('2026-10-08');
-  expect(getDayWindow('2026-10-01', '2026-10-08').at(-1)).toBe('2026-10-01');
+test('the strip centres the selected day until it reaches today', () => {
+  const today = '2026-10-16';
+  expect(getStripEnd('2026-10-16', today)).toBe('2026-10-16');
+  expect(getStripEnd('2026-10-14', today)).toBe('2026-10-16');
+  expect(getStripEnd('2026-10-13', today)).toBe('2026-10-16');
+  expect(getStripEnd('2026-10-12', today)).toBe('2026-10-15');
+  expect(daysEndingOn(getStripEnd('2026-09-29', today))[3]).toBe('2026-09-29');
 });
 
 test('a day lists active treatments started by then and any answered one', () => {
@@ -71,15 +77,11 @@ test('a day lists active treatments started by then and any answered one', () =>
     log('active', '2026-10-04', 'completed'),
     log('undated', '2026-10-05', 'not-done'),
   ]);
-  expect(day.treatments.map(({ id }) => id)).toEqual([
-    'active',
-    'undated',
-    'stopped-logged',
+  expect(day.items.map(({ rowId, answer }) => [rowId, answer])).toEqual([
+    ['active', null],
+    ['undated', 'not-taken'],
+    ['stopped-logged-2026-10-05', 'taken'],
   ]);
-  expect(day.answers).toEqual({
-    'stopped-logged': 'taken',
-    undated: 'not-taken',
-  });
   expect(isDayComplete(day)).toBe(false);
 
   const answered = buildActionDay('2026-10-05', treatments.slice(1, 2), [
@@ -89,14 +91,68 @@ test('a day lists active treatments started by then and any answered one', () =>
   expect(isDayComplete(buildActionDay('2026-10-05', [], []))).toBe(false);
 });
 
-test('labels and headings name today, yesterday and older days', () => {
+const dose = (sequence: number, when: string, days?: number): Dosage => ({
+  sequence,
+  doseAndRate: [
+    { doseQuantity: { value: 1, unit: 'tablet', code: '{tablet}' } },
+  ],
+  timing: {
+    repeat: {
+      frequency: 1,
+      period: 1,
+      periodUnit: 'd',
+      when: [when as 'MORN'],
+      ...(days && { boundsDuration: { value: days, unit: 'days', code: 'd' } }),
+    },
+  },
+});
+
+test('a structured regimen lists one row per dose of the current phase', () => {
+  const regimen: MedicationRequest = {
+    ...treatment('regimen', 'active', '2026-10-01'),
+    dosageInstruction: [
+      dose(1, 'MORN', 7),
+      dose(1, 'EVE', 7),
+      dose(2, 'EVE', 7),
+    ],
+  };
+  const rows = (date: string, logs: MedicationAdministration[] = []) =>
+    buildActionDay(date, [regimen], logs).items.map((item) => [
+      item.rowId,
+      item.dose?.text,
+      item.answer,
+    ]);
+
+  expect(
+    rows('2026-10-07', [
+      {
+        ...log('regimen', '2026-10-07', 'completed'),
+        id: 'regimen-2026-10-07-1',
+      },
+    ])
+  ).toEqual([
+    ['regimen-0', '1 tablet in the morning, for 7 days', null],
+    ['regimen-1', '1 tablet in the evening, for 7 days', 'taken'],
+  ]);
+  // The second phase starts once the first week's course ends.
+  expect(rows('2026-10-08')).toEqual([
+    ['regimen-2', '1 tablet in the evening, for 7 days', null],
+  ]);
+  // Nothing is due after the last phase; earlier answers still show.
+  expect(rows('2026-10-15')).toEqual([]);
+  expect(
+    rows('2026-10-15', [
+      {
+        ...log('regimen', '2026-10-15', 'not-done'),
+        id: 'regimen-2026-10-15-2',
+        dosage: { text: '1 tablet in the evening' },
+      },
+    ])
+  ).toEqual([['regimen-2026-10-15-2', '1 tablet in the evening', 'not-taken']]);
+});
+
+test('labels name today, yesterday and older days', () => {
   expect(formatDayLabel('2026-10-08', '2026-10-08')).toBe('Today');
   expect(formatDayLabel('2026-10-07', '2026-10-08')).toBe('Yesterday');
   expect(formatDayLabel('2026-10-05', '2026-10-08')).toBe('Mon, Oct 5');
-  expect(formatActionsHeading('2026-10-08', '2026-10-08')).toBe(
-    "What's happening today, October 8?"
-  );
-  expect(formatActionsHeading('2026-10-05', '2026-10-08')).toBe(
-    'What happened on Monday, October 5?'
-  );
 });

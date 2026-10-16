@@ -226,7 +226,7 @@ existing table or record changes; backup restore remains the recovery path.
 
 ## Treatment logs
 
-The homepage's "My actions" section and the `/actions` screen record, day by
+The homepage's "Journal" section and the `/journal` screen record, day by
 day, whether each treatment was taken. Each answer is a FHIR R5
 `MedicationAdministration`:
 
@@ -236,14 +236,19 @@ day, whether each treatment was taken. Each answer is a FHIR R5
   spells this element `occurence[x]`.
 - `request`: the treatment's `MedicationRequest`; `medication` is copied from
   it, because R5 requires it; `subject` is the patient.
-- One resource per treatment and day, with the id `<treatment id>-<day>`, so
-  answers given on several devices update the same resource and sync keeps the
-  latest. Updating an answer keeps fields the screen does not show.
+- One resource per treatment and day, or per scheduled dose and day for a
+  structured regimen, with the id `<treatment id>-<day>` or
+  `<treatment id>-<day>-<dosageInstruction index>`. Answers given on several
+  devices then update the same resource and sync keeps the latest. A dose's
+  log carries the dose in `dosage` (text, route, site and a simple dose
+  quantity). Updating an answer keeps fields the screen does not show.
 
-A day lists active treatments authored on or before it, plus any treatment
-already answered that day, so history stays visible after a treatment ends. A
-day is complete once every listed treatment is answered. Logs are not compared
-with the regimen's expected doses.
+A day lists each active treatment authored on or before it: free-text dosing
+as one row, a structured regimen as one row per dose of the phase in effect.
+Phases follow each other from the authored date, each lasting its longest
+course length; a phase without one continues, and nothing is due after the
+last phase ends. Answers already given that day stay listed after a treatment
+ends or its regimen changes. Logs are not compared with expected frequency.
 
 Deleting a treatment or patient deletes its logs by cascade, which sync records
 as deletions. ZIP archives carry `records/medication_administration_*.json`

@@ -70,11 +70,20 @@ test.describe('My actions - Visual Regression', () => {
       .waitFor({ state: 'visible' });
     await takeSnapshot(page, 'My actions - Today', testInfo);
 
-    await page.getByTestId('actions-day-2026-10-05').click();
+    // The fixture's frozen clock stops slide animations, so other days
+    // open directly.
+    await page.goto('/journal?date=2026-10-05');
     await page
       .getByTestId('actions-day-label')
       .getByText('Mon, Oct 5')
       .waitFor();
+    await page.getByTestId('treatment-log-row-visual-log-cream').waitFor();
     await takeSnapshot(page, 'My actions - Past day', testInfo);
+
+    // An older day sits in the middle of the strip (Sep 26 – Oct 2).
+    await page.goto('/journal?date=2026-09-29');
+    await page.getByTestId('actions-day-2026-09-26').waitFor();
+    await page.getByTestId('treatment-log-row-visual-log-cream').waitFor();
+    await takeSnapshot(page, 'My actions - Centred older day', testInfo);
   });
 });

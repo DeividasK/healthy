@@ -1,19 +1,43 @@
-import type { MedicationAdministration, MedicationRequest } from 'fhir/r5';
+import type {
+  Dosage,
+  MedicationAdministration,
+  MedicationRequest,
+} from 'fhir/r5';
 import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
+import {
+  formatDose,
+  getScheduledDoses,
+} from '@/src/features/treatments/regimen';
 
 /** How many days the homepage and the actions view show at once. */
 export const ACTION_WINDOW_DAYS = 7;
 
 export type TreatmentLogAnswer = 'taken' | 'not-taken';
 
-/** One day of actions: the treatments to answer and the answers given. */
+/**
+ * One thing to answer on a day: a treatment with free-text dosing, or one
+ * scheduled dose of a structured regimen.
+ */
+export interface ActionItem {
+  /** Id of the MedicationAdministration that records the answer. */
+  key: string;
+  /** Stable within the day: the treatment id, plus the dose index for doses. */
+  rowId: string;
+  treatment: MedicationRequest;
+  dose?: {
+    /** Index in `dosageInstruction`, absent for a dose no longer prescribed. */
+    index?: number;
+    dosage?: Dosage;
+    text: string;
+  };
+  answer: TreatmentLogAnswer | null;
+  log?: MedicationAdministration;
+}
+
+/** One day of actions: what to answer and the answers given. */
 export interface ActionDay {
   date: string;
-  treatments: MedicationRequest[];
-  /** Answers by treatment id. */
-  answers: Record<string, TreatmentLogAnswer>;
-  /** The stored logs by treatment id. */
-  logs: Record<string, MedicationAdministration>;
+  items: ActionItem[];
 }
 
 /** The local day (YYYY-MM-DD) a treatment log is recorded for. */
@@ -54,13 +78,20 @@ export function daysEndingOn(
   );
 }
 
+/** Whole days from `from` to `to` (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (parseLocalDate(to).getTime() - parseLocalDate(from).getTime()) / 86400000
+  );
+}
+
 /**
- * The days the actions view shows: the week ending today, or ending on the
- * selected day once it is older than that.
+ * The last day the actions view shows: 3 days after the selected one, so it
+ * sits in the middle of the 7, but never after today.
  */
-export function getDayWindow(selected: string, today: string): string[] {
-  const oldestOfWeek = addDays(today, 1 - ACTION_WINDOW_DAYS);
-  return daysEndingOn(selected < oldestOfWeek ? selected : today);
+export function getStripEnd(selected: string, today: string): string {
+  const end = addDays(selected, Math.floor(ACTION_WINDOW_DAYS / 2));
+  return end > today ? today : end;
 }
 
 export const getAnswer = (
@@ -73,42 +104,116 @@ export const getAnswer = (
       : null;
 
 /**
- * Treatments to answer on a day: active treatments started on or before it,
- * plus any treatment already answered that day, so logged history stays
- * visible after a treatment ends.
+ * What to answer on a day: each active treatment started on or before it,
+ * one row per dose scheduled that day for structured regimens. Answers given
+ * that day stay listed even after a treatment ends or its regimen changes.
  */
 export function buildActionDay(
   date: string,
   treatments: MedicationRequest[],
   administrations: MedicationAdministration[]
 ): ActionDay {
-  const logs: Record<string, MedicationAdministration> = {};
-  const answers: Record<string, TreatmentLogAnswer> = {};
-  for (const administration of administrations) {
-    if (getAdministrationDate(administration) !== date) continue;
-    const requestId = getAdministrationRequestId(administration);
-    const answer = getAnswer(administration);
-    if (!requestId || !answer) continue;
-    logs[requestId] = administration;
-    answers[requestId] = answer;
+  const logs = administrations.filter(
+    (administration) =>
+      getAdministrationDate(administration) === date &&
+      Boolean(getAnswer(administration))
+  );
+  const items: ActionItem[] = [];
+  for (const treatment of treatments) {
+    const id = treatment.id;
+    if (!id) continue;
+    const treatmentLogs = logs.filter(
+      (administration) => getAdministrationRequestId(administration) === id
+    );
+    const unused = new Set(treatmentLogs);
+    const take = (key: string, fallback = false) => {
+      const log =
+        treatmentLogs.find((candidate) => candidate.id === key) ??
+        (fallback ? [...unused][0] : undefined);
+      if (log) unused.delete(log);
+      return log;
+    };
+    const isDue =
+      treatment.status === 'active' &&
+      (!treatment.authoredOn || treatment.authoredOn.slice(0, 10) <= date);
+    if (isDue) {
+      const doses = getScheduledDoses(treatment, date);
+      if (doses === null) {
+        const key = getTreatmentLogId(id, date);
+        const log = take(key, true);
+        items.push({ key, rowId: id, treatment, ...withLog(log) });
+      } else {
+        for (const { index, dosage } of doses) {
+          const key = getTreatmentLogId(id, date, index);
+          items.push({
+            key,
+            rowId: `${id}-${index}`,
+            treatment,
+            dose: { index, dosage, text: formatDose(dosage) },
+            ...withLog(take(key)),
+          });
+        }
+      }
+    }
+    // Answers no longer matching what is due still show.
+    for (const log of unused) {
+      items.push({
+        key: log.id!,
+        rowId: log.id!,
+        treatment,
+        dose: log.dosage?.text ? { text: log.dosage.text } : undefined,
+        ...withLog(log),
+      });
+    }
   }
-  return {
-    date,
-    treatments: treatments.filter(
-      (treatment) =>
-        Boolean(treatment.id && answers[treatment.id]) ||
-        (treatment.status === 'active' &&
-          (!treatment.authoredOn || treatment.authoredOn.slice(0, 10) <= date))
-    ),
-    answers,
-    logs,
-  };
+  return { date, items };
 }
 
-/** A day is complete once every treatment listed for it is answered. */
+const withLog = (log?: MedicationAdministration) => ({
+  answer: log ? getAnswer(log) : null,
+  log,
+});
+
+/**
+ * The id of the log answering a treatment, or one of its doses, on a day.
+ * Derived from all three, so answers from several devices meet in one
+ * resource.
+ */
+export const getTreatmentLogId = (
+  treatmentId: string,
+  date: string,
+  doseIndex?: number
+) =>
+  doseIndex === undefined
+    ? `${treatmentId}-${date}`
+    : `${treatmentId}-${date}-${doseIndex}`;
+
+/**
+ * How far a day is logged: `none` when nothing is due, `empty` before any
+ * answer, `partial` while some are missing and `complete` once all are given.
+ * `future` days cannot be logged yet.
+ */
+export type DayStatus = 'none' | 'empty' | 'partial' | 'complete' | 'future';
+
+export function getDayStatus(day?: ActionDay): DayStatus {
+  if (!day?.items.length) return 'none';
+  const answered = day.items.filter((item) => item.answer).length;
+  if (!answered) return 'empty';
+  return answered === day.items.length ? 'complete' : 'partial';
+}
+
+/** A day is complete once everything listed for it is answered. */
 export const isDayComplete = (day: ActionDay) =>
-  day.treatments.length > 0 &&
-  day.treatments.every((treatment) => Boolean(day.answers[treatment.id || '']));
+  getDayStatus(day) === 'complete';
+
+/** Day status in words, for the calendar's legend and day buttons. */
+export const DAY_STATUS_LABELS: Record<DayStatus, string> = {
+  complete: 'All logged',
+  partial: 'Partly logged',
+  empty: 'Not logged',
+  none: 'Nothing to log',
+  future: 'Upcoming',
+};
 
 const formatDay = (date: string, options: Intl.DateTimeFormatOptions) =>
   parseLocalDate(date).toLocaleDateString('en-US', options);
@@ -131,9 +236,59 @@ export function formatDayLabel(date: string, today: string): string {
 export const formatLongDate = (date: string) =>
   formatDay(date, { weekday: 'long', month: 'long', day: 'numeric' });
 
-/** The question above the day's treatments. */
-export function formatActionsHeading(date: string, today: string): string {
-  return date === today
-    ? `What's happening today, ${formatDay(date, { month: 'long', day: 'numeric' })}?`
-    : `What happened on ${formatLongDate(date)}?`;
+/**
+ * Answers the previous day gave to the same treatments and doses. Copying
+ * them fills only rows still unanswered.
+ */
+export function getCopyableAnswers(
+  day: ActionDay,
+  previousDay?: ActionDay
+): { item: ActionItem; answer: TreatmentLogAnswer }[] {
+  const previous = new Map(
+    (previousDay?.items ?? []).map((item) => [item.rowId, item.answer])
+  );
+  return day.items.flatMap((item) => {
+    const answer = previous.get(item.rowId);
+    return answer ? [{ item, answer }] : [];
+  });
+}
+
+/** The days of a month (YYYY-MM) in Monday-first weeks; null pads the grid. */
+export function getMonthGrid(month: string): (string | null)[] {
+  const first = `${month}-01`;
+  const lead = (parseLocalDate(first).getDay() + 6) % 7;
+  const days: (string | null)[] = Array.from({ length: lead }, () => null);
+  for (let date = first; date.startsWith(month); date = addDays(date, 1))
+    days.push(date);
+  while (days.length % 7) days.push(null);
+  return days;
+}
+
+/** The month `delta` months after `month` (YYYY-MM). */
+export function addMonths(month: string, delta: number): string {
+  const day = parseLocalDate(`${month}-01`);
+  day.setMonth(day.getMonth() + delta);
+  return formatLocalDate(day).slice(0, 7);
+}
+
+/** e.g. "October 2026". */
+export const formatMonth = (month: string) =>
+  formatDay(`${month}-01`, { month: 'long', year: 'numeric' });
+
+/** Days the actions strip offers at once; others are picked from a calendar. */
+export const STRIP_DAYS = 21;
+
+/** Whether a day is within the strip's default days, which end today. */
+export const isRecentDay = (date: string, today: string) =>
+  daysBetween(date, today) < STRIP_DAYS;
+
+/**
+ * The last day of the strip showing `selected`: today for recent days,
+ * otherwise 10 days later (never after today), so an older day picked from
+ * the calendar sits in the middle of its own 21 days.
+ */
+export function getStripAnchor(selected: string, today: string): string {
+  if (isRecentDay(selected, today)) return today;
+  const end = addDays(selected, Math.floor(STRIP_DAYS / 2));
+  return end > today ? today : end;
 }

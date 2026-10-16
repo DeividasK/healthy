@@ -1,41 +1,38 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Check, X, type LucideIcon } from 'lucide-react-native';
-import type { MedicationRequest } from 'fhir/r5';
+import { Check, Tablets, X, type LucideIcon } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import type { TreatmentLogAnswer } from './actionDays';
+import type { ActionItem, TreatmentLogAnswer } from './actionDays';
 
 /**
- * A treatment with "not taken" (×) and "taken" (✓) buttons. Pressing the
- * selected button again clears the answer.
+ * A treatment, or one scheduled dose of it, with "not taken" (×) and "taken"
+ * (✓) buttons. Pressing the selected button again clears the answer.
  */
 export function TreatmentLogRow({
-  treatment,
-  answer,
+  item,
   disabled = false,
   onAnswer,
 }: {
-  treatment: MedicationRequest;
-  answer: TreatmentLogAnswer | null;
+  item: ActionItem;
   disabled?: boolean;
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
 }) {
-  const title = getTreatmentTitle(treatment);
-  const id = treatment.id || '';
+  const title = getTreatmentTitle(item.treatment);
+  const name = item.dose ? `${title}, ${item.dose.text}` : title;
   const button = (
     value: TreatmentLogAnswer,
     Icon: LucideIcon,
     label: string,
     selectedStyle: object
   ) => {
-    const selected = answer === value;
+    const selected = item.answer === value;
     return (
       <TouchableOpacity
-        testID={`treatment-log-${value}-${id}`}
+        testID={`treatment-log-${value}-${item.rowId}`}
         accessibilityRole="checkbox"
-        accessibilityLabel={`Mark ${title} ${label}`}
+        accessibilityLabel={`Mark ${name} ${label}`}
         aria-checked={selected}
         accessibilityState={{ checked: selected, disabled }}
         disabled={disabled}
@@ -55,8 +52,9 @@ export function TreatmentLogRow({
   };
   return (
     <ResourceRow
-      testID={`treatment-log-row-${id}`}
+      testID={`treatment-log-row-${item.rowId}`}
       title={title}
+      meta={item.dose ? [{ icon: Tablets, text: item.dose.text }] : []}
       accessory={
         <View style={styles.buttons}>
           {button('not-taken', X, 'not taken', styles.notTaken)}

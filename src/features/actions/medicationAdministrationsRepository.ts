@@ -186,12 +186,14 @@ export async function fetchAllMedicationAdministrationRecords(
 
 export async function deleteMedicationAdministrationRecord(
   id: string,
-  patientId: string
+  patientId: string,
+  withinTransaction: boolean = false
 ): Promise<void> {
   const db = await getDb();
   const result = await db.runAsync(
     'DELETE FROM medication_administrations WHERE id = ? AND patient_id = ?;',
     [id, patientId]
   );
-  if (result.changes) notifyDatabaseChanged(['medication_administrations']);
+  if (result.changes && !withinTransaction)
+    notifyDatabaseChanged(['medication_administrations']);
 }

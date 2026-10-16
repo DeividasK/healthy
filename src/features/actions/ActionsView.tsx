@@ -2,21 +2,29 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Pill } from 'lucide-react-native';
+import { Check, Copy, Pill } from 'lucide-react-native';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
-import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 import { ActionDayPills } from './ActionDayPills';
+import { ActionCalendar } from './ActionCalendar';
 import { TreatmentLogRow } from './TreatmentLogRow';
-import { getActionDays, setTreatmentLog } from './treatmentLogService';
+import { CheckboxRow } from './CheckboxRow';
 import {
-  formatActionsHeading,
-  getDayWindow,
+  getActionDays,
+  setTreatmentLog,
+  setTreatmentLogs,
+} from './treatmentLogService';
+import {
+  addDays,
+  getCopyableAnswers,
+  daysEndingOn,
+  STRIP_DAYS,
   todayKey,
   type ActionDay,
+  type ActionItem,
   type TreatmentLogAnswer,
 } from './actionDays';
 
@@ -55,24 +63,38 @@ function ActionsForPatient({
   today: string;
 }) {
   const router = useRouter();
-  const dayWindow = getDayWindow(selected, today);
 
-  const [days, setDays] = useState<ActionDay[]>([]);
+  const [daysByDate, setDaysByDate] = useState<Record<string, ActionDay>>({});
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [loadedPatientId, setLoadedPatientId] = useState('');
   const [hasLoadError, setHasLoadError] = useState(false);
-  const [savingIds, setSavingIds] = useState<string[]>([]);
+  const [savingKeys, setSavingKeys] = useState<string[]>([]);
+  // Answers copied from the previous day into each day it was checked for,
+  // by item key. Each day starts unchecked.
+  const [copiesByDate, setCopiesByDate] = useState<
+    Record<string, Record<string, TreatmentLogAnswer>>
+  >({});
   const loadSequence = useRef(0);
 
   const loadData = useCallback(async () => {
     if (!activePatientId) return;
     const sequence = ++loadSequence.current;
     try {
-      const loaded = await getActionDays(
-        activePatientId,
-        getDayWindow(selected, today)
+      // The recent days, and any strip around an older selection: every day
+      // within 21 of it (including the day before, for copying answers).
+      const dates = new Set(
+        [
+          ...daysEndingOn(today, STRIP_DAYS),
+          ...daysEndingOn(addDays(selected, STRIP_DAYS), 2 * STRIP_DAYS + 1),
+        ].filter((date) => date <= today)
       );
+      const loaded = await getActionDays(activePatientId, [...dates]);
       if (sequence !== loadSequence.current) return;
-      setDays(loaded);
+      setDaysByDate((current) => {
+        const next = { ...current };
+        for (const loadedDay of loaded) next[loadedDay.date] = loadedDay;
+        return next;
+      });
       setHasLoadError(false);
       setLoadedPatientId(activePatientId);
     } catch (err) {
@@ -82,52 +104,123 @@ function ActionsForPatient({
     }
   }, [activePatientId, selected, today]);
 
+  const loadCalendarDays = useCallback(
+    (dates: string[]) => getActionDays(activePatientId, dates),
+    [activePatientId]
+  );
+
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
     ['medication_requests', 'medication_administrations'],
     loadData
   );
 
-  const day = days.find((candidate) => candidate.date === selected);
+  const day = daysByDate[selected];
   const isLoading =
     isPatientLoading ||
     (!hasLoadError && (loadedPatientId !== activePatientId || !day));
 
   const handleAnswer = async (
-    treatmentId: string,
+    item: ActionItem,
     answer: TreatmentLogAnswer | null
   ) => {
-    const treatment = day?.treatments.find((t) => t.id === treatmentId);
-    if (!day || !treatment) return;
-    setSavingIds((ids) => [...ids, treatmentId]);
+    if (!day) return;
+    setSavingKeys((keys) => [...keys, item.key]);
     // Show the answer at once; the reload after saving confirms it.
-    setDays((current) =>
-      current.map((candidate) => {
-        if (candidate.date !== day.date) return candidate;
-        const answers = { ...candidate.answers };
-        if (answer) answers[treatmentId] = answer;
-        else delete answers[treatmentId];
-        return { ...candidate, answers };
-      })
-    );
+    setDaysByDate((current) => ({
+      ...current,
+      [day.date]: {
+        ...current[day.date],
+        items: current[day.date].items.map((candidate) =>
+          candidate.key === item.key ? { ...candidate, answer } : candidate
+        ),
+      },
+    }));
     try {
-      await setTreatmentLog(
-        treatment,
-        day.date,
-        answer,
-        activePatientId,
-        day.logs[treatmentId]
-      );
+      await setTreatmentLog(item, day.date, answer, activePatientId);
     } catch (err) {
       console.error('Failed to save treatment log:', err);
     } finally {
-      setSavingIds((ids) => ids.filter((id) => id !== treatmentId));
+      setSavingKeys((keys) => keys.filter((key) => key !== item.key));
       await loadData();
     }
   };
 
-  const selectDay = (date: string) =>
+  const previousDay = daysByDate[addDays(selected, -1)];
+  const copyable = day ? getCopyableAnswers(day, previousDay) : [];
+
+  /**
+   * Shows several answers at once, then saves them together: one
+   * transaction and one refresh.
+   */
+  const applyAnswers = useCallback(
+    async (
+      date: string,
+      changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[]
+    ) => {
+      if (!changes.length) return;
+      const keys = changes.map(({ item }) => item.key);
+      const answers = new Map(
+        changes.map(({ item, answer }) => [item.key, answer])
+      );
+      setDaysByDate((current) => ({
+        ...current,
+        [date]: {
+          ...current[date],
+          items: current[date].items.map((item) =>
+            answers.has(item.key)
+              ? { ...item, answer: answers.get(item.key) ?? null }
+              : item
+          ),
+        },
+      }));
+      setSavingKeys((current) => [...current, ...keys]);
+      try {
+        await setTreatmentLogs(changes, date, activePatientId);
+      } catch (err) {
+        console.error('Failed to copy treatment logs:', err);
+      } finally {
+        setSavingKeys((current) =>
+          current.filter((key) => !keys.includes(key))
+        );
+        await loadData();
+      }
+    },
+    [activePatientId, loadData]
+  );
+
+  /**
+   * Checking fills this day's unanswered rows with the previous day's
+   * answers, never replacing one already given; they stay editable.
+   * Unchecking clears the copies not changed since.
+   */
+  const handleCopyChange = (checked: boolean) => {
+    if (!day) return;
+    const copies = copiesByDate[selected] ?? {};
+    const changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[] =
+      checked
+        ? copyable.filter(({ item }) => !item.answer)
+        : day.items.flatMap((item) =>
+            item.answer && copies[item.key] === item.answer
+              ? [{ item, answer: null }]
+              : []
+          );
+    setCopiesByDate(({ [selected]: _previous, ...others }) =>
+      checked
+        ? {
+            ...others,
+            [selected]: Object.fromEntries(
+              changes.map(({ item, answer }) => [item.key, answer!])
+            ),
+          }
+        : others
+    );
+    void applyAnswers(selected, changes);
+  };
+
+  const selectDay = (date: string) => {
     router.setParams({ date: date === today ? undefined : date });
+  };
 
   const handleDone = () => {
     if (router.canGoBack()) router.back();
@@ -145,38 +238,55 @@ function ActionsForPatient({
         contentContainerStyle={styles.scrollContent}
       >
         <ActionDayPills
-          days={days.length ? days : dayWindow.map(emptyDay)}
+          daysByDate={daysByDate}
           selected={selected}
           today={today}
           onSelect={selectDay}
+          onOpenCalendar={() => setIsCalendarOpen(true)}
+          leading={
+            copyable.length > 0 && (
+              <CheckboxRow
+                testID="actions-copy-previous-day"
+                label="Copy answers from previous day"
+                icon={Copy}
+                checked={selected in copiesByDate}
+                onChange={handleCopyChange}
+              />
+            )
+          }
         />
-        <ScreenHeading testID="actions-heading">
-          {formatActionsHeading(selected, today)}
-        </ScreenHeading>
         {isLoading ? (
           <ActivityIndicator size="large" color={COLORS.light.primary} />
         ) : hasLoadError ? (
           <Text style={styles.errorText}>Failed to load treatments.</Text>
         ) : (
-          <ResourceSection
-            icon={Pill}
-            title="Treatments"
-            testID="actions-treatments-section"
-          >
-            {day?.treatments.map((treatment) => (
-              <TreatmentLogRow
-                key={treatment.id}
-                treatment={treatment}
-                answer={day.answers[treatment.id || ''] ?? null}
-                disabled={savingIds.includes(treatment.id || '')}
-                onAnswer={(answer) =>
-                  void handleAnswer(treatment.id || '', answer)
-                }
-              />
-            ))}
-          </ResourceSection>
+          <>
+            <ResourceSection
+              icon={Pill}
+              title="Treatments"
+              testID="actions-treatments-section"
+            >
+              {day?.items.map((item) => (
+                <TreatmentLogRow
+                  key={item.key}
+                  item={item}
+                  disabled={savingKeys.includes(item.key)}
+                  onAnswer={(answer) => void handleAnswer(item, answer)}
+                />
+              ))}
+            </ResourceSection>
+          </>
         )}
       </ScrollView>
+      {isCalendarOpen && (
+        <ActionCalendar
+          selected={selected}
+          today={today}
+          loadDays={loadCalendarDays}
+          onSelect={selectDay}
+          onClose={() => setIsCalendarOpen(false)}
+        />
+      )}
       <ResourceActionDock
         actions={[
           {
@@ -191,13 +301,6 @@ function ActionsForPatient({
     </SafeAreaView>
   );
 }
-
-const emptyDay = (date: string): ActionDay => ({
-  date,
-  treatments: [],
-  answers: {},
-  logs: {},
-});
 
 const styles = StyleSheet.create({
   safeArea: {

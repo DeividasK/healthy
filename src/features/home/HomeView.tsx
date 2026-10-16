@@ -431,23 +431,25 @@ export function HomeView() {
             style={styles.scrollList}
             contentContainerStyle={styles.scrollListContent}
           >
-            {/* My actions: the last 7 days of treatment logs */}
-            {actionDays.some((day) => day.treatments.length > 0) && (
+            {/* Journal: the last 7 days of treatment logs */}
+            {actionDays.some((day) => day.items.length > 0) && (
               <ResourceSection
                 icon={ListChecks}
-                title="My actions"
+                title="Journal"
                 testID="home-actions-section"
+                pressLabel="Open journal"
+                pressTestID="home-actions-open"
+                onPress={() => {
+                  blurActiveElement();
+                  router.push('/journal');
+                }}
               >
                 <ActionWeekStrip
                   days={actionDays}
                   today={actionDays[actionDays.length - 1].date}
-                  onOpen={() => {
-                    blurActiveElement();
-                    router.push('/actions');
-                  }}
                   onOpenDay={(date) => {
                     blurActiveElement();
-                    router.push({ pathname: '/actions', params: { date } });
+                    router.push({ pathname: '/journal', params: { date } });
                   }}
                 />
               </ResourceSection>
