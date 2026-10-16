@@ -1,11 +1,14 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
+import { CountBadge } from './CountBadge';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceSectionProps {
   icon: LucideIcon;
   title: string;
+  /** Total rows, including any collapsed rows. Omit for non-list sections. */
+  count?: number;
   testID?: string;
   /** Makes the heading a button with a chevron, e.g. opening the whole section. */
   onPress?: () => void;
@@ -19,6 +22,7 @@ interface ResourceSectionProps {
 export function ResourceSection({
   icon: Icon,
   title,
+  count,
   testID,
   onPress,
   pressLabel,
@@ -33,6 +37,13 @@ export function ResourceSection({
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
+      {count !== undefined && (
+        <CountBadge
+          count={count}
+          accessibilityLabel={`${title}: ${count} total`}
+          testID={testID ? `${testID}-count` : undefined}
+        />
+      )}
     </>
   );
   return (

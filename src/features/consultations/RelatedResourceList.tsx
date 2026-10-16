@@ -18,6 +18,7 @@ export function RelatedResourceList({
     <ResourceSection
       icon={Pill}
       title="Treatments"
+      count={linkedTreatments.length}
       testID="consultation-treatments"
     >
       {linkedTreatments.map((treatment) => (

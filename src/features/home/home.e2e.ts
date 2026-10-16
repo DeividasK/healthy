@@ -445,6 +445,18 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
   test('shows three recent items per section and expands and collapses them', async ({
     page,
   }) => {
+    await expect(page.getByTestId('home-conditions-section-count')).toHaveText(
+      '4'
+    );
+    await expect(
+      page.getByTestId('home-consultations-section-count')
+    ).toHaveText('4');
+    await expect(page.getByTestId('home-treatments-section-count')).toHaveText(
+      '1'
+    );
+    await expect(
+      page.getByTestId('home-service-requests-section-count')
+    ).toHaveText('1');
     const conditionCards = page.getByTestId(/^condition-card-/);
     const consultationCards = page.getByTestId(/^consultation-card-/);
     await expect(conditionCards).toHaveCount(3);
@@ -464,6 +476,9 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
 
     await page.getByTestId('conditions-list-toggle').click();
     await expect(conditionCards).toHaveCount(4);
+    await expect(page.getByTestId('home-conditions-section-count')).toHaveText(
+      '4'
+    );
     await page.getByTestId('conditions-list-toggle').click();
     await expect(conditionCards).toHaveCount(3);
   });

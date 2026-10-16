@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Calendar,
+  CalendarRange,
   FileText,
   History,
   MessageSquareText,
@@ -10,7 +11,10 @@ import {
   Square,
   X,
 } from 'lucide-react-native';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
+import { formatUsageDuration } from './usageDuration';
 import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
@@ -45,6 +49,7 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
   const [periods, setPeriods] = useState<UsagePeriod[]>([]);
   // The period the user asked to remove, awaiting confirmation.
   const [removing, setRemoving] = useState<UsagePeriod | null>(null);
+  const [removalError, setRemovalError] = useState<string | null>(null);
   const loadSequence = useRef(0);
 
   const loadData = useCallback(async () => {
@@ -63,12 +68,13 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
 
   const confirmRemove = async () => {
     if (!removing?.statement.id) return;
+    setRemovalError(null);
     try {
       await removeTreatmentUsage(treatmentId, removing.statement.id, patientId);
+      setRemoving(null);
     } catch (err) {
       console.error('Failed to remove treatment usage:', err);
-    } finally {
-      setRemoving(null);
+      setRemovalError('Failed to remove period. Please try again.');
     }
   };
 
@@ -97,9 +103,19 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
       confirmLabel="Remove"
       requireCountdown={false}
       onConfirm={confirmRemove}
-      onCancel={() => setRemoving(null)}
+      onCancel={() => {
+        setRemoving(null);
+        setRemovalError(null);
+      }}
       testID="treatment-usage-remove-dialog"
-    />
+    >
+      {removalError && (
+        <FormErrorBanner
+          message={removalError}
+          testID="treatment-usage-remove-error"
+        />
+      )}
+    </DeleteConfirmationModal>
   );
 
   return {
@@ -107,7 +123,10 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
     /** The screen's main button: start or resume, or stop while taking. */
     primaryAction,
     /** Asks to remove a period, after confirmation. */
-    requestRemove: setRemoving,
+    requestRemove: (period: UsagePeriod) => {
+      setRemovalError(null);
+      setRemoving(period);
+    },
     modals,
   };
 }
@@ -124,39 +143,49 @@ export function TreatmentUsageSection({
   periods: UsagePeriod[];
   onRemove: (period: UsagePeriod) => void;
 }) {
+  if (!periods.length) return null;
   return (
     <ResourceSection
       icon={USAGE_ICON}
       title="Usage"
+      count={periods.length}
       testID="treatment-usage-section"
     >
-      {[...periods].reverse().map((period) => (
-        <ResourceRow
-          key={period.statement.id}
-          testID={`treatment-usage-period-${period.statement.id}`}
-          title={period.label}
-          meta={[
-            { icon: Calendar, text: formatPeriod(period) },
-            ...(period.reason
-              ? [{ icon: MessageSquareText, text: period.reason }]
-              : []),
-            ...(period.notes ? [{ icon: FileText, text: period.notes }] : []),
-          ]}
-          accessory={
-            <TouchableOpacity
-              testID={`treatment-usage-remove-${period.statement.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove ${period.label}, ${formatPeriod(period)}`}
-              hitSlop={10}
-              style={styles.remove}
-              activeOpacity={0.6}
-              onPress={() => onRemove(period)}
-            >
-              <X size={16} color={COLORS.light.iconClear} />
-            </TouchableOpacity>
-          }
-        />
-      ))}
+      <CollapsibleList
+        items={[...periods].reverse()}
+        testID="treatment-usage-list"
+        renderItem={(period) => (
+          <ResourceRow
+            key={period.statement.id}
+            testID={`treatment-usage-period-${period.statement.id}`}
+            title={period.label}
+            meta={[
+              {
+                icon: CalendarRange,
+                text: formatUsageDuration(period.start, period.end),
+              },
+              { icon: Calendar, text: formatPeriod(period) },
+              ...(period.reason
+                ? [{ icon: MessageSquareText, text: period.reason }]
+                : []),
+              ...(period.notes ? [{ icon: FileText, text: period.notes }] : []),
+            ]}
+            accessory={
+              <TouchableOpacity
+                testID={`treatment-usage-remove-${period.statement.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${period.label}, ${formatPeriod(period)}`}
+                hitSlop={10}
+                style={styles.remove}
+                activeOpacity={0.6}
+                onPress={() => onRemove(period)}
+              >
+                <X size={16} color={COLORS.light.iconClear} />
+              </TouchableOpacity>
+            }
+          />
+        )}
+      />
     </ResourceSection>
   );
 }

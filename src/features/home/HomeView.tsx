@@ -37,7 +37,7 @@ import {
   getConsultationIdsLinkingServiceRequest,
 } from '@/src/features/service-requests/serviceRequestService';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
-import { CollapsibleList } from './CollapsibleList';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ActionWeekStrip } from '@/src/features/actions/ActionWeekStrip';
 import { getActionDays } from '@/src/features/actions/treatmentLogService';
 import {
@@ -461,6 +461,7 @@ export function HomeView() {
               <ResourceSection
                 icon={FolderPlus}
                 title="Conditions"
+                count={conditions.length}
                 testID="home-conditions-section"
               >
                 <CollapsibleList
@@ -510,6 +511,7 @@ export function HomeView() {
               <ResourceSection
                 icon={Pill}
                 title="Treatments"
+                count={treatments.length}
                 testID="home-treatments-section"
               >
                 {treatments.map((treatment) => {
@@ -546,6 +548,7 @@ export function HomeView() {
               <ResourceSection
                 icon={ClipboardList}
                 title="Service requests"
+                count={serviceRequests.length}
                 testID="home-service-requests-section"
               >
                 {serviceRequests.map((request) => {
@@ -585,6 +588,7 @@ export function HomeView() {
               <ResourceSection
                 icon={Stethoscope}
                 title="Consultations"
+                count={recentConsultations.length}
                 testID="home-consultations-section"
               >
                 <CollapsibleList

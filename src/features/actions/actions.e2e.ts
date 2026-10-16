@@ -395,7 +395,7 @@ test.describe('My actions: treatment logging', () => {
       ],
     });
     await expect(page.getByTestId('home-actions-section')).toBeVisible();
-    // Days with nothing to log show a cross.
+    // Days with nothing to log show a dot.
     await expect(
       page.getByTestId(
         `home-action-day-${await getBrowserLocalDate(page, -2)}-none`
@@ -427,3 +427,64 @@ test.describe('My actions: treatment logging', () => {
     ).toBeNull();
   });
 });
+
+for (const mode of ['answer', 'copy'] as const) {
+  test(`explains a failed journal ${mode} and allows retry after restoring the stored answer`, async ({
+    page,
+    consoleMonitor,
+  }) => {
+    await seedTestPatient(page);
+    const today = await getBrowserLocalDate(page);
+    const yesterday = await getBrowserLocalDate(page, -1);
+    await seedTestResources(page, {
+      treatments: [
+        {
+          id: 'save-failure',
+          title: 'Vitamin D',
+          status: 'active',
+          takingSince: yesterday,
+        },
+      ],
+      treatmentLogs:
+        mode === 'copy'
+          ? [{ treatmentId: 'save-failure', date: yesterday, answer: 'taken' }]
+          : [],
+    });
+    await page.goto('/journal');
+    const taken = page.getByTestId('treatment-log-taken-save-failure');
+    await expect(taken).toBeVisible();
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        `CREATE TEMP TRIGGER fail_journal_insert BEFORE INSERT ON medication_administrations BEGIN SELECT RAISE(ABORT, 'Synthetic save failure'); END;`
+      )
+    );
+    consoleMonitor.ignore(
+      mode === 'copy'
+        ? 'Failed to copy treatment logs:'
+        : 'Failed to save treatment log:'
+    );
+    const action =
+      mode === 'copy' ? page.getByTestId('actions-copy-previous-day') : taken;
+    await action.click();
+    await expect(page.getByTestId('actions-save-error')).toHaveText(
+      mode === 'copy'
+        ? 'Failed to copy treatment answers. Please try again.'
+        : 'Failed to save treatment answer. Please try again.'
+    );
+    await expect(taken).toHaveAttribute('aria-checked', 'false');
+    expect(await getTestTreatmentLog(page, `save-failure-${today}`)).toBeNull();
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'DROP TRIGGER fail_journal_insert;'
+      )
+    );
+    // Copy is a checkbox, so uncheck its failed optimistic state first.
+    if (mode === 'copy') await action.click();
+    await action.click();
+    await expect(taken).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('actions-save-error')).toHaveCount(0);
+    await expect
+      .poll(() => getTestTreatmentLog(page, `save-failure-${today}`))
+      .toMatchObject({ status: 'completed' });
+  });
+}

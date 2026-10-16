@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Copy, Pill } from 'lucide-react-native';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
@@ -69,6 +70,9 @@ function ActionsForPatient({
   const [loadedPatientId, setLoadedPatientId] = useState('');
   const [hasLoadError, setHasLoadError] = useState(false);
   const [savingKeys, setSavingKeys] = useState<string[]>([]);
+  const [saveErrorsByDate, setSaveErrorsByDate] = useState<
+    Record<string, string | undefined>
+  >({});
   // Answers copied from the previous day into each day it was checked for,
   // by item key. Each day starts unchecked.
   const [copiesByDate, setCopiesByDate] = useState<
@@ -129,6 +133,7 @@ function ActionsForPatient({
     answer: TreatmentLogAnswer | null
   ) => {
     if (!day) return;
+    setSaveErrorsByDate((current) => ({ ...current, [day.date]: undefined }));
     setSavingKeys((keys) => [...keys, item.key]);
     // Show the answer at once; the reload after saving confirms it.
     setDaysByDate((current) => ({
@@ -144,6 +149,10 @@ function ActionsForPatient({
       await setTreatmentLog(item, day.date, answer, activePatientId);
     } catch (err) {
       console.error('Failed to save treatment log:', err);
+      setSaveErrorsByDate((current) => ({
+        ...current,
+        [day.date]: 'Failed to save treatment answer. Please try again.',
+      }));
     } finally {
       setSavingKeys((keys) => keys.filter((key) => key !== item.key));
       await loadData();
@@ -163,6 +172,7 @@ function ActionsForPatient({
       changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[]
     ) => {
       if (!changes.length) return;
+      setSaveErrorsByDate((current) => ({ ...current, [date]: undefined }));
       const keys = changes.map(({ item }) => item.key);
       const answers = new Map(
         changes.map(({ item, answer }) => [item.key, answer])
@@ -183,6 +193,10 @@ function ActionsForPatient({
         await setTreatmentLogs(changes, date, activePatientId);
       } catch (err) {
         console.error('Failed to copy treatment logs:', err);
+        setSaveErrorsByDate((current) => ({
+          ...current,
+          [date]: 'Failed to copy treatment answers. Please try again.',
+        }));
       } finally {
         setSavingKeys((current) =>
           current.filter((key) => !keys.includes(key))
@@ -260,6 +274,12 @@ function ActionsForPatient({
             )
           }
         />
+        {saveErrorsByDate[selected] && (
+          <FormErrorBanner
+            message={saveErrorsByDate[selected]}
+            testID="actions-save-error"
+          />
+        )}
         {isLoading ? (
           <ActivityIndicator size="large" color={COLORS.light.primary} />
         ) : hasLoadError ? (

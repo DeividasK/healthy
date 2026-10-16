@@ -264,6 +264,7 @@ function TreatmentForPatient({
           <ResourceSection
             icon={FolderPlus}
             title="Associated Conditions"
+            count={reasonConditions.length}
             testID="treatment-reason-conditions-section"
           >
             {reasonConditions.map((condition) => (
@@ -292,6 +293,7 @@ function TreatmentForPatient({
           <ResourceSection
             icon={Stethoscope}
             title="Originating Consultation"
+            count={1}
             testID="treatment-origin-consultation"
           >
             <ConsultationRelatedRow
@@ -308,6 +310,7 @@ function TreatmentForPatient({
           <ResourceSection
             icon={Stethoscope}
             title="Linked Consultations"
+            count={linkedConsultations.length}
             testID="treatment-linked-consultations"
           >
             {linkedConsultations.map((consultation) => (

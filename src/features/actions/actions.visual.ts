@@ -91,5 +91,27 @@ test.describe('My actions - Visual Regression', () => {
     await page.getByTestId('actions-day-label').click();
     await page.getByTestId('actions-calendar-day-2026-09-29').waitFor();
     await takeSnapshot(page, 'My actions - Month calendar', testInfo);
+    await page.goto('/journal');
+    await page.getByTestId('treatment-log-taken-visual-log-cream').waitFor();
+    // Do not capture Expo's development error toast for this injected failure.
+    await page.evaluate(() => {
+      const report = console.error;
+      console.error = (...args: unknown[]) => {
+        if (args[0] !== 'Failed to save treatment log:') report(...args);
+      };
+    });
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        `CREATE TEMP TRIGGER fail_journal_insert BEFORE INSERT ON medication_administrations BEGIN SELECT RAISE(ABORT, 'Synthetic save failure'); END;`
+      )
+    );
+    await page.getByTestId('treatment-log-taken-visual-log-cream').click();
+    await page.getByTestId('actions-save-error').waitFor();
+    await takeSnapshot(page, 'My actions - Answer save failed', testInfo);
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+        'DROP TRIGGER fail_journal_insert;'
+      )
+    );
   });
 });

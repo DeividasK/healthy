@@ -95,7 +95,29 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   expect(statements[1].note).toEqual([{ text: 'Waiting for a refill' }]);
   expect((await getTestTreatment(page, treatmentId)).status).toBe('active');
   await page.reload();
-  await expect(page.getByTestId(/^treatment-usage-period-/)).toHaveCount(4);
+  const usageRows = page.getByTestId(/^treatment-usage-period-/);
+  const badge = page.getByTestId('treatment-usage-section-count');
+  const toggle = page.getByTestId('treatment-usage-list-toggle');
+  await expect(badge).toHaveText('4');
+  await expect(usageRows).toHaveCount(3);
+  await expect(usageRows.first()).toContainText('Stopped');
+  await expect(usageRows.first()).toContainText('1 day');
+  await expect(usageRows.first()).toHaveText(/Stopped.*1 day.*Since/);
+  await expect(usageRows.nth(2)).toContainText('2 days');
+  await expect(
+    page.getByTestId(`treatment-usage-period-${statements[0].id}`)
+  ).toHaveCount(0);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(usageRows).toHaveCount(4);
+  await expect(
+    page.getByTestId(`treatment-usage-period-${statements[0].id}`)
+  ).toBeVisible();
+  await expect(badge).toHaveText('4');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(usageRows).toHaveCount(3);
+  await expect(badge).toHaveText('4');
   await expect(
     page.getByTestId(`treatment-log-history-day-${dates[5]}-missing`)
   ).toBeVisible();
@@ -111,6 +133,15 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
       page.getByTestId(`treatment-log-row-${treatmentId}`)
     ).toHaveCount([1, 2, 5].includes(index) ? 1 : 0);
   }
+  // Removing a previously collapsed entry updates the total and removes the
+  // toggle when the entire list fits in the three-row preview.
+  await page.goto(viewUrl);
+  await toggle.click();
+  await page.getByTestId(`treatment-usage-remove-${statements[0].id}`).click();
+  await page.getByTestId('delete-modal-confirm-button').click();
+  await expect(usageRows).toHaveCount(3);
+  await expect(badge).toHaveText('3');
+  await expect(toggle).toHaveCount(0);
 });
 
 test('validates dates, removes optional notes and confirms removing a period', async ({
@@ -146,6 +177,10 @@ test('validates dates, removes optional notes and confirms removing a period', a
   await page.getByTestId(`treatment-usage-remove-${statements[1].id}`).click();
   await page.getByTestId('delete-modal-confirm-button').click();
   await expect(page.getByTestId('treatment-usage-stop')).toBeVisible();
+  await expect(page.getByTestId('treatment-usage-section-count')).toHaveText(
+    '1'
+  );
+  await expect(page.getByTestId('treatment-usage-list-toggle')).toHaveCount(0);
   await expect
     .poll(() => getTestTreatmentUsage(page, treatmentId))
     .toMatchObject([{ effectivePeriod: { start: yesterday } }]);
@@ -156,4 +191,39 @@ test('validates dates, removes optional notes and confirms removing a period', a
   await page.getByTestId('delete-modal-confirm-button').click();
   await expect(page.getByTestId('treatment-usage-section')).toHaveCount(0);
   await expect(page.getByTestId('treatment-usage-start')).toBeVisible();
+});
+
+test('explains a failed period removal and keeps the dialog open for retry', async ({
+  page,
+  consoleMonitor,
+}) => {
+  const today = await getBrowserLocalDate(page);
+  await seedTestResources(page, {
+    treatmentUsage: [{ treatmentId, action: 'start', date: today }],
+  });
+  await page.goto(viewUrl);
+  const [statement] = await getTestTreatmentUsage(page, treatmentId);
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+      `CREATE TEMP TRIGGER fail_usage_delete BEFORE DELETE ON medication_statements BEGIN SELECT RAISE(ABORT, 'Synthetic removal failure'); END;`
+    )
+  );
+  consoleMonitor.ignore('Failed to remove treatment usage:');
+  await page.getByTestId(`treatment-usage-remove-${statement.id}`).click();
+  await page.getByTestId('delete-modal-confirm-button').click();
+  const dialog = page.getByTestId('treatment-usage-remove-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId('treatment-usage-remove-error')).toHaveText(
+    'Failed to remove period. Please try again.'
+  );
+  expect(await getTestTreatmentUsage(page, treatmentId)).toHaveLength(1);
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+      'DROP TRIGGER fail_usage_delete;'
+    )
+  );
+  await page.getByTestId('delete-modal-confirm-button').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('treatment-usage-section')).toHaveCount(0);
+  expect(await getTestTreatmentUsage(page, treatmentId)).toHaveLength(0);
 });
