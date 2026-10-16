@@ -1,9 +1,11 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
 import { notifyDatabaseChanged } from './dbEvents';
+import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
+import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
 import { COLORS } from '@/src/theme/colors';
 
 export * from './migrations';
@@ -74,26 +76,55 @@ export interface DatabaseProviderProps {
   children: React.ReactNode;
 }
 
+function DatabaseLoading() {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: COLORS.light.background,
+      }}
+    >
+      <ActivityIndicator size="large" color={COLORS.light.primary} />
+    </View>
+  );
+}
+
 /**
  * Configured SQLiteProvider for the Healthy application.
  * Manages the SQLite database connection, PRAGMA setup, and schema migrations.
+ * On web, only one tab opens the database; others wait until it closes.
  */
 export function DatabaseProvider({ children }: DatabaseProviderProps) {
+  const [owned, setOwned] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    claimDatabaseTab().then((claimed) => {
+      if (active) setOwned((current) => current || claimed);
+    });
+    whenDatabaseTabOwned().then(() => {
+      if (active) setOwned(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (owned === null) return <DatabaseLoading />;
+  if (!owned) {
+    return (
+      <DatabaseInUseView
+        onRetry={async () => {
+          if (await claimDatabaseTab()) setOwned(true);
+        }}
+      />
+    );
+  }
+
   return (
-    <Suspense
-      fallback={
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: COLORS.light.background,
-          }}
-        >
-          <ActivityIndicator size="large" color={COLORS.light.primary} />
-        </View>
-      }
-    >
+    <Suspense fallback={<DatabaseLoading />}>
       <SQLiteProvider
         databaseName={DB_NAME}
         onInit={migrateDatabase}
@@ -123,6 +154,7 @@ export async function initializeDatabase(): Promise<SQLiteDatabase> {
 
   initPromise = (async () => {
     try {
+      await whenDatabaseTabOwned();
       const db = await openNativeDatabase(DB_NAME);
       await migrateDatabase(db);
       return db;
