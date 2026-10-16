@@ -62,6 +62,12 @@ an optional link to a same-patient Condition is `reason[0].reference`. Notes are
 `note[0]`. Intent defaults to `plan` (recommendation) and status to `unknown`.
 Further dosage entries, reasons, notes and codings are preserved on edit.
 
+`authoredOn` is when the treatment was prescribed or recommended and `status`
+is the state of that order (generally `active` or `completed`). Whether and
+when the patient actually takes it is recorded separately, as
+MedicationStatements (see Treatment usage). `effectiveDosePeriod`, the
+prescribed period, is preserved but not edited.
+
 Dosing is either free text (`dosageInstruction[0].text`) or a structured
 regimen, never both: the form offers one or the other, and the service rejects
 a save that supplies both. A regimen is a list of `Dosage` entries:
@@ -223,3 +229,82 @@ grouped requests), its indexes and its sync capture triggers. The originating
 consultation foreign key is `ON DELETE SET NULL`; deleting a patient cascades.
 `Encounter.basedOn` lives in canonical Encounter JSON and needs no column. No
 existing table or record changes; backup restore remains the recovery path.
+
+## Treatment logs
+
+The homepage's "Journal" section and the `/journal` screen record, day by
+day, whether each treatment was taken. Each answer is a FHIR R5
+`MedicationAdministration`:
+
+- `status`: `completed` when taken, `not-done` when not taken. Clearing an
+  answer deletes the resource.
+- `occurenceDateTime`: the local day, at date precision (`2026-10-16`). R5
+  spells this element `occurence[x]`.
+- `request`: the treatment's `MedicationRequest`; `medication` is copied from
+  it, because R5 requires it; `subject` is the patient.
+- One resource per treatment and day, or per scheduled dose and day for a
+  structured regimen, with the id `<treatment id>-<day>` or
+  `<treatment id>-<day>-<dosageInstruction index>`. Answers given on several
+  devices then update the same resource and sync keeps the latest. A dose's
+  log carries the dose in `dosage` (text, route, site and a simple dose
+  quantity). Updating an answer keeps fields the screen does not show.
+
+A day lists each active treatment on days a "taking" period of its usage
+covers (see Treatment usage); before it is started, while on hold and after it
+is stopped nothing is due. Free-text dosing is one row, a structured regimen
+one row per dose of the phase in effect. Phases follow each other from the
+first day it was taken, each lasting its longest course length (pauses do not
+extend them); a phase without one continues, and nothing is due after the last
+phase ends. Answers already given that day stay listed after a treatment ends
+or its regimen changes. Logs are not compared with expected frequency.
+
+Deleting a treatment or patient deletes its logs by cascade, which sync records
+as deletions. ZIP archives carry `records/medication_administration_*.json`
+envelopes, restored after treatments and before service requests. Encrypted
+sync replicates `MedicationAdministration` after `MedicationRequest`.
+
+### Migration v15
+
+v15 is additive and non-breaking: it creates `medication_administrations`
+(canonical JSON plus projected patient, treatment, status and day), its indexes
+and its sync capture triggers. The treatment and patient foreign keys cascade on
+delete. No existing table or record changes.
+
+## Treatment usage
+
+A treatment's `MedicationRequest.status` is the state of the order. Whether the
+patient actually takes it is reported with FHIR R5 `MedicationStatement`, one
+per period of use, recorded from the treatment page's main button (play to
+start or resume taking; stop, choosing on hold or stopped, while taking) and
+edited by removing periods:
+
+- `derivedFrom`: the treatment's `MedicationRequest`; `medication` is copied
+  from it and `subject` is the patient. `status` is `recorded`.
+- `adherence.code`: `taking`, `on-hold` or `stopped` from
+  `http://hl7.org/fhir/CodeSystem/medication-statement-adherence`; other codes
+  in imported data are kept, and `taking-*` codes count as taking.
+  `adherence.reason.text` (kept from imported data) and `note` (optional notes
+  added when pausing or stopping) explain why.
+- `effectivePeriod`: inclusive dates. The current period has no `end`. A change
+  on day D ends the current period on D − 1 and starts the next on D; a change
+  on the current period's first day replaces it. Dates cannot be in the future
+  or before the current period, so periods never overlap.
+- Removing a period deletes it; the period before it then runs up to the next
+  one (or stays open when the removed one was current), and neighbours in the
+  same state merge.
+
+Deleting a treatment or patient deletes its periods by cascade, which sync
+records as deletions. ZIP archives carry `records/medication_statement_*.json`
+envelopes, restored after treatments. Encrypted sync replicates
+`MedicationStatement` after `MedicationRequest`.
+
+### Migration v16
+
+v16 is additive and non-breaking: it creates `medication_statements`
+(canonical JSON plus projected patient, treatment, adherence code and dates),
+its index and its sync capture triggers. It then backfills one open `taking`
+period for each active treatment that already had a journal answer or a
+prescribed start (`effectiveDosePeriod.start`), starting on the
+earlier of the two, so those treatments stay due. Backfilled ids
+(`use-<treatment id>-backfill`) are derived from the treatment, so devices
+migrating separately converge. No existing table or record changes.

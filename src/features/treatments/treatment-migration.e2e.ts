@@ -175,3 +175,106 @@ for (const scenario of [
     ).toBeVisible();
   });
 }
+
+test('v16 backfills taking periods from the earliest log or prescribed start and captures them for sync', async ({
+  page,
+}) => {
+  await seedTestPatient(page, { id: 'migration-patient' });
+  for (const id of [
+    'logged',
+    'planned',
+    'earlier-log',
+    'earlier-plan',
+    'not-started',
+    'stopped',
+  ]) {
+    await seedTestTreatment(page, {
+      id,
+      title: id,
+      status: id === 'stopped' ? 'stopped' : 'active',
+    });
+  }
+  const before = await page.evaluate(async () => {
+    const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+    for (const id of ['logged', 'earlier-log', 'earlier-plan', 'stopped']) {
+      await b.seedTreatmentLog({
+        treatmentId: id,
+        date: '2026-10-05',
+        answer: 'taken',
+      });
+    }
+    await b.executeSql(
+      `UPDATE medication_requests SET fhir_json = json_set(fhir_json, '$.effectiveDosePeriod.start', '2026-10-07') WHERE id IN ('planned', 'earlier-log')`
+    );
+    await b.executeSql(
+      `UPDATE medication_requests SET fhir_json = json_set(fhir_json, '$.effectiveDosePeriod.start', '2026-10-01') WHERE id = 'earlier-plan'`
+    );
+    const rows = await b.querySql(
+      'SELECT id, fhir_json FROM medication_requests ORDER BY id'
+    );
+    await b.executeSql('DROP TABLE medication_statements');
+    await b.executeSql('PRAGMA user_version = 15');
+    return rows;
+  });
+  await page.reload();
+  await expect(page.getByTestId('treatment-card-logged')).toBeVisible();
+  const readMigration = () =>
+    page.evaluate(async () => {
+      const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        version: await b.querySql('PRAGMA user_version'),
+        periods: await b.querySql(
+          'SELECT id, medication_request_id, start_date, fhir_json FROM medication_statements ORDER BY medication_request_id'
+        ),
+        requests: await b.querySql(
+          'SELECT id, fhir_json FROM medication_requests ORDER BY id'
+        ),
+        dirty: await b.querySql(
+          "SELECT resource_id FROM sync_dirty WHERE resource_type = 'MedicationStatement' ORDER BY resource_id"
+        ),
+      };
+    });
+  const result = await readMigration();
+  expect(result.version[0].user_version).toBe(16);
+  expect(result.requests).toEqual(before);
+  expect(
+    result.periods.map((row: any) => [
+      row.medication_request_id,
+      row.start_date,
+    ])
+  ).toEqual([
+    ['earlier-log', '2026-10-05'],
+    ['earlier-plan', '2026-10-01'],
+    ['logged', '2026-10-05'],
+    ['planned', '2026-10-07'],
+  ]);
+  for (const row of result.periods) {
+    expect(row.id).toBe(`use-${row.medication_request_id}-backfill`);
+    expect(JSON.parse(row.fhir_json)).toMatchObject({
+      resourceType: 'MedicationStatement',
+      status: 'recorded',
+      subject: { reference: 'Patient/migration-patient' },
+      derivedFrom: [
+        { reference: `MedicationRequest/${row.medication_request_id}` },
+      ],
+      effectivePeriod: { start: row.start_date },
+      adherence: {
+        code: {
+          coding: [
+            {
+              system:
+                'http://hl7.org/fhir/CodeSystem/medication-statement-adherence',
+              code: 'taking',
+            },
+          ],
+        },
+      },
+    });
+  }
+  expect(result.dirty.map((row: any) => row.resource_id)).toEqual(
+    result.periods.map((row: any) => row.id)
+  );
+  await page.reload();
+  await expect(page.getByTestId('treatment-card-logged')).toBeVisible();
+  expect(await readMigration()).toEqual(result);
+});

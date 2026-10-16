@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Alert, Platform } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Pencil, Stethoscope, Trash2 } from 'lucide-react-native';
+import { FolderPlus, Pencil, Stethoscope } from 'lucide-react-native';
 import type { MedicationRequest, Encounter, Condition } from 'fhir/r5';
 import { getTreatmentMeta } from './TreatmentRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
@@ -26,6 +26,11 @@ import {
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { formatQuantityText, formatRegimenLines } from './regimen';
+import { TreatmentLogHistory } from '@/src/features/actions/TreatmentLogHistory';
+import {
+  TreatmentUsageSection,
+  useTreatmentUsage,
+} from '@/src/features/actions/TreatmentUsageSection';
 
 export function ViewTreatmentView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -61,6 +66,7 @@ function TreatmentForPatient({
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const usage = useTreatmentUsage(id, activePatientId);
 
   const loadSequence = useRef(0);
 
@@ -205,22 +211,21 @@ function TreatmentForPatient({
         actions={
           <ResourceActionDock
             actions={[
-              {
-                label: 'Delete treatment',
-                testID: 'delete-treatment-button',
-                icon: Trash2,
-                onPress: () => setShowDeleteModal(true),
-              },
+              // Play to start or resume taking it; stop while taking it.
+              { ...usage.primaryAction, primary: true },
               {
                 label: 'Edit treatment',
                 testID: 'edit-treatment-button',
                 icon: Pencil,
                 onPress: () => router.push(`/treatment/${id}/edit`),
-                primary: true,
               },
             ]}
+            onDelete={() => setShowDeleteModal(true)}
+            deleteLabel="Delete treatment"
+            deleteTestID="delete-treatment-button"
           />
         }
+        modal={usage.modals}
       >
         <View style={styles.details}>
           {Boolean(reasonText) && (
@@ -259,6 +264,7 @@ function TreatmentForPatient({
           <ResourceSection
             icon={FolderPlus}
             title="Associated Conditions"
+            count={reasonConditions.length}
             testID="treatment-reason-conditions-section"
           >
             {reasonConditions.map((condition) => (
@@ -272,10 +278,22 @@ function TreatmentForPatient({
           </ResourceSection>
         )}
 
+        <TreatmentUsageSection
+          periods={usage.periods}
+          onRemove={usage.requestRemove}
+        />
+
+        <TreatmentLogHistory
+          treatmentId={id}
+          patientId={activePatientId}
+          isActive={treatment.status === 'active'}
+        />
+
         {originConsultation && (
           <ResourceSection
             icon={Stethoscope}
             title="Originating Consultation"
+            count={1}
             testID="treatment-origin-consultation"
           >
             <ConsultationRelatedRow
@@ -292,6 +310,7 @@ function TreatmentForPatient({
           <ResourceSection
             icon={Stethoscope}
             title="Linked Consultations"
+            count={linkedConsultations.length}
             testID="treatment-linked-consultations"
           >
             {linkedConsultations.map((consultation) => (

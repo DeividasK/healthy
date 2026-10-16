@@ -8,6 +8,7 @@ import {
   getTestClinicalDocument,
   findTreatmentsSection,
   checkA11y,
+  getBrowserLocalDate,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Treatment Flow', () => {
@@ -31,6 +32,7 @@ test.describe('View Treatment Flow', () => {
       status: 'active',
       dosageInstructions: longInstructions,
       notes: 'Prescribed for dermatological regimen.',
+      takingSince: await getBrowserLocalDate(page, -7),
     });
 
     await page.goto(`/treatment/${treatment.id}`);
@@ -102,7 +104,7 @@ test.describe('View Treatment Flow', () => {
   });
 });
 
-test('the island ends at the primary edit button with nothing beyond it', async ({
+test('the island centers Start taking and keeps Edit available beside it', async ({
   page,
 }) => {
   await seedTestPatient(page);
@@ -110,12 +112,49 @@ test('the island ends at the primary edit button with nothing beyond it', async 
   await page.goto(`/treatment/${treatment.id}`);
   const edit = page.getByTestId('edit-treatment-button');
   await expect(edit).toBeVisible();
-  const background = page.getByTestId('action-dock-background');
+  const start = page.getByTestId('treatment-usage-start');
+  await expect(start).toBeVisible();
   await expect
     .poll(async () => {
-      const island = (await background.boundingBox())!;
-      const box = (await edit.boundingBox())!;
-      return Math.abs(island.x + island.width - (box.x + box.width));
+      const box = (await start.boundingBox())!;
+      return Math.abs(box.x + box.width / 2 - page.viewportSize()!.width / 2);
     })
     .toBeLessThan(1);
+  await expect
+    .poll(
+      async () => (await edit.boundingBox())!.x - (await start.boundingBox())!.x
+    )
+    .toBeGreaterThan(0);
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(page.getByTestId('treatment-usage-form-title')).toHaveText(
+    'Start taking: Island edge'
+  );
+});
+
+test('unstarted treatment scroll region supports keyboard access', async ({
+  page,
+}) => {
+  // Keep this known accessibility defect visible without changing app behavior
+  // in this coverage-only handoff. An unexpected pass asks us to remove fail().
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await seedTestPatient(page);
+  const treatment = await seedTestTreatment(page, {
+    title: 'Unstarted treatment',
+    status: 'active',
+    dosageInstructions: Array.from(
+      { length: 4 },
+      (_, i) => `Line ${i + 1}: Instructions for this treatment.`
+    ).join('\n\n'),
+    notes: 'Not yet started.',
+  });
+  await page.goto(`/treatment/${treatment.id}`);
+  await expect(page.getByTestId('treatment-title')).toHaveText(
+    'Unstarted treatment'
+  );
+  await expect(page.getByTestId('treatment-usage-start')).toBeVisible();
+  test.fail(
+    true,
+    'Existing scrollable-region-focusable violation when there are no taking days or related links. Application changes are outside this coverage-only task.'
+  );
+  await checkA11y(page, { include: '[data-testid="treatment-view"]' });
 });

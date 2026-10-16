@@ -100,7 +100,8 @@ export function TreatmentForm({
     initialValues?.intent || 'plan'
   );
   const [status, setStatus] = useState<MedicationRequest['status']>(
-    initialValues?.status || 'unknown'
+    // New treatments are in force once recorded; FHIR's usual status.
+    initialValues?.status || 'active'
   );
   const [authoredDate, setAuthoredDate] = useState<Date>(
     initialValues?.authoredDate || new Date()

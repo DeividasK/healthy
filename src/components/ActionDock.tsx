@@ -272,7 +272,6 @@ function ActionSlot({
   return (
     <Animated.View
       testID={displayedAction.primary ? 'action-dock-primary-slot' : undefined}
-      pointerEvents={visible && enabled ? 'auto' : 'none'}
       accessibilityElementsHidden={!visible || !enabled}
       importantForAccessibility={
         visible && enabled ? 'auto' : 'no-hide-descendants'
@@ -281,6 +280,7 @@ function ActionSlot({
       style={[
         styles.slot,
         {
+          pointerEvents: visible && enabled ? 'auto' : 'none',
           width: size,
           height: size,
           marginLeft: -size / 2,

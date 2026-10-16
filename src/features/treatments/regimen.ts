@@ -6,6 +6,7 @@ import type {
   TimingRepeat,
 } from 'fhir/r5';
 import type { NativeSelectOption } from '@/src/components/NativeSelect.types';
+import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 
 /**
  * Structured regimens map to FHIR R5 `MedicationRequest.dosageInstruction`:
@@ -607,12 +608,21 @@ export function formatDose(dosage: Dosage): string {
   const bounds = repeat?.boundsDuration;
   const boundsUnit =
     bounds?.code && isTimeUnit(bounds.code) ? TIME_UNITS[bounds.code] : null;
+  const when = repeat?.when
+    ?.map((code) => WHEN_LABELS[code]?.phrase || code)
+    .join(' and ');
+  // A time of day implies once a day: "1 tablet in the morning".
+  const isOnceDaily =
+    repeat?.frequency === 1 &&
+    !repeat.frequencyMax &&
+    (repeat.period ?? 1) === 1 &&
+    repeat.periodUnit === 'd';
   const parts = [
-    [amount, route?.toLowerCase()].filter(Boolean).join(' '),
-    repeat && formatFrequency(repeat),
-    repeat?.when
-      ?.map((code) => WHEN_LABELS[code]?.phrase || code)
-      .join(' and '),
+    when && isOnceDaily
+      ? [amount, route?.toLowerCase(), when].filter(Boolean).join(' ')
+      : [amount, route?.toLowerCase()].filter(Boolean).join(' '),
+    !(when && isOnceDaily) && repeat && formatFrequency(repeat),
+    !(when && isOnceDaily) && when,
     bounds?.value !== undefined &&
       `for ${bounds.value} ${
         boundsUnit
@@ -637,5 +647,68 @@ export function formatRegimenLines(request: MedicationRequest): string[] {
       const text = formatDose(dosages[dose.sourceIndex!]);
       return draft.phases.length > 1 ? `Phase ${index + 1}: ${text}` : text;
     })
+  );
+}
+
+/** The local day (YYYY-MM-DD) a course of `value` units starting on `start` ends. */
+function addCourse(start: string, value: number, unit: string): string | null {
+  const day = parseLocalDate(start);
+  if (unit === 'd') day.setDate(day.getDate() + value);
+  else if (unit === 'wk') day.setDate(day.getDate() + value * 7);
+  else if (unit === 'mo') day.setMonth(day.getMonth() + value);
+  else if (unit === 'a') day.setFullYear(day.getFullYear() + value);
+  else return null;
+  return formatLocalDate(day);
+}
+
+/**
+ * The structured doses scheduled on a local day, each with its index in
+ * `dosageInstruction`; null when the treatment has no structured regimen.
+ *
+ * Phases follow each other from the day taking starts, each lasting its longest
+ * course length (`timing.repeat.boundsDuration`). A phase without a course
+ * length continues indefinitely; after the last phase ends nothing is due.
+ */
+export function getScheduledDoses(
+  request: MedicationRequest,
+  date: string,
+  /** The first day of the course; defaults to `getTreatmentStart`. */
+  courseStart: string | undefined = getTreatmentStart(request)
+): { index: number; dosage: Dosage }[] | null {
+  const dosages = request.dosageInstruction || [];
+  const { phases } = getRegimenDraft(request);
+  if (!phases.length) return null;
+  let start = courseStart;
+  for (const phase of phases) {
+    const doses = phase.doses.map((dose) => ({
+      index: dose.sourceIndex!,
+      dosage: dosages[dose.sourceIndex!],
+    }));
+    if (!start) return doses;
+    let end: string | null = null;
+    for (const { dosage } of doses) {
+      const bounds = dosage.timing?.repeat?.boundsDuration;
+      if (bounds?.value === undefined) return date >= start ? doses : [];
+      const doseEnd = addCourse(start, bounds.value, bounds.code || '');
+      if (!doseEnd) return date >= start ? doses : [];
+      if (!end || doseEnd > end) end = doseEnd;
+    }
+    if (date < end!) return date >= start ? doses : [];
+    start = end!;
+  }
+  return [];
+}
+
+/**
+ * The day a treatment's prescribed course starts (YYYY-MM-DD):
+ * `effectiveDosePeriod.start` when prescribed, otherwise the day it was
+ * authored. Actual use is recorded separately as MedicationStatements.
+ */
+export function getTreatmentStart(
+  request: MedicationRequest
+): string | undefined {
+  return (request.effectiveDosePeriod?.start ?? request.authoredOn)?.slice(
+    0,
+    10
   );
 }

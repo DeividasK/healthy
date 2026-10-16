@@ -286,6 +286,7 @@ export function ViewConditionView() {
       <ResourceSection
         icon={Stethoscope}
         title="Recent Consultations"
+        count={consultations.length}
         testID="condition-consultations-section"
       >
         {consultations.map((consultation) => (
@@ -308,6 +309,7 @@ export function ViewConditionView() {
         <ResourceSection
           icon={Pill}
           title="Treatments"
+          count={treatments.length}
           testID="condition-treatments-section"
         >
           {treatments.map((treatment) => (
@@ -329,6 +331,7 @@ export function ViewConditionView() {
       <ResourceSection
         icon={ClipboardList}
         title="Service requests"
+        count={serviceRequests.length}
         testID="condition-service-request-section"
       >
         {serviceRequests.map((request) => (

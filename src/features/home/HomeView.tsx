@@ -4,6 +4,7 @@ import {
   ClipboardList,
   FileText,
   FolderPlus,
+  ListChecks,
   Pencil,
   Pill,
   Stethoscope,
@@ -36,7 +37,14 @@ import {
   getConsultationIdsLinkingServiceRequest,
 } from '@/src/features/service-requests/serviceRequestService';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
-import { CollapsibleList } from './CollapsibleList';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
+import { ActionWeekStrip } from '@/src/features/actions/ActionWeekStrip';
+import { getActionDays } from '@/src/features/actions/treatmentLogService';
+import {
+  daysEndingOn,
+  todayKey,
+  type ActionDay,
+} from '@/src/features/actions/actionDays';
 import {
   ResourceSection,
   type ResourceMeta,
@@ -116,6 +124,7 @@ export function HomeView() {
     consultationServiceRequestCounts,
     setConsultationServiceRequestCounts,
   ] = useState<Record<string, number>>({});
+  const [actionDays, setActionDays] = useState<ActionDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
@@ -172,6 +181,7 @@ export function HomeView() {
     setConsultationTreatmentCounts({});
     setServiceRequests([]);
     setConsultationServiceRequestCounts({});
+    setActionDays([]);
     setIsLoading(true);
   }
 
@@ -191,12 +201,14 @@ export function HomeView() {
         consultationsData,
         treatmentsData,
         serviceRequestsData,
+        actionDaysData,
       ] = await Promise.all([
         getAllReports(requestedPatientId),
         getAllConditions(requestedPatientId),
         getAllConsultations(requestedPatientId),
         getAllTreatments(requestedPatientId),
         getAllServiceRequests(requestedPatientId),
+        getActionDays(requestedPatientId, daysEndingOn(todayKey())),
       ]);
 
       // Counts each record once per consultation whose document lists it.
@@ -246,6 +258,7 @@ export function HomeView() {
       setConsultationTreatmentCounts(treatmentCounts);
       setServiceRequests(serviceRequestsData);
       setConsultationServiceRequestCounts(serviceRequestCounts);
+      setActionDays(actionDaysData);
     } catch (err) {
       if (
         activePatientIdRef.current === requestedPatientId &&
@@ -258,6 +271,7 @@ export function HomeView() {
         setConsultations([]);
         setTreatments([]);
         setServiceRequests([]);
+        setActionDays([]);
       }
     } finally {
       if (
@@ -282,6 +296,8 @@ export function HomeView() {
       'observations',
       'consultations',
       'medication_requests',
+      'medication_administrations',
+      'medication_statements',
       'service_requests',
       'clinical_documents',
     ],
@@ -388,11 +404,36 @@ export function HomeView() {
             style={styles.scrollList}
             contentContainerStyle={styles.scrollListContent}
           >
+            {/* Journal: the last 7 days of treatment logs */}
+            {actionDays.some((day) => day.items.length > 0) && (
+              <ResourceSection
+                icon={ListChecks}
+                title="Journal"
+                testID="home-actions-section"
+                pressLabel="Open journal"
+                pressTestID="home-actions-open"
+                onPress={() => {
+                  blurActiveElement();
+                  router.push('/journal');
+                }}
+              >
+                <ActionWeekStrip
+                  days={actionDays}
+                  today={actionDays[actionDays.length - 1].date}
+                  onOpenDay={(date) => {
+                    blurActiveElement();
+                    router.push({ pathname: '/journal', params: { date } });
+                  }}
+                />
+              </ResourceSection>
+            )}
+
             {/* Conditions Section */}
             {conditions.length > 0 && (
               <ResourceSection
                 icon={FolderPlus}
                 title="Conditions"
+                count={conditions.length}
                 testID="home-conditions-section"
               >
                 <CollapsibleList
@@ -451,6 +492,7 @@ export function HomeView() {
               <ResourceSection
                 icon={Pill}
                 title="Treatments"
+                count={treatments.length}
                 testID="home-treatments-section"
               >
                 {treatments.map((treatment) => {
@@ -487,6 +529,7 @@ export function HomeView() {
               <ResourceSection
                 icon={ClipboardList}
                 title="Service requests"
+                count={serviceRequests.length}
                 testID="home-service-requests-section"
               >
                 {serviceRequests.map((request) => {
@@ -526,6 +569,7 @@ export function HomeView() {
               <ResourceSection
                 icon={Stethoscope}
                 title="Consultations"
+                count={recentConsultations.length}
                 testID="home-consultations-section"
               >
                 <CollapsibleList

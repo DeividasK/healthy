@@ -12,7 +12,9 @@ export type DatabaseTable =
   | 'clinical_documents'
   | 'medication_requests'
   | 'organizations'
-  | 'service_requests';
+  | 'service_requests'
+  | 'medication_administrations'
+  | 'medication_statements';
 
 type Listener = (tables: DatabaseTable[]) => void;
 

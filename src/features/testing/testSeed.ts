@@ -66,6 +66,8 @@ export interface SeedTreatmentOptions {
   reasonConditionIds?: string[];
   notes?: string;
   requesterName?: string;
+  /** Records taking it from this day (YYYY-MM-DD), so the journal asks. */
+  takingSince?: string;
 }
 
 export interface SeedServiceRequestOptions {
@@ -86,6 +88,25 @@ export interface SeedServiceRequestOptions {
   requesterName?: string;
 }
 
+export interface SeedTreatmentLogOptions {
+  treatmentId: string;
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  answer: 'taken' | 'not-taken' | null;
+  /** Index in `dosageInstruction` of a scheduled dose to answer. */
+  doseIndex?: number;
+  patientId?: string;
+}
+
+export interface SeedTreatmentUsageOptions {
+  treatmentId: string;
+  action: 'start' | 'pause' | 'resume' | 'stop';
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  notes?: string;
+  patientId?: string;
+}
+
 /** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
 export async function seedTestResources(
   page: Page,
@@ -94,6 +115,8 @@ export async function seedTestResources(
     consultations?: SeedConsultationOptions[];
     treatments?: SeedTreatmentOptions[];
     serviceRequests?: SeedServiceRequestOptions[];
+    treatmentUsage?: SeedTreatmentUsageOptions[];
+    treatmentLogs?: SeedTreatmentLogOptions[];
     reports?: SeedReportOptions[];
   }
 ): Promise<void> {
@@ -109,6 +132,10 @@ export async function seedTestResources(
         await bridge.seedTreatment(input);
       for (const input of resources.serviceRequests ?? [])
         await bridge.seedServiceRequest(input);
+      for (const input of resources.treatmentUsage ?? [])
+        await bridge.seedTreatmentUsage(input);
+      for (const input of resources.treatmentLogs ?? [])
+        await bridge.seedTreatmentLog(input);
       for (const input of resources.reports ?? [])
         await bridge.seedReport(input);
     }, resources);
@@ -277,6 +304,36 @@ export async function getTestServiceRequest(
   );
 }
 
+/** Fetches a stored treatment log (MedicationAdministration) via the test bridge. */
+export async function getTestTreatmentLog(
+  page: Page,
+  id: string,
+  patientId?: string
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    async ({ logId, patId }) =>
+      await (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentLog(
+        logId,
+        patId
+      ),
+    { logId: id, patId: patientId }
+  );
+}
+
+/** Local YYYY-MM-DD of the browser's today plus `delta` days. */
+export async function getBrowserLocalDate(
+  page: Page,
+  delta = 0
+): Promise<string> {
+  return await page.evaluate((offset) => {
+    const day = new Date();
+    day.setDate(day.getDate() + offset);
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+  }, delta);
+}
+
 /** LOINC code of the consultation document section that lists service request. */
 export const SERVICE_REQUESTS_SECTION_CODE = '18776-5';
 
@@ -303,3 +360,16 @@ export const evaluateBridge = <T>(
       ),
     { source: run.toString(), arg }
   );
+
+/** A treatment's usage periods (MedicationStatements) via the test bridge. */
+export async function getTestTreatmentUsage(
+  page: Page,
+  treatmentId: string
+): Promise<any[]> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    (id) =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentUsageStatements(id),
+    treatmentId
+  );
+}

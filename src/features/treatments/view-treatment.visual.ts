@@ -5,6 +5,7 @@ import {
   seedTestCondition,
   seedTestTreatment,
   seedTestConsultation,
+  seedTestResources,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Treatment - Visual Regression', () => {
@@ -124,4 +125,55 @@ test.describe('View Treatment - Visual Regression', () => {
     await page.getByTestId('treatment-dosage').waitFor();
     await takeSnapshot(page, 'Treatment View - Regimen', testInfo);
   });
+});
+
+test('Taking and paused usage periods with removal confirmation', async ({
+  page,
+}, testInfo) => {
+  await seedTestPatient(page);
+  await seedTestResources(page, {
+    treatments: [{ id: 'usage-history', title: 'Vitamin D', status: 'active' }],
+    treatmentUsage: [
+      { treatmentId: 'usage-history', action: 'start', date: '2025-07-25' },
+      { treatmentId: 'usage-history', action: 'stop', date: '2026-09-01' },
+      { treatmentId: 'usage-history', action: 'start', date: '2026-10-01' },
+      {
+        treatmentId: 'usage-history',
+        action: 'pause',
+        date: '2026-10-04',
+        notes: 'Waiting for a refill',
+      },
+      { treatmentId: 'usage-history', action: 'resume', date: '2026-10-07' },
+    ],
+  });
+  await page.goto('/treatment/usage-history');
+  await page.getByTestId('treatment-usage-stop').waitFor();
+  await page.getByTestId('treatment-usage-section').waitFor();
+  await takeSnapshot(page, 'Treatment View - Usage periods', testInfo);
+  await page.getByTestId('treatment-usage-list-toggle').click();
+  await page.getByRole('button', { name: 'Show less', exact: true }).waitFor();
+  await takeSnapshot(page, 'Treatment View - All usage periods', testInfo);
+  await page.getByRole('button', { name: /^Remove On hold/i }).click();
+  await page.getByTestId('treatment-usage-remove-dialog').waitFor();
+  await takeSnapshot(page, 'Treatment View - Remove usage period', testInfo);
+  // Do not capture Expo's development error toast for this injected failure.
+  await page.evaluate(() => {
+    const report = console.error;
+    console.error = (...args: unknown[]) => {
+      if (args[0] !== 'Failed to remove treatment usage:') report(...args);
+    };
+  });
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+      `CREATE TEMP TRIGGER fail_usage_delete BEFORE DELETE ON medication_statements BEGIN SELECT RAISE(ABORT, 'Synthetic removal failure'); END;`
+    )
+  );
+  await page.getByTestId('delete-modal-confirm-button').click();
+  await page.getByTestId('treatment-usage-remove-error').waitFor();
+  await takeSnapshot(page, 'Treatment View - Usage removal failed', testInfo);
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+      'DROP TRIGGER fail_usage_delete;'
+    )
+  );
 });

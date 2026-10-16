@@ -628,7 +628,6 @@ function BiomarkerChart({
         ))}
         {hoveredIndex !== null && (
           <View
-            pointerEvents="none"
             testID="biomarker-tooltip"
             style={[
               styles.tooltip,
@@ -668,6 +667,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tooltip: {
+    pointerEvents: 'none',
     position: 'absolute',
     minWidth: 180,
     paddingHorizontal: 10,

@@ -1,12 +1,20 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
+import { CountBadge } from './CountBadge';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceSectionProps {
   icon: LucideIcon;
   title: string;
+  /** Total rows, including any collapsed rows. Omit for non-list sections. */
+  count?: number;
   testID?: string;
+  /** Makes the heading a button with a chevron, e.g. opening the whole section. */
+  onPress?: () => void;
+  /** Accessible name of the heading button, e.g. "Open journal". */
+  pressLabel?: string;
+  pressTestID?: string;
   children?: React.ReactNode;
 }
 
@@ -14,19 +22,49 @@ interface ResourceSectionProps {
 export function ResourceSection({
   icon: Icon,
   title,
+  count,
   testID,
+  onPress,
+  pressLabel,
+  pressTestID,
   children,
 }: ResourceSectionProps) {
   // Sections with no related resources are left out entirely.
   if (React.Children.toArray(children).length === 0) return null;
+  const heading = (
+    <>
+      <Icon size={18} color={COLORS.light.primary} />
+      <Text style={styles.title} accessibilityRole="header">
+        {title}
+      </Text>
+      {count !== undefined && (
+        <CountBadge
+          count={count}
+          accessibilityLabel={`${title}: ${count} total`}
+          testID={testID ? `${testID}-count` : undefined}
+        />
+      )}
+    </>
+  );
   return (
     <View style={[styles.section, styles.list]} testID={testID}>
-      <View style={styles.heading}>
-        <Icon size={18} color={COLORS.light.primary} />
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-      </View>
+      {onPress ? (
+        <TouchableOpacity
+          testID={pressTestID}
+          accessibilityRole="button"
+          accessibilityLabel={pressLabel ?? title}
+          style={[styles.heading, styles.pressableHeading]}
+          activeOpacity={0.6}
+          onPress={onPress}
+        >
+          {heading}
+          <View style={styles.headingChevron}>
+            <ChevronRight color={COLORS.light.muted} size={18} />
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.heading}>{heading}</View>
+      )}
       {children}
     </View>
   );
@@ -47,6 +85,11 @@ interface ResourceRowProps {
   note?: string | null;
   /** Opens the resource; without it the row shows no chevron. */
   onPress?: () => void;
+  /**
+   * Controls at the end of the row, e.g. log buttons, shown instead of the
+   * chevron. With `onPress`, only the title and meta open the resource.
+   */
+  accessory?: React.ReactNode;
   /** Accessible name of the open button, e.g. "View condition: Migraine". */
   accessibilityLabel?: string;
   /** Test ID of the pressable row (or of the plain row when it cannot be opened). */
@@ -89,9 +132,28 @@ export function ResourceRow({
   meta = [],
   note,
   onPress,
+  accessory,
   accessibilityLabel,
   testID,
 }: ResourceRowProps) {
+  if (onPress && accessory) {
+    return (
+      <View style={styles.row} testID={testID}>
+        <TouchableOpacity
+          testID={`${testID}-open`}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          style={[styles.main, styles.mainPressable]}
+          activeOpacity={0.6}
+          onPress={onPress}
+        >
+          <Text style={styles.rowTitle}>{title}</Text>
+          <ResourceMetaLine meta={meta} />
+        </TouchableOpacity>
+        {accessory}
+      </View>
+    );
+  }
   const content = (
     <>
       <View style={styles.row} testID={onPress ? `${testID}-row` : testID}>
@@ -99,10 +161,12 @@ export function ResourceRow({
           <Text style={styles.rowTitle}>{title}</Text>
           <ResourceMetaLine meta={meta} />
         </View>
-        {onPress && (
+        {onPress ? (
           <View style={styles.chevron}>
             <ChevronRight color={COLORS.light.muted} size={18} />
           </View>
+        ) : (
+          accessory
         )}
       </View>
       {note && <Text style={styles.note}>&quot;{note}&quot;</Text>}
@@ -142,6 +206,16 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+  // Spans the section, so tapping anywhere on the heading line opens it.
+  pressableHeading: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  // Lines up with the chevrons of resource rows.
+  headingChevron: {
+    marginLeft: 'auto',
+    marginRight: 0,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
@@ -172,6 +246,11 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
     gap: 5,
+  },
+  // Fills the row's height, so the whole area beside the controls opens it.
+  mainPressable: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
   },
   rowTitle: {
     fontSize: 14,

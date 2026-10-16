@@ -254,6 +254,7 @@ function ServiceRequestForPatient({
       <ResourceSection
         icon={FolderPlus}
         title="Associated Conditions"
+        count={related.conditions.length}
         testID="service-request-reason-conditions-section"
       >
         {related.conditions.map((condition) => (
@@ -269,6 +270,7 @@ function ServiceRequestForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Originating Consultation"
+        count={related.origin ? 1 : 0}
         testID="service-request-origin-consultation"
       >
         {related.origin && (
@@ -283,6 +285,7 @@ function ServiceRequestForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Linked Consultations"
+        count={related.linked.length}
         testID="service-request-linked-consultations"
       >
         {related.linked.map((consultation) => (
@@ -298,6 +301,7 @@ function ServiceRequestForPatient({
       <ResourceSection
         icon={Stethoscope}
         title="Visits Based on This"
+        count={related.basedOn.length}
         testID="service-request-based-on-consultations"
       >
         {related.basedOn.map((consultation) => (

@@ -437,8 +437,8 @@ test.describe('Treatment form keyboard support', () => {
     await page.goto(`/treatment/${id}`);
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       [
-        'Phase 1: 2 tablets oral, once a day, in the morning, for 7 days',
-        'Phase 1: 1 tablet oral, once a day, in the evening, for 7 days',
+        'Phase 1: 2 tablets oral in the morning, for 7 days',
+        'Phase 1: 1 tablet oral in the evening, for 7 days',
         'Phase 2: 1 tablet, 1–2 times a day',
       ].join('\n')
     );

@@ -27,6 +27,10 @@ export interface DeleteConfirmationModalProps {
   onConfirm: (options?: { deleteFromCloud?: boolean }) => void | Promise<void>;
   onCancel: () => void;
   testID?: string;
+  /** Fields shown below the message, e.g. a date for a confirmed change. */
+  children?: React.ReactNode;
+  /** `primary` for confirmations that change rather than delete data. */
+  confirmTone?: 'destructive' | 'primary';
 }
 
 interface DeleteConfirmationModalContentProps {
@@ -42,6 +46,8 @@ interface DeleteConfirmationModalContentProps {
   onConfirm: (options?: { deleteFromCloud?: boolean }) => void | Promise<void>;
   onCancel: () => void;
   testID: string;
+  children?: React.ReactNode;
+  confirmTone: 'destructive' | 'primary';
 }
 
 function DeleteConfirmationModalContent({
@@ -57,6 +63,8 @@ function DeleteConfirmationModalContent({
   onConfirm,
   onCancel,
   testID,
+  children,
+  confirmTone,
 }: DeleteConfirmationModalContentProps) {
   const [countdown, setCountdown] = useState(
     requireCountdown ? countdownDuration : 0
@@ -95,7 +103,8 @@ function DeleteConfirmationModalContent({
         onPress={(e) => e.stopPropagation?.()}
       >
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
+        {Boolean(message) && <Text style={styles.message}>{message}</Text>}
+        {children}
 
         {showCloudDeleteOption && (
           <TouchableOpacity
@@ -138,13 +147,19 @@ function DeleteConfirmationModalContent({
             accessibilityRole="button"
             style={[
               styles.deleteButton,
+              confirmTone === 'primary' && styles.primaryButton,
               isDeleteDisabled && styles.deleteButtonDisabled,
             ]}
             disabled={isDeleteDisabled}
             onPress={() => onConfirm({ deleteFromCloud })}
             activeOpacity={0.8}
           >
-            <Text style={styles.deleteButtonText}>
+            <Text
+              style={[
+                styles.deleteButtonText,
+                confirmTone === 'primary' && styles.primaryButtonText,
+              ]}
+            >
               {countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel}
             </Text>
           </TouchableOpacity>
@@ -168,6 +183,8 @@ export function DeleteConfirmationModal({
   onConfirm,
   onCancel,
   testID = 'delete-confirmation-modal',
+  children,
+  confirmTone = 'destructive',
 }: DeleteConfirmationModalProps) {
   if (!visible) return null;
 
@@ -192,7 +209,10 @@ export function DeleteConfirmationModal({
         onConfirm={onConfirm}
         onCancel={onCancel}
         testID={testID}
-      />
+        confirmTone={confirmTone}
+      >
+        {children}
+      </DeleteConfirmationModalContent>
     </Modal>
   );
 }
@@ -291,6 +311,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 100,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.light.primary,
+  },
+  primaryButtonText: {
+    color: COLORS.light.primaryForeground,
   },
   deleteButtonDisabled: {
     opacity: 0.45,

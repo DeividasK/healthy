@@ -241,6 +241,13 @@ export function ViewConsultationView() {
         <ResourceSection
           icon={FolderPlus}
           title="Reasons for visit"
+          count={
+            relatedConditions.filter((condition) =>
+              getConsultationReasonConditionIds(consultation).includes(
+                condition.id!
+              )
+            ).length
+          }
           testID="consultation-reasons"
         >
           {relatedConditions
@@ -266,6 +273,7 @@ export function ViewConsultationView() {
       <ResourceSection
         icon={ClipboardList}
         title="Based on"
+        count={basedOn.length}
         testID="consultation-based-on"
       >
         {basedOn.map((request) => (
@@ -330,6 +338,7 @@ export function ViewConsultationView() {
       <ResourceSection
         icon={ClipboardList}
         title="Service requests"
+        count={serviceRequests.length}
         testID="consultation-service-request"
       >
         {serviceRequests.map((request) => (
