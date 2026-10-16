@@ -22,6 +22,8 @@ import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { getActionDays } from './treatmentLogService';
 import { fetchFirstAdministrationDate } from './medicationAdministrationsRepository';
+import { getTreatmentUsage } from './treatmentUsageService';
+import { getFirstTakingDay } from './treatmentUsage';
 import {
   addMonths,
   formatLongDate,
@@ -58,14 +60,11 @@ export function TreatmentLogHistory({
   treatmentId,
   patientId,
   isActive,
-  startDate,
 }: {
   treatmentId: string;
   patientId: string;
   /** Active treatments always show it; others only with answers in view. */
   isActive: boolean;
-  /** When the treatment started (`authoredOn`), if known. */
-  startDate?: string;
 }) {
   const router = useRouter();
   const today = todayKey();
@@ -108,17 +107,9 @@ export function TreatmentLogHistory({
     });
   };
   const isCurrent = lastMonth >= today.slice(0, 7);
-  const [firstLogDate, setFirstLogDate] = useState<string | null>(null);
-  // Months before the first one with anything due or logged hold no history.
-  // An active treatment without a start date was always due.
-  const firstDate = [
-    isActive ? startDate?.slice(0, 10) : undefined,
-    firstLogDate ?? undefined,
-  ]
-    .filter((date): date is string => Boolean(date))
-    .sort()[0];
-  const isFirst =
-    !(isActive && !startDate) && months[0] <= (firstDate ?? today).slice(0, 7);
+  // The first day taken or logged; months before it hold no history.
+  const [firstDate, setFirstDate] = useState<string | null>(null);
+  const isFirst = months[0] <= (firstDate ?? today).slice(0, 7);
 
   const loadData = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -130,12 +121,17 @@ export function TreatmentLogHistory({
       .flat()
       .filter((date): date is string => date !== null && date <= now);
     try {
-      const [days, firstLog] = await Promise.all([
+      const [days, firstLog, periods] = await Promise.all([
         getActionDays(patientId, dates),
         fetchFirstAdministrationDate(patientId, treatmentId),
+        getTreatmentUsage(patientId, treatmentId),
       ]);
       if (sequence !== loadSequence.current) return;
-      setFirstLogDate(firstLog);
+      setFirstDate(
+        [firstLog, getFirstTakingDay(periods)]
+          .filter((date): date is string => Boolean(date))
+          .sort()[0] ?? null
+      );
       setDaysByDate((current) => {
         const next = { ...current };
         for (const day of days) next[day.date] = day;
@@ -148,7 +144,11 @@ export function TreatmentLogHistory({
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['medication_requests', 'medication_administrations'],
+    [
+      'medication_requests',
+      'medication_administrations',
+      'medication_statements',
+    ],
     loadData
   );
 

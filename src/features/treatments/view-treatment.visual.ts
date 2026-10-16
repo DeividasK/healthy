@@ -5,6 +5,7 @@ import {
   seedTestCondition,
   seedTestTreatment,
   seedTestConsultation,
+  seedTestResources,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Treatment - Visual Regression', () => {
@@ -124,4 +125,30 @@ test.describe('View Treatment - Visual Regression', () => {
     await page.getByTestId('treatment-dosage').waitFor();
     await takeSnapshot(page, 'Treatment View - Regimen', testInfo);
   });
+});
+
+test('Taking and paused usage periods with removal confirmation', async ({
+  page,
+}, testInfo) => {
+  await seedTestPatient(page);
+  await seedTestResources(page, {
+    treatments: [{ id: 'usage-history', title: 'Vitamin D', status: 'active' }],
+    treatmentUsage: [
+      { treatmentId: 'usage-history', action: 'start', date: '2026-10-01' },
+      {
+        treatmentId: 'usage-history',
+        action: 'pause',
+        date: '2026-10-04',
+        notes: 'Waiting for a refill',
+      },
+      { treatmentId: 'usage-history', action: 'resume', date: '2026-10-07' },
+    ],
+  });
+  await page.goto('/treatment/usage-history');
+  await page.getByTestId('treatment-usage-stop').waitFor();
+  await page.getByTestId('treatment-usage-section').waitFor();
+  await takeSnapshot(page, 'Treatment View - Usage periods', testInfo);
+  await page.getByRole('button', { name: /^Remove On hold/i }).click();
+  await page.getByTestId('treatment-usage-remove-dialog').waitFor();
+  await takeSnapshot(page, 'Treatment View - Remove usage period', testInfo);
 });

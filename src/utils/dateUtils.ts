@@ -64,3 +64,10 @@ export function formatDisplayDateTime(dateStr: string): string {
     return dateStr;
   }
 }
+
+/** The local day `delta` days after `date` (YYYY-MM-DD). */
+export function addDays(date: string, delta: number): string {
+  const day = parseLocalDate(date);
+  day.setDate(day.getDate() + delta);
+  return formatLocalDate(day);
+}

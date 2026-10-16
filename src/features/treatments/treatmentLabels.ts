@@ -29,12 +29,16 @@ const STATUS_LABELS: Record<Status, string> = {
 
 /** Intents offered when creating a treatment; others remain editable. */
 const OFFERED_INTENTS: Intent[] = ['plan', 'order'];
+/**
+ * Statuses a user can choose. `unknown` is reserved for imported records whose
+ * status was not stated; such a record still shows it as its current value.
+ */
 const OFFERED_STATUSES: Status[] = [
   'active',
-  'completed',
   'on-hold',
+  'completed',
+  'stopped',
   'cancelled',
-  'unknown',
 ];
 
 /** Display label for a MedicationRequest intent code. */

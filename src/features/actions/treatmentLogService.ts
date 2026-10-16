@@ -2,6 +2,7 @@ import type { MedicationAdministration } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { getAllTreatments } from '@/src/features/treatments/treatmentService';
+import { fetchMedicationStatements } from './medicationStatementsRepository';
 import {
   deleteMedicationAdministrationRecord,
   fetchMedicationAdministrationsInRange,
@@ -21,15 +22,18 @@ export async function getActionDays(
 ): Promise<ActionDay[]> {
   if (!dates.length) return [];
   const sorted = [...dates].sort();
-  const [treatments, administrations] = await Promise.all([
+  const [treatments, administrations, statements] = await Promise.all([
     getAllTreatments(patientId),
     fetchMedicationAdministrationsInRange(
       patientId,
       sorted[0],
       sorted[sorted.length - 1]
     ),
+    fetchMedicationStatements(patientId),
   ]);
-  return dates.map((date) => buildActionDay(date, treatments, administrations));
+  return dates.map((date) =>
+    buildActionDay(date, treatments, administrations, statements)
+  );
 }
 
 /**

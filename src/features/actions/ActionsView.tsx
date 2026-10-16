@@ -111,7 +111,11 @@ function ActionsForPatient({
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['medication_requests', 'medication_administrations'],
+    [
+      'medication_requests',
+      'medication_administrations',
+      'medication_statements',
+    ],
     loadData
   );
 

@@ -329,7 +329,8 @@ export async function deleteMedicationRequestRecord(
     if (!result.changes) return;
 
     // Deletion and reference cleanup must commit together. The treatment's
-    // logs (MedicationAdministrations) go with it by cascade.
+    // logs (MedicationAdministrations) and usage periods (MedicationStatements)
+    // go with it by cascade.
     await removeEntryFromAllDocuments(db, `MedicationRequest/${id}`);
 
     didDelete = true;
@@ -343,6 +344,7 @@ export async function deleteMedicationRequestRecord(
       notifyDatabaseChanged([
         'medication_requests',
         'medication_administrations',
+        'medication_statements',
         'clinical_documents',
       ]);
     }

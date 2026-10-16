@@ -66,6 +66,8 @@ export interface SeedTreatmentOptions {
   reasonConditionIds?: string[];
   notes?: string;
   requesterName?: string;
+  /** Records taking it from this day (YYYY-MM-DD), so the journal asks. */
+  takingSince?: string;
 }
 
 export interface SeedServiceRequestOptions {
@@ -96,6 +98,15 @@ export interface SeedTreatmentLogOptions {
   patientId?: string;
 }
 
+export interface SeedTreatmentUsageOptions {
+  treatmentId: string;
+  action: 'start' | 'pause' | 'resume' | 'stop';
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  notes?: string;
+  patientId?: string;
+}
+
 /** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
 export async function seedTestResources(
   page: Page,
@@ -104,6 +115,7 @@ export async function seedTestResources(
     consultations?: SeedConsultationOptions[];
     treatments?: SeedTreatmentOptions[];
     serviceRequests?: SeedServiceRequestOptions[];
+    treatmentUsage?: SeedTreatmentUsageOptions[];
     treatmentLogs?: SeedTreatmentLogOptions[];
     reports?: SeedReportOptions[];
   }
@@ -120,6 +132,8 @@ export async function seedTestResources(
         await bridge.seedTreatment(input);
       for (const input of resources.serviceRequests ?? [])
         await bridge.seedServiceRequest(input);
+      for (const input of resources.treatmentUsage ?? [])
+        await bridge.seedTreatmentUsage(input);
       for (const input of resources.treatmentLogs ?? [])
         await bridge.seedTreatmentLog(input);
       for (const input of resources.reports ?? [])
@@ -346,3 +360,16 @@ export const evaluateBridge = <T>(
       ),
     { source: run.toString(), arg }
   );
+
+/** A treatment's usage periods (MedicationStatements) via the test bridge. */
+export async function getTestTreatmentUsage(
+  page: Page,
+  treatmentId: string
+): Promise<any[]> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    (id) =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentUsageStatements(id),
+    treatmentId
+  );
+}

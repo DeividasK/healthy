@@ -26,12 +26,14 @@ test.describe('My actions: treatment logging', () => {
           title: 'Vitamin D',
           status: 'active',
           authoredOn: started,
+          takingSince: started,
         },
         {
           id: 'log-iron',
           title: 'Iron',
           status: 'active',
           authoredOn: started,
+          takingSince: started,
         },
       ],
     });
@@ -151,6 +153,7 @@ test.describe('My actions: treatment logging', () => {
           title: 'Metformin 500mg',
           status: 'active',
           authoredOn: await getBrowserLocalDate(page, -3),
+          takingSince: await getBrowserLocalDate(page, -3),
           regimen: {
             phases: [{ doses: [timedDose('MORN'), timedDose('EVE')] }],
           },
@@ -197,8 +200,20 @@ test.describe('My actions: treatment logging', () => {
     const started = await getBrowserLocalDate(page, -5);
     await seedTestResources(page, {
       treatments: [
-        { id: 'copy-a', title: 'A', status: 'active', authoredOn: started },
-        { id: 'copy-b', title: 'B', status: 'active', authoredOn: started },
+        {
+          id: 'copy-a',
+          title: 'A',
+          status: 'active',
+          authoredOn: started,
+          takingSince: started,
+        },
+        {
+          id: 'copy-b',
+          title: 'B',
+          status: 'active',
+          authoredOn: started,
+          takingSince: started,
+        },
       ],
       treatmentLogs: [
         { treatmentId: 'copy-a', date: yesterday, answer: 'taken' },
@@ -242,7 +257,7 @@ test.describe('My actions: treatment logging', () => {
     ).toBeVisible();
   });
 
-  test('pages through weeks by swiping, arrows and the date picker', async ({
+  test('pages through weeks by swiping, arrows and the calendar', async ({
     page,
   }) => {
     const today = await getBrowserLocalDate(page);
@@ -257,6 +272,7 @@ test.describe('My actions: treatment logging', () => {
           title: 'Paged',
           status: 'active',
           authoredOn: await getBrowserLocalDate(page, -60),
+          takingSince: await getBrowserLocalDate(page, -60),
         },
       ],
     });
@@ -329,11 +345,21 @@ test.describe('My actions: treatment logging', () => {
       // Scroll offsets are whole pixels.
       .toBeLessThanOrEqual(1);
 
-    // The day label opens a date picker for any earlier day.
-    await page
-      .getByTestId('actions-day-label')
-      .locator('input[type="date"]')
-      .fill(picked);
+    // The day label now opens the journal's month calendar.
+    await page.getByTestId('actions-day-label').click();
+    await expect(page.getByTestId('actions-calendar')).toBeVisible();
+    const selectedDate = await getBrowserLocalDate(page, -9);
+    const monthIndex = (date: string) =>
+      Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7));
+    for (
+      let month = monthIndex(selectedDate);
+      month > monthIndex(picked);
+      month--
+    ) {
+      await page.getByTestId('actions-calendar-previous-month').click();
+    }
+    await page.getByTestId(`actions-calendar-day-${picked}`).click();
+    await expect(page.getByTestId('actions-calendar')).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`date=${picked}`));
     await expect(page.getByTestId(`actions-day-${picked}`)).toBeInViewport();
     await expect(
@@ -361,6 +387,7 @@ test.describe('My actions: treatment logging', () => {
           title: 'Started today',
           status: 'active',
           authoredOn: today,
+          takingSince: today,
         },
       ],
       treatmentLogs: [

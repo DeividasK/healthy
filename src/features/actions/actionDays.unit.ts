@@ -12,6 +12,7 @@ import {
   getStripEnd,
   isDayComplete,
 } from './actionDays';
+import { buildUsageStatement } from './treatmentUsage';
 
 const treatment = (
   id: string,
@@ -64,29 +65,59 @@ test('the strip centres the selected day until it reaches today', () => {
   expect(daysEndingOn(getStripEnd('2026-09-29', today))[3]).toBe('2026-09-29');
 });
 
-test('a day lists active treatments started by then and any answered one', () => {
+/** A "taking" usage period for a treatment, from `start` to `end`. */
+const taking = (id: string, start: string, end?: string) => {
+  const statement = buildUsageStatement(
+    treatment(id, 'active'),
+    'p1',
+    'taking',
+    start,
+    `use-${id}-${start}`
+  );
+  if (end) statement.effectivePeriod = { start, end };
+  return statement;
+};
+
+test('a day lists active treatments being taken and any answered one', () => {
   const treatments = [
     treatment('active', 'active', '2026-10-01'),
-    treatment('undated', 'active'),
-    treatment('later', 'active', '2026-10-06T09:00:00+03:00'),
+    treatment('also-active', 'active'),
+    treatment('not-started', 'active', '2026-09-01'),
+    treatment('later', 'active', '2026-10-01'),
+    treatment('paused', 'active', '2026-10-01'),
     treatment('stopped', 'stopped', '2026-09-01'),
     treatment('stopped-logged', 'stopped', '2026-09-01'),
   ];
-  const day = buildActionDay('2026-10-05', treatments, [
-    log('stopped-logged', '2026-10-05', 'completed'),
-    log('active', '2026-10-04', 'completed'),
-    log('undated', '2026-10-05', 'not-done'),
-  ]);
+  const statements = [
+    taking('active', '2026-10-01'),
+    taking('also-active', '2026-10-05'),
+    taking('later', '2026-10-06'),
+    taking('paused', '2026-10-01', '2026-10-04'),
+    taking('stopped', '2026-09-01'),
+  ];
+  const day = buildActionDay(
+    '2026-10-05',
+    treatments,
+    [
+      log('stopped-logged', '2026-10-05', 'completed'),
+      log('active', '2026-10-04', 'completed'),
+      log('also-active', '2026-10-05', 'not-done'),
+    ],
+    statements
+  );
   expect(day.items.map(({ rowId, answer }) => [rowId, answer])).toEqual([
     ['active', null],
-    ['undated', 'not-taken'],
+    ['also-active', 'not-taken'],
     ['stopped-logged-2026-10-05', 'taken'],
   ]);
   expect(isDayComplete(day)).toBe(false);
 
-  const answered = buildActionDay('2026-10-05', treatments.slice(1, 2), [
-    log('undated', '2026-10-05', 'not-done'),
-  ]);
+  const answered = buildActionDay(
+    '2026-10-05',
+    treatments.slice(1, 2),
+    [log('also-active', '2026-10-05', 'not-done')],
+    statements
+  );
   expect(isDayComplete(answered)).toBe(true);
   expect(isDayComplete(buildActionDay('2026-10-05', [], []))).toBe(false);
 });
@@ -117,11 +148,9 @@ test('a structured regimen lists one row per dose of the current phase', () => {
     ],
   };
   const rows = (date: string, logs: MedicationAdministration[] = []) =>
-    buildActionDay(date, [regimen], logs).items.map((item) => [
-      item.rowId,
-      item.dose?.text,
-      item.answer,
-    ]);
+    buildActionDay(date, [regimen], logs, [
+      taking('regimen', '2026-10-01'),
+    ]).items.map((item) => [item.rowId, item.dose?.text, item.answer]);
 
   expect(
     rows('2026-10-07', [

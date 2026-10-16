@@ -22,7 +22,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   await seedTestCondition(page, { title: 'Integrity condition' });
   await page.goto('/treatment/add');
   await expect(page.getByTestId('treatment-status-select')).toHaveValue(
-    'unknown'
+    'active'
   );
   const addField = async (field: string) => {
     await page.getByTestId('add-option-button').click();
@@ -78,7 +78,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   expect(saved.note).toBeUndefined();
   expect(saved.dosageInstruction).toBeUndefined();
   expect(saved.requester).toBeUndefined();
-  expect(saved.status).toBe('unknown');
+  expect(saved.status).toBe('active');
 });
 
 test('editing imported requests preserves nested FHIR data and date-time precision', async ({

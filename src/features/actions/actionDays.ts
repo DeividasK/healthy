@@ -2,12 +2,22 @@ import type {
   Dosage,
   MedicationAdministration,
   MedicationRequest,
+  MedicationStatement,
 } from 'fhir/r5';
-import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
+import {
+  addDays,
+  formatLocalDate,
+  parseLocalDate,
+} from '@/src/utils/dateUtils';
 import {
   formatDose,
   getScheduledDoses,
 } from '@/src/features/treatments/regimen';
+import {
+  getFirstTakingDay,
+  getUsagePeriods,
+  isTakingOn,
+} from './treatmentUsage';
 
 /** How many days the homepage and the actions view show at once. */
 export const ACTION_WINDOW_DAYS = 7;
@@ -61,12 +71,7 @@ export function getAdministrationRequestId(
 
 export const todayKey = (now = new Date()) => formatLocalDate(now);
 
-/** The local day `delta` days after `date` (YYYY-MM-DD). */
-export function addDays(date: string, delta: number): string {
-  const day = parseLocalDate(date);
-  day.setDate(day.getDate() + delta);
-  return formatLocalDate(day);
-}
+export { addDays };
 
 /** `count` consecutive days ending on `end`, oldest first. */
 export function daysEndingOn(
@@ -104,14 +109,16 @@ export const getAnswer = (
       : null;
 
 /**
- * What to answer on a day: each active treatment started on or before it,
+ * What to answer on a day: each active treatment being taken that day (a
+ * "taking" MedicationStatement period covers it),
  * one row per dose scheduled that day for structured regimens. Answers given
  * that day stay listed even after a treatment ends or its regimen changes.
  */
 export function buildActionDay(
   date: string,
   treatments: MedicationRequest[],
-  administrations: MedicationAdministration[]
+  administrations: MedicationAdministration[],
+  statements: MedicationStatement[] = []
 ): ActionDay {
   const logs = administrations.filter(
     (administration) =>
@@ -133,11 +140,17 @@ export function buildActionDay(
       if (log) unused.delete(log);
       return log;
     };
-    const isDue =
-      treatment.status === 'active' &&
-      (!treatment.authoredOn || treatment.authoredOn.slice(0, 10) <= date);
+    // Due on days it is being taken (MedicationStatement periods), while the
+    // prescription is active.
+    const periods = getUsagePeriods(statements, id);
+    const isDue = treatment.status === 'active' && isTakingOn(periods, date);
     if (isDue) {
-      const doses = getScheduledDoses(treatment, date);
+      // Regimen phases count from the first day it was taken.
+      const doses = getScheduledDoses(
+        treatment,
+        date,
+        getFirstTakingDay(periods)
+      );
       if (doses === null) {
         const key = getTreatmentLogId(id, date);
         const log = take(key, true);

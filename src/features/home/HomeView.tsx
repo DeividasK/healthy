@@ -301,6 +301,7 @@ export function HomeView() {
       'consultations',
       'medication_requests',
       'medication_administrations',
+      'medication_statements',
       'service_requests',
       'clinical_documents',
     ],

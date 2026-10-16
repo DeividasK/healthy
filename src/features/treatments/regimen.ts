@@ -665,18 +665,20 @@ function addCourse(start: string, value: number, unit: string): string | null {
  * The structured doses scheduled on a local day, each with its index in
  * `dosageInstruction`; null when the treatment has no structured regimen.
  *
- * Phases follow each other from the authored date, each lasting its longest
+ * Phases follow each other from the day taking starts, each lasting its longest
  * course length (`timing.repeat.boundsDuration`). A phase without a course
  * length continues indefinitely; after the last phase ends nothing is due.
  */
 export function getScheduledDoses(
   request: MedicationRequest,
-  date: string
+  date: string,
+  /** The first day of the course; defaults to `getTreatmentStart`. */
+  courseStart: string | undefined = getTreatmentStart(request)
 ): { index: number; dosage: Dosage }[] | null {
   const dosages = request.dosageInstruction || [];
   const { phases } = getRegimenDraft(request);
   if (!phases.length) return null;
-  let start = request.authoredOn?.slice(0, 10);
+  let start = courseStart;
   for (const phase of phases) {
     const doses = phase.doses.map((dose) => ({
       index: dose.sourceIndex!,
@@ -695,4 +697,18 @@ export function getScheduledDoses(
     start = end!;
   }
   return [];
+}
+
+/**
+ * The day a treatment's prescribed course starts (YYYY-MM-DD):
+ * `effectiveDosePeriod.start` when prescribed, otherwise the day it was
+ * authored. Actual use is recorded separately as MedicationStatements.
+ */
+export function getTreatmentStart(
+  request: MedicationRequest
+): string | undefined {
+  return (request.effectiveDosePeriod?.start ?? request.authoredOn)?.slice(
+    0,
+    10
+  );
 }

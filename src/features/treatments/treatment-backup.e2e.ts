@@ -8,6 +8,8 @@ import {
   connectTestSync,
   syncTestDevice,
   driveContents,
+  seedTestResources,
+  getTestTreatmentUsage,
 } from '@/src/features/testing/testStorage';
 
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
@@ -77,6 +79,19 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       });
       return await b.getTreatmentLog('backed-up-treatment-2026-10-07');
     });
+    await seedTestResources(page, {
+      treatmentUsage: [
+        { treatmentId: original.id, action: 'start', date: '2026-10-01' },
+        {
+          treatmentId: original.id,
+          action: 'pause',
+          date: '2026-10-04',
+          notes: 'Waiting for refill',
+        },
+        { treatmentId: original.id, action: 'resume', date: '2026-10-06' },
+      ],
+    });
+    const usage = await getTestTreatmentUsage(page, original.id);
     let archive: number[] = [];
     if (transport === 'ZIP') {
       const download = page.waitForEvent('download');
@@ -98,6 +113,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         else await b.syncAllProfiles();
         return {
           request: await b.getTreatment('backed-up-treatment'),
+          usage: await b.getTreatmentUsageStatements('backed-up-treatment'),
           log: await b.getTreatmentLog('backed-up-treatment-2026-10-07'),
           clearedLog: await b.getTreatmentLog('backed-up-treatment-2026-10-08'),
           document: await b.getClinicalDocumentByConsultationId(
@@ -108,6 +124,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       { transport, archive }
     );
     expect(restored.request).toEqual(original);
+    expect(restored.usage).toEqual(usage);
     expect(restored.log).toEqual(log);
     expect(restored.log).toMatchObject({
       resourceType: 'MedicationAdministration',

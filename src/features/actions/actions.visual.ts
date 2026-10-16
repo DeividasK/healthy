@@ -12,18 +12,21 @@ const treatments = [
     title: 'Vitamin D 1000 IU',
     status: 'active' as const,
     authoredOn: '2026-09-20',
+    takingSince: '2026-09-20',
   },
   {
     id: 'visual-log-iron',
     title: 'Ferrous sulfate 200mg',
     status: 'active' as const,
     authoredOn: '2026-09-20',
+    takingSince: '2026-09-20',
   },
   {
     id: 'visual-log-cream',
     title: 'Hydrocortisone cream',
     status: 'active' as const,
     authoredOn: '2026-09-20',
+    takingSince: '2026-09-20',
   },
 ];
 const fullDay = (date: string) =>
@@ -85,5 +88,8 @@ test.describe('My actions - Visual Regression', () => {
     await page.getByTestId('actions-day-2026-09-26').waitFor();
     await page.getByTestId('treatment-log-row-visual-log-cream').waitFor();
     await takeSnapshot(page, 'My actions - Centred older day', testInfo);
+    await page.getByTestId('actions-day-label').click();
+    await page.getByTestId('actions-calendar-day-2026-09-29').waitFor();
+    await takeSnapshot(page, 'My actions - Month calendar', testInfo);
   });
 });

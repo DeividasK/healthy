@@ -66,6 +66,9 @@ import {
   getTreatmentLogId,
   type TreatmentLogAnswer,
 } from '@/src/features/actions/actionDays';
+import { changeTreatmentUsage } from '@/src/features/actions/treatmentUsageService';
+import { fetchMedicationStatements } from '@/src/features/actions/medicationStatementsRepository';
+import type { UsageAction } from '@/src/features/actions/treatmentUsage';
 import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
 import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
@@ -373,10 +376,12 @@ export function setupTestBridge() {
     seedTreatment: async (
       input: Omit<TreatmentInput, 'authoredDate'> & {
         authoredOn?: string;
+        /** Records taking it from this day (YYYY-MM-DD). */
+        takingSince?: string;
       }
     ) => {
       const patientId = await resolvePatientId(input.patientId);
-      return await createOrUpdateTreatment({
+      const treatment = await createOrUpdateTreatment({
         id: input.id,
         patientId,
         consultationId: input.consultationId,
@@ -393,6 +398,15 @@ export function setupTestBridge() {
         notes: input.notes,
         requesterName: input.requesterName,
       });
+      // Taking it from a day makes it due in the journal.
+      if (input.takingSince && patientId)
+        await changeTreatmentUsage(
+          treatment,
+          patientId,
+          'start',
+          input.takingSince
+        );
+      return treatment;
     },
     seedTreatmentLog: async (input: {
       treatmentId: string;
@@ -430,6 +444,37 @@ export function setupTestBridge() {
         };
       }
       await setTreatmentLog(item, input.date, input.answer, patientId);
+    },
+    seedTreatmentUsage: async (input: {
+      treatmentId: string;
+      action: UsageAction;
+      date: string;
+      notes?: string;
+      patientId?: string;
+    }) => {
+      const patientId = await resolvePatientId(input.patientId);
+      if (!patientId) throw new Error('No patient to record usage for');
+      const treatment = await fetchMedicationRequestById(
+        input.treatmentId,
+        patientId
+      );
+      if (!treatment)
+        throw new Error(`Treatment ${input.treatmentId} not found`);
+      await changeTreatmentUsage(
+        treatment,
+        patientId,
+        input.action,
+        input.date,
+        undefined,
+        input.notes
+      );
+    },
+    getTreatmentUsageStatements: async (
+      treatmentId: string,
+      patientId?: string
+    ) => {
+      const resolved = await resolvePatientId(patientId);
+      return resolved ? fetchMedicationStatements(resolved, treatmentId) : [];
     },
     getTreatmentLog: async (id: string, patientId?: string) => {
       const resolved = await resolvePatientId(patientId);
