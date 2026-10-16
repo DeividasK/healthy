@@ -58,6 +58,8 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await page
     .getByTestId('treatment-usage-notes-input')
     .fill('Waiting for a refill');
+  // Axe would otherwise sample the add menu's fading options.
+  await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
   await checkA11y(page);
   await saveChange(page, dates[3]);
   await expect(page.getByTestId('treatment-usage-section')).toContainText(
