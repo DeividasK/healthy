@@ -15,13 +15,13 @@ runs:
       uses: actions/cache@v6
       with:
         path: dist
-        key: ${{ runner.os }}-web-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
+        key: ${{ runner.os }}-web-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}
 
     - name: Cache Metro Bundler
       uses: actions/cache@v6
       with:
         path: .expo/cache
-        key: ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**') }}
+        key: ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}
         restore-keys: |
           ${{ runner.os }}-metro-${{ inputs.base-url != '' && 'pages' || 'root' }}-
           ${{ runner.os }}-metro-
