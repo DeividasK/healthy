@@ -74,7 +74,10 @@ interface ResourceRowProps {
   note?: string | null;
   /** Opens the resource; without it the row shows no chevron. */
   onPress?: () => void;
-  /** Controls shown at the end of a row that does not open, e.g. log buttons. */
+  /**
+   * Controls at the end of the row, e.g. log buttons, shown instead of the
+   * chevron. With `onPress`, only the title and meta open the resource.
+   */
   accessory?: React.ReactNode;
   /** Accessible name of the open button, e.g. "View condition: Migraine". */
   accessibilityLabel?: string;
@@ -122,6 +125,24 @@ export function ResourceRow({
   accessibilityLabel,
   testID,
 }: ResourceRowProps) {
+  if (onPress && accessory) {
+    return (
+      <View style={styles.row} testID={testID}>
+        <TouchableOpacity
+          testID={`${testID}-open`}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          style={[styles.main, styles.mainPressable]}
+          activeOpacity={0.6}
+          onPress={onPress}
+        >
+          <Text style={styles.rowTitle}>{title}</Text>
+          <ResourceMetaLine meta={meta} />
+        </TouchableOpacity>
+        {accessory}
+      </View>
+    );
+  }
   const content = (
     <>
       <View style={styles.row} testID={onPress ? `${testID}-row` : testID}>
@@ -214,6 +235,11 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
     gap: 5,
+  },
+  // Fills the row's height, so the whole area beside the controls opens it.
+  mainPressable: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
   },
   rowTitle: {
     fontSize: 14,

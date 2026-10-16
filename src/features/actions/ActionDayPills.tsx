@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 import { DayStatusMark } from './DayStatusMark';
@@ -46,6 +47,7 @@ export function ActionDayPills({
   onSelect,
   onOpenCalendar,
   leading,
+  keysEnabled = true,
 }: {
   daysByDate: Record<string, ActionDay>;
   selected: string;
@@ -54,6 +56,8 @@ export function ActionDayPills({
   onOpenCalendar: () => void;
   /** Shown left of the day navigation, e.g. a toggle for the whole view. */
   leading?: React.ReactNode;
+  /** Whether Left/Right and A/D step between days, e.g. not while a dialog is open. */
+  keysEnabled?: boolean;
 }) {
   const [width, setWidth] = useState(0);
   // The strip's last day. It moves only when the selection leaves the strip
@@ -64,6 +68,13 @@ export function ActionDayPills({
     setAnchor(getStripAnchor(selected, today));
   const isFirst = selected <= oldest;
   const isLast = selected >= anchor;
+  // Before the strip's first day, the calendar offers older days.
+  const goBack = () =>
+    isFirst ? onOpenCalendar() : onSelect(addDays(selected, -1));
+  const goForward = () => {
+    if (!isLast) onSelect(addDays(selected, 1));
+  };
+  useDayKeys(goBack, goForward, keysEnabled);
   return (
     <View style={styles.container}>
       <View style={styles.navigation}>
@@ -75,9 +86,7 @@ export function ActionDayPills({
           accessibilityLabel={isFirst ? 'Open calendar' : 'Previous day'}
           style={styles.arrow}
           activeOpacity={0.6}
-          onPress={() =>
-            isFirst ? onOpenCalendar() : onSelect(addDays(selected, -1))
-          }
+          onPress={goBack}
         >
           <ChevronLeft color={COLORS.light.foreground} size={20} />
         </TouchableOpacity>
@@ -101,7 +110,7 @@ export function ActionDayPills({
           disabled={isLast}
           style={[styles.arrow, isLast && styles.disabled]}
           activeOpacity={0.6}
-          onPress={() => onSelect(addDays(selected, 1))}
+          onPress={goForward}
         >
           <ChevronRight color={COLORS.light.foreground} size={20} />
         </TouchableOpacity>
@@ -139,6 +148,41 @@ export function ActionDayPills({
       </View>
     </View>
   );
+}
+
+/** Keys that step a day back or forward (web). */
+const BACK_KEYS = ['ArrowLeft', 'a', 'A'];
+const FORWARD_KEYS = ['ArrowRight', 'd', 'D'];
+
+/**
+ * Steps between days on Left/Right and A/D while the screen is focused,
+ * except while typing or with a modifier held.
+ */
+function useDayKeys(back: () => void, forward: () => void, enabled: boolean) {
+  const isFocused = useIsFocused();
+  const handlers = useRef({ back, forward });
+  useEffect(() => {
+    handlers.current = { back, forward };
+  });
+  useEffect(() => {
+    if (!enabled || !isFocused || Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')
+      )
+        return;
+      if (BACK_KEYS.includes(event.key)) handlers.current.back();
+      else if (FORWARD_KEYS.includes(event.key)) handlers.current.forward();
+      else return;
+      event.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [enabled, isFocused]);
 }
 
 /**
@@ -271,7 +315,6 @@ function DayStrip({
       ListHeaderComponent={
         isInStrip ? (
           <Animated.View
-            pointerEvents="none"
             testID="actions-day-highlight"
             style={[
               styles.outline,
@@ -439,6 +482,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   outline: {
+    pointerEvents: 'none',
     position: 'absolute',
     top: 0,
     bottom: 0,

@@ -197,3 +197,17 @@ export async function deleteMedicationAdministrationRecord(
   if (result.changes && !withinTransaction)
     notifyDatabaseChanged(['medication_administrations']);
 }
+
+/** The first day a treatment was logged, or null before any log. */
+export async function fetchFirstAdministrationDate(
+  patientId: string,
+  medicationRequestId: string
+): Promise<string | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ first: string | null }>(
+    `SELECT MIN(occurrence_date) AS first FROM medication_administrations
+     WHERE patient_id = ? AND medication_request_id = ?;`,
+    [patientId, medicationRequestId]
+  );
+  return row?.first ?? null;
+}

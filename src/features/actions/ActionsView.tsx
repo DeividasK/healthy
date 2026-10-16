@@ -243,6 +243,7 @@ function ActionsForPatient({
           today={today}
           onSelect={selectDay}
           onOpenCalendar={() => setIsCalendarOpen(true)}
+          keysEnabled={!isCalendarOpen}
           leading={
             copyable.length > 0 && (
               <CheckboxRow
@@ -272,6 +273,12 @@ function ActionsForPatient({
                   item={item}
                   disabled={savingKeys.includes(item.key)}
                   onAnswer={(answer) => void handleAnswer(item, answer)}
+                  onOpen={() =>
+                    router.push({
+                      pathname: '/treatment/[id]',
+                      params: { id: item.treatment.id || '' },
+                    })
+                  }
                 />
               ))}
             </ResourceSection>

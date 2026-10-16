@@ -14,10 +14,13 @@ export function TreatmentLogRow({
   item,
   disabled = false,
   onAnswer,
+  onOpen,
 }: {
   item: ActionItem;
   disabled?: boolean;
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
+  /** Opens the treatment's page. */
+  onOpen: () => void;
 }) {
   const title = getTreatmentTitle(item.treatment);
   const name = item.dose ? `${title}, ${item.dose.text}` : title;
@@ -55,6 +58,8 @@ export function TreatmentLogRow({
       testID={`treatment-log-row-${item.rowId}`}
       title={title}
       meta={item.dose ? [{ icon: Tablets, text: item.dose.text }] : []}
+      accessibilityLabel={`View treatment: ${title}`}
+      onPress={onOpen}
       accessory={
         <View style={styles.buttons}>
           {button('not-taken', X, 'not taken', styles.notTaken)}

@@ -26,6 +26,7 @@ import {
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { formatQuantityText, formatRegimenLines } from './regimen';
+import { TreatmentLogHistory } from '@/src/features/actions/TreatmentLogHistory';
 
 export function ViewTreatmentView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -271,6 +272,13 @@ function TreatmentForPatient({
             ))}
           </ResourceSection>
         )}
+
+        <TreatmentLogHistory
+          treatmentId={id}
+          patientId={activePatientId}
+          isActive={treatment.status === 'active'}
+          startDate={treatment.authoredOn}
+        />
 
         {originConsultation && (
           <ResourceSection

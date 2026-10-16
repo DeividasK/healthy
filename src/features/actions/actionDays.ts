@@ -292,3 +292,25 @@ export function getStripAnchor(selected: string, today: string): string {
   const end = addDays(selected, Math.floor(STRIP_DAYS / 2));
   return end > today ? today : end;
 }
+
+/**
+ * One treatment's day in its logging history: `taken` when every dose due
+ * was taken, `not-taken` once all are answered and any was not, `missing`
+ * while some are unanswered, `upcoming` for days ahead and null when nothing
+ * was due.
+ */
+export type TreatmentDayStatus = 'taken' | 'not-taken' | 'missing' | 'upcoming';
+
+export function getTreatmentDayStatus(
+  day: ActionDay | undefined,
+  treatmentId: string,
+  isFuture: boolean
+): TreatmentDayStatus | null {
+  if (isFuture) return 'upcoming';
+  const items = (day?.items ?? []).filter(
+    (item) => item.treatment.id === treatmentId
+  );
+  if (!items.length) return null;
+  if (items.some((item) => !item.answer)) return 'missing';
+  return items.every((item) => item.answer === 'taken') ? 'taken' : 'not-taken';
+}

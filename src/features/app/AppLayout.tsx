@@ -1,5 +1,5 @@
 import { useFonts } from 'expo-font';
-import { Stack, ThemeProvider } from 'expo-router';
+import { Stack, ThemeProvider, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
@@ -63,7 +63,25 @@ export default function RootLayout() {
   );
 }
 
+/**
+ * Releases focus before a screen change hides the current screen (web).
+ * Otherwise the focused button ends up inside an `aria-hidden` screen, which
+ * browsers block with a warning. Parameter changes keep the same screen, so
+ * keyboard focus stays where it is for them.
+ */
+function useBlurOnScreenChange() {
+  const navigation = useNavigationContainerRef();
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    return navigation.addListener('__unsafe_action__', ({ data }) => {
+      if (data.noop || data.action.type === 'SET_PARAMS') return;
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    });
+  }, [navigation]);
+}
+
 function RootLayoutNav() {
+  useBlurOnScreenChange();
   return (
     <ThemeProvider value={NAV_THEME.light}>
       <AppChrome>
