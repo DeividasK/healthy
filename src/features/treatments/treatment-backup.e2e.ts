@@ -28,6 +28,31 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       notes: 'Original annotation',
     });
     original.dosageInstruction[0].route = { text: 'Oral' };
+    // A structured later phase and a dispense quantity travel intact.
+    original.dosageInstruction.push({
+      sequence: 2,
+      doseAndRate: [
+        {
+          doseRange: {
+            low: { value: 1, unit: 'tablet', code: '{tablet}' },
+            high: { value: 2, unit: 'tablet', code: '{tablet}' },
+          },
+        },
+      ],
+      timing: {
+        repeat: {
+          frequency: 1,
+          frequencyMax: 2,
+          period: 1,
+          periodUnit: 'd',
+          when: ['EVE'],
+          boundsDuration: { value: 4, unit: 'weeks', code: 'wk' },
+        },
+      },
+    });
+    original.dispenseRequest = {
+      quantity: { value: 56, unit: 'tablet', code: '{tablet}' },
+    };
     original.medication.concept.coding = [
       { system: 'https://example.org/medication', code: 'synthetic-code' },
     ];

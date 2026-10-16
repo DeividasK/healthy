@@ -30,6 +30,7 @@ import {
 import type { Condition } from 'fhir/r5';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
+import { getQuantityDraft, getRegimenDraft } from './regimen';
 import { COLORS } from '@/src/theme/colors';
 import { Stethoscope } from 'lucide-react-native';
 import {
@@ -120,6 +121,10 @@ function EditTreatmentForPatient({
           authoredDate: dateObj,
           originalAuthoredOn: treatment.authoredOn,
           dosageInstructions: getTreatmentInstructions(treatment) || '',
+          regimen: getRegimenDraft(treatment),
+          dispenseQuantity: getQuantityDraft(
+            treatment.dispenseRequest?.quantity
+          ),
           reason: getTreatmentReason(treatment) || '',
           reasonConditionIds: getTreatmentReasonConditionIds(treatment),
           notes: getTreatmentNotes(treatment) || '',
@@ -165,6 +170,8 @@ function EditTreatmentForPatient({
       status: values.status,
       authoredDate: formattedDate,
       dosageInstructions: values.dosageInstructions,
+      regimen: values.regimen,
+      dispenseQuantity: values.dispenseQuantity,
       reason: values.reason,
       reasonConditionIds: values.reasonConditionIds,
       notes: values.notes,

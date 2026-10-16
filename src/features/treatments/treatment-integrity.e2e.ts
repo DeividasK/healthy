@@ -43,6 +43,8 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveValue('');
     await page.getByTestId(`treatment-${field}-input`).fill(`Saved ${field}`);
   }
+  // Text instructions exclude a regimen; an empty quantity saves nothing
+  await addField('dispenseQuantity');
   // An empty associated-conditions field saves no link
   await addField('reasonCondition');
   await expect(page.getByTestId(/^treatment-selected-condition-/)).toHaveCount(
@@ -143,7 +145,11 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
     'ended'
   );
   await page.getByTestId('treatment-title-input').fill('Edited request');
-  await page.getByTestId('remove-treatment-instructions-button').click();
+  // Text stored beside structured dosing opens as a regimen and is kept.
+  await expect(page.getByTestId('treatment-instructions-input')).toHaveCount(0);
+  await expect(
+    page.getByTestId('treatment-regimen-p1-d1-frequency-input')
+  ).toHaveValue('2');
   await page.getByTestId('remove-treatment-reason-button').click();
   await page.getByTestId('treatment-notes-input').fill('Edited first note');
   await page.getByTestId('save-treatment-button').click();
@@ -154,11 +160,7 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
   expect(saved.medication.concept.coding).toEqual(
     resource.medication.concept.coding
   );
-  expect(saved.dosageInstruction[0]).toEqual({
-    route: resource.dosageInstruction[0].route,
-    timing: resource.dosageInstruction[0].timing,
-  });
-  expect(saved.dosageInstruction[1]).toEqual(resource.dosageInstruction[1]);
+  expect(saved.dosageInstruction).toEqual(resource.dosageInstruction);
   expect(saved.reason[0]).toEqual({
     concept: { coding: resource.reason[0].concept.coding },
     reference: resource.reason[0].reference,
@@ -444,7 +446,9 @@ test('new documents are authored by the patient and requesters default to the co
   );
   await page.getByTestId('treatment-title-input').fill('Attributed treatment');
   await page.getByTestId('save-treatment-button').click();
-  await expect(page).toHaveURL(new RegExp(`/consultation/${consultation.id}$`));
+  await expect(page.getByTestId('treatment-title')).toHaveText(
+    'Attributed treatment'
+  );
   const document = await getTestClinicalDocument(page, consultation.id);
   expect(document.author).toEqual([{ reference: 'Patient/integrity-patient' }]);
   expect(document.status).toBe('preliminary');
@@ -497,4 +501,71 @@ test('rejects foreign reason and consultation references without saving', async 
   });
   expect(attempts.errors).toHaveLength(2);
   expect(attempts.request).toBeNull();
+});
+
+test('rejects conflicting or invalid dosing without saving', async ({
+  page,
+}) => {
+  const treatment = await seedTestTreatment(page, {
+    patientId: 'integrity-patient',
+    title: 'Dosing guard',
+    dosageInstructions: 'Original text',
+  });
+  const regimen = (frequency: string, frequencyMax = '') => ({
+    phases: [
+      {
+        doses: [
+          {
+            amount: '1',
+            amountMax: '',
+            unit: '{tablet}',
+            route: '',
+            site: '',
+            patientInstruction: '',
+            timing: {
+              frequency,
+              frequencyMax,
+              period: '1',
+              periodUnit: 'd',
+              when: '',
+              boundsValue: '',
+              boundsUnit: 'd',
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const attempt = (input: object) =>
+    page.evaluate(
+      async (input) => {
+        try {
+          await (window as any).__HEALTHY_TEST_BRIDGE__.updateTreatment(input);
+          return null;
+        } catch (error: any) {
+          return error.message;
+        }
+      },
+      {
+        id: treatment.id,
+        patientId: 'integrity-patient',
+        title: 'Changed title',
+        ...input,
+      }
+    );
+  expect(
+    await attempt({ dosageInstructions: 'Text', regimen: regimen('2') })
+  ).toBe('A treatment has either dosage instructions or a regimen, not both');
+  expect(await attempt({ regimen: regimen('1.5') })).toBe(
+    'Min times must be a whole number'
+  );
+  expect(await attempt({ regimen: regimen('3', '2') })).toBe(
+    'Max times must be more than min times'
+  );
+  expect(
+    await attempt({ dispenseQuantity: { value: '-3', unit: '{tablet}' } })
+  ).toBe('Quantity to dispense must be a positive number');
+  expect(
+    await getTestTreatment(page, treatment.id, 'integrity-patient')
+  ).toEqual(treatment);
 });

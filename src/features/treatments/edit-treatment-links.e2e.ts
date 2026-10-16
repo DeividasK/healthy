@@ -75,6 +75,7 @@ test.describe('Edit Treatment add menu', () => {
       dosageInstructions: 'Daily',
       reason: 'Low levels',
       notes: 'With food',
+      dispenseQuantity: { value: '30', unit: '{tablet}' },
     });
     await page.goto(`/treatment/${treatment.id}/edit`);
     // No consultations or conditions exist, so nothing can be linked.

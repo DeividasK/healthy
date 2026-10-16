@@ -13,6 +13,8 @@ import {
   FileText,
   FolderPlus,
   MessageSquareText,
+  Package,
+  Repeat,
   Tablets,
   User,
 } from 'lucide-react-native';
@@ -31,6 +33,22 @@ import {
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
+import { DosageEditor } from './DosageEditor';
+import { NumberInput, ValueWithUnit } from './TimingFields';
+import {
+  AddOptionsModal,
+  type AddOptionItem,
+} from '@/src/components/AddOptionsModal';
+import {
+  createDoseDraft,
+  getAmountUnitOptions,
+  getQuantityDraft,
+  hasRegimen,
+  validateQuantity,
+  validateRegimen,
+  type QuantityDraft,
+  type RegimenDraft,
+} from './regimen';
 import {
   getTreatmentIntentOptions,
   getTreatmentStatusOptions,
@@ -45,6 +63,9 @@ export interface TreatmentFormValues {
   originalAuthoredOn?: string;
   requesterName?: string | null;
   dosageInstructions?: string | null;
+  /** Structured doses; a treatment has these or text instructions. */
+  regimen?: RegimenDraft | null;
+  dispenseQuantity?: QuantityDraft | null;
   reason?: string | null;
   /** Conditions the treatment is associated with. */
   reasonConditionIds?: string[];
@@ -87,6 +108,15 @@ export function TreatmentForm({
   const [dosageInstructions, setDosageInstructions] = useState(
     initialValues?.dosageInstructions || ''
   );
+  const [regimen, setRegimen] = useState<RegimenDraft>(
+    initialValues?.regimen || { phases: [] }
+  );
+  const [dispenseQuantity, setDispenseQuantity] = useState<QuantityDraft>(
+    initialValues?.dispenseQuantity || getQuantityDraft()
+  );
+  // Records carrying both (e.g. imported) open on the regimen and keep their
+  // text untouched unless the user replaces the regimen with text.
+  const initialRegimen = hasRegimen(initialValues?.regimen);
   const [reason, setReason] = useState(initialValues?.reason || '');
   const [reasonConditionIds, setReasonConditionIds] = useState(
     initialValues?.reasonConditionIds || []
@@ -97,7 +127,9 @@ export function TreatmentForm({
   );
   const [visibleFields, setVisibleFields] = useState({
     requester: Boolean(initialValues?.requesterName),
-    instructions: Boolean(initialValues?.dosageInstructions),
+    instructions: Boolean(initialValues?.dosageInstructions) && !initialRegimen,
+    regimen: initialRegimen,
+    dispenseQuantity: Boolean(initialValues?.dispenseQuantity?.value),
     reason: Boolean(initialValues?.reason),
     reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
     notes: Boolean(initialValues?.notes),
@@ -108,6 +140,8 @@ export function TreatmentForm({
     status,
     authoredDate,
     dosageInstructions,
+    regimen,
+    dispenseQuantity,
     reason,
     reasonConditionIds,
     notes,
@@ -116,12 +150,18 @@ export function TreatmentForm({
   });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  // Fields a regimen phase or dose can add, shown in a centered menu.
+  const [regimenOptions, setRegimenOptions] = useState<AddOptionItem[] | null>(
+    null
+  );
   const optionalFields = [
     { id: 'requester' as const, label: 'Requester (Specialist)', icon: User },
+    { id: 'instructions' as const, label: 'Dosage', icon: Tablets },
+    { id: 'regimen' as const, label: 'Regimen', icon: Repeat },
     {
-      id: 'instructions' as const,
-      label: 'Dosage Instructions',
-      icon: Tablets,
+      id: 'dispenseQuantity' as const,
+      label: 'Quantity to Dispense',
+      icon: Package,
     },
     { id: 'reason' as const, label: 'Reason', icon: MessageSquareText },
     {
@@ -142,7 +182,10 @@ export function TreatmentForm({
         ({ id }) =>
           !visibleFields[id] &&
           // Linking needs at least one existing condition.
-          (id !== 'reasonCondition' || conditionOptions.length > 0)
+          (id !== 'reasonCondition' || conditionOptions.length > 0) &&
+          // Dosing is either text instructions or a regimen, never both.
+          (id !== 'instructions' || !visibleFields.regimen) &&
+          (id !== 'regimen' || !visibleFields.instructions)
       )
       .map(({ id, label, icon: Icon }) => ({
         id,
@@ -155,14 +198,19 @@ export function TreatmentForm({
             style={{ marginRight: 12 }}
           />
         ),
-        onPress: () =>
-          setVisibleFields((fields) => ({ ...fields, [id]: true })),
+        onPress: () => {
+          if (id === 'regimen' && !hasRegimen(regimen))
+            setRegimen({ phases: [{ doses: [createDoseDraft()] }] });
+          setVisibleFields((fields) => ({ ...fields, [id]: true }));
+        },
       })),
     ...links.menuOptions,
   ];
   const removeField = (id: keyof typeof visibleFields) => {
     setVisibleFields((fields) => ({ ...fields, [id]: false }));
     if (id === 'instructions') setDosageInstructions('');
+    else if (id === 'regimen') setRegimen({ phases: [] });
+    else if (id === 'dispenseQuantity') setDispenseQuantity(getQuantityDraft());
     else if (id === 'reason') setReason('');
     else if (id === 'reasonCondition') setReasonConditionIds([]);
     else if (id === 'requester') setRequesterName('');
@@ -175,6 +223,14 @@ export function TreatmentForm({
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setErrorMessage('Treatment name is required');
+      return;
+    }
+    const fieldError =
+      (visibleFields.regimen && validateRegimen(regimen)) ||
+      (visibleFields.dispenseQuantity &&
+        validateQuantity(dispenseQuantity, 'Quantity to dispense'));
+    if (fieldError) {
+      setErrorMessage(fieldError);
       return;
     }
     setErrorMessage(null);
@@ -197,9 +253,23 @@ export function TreatmentForm({
         requesterName: visibleFields.requester
           ? requesterName.trim() || null
           : null,
+        // Hidden text is kept only beside a regimen it was stored with.
         dosageInstructions: visibleFields.instructions
           ? dosageInstructions.trim() || null
-          : null,
+          : initialRegimen && visibleFields.regimen
+            ? undefined
+            : null,
+        // Unchanged values are omitted so stored data is not rewritten.
+        regimen: !visibleFields.regimen
+          ? null
+          : isUnchanged(regimen, initialValues?.regimen)
+            ? undefined
+            : regimen,
+        dispenseQuantity: !visibleFields.dispenseQuantity
+          ? null
+          : isUnchanged(dispenseQuantity, initialValues?.dispenseQuantity)
+            ? undefined
+            : dispenseQuantity,
         reason: visibleFields.reason ? reason.trim() || null : null,
         reasonConditionIds: visibleFields.reasonCondition
           ? reasonConditionIds
@@ -313,6 +383,53 @@ export function TreatmentForm({
                 />
               );
             }
+            if (id === 'regimen') {
+              return (
+                <DosageEditor
+                  key={id}
+                  value={regimen}
+                  onChange={setRegimen}
+                  onRemove={fieldProps.onRemove}
+                  removeTestID={fieldProps.removeTestID}
+                  onShowOptions={setRegimenOptions}
+                />
+              );
+            }
+            if (id === 'dispenseQuantity') {
+              return (
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  nativeID="treatment-dispenseQuantity-input"
+                >
+                  <ValueWithUnit
+                    input={
+                      <NumberInput
+                        id="treatment-dispenseQuantity-input"
+                        name="dispenseQuantity"
+                        label={label}
+                        placeholder="e.g. 30"
+                        value={dispenseQuantity.value}
+                        onChangeText={(value) =>
+                          setDispenseQuantity((current) => ({
+                            ...current,
+                            value,
+                          }))
+                        }
+                      />
+                    }
+                    testID="treatment-dispenseQuantity-unit-select"
+                    name="dispenseQuantityUnit"
+                    unitLabel="Quantity unit"
+                    unit={dispenseQuantity.unit}
+                    options={getAmountUnitOptions(dispenseQuantity.unit)}
+                    onUnitChange={(unit) =>
+                      setDispenseQuantity((current) => ({ ...current, unit }))
+                    }
+                  />
+                </FormField>
+              );
+            }
             if (id === 'reasonCondition') {
               return (
                 <LinkedResourcesField
@@ -373,6 +490,13 @@ export function TreatmentForm({
           hasChanges={hasChanges}
           saveTestID="save-treatment-button"
         />
+        <AddOptionsModal
+          visible={Boolean(regimenOptions)}
+          onClose={() => setRegimenOptions(null)}
+          options={regimenOptions || []}
+          overlayTestID="regimen-options-overlay"
+          cardTestID="regimen-options-menu"
+        />
       </SafeAreaView>
     </FieldRevealProvider>
   );
@@ -388,3 +512,12 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 });
+
+/** Equal values, ignoring which empty optional fields the form shows. */
+const isUnchanged = (value: unknown, initial: unknown) => {
+  const json = (data: unknown) =>
+    JSON.stringify(data, (key, field) =>
+      key === 'shownFields' ? undefined : field
+    );
+  return initial !== undefined && json(value) === json(initial);
+};

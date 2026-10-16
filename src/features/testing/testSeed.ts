@@ -1,5 +1,9 @@
 import { test, type Page } from '@playwright/test';
 import type { MedicationRequest, ServiceRequest } from 'fhir/r5';
+import type {
+  QuantityDraft,
+  RegimenDraft,
+} from '@/src/features/treatments/regimen';
 
 export interface SeedPatientOptions {
   id?: string;
@@ -56,6 +60,8 @@ export interface SeedTreatmentOptions {
   status?: MedicationRequest['status'];
   authoredOn?: string;
   dosageInstructions?: string;
+  regimen?: RegimenDraft;
+  dispenseQuantity?: QuantityDraft;
   reason?: string;
   reasonConditionIds?: string[];
   notes?: string;

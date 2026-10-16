@@ -37,13 +37,13 @@ test.describe('View Treatment Flow', () => {
     await expect(page.getByTestId('treatment-title')).toHaveText(
       'Doxycycline 100mg'
     );
-    await expect(page.getByTestId('treatment-instructions')).toHaveText(
+    await expect(page.getByTestId('treatment-dosage')).toHaveText(
       longInstructions
     );
     await checkA11y(page, { include: '[data-testid="treatment-view"]' });
 
     await page.reload();
-    await expect(page.getByTestId('treatment-instructions')).toHaveText(
+    await expect(page.getByTestId('treatment-dosage')).toHaveText(
       longInstructions
     );
     const stored = await getTestTreatment(page, treatment.id);

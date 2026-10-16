@@ -28,6 +28,17 @@ import {
   getTreatmentNotes,
   getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
+import {
+  applyRegimen,
+  buildDraftQuantity,
+  formatQuantityText,
+  formatRegimenLines,
+  hasRegimen,
+  validateQuantity,
+  validateRegimen,
+  type QuantityDraft,
+  type RegimenDraft,
+} from './regimen';
 
 export interface TreatmentInput {
   id?: string;
@@ -38,6 +49,13 @@ export interface TreatmentInput {
   status?: MedicationRequest['status']; // Defaults to 'unknown'
   authoredDate?: string; // ISO date YYYY-MM-DD or date-time with timezone
   dosageInstructions?: string | null; // Text regimen instructions
+  /**
+   * Structured doses grouped into phases; null removes them, undefined keeps
+   * them. A treatment has either text instructions or a regimen, not both.
+   */
+  regimen?: RegimenDraft | null;
+  /** Amount to supply; null removes it, undefined keeps it. */
+  dispenseQuantity?: QuantityDraft | null;
   reason?: string | null; // Indication / reason text
   /** Associated Condition IDs; [] removes all links, undefined keeps them. */
   reasonConditionIds?: string[];
@@ -68,6 +86,18 @@ export async function createOrUpdateTreatment(
   if (!input.title || !input.title.trim()) {
     throw new Error('Treatment name is required');
   }
+
+  if (input.dosageInstructions?.trim() && hasRegimen(input.regimen)) {
+    throw new Error(
+      'A treatment has either dosage instructions or a regimen, not both'
+    );
+  }
+  const regimenError = input.regimen ? validateRegimen(input.regimen) : null;
+  if (regimenError) throw new Error(regimenError);
+  const quantityError = input.dispenseQuantity
+    ? validateQuantity(input.dispenseQuantity, 'Quantity to dispense')
+    : null;
+  if (quantityError) throw new Error(quantityError);
 
   const patientId = input.patientId || DEFAULT_PATIENT_ID;
   const db = await getDb();
@@ -145,17 +175,38 @@ export async function createOrUpdateTreatment(
 
     // Omission means unchanged; null/empty text explicitly clears only the
     // exposed text, retaining structured dosage and coded reason information.
-    if (input.dosageInstructions !== undefined) {
-      const first = { ...existing?.dosageInstruction?.[0] };
-      if (trimmedInstructions) first.text = trimmedInstructions;
-      else delete first.text;
-      const dosages = [
-        ...(Object.keys(first).length ? [first] : []),
-        ...(existing?.dosageInstruction?.slice(1) || []),
-      ];
+    if (input.regimen !== undefined || input.dosageInstructions !== undefined) {
+      let dosages = existing?.dosageInstruction || [];
+      // The regimen replaces structured doses; entries it does not show are
+      // kept first, so the text below lands on the text-only entry.
+      if (input.regimen !== undefined)
+        dosages = applyRegimen(
+          dosages,
+          hasRegimen(input.regimen) ? input.regimen : null
+        );
+      if (input.dosageInstructions !== undefined) {
+        const first = { ...dosages[0] };
+        if (trimmedInstructions) first.text = trimmedInstructions;
+        else delete first.text;
+        dosages = [
+          ...(Object.keys(first).length ? [first] : []),
+          ...dosages.slice(1),
+        ];
+      }
       medicationRequest.dosageInstruction = dosages.length
         ? dosages
         : undefined;
+    }
+    if (input.dispenseQuantity !== undefined) {
+      const dispenseRequest = { ...existing?.dispenseRequest };
+      const quantity = input.dispenseQuantity
+        ? buildDraftQuantity(input.dispenseQuantity, dispenseRequest.quantity)
+        : undefined;
+      if (quantity) dispenseRequest.quantity = quantity;
+      else delete dispenseRequest.quantity;
+      if (Object.keys(dispenseRequest).length)
+        medicationRequest.dispenseRequest = dispenseRequest;
+      else delete medicationRequest.dispenseRequest;
     }
     if (input.reason !== undefined || input.reasonConditionIds !== undefined) {
       let reasons = [...(existing?.reason || [])];
@@ -216,6 +267,11 @@ export async function createOrUpdateTreatment(
           [
             getTreatmentTitle(medicationRequest),
             getTreatmentInstructions(medicationRequest),
+            formatRegimenLines(medicationRequest).join('\n'),
+            formatQuantityText(medicationRequest.dispenseRequest?.quantity) &&
+              `Quantity to dispense: ${formatQuantityText(
+                medicationRequest.dispenseRequest?.quantity
+              )}`,
             getTreatmentReason(medicationRequest),
             getTreatmentNotes(medicationRequest),
           ]
