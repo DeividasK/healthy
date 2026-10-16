@@ -4,53 +4,116 @@ on:
   push:
     branches-ignore: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     name: Typecheck, Lint & Format
     runs-on: ubuntu-26.04
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: pnpm/setup@v3
         with:
           cache: true
-
+          save-cache: false
       - name: TypeScript Check
         run: pnpm tsc --noEmit
-
       - name: Lint
         run: pnpm expo lint
-
       - name: Format Check
         run: pnpm format:check
+      - name: Pure Function Tests
+        run: pnpm test:unit
 
-  e2e:
-    name: E2E
+  build:
+    name: Production Web Build
     runs-on: ubuntu-26.04
+    # This job warms the same pnpm cache/runtime as the browser jobs.
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --ipc=host
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: pnpm/setup@v3
         with:
           cache: true
+      - uses: ./.github/actions/build-web
 
+  e2e-shards:
+    name: E2E shard ${{ matrix.shard }}/2
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          save-cache: false
       - name: Run E2E Tests
-        run: pnpm test:e2e
-
+        env:
+          PLAYWRIGHT_BLOB_REPORT: '1'
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/2
       - name: Upload Test Results
-        if: failure()
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+      - name: Upload Mergeable Report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-blob-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 7
+
+  e2e:
+    name: E2E
+    needs: [e2e-shards]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          save-cache: false
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: e2e-blob-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge E2E Reports
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+      - name: Upload Combined Report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+      - name: Require Every Shard to Pass
+        if: ${{ always() }}
+        env:
+          SHARD_RESULT: ${{ needs.e2e-shards.result }}
+        run: test "$SHARD_RESULT" = success
 
   visual:
     name: Visual Regression (Chromatic)
@@ -61,33 +124,32 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --ipc=host
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
-
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - uses: pnpm/setup@v3
         with:
           cache: true
-
-      - name: Build Web Static Export
-        uses: ./.github/actions/build-web
-
+          save-cache: false
       - name: Run Visual Tests
         run: pnpm test:visual
-
-      - name: Upload Test Results
+      - name: Upload Capture Timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-test-results
+          path: test-results/results.json
+          retention-days: 7
+      - name: Upload Failed Capture Results
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: visual-test-report
-          path: playwright-report/
+          name: visual-test-failures
+          path: test-results/
           retention-days: 7
-
       - name: Publish to Chromatic
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}

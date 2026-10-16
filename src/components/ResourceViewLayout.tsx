@@ -10,16 +10,16 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { Calendar } from 'lucide-react-native';
 import { ResourceActionDock } from './ResourceActionDock';
+import { ResourceMetaLine, type ResourceMeta } from './ResourceSection';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceViewLayoutProps {
   testID: string;
   title?: string;
   titleTestID?: string;
-  date?: string;
-  status?: { label: string; color?: string };
+  /** Same meta line as the resource's rows: date, status, specialist, then type-specific fields. */
+  meta?: ResourceMeta[];
   isLoading?: boolean;
   error?: string;
   children?: React.ReactNode;
@@ -32,8 +32,7 @@ export function ResourceViewLayout({
   testID,
   title,
   titleTestID,
-  date,
-  status,
+  meta = [],
   isLoading,
   error,
   children,
@@ -75,27 +74,9 @@ export function ResourceViewLayout({
                 >
                   {title}
                 </Text>
-                {(date || status) && (
+                {meta.length > 0 && (
                   <View style={styles.metadata}>
-                    {date && (
-                      <View style={styles.inlineMetadata}>
-                        <Calendar color={COLORS.light.muted} size={14} />
-                        <Text style={styles.date}>{date}</Text>
-                      </View>
-                    )}
-                    {status && (
-                      <View style={styles.inlineMetadata}>
-                        {status.color && (
-                          <View
-                            style={[
-                              styles.statusDot,
-                              { backgroundColor: status.color },
-                            ]}
-                          />
-                        )}
-                        <Text style={styles.status}>{status.label}</Text>
-                      </View>
-                    )}
+                    <ResourceMetaLine meta={meta} />
                   </View>
                 )}
               </View>
@@ -148,29 +129,6 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
   },
   metadata: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 12,
     marginTop: 14,
-  },
-  inlineMetadata: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  date: {
-    fontSize: 12,
-    color: COLORS.light.mutedForeground,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  status: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
   },
 });

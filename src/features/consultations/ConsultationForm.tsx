@@ -2,43 +2,43 @@ import type {
   ConsultationInput,
   ConsultationDiagnosisInput,
 } from './consultationService';
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  Alert,
-  ActionSheetIOS,
-} from 'react-native';
+import { FormField } from '@/src/components/FormField';
+import React, { useState, useEffect, useMemo } from 'react';
+import { StyleSheet, View, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
   Stethoscope,
-  ChevronDown,
   Clock,
   FileText,
   FolderPlus,
   User,
-  X,
+  Hospital,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
-  AddOptionsModal,
-  AddOptionItem,
-} from '@/src/components/AddOptionsModal';
+  FieldRevealProvider,
+  useFieldReveal,
+} from '@/src/components/FieldReveal';
+import type { AddOptionItem } from '@/src/components/AddOptionsModal';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import { AutocompleteDropdown } from '@/src/components/AutocompleteDropdown';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
+import { getOrganizationNames } from '@/src/features/organizations/organizationService';
+import { LinkedResourcesField } from '@/src/components/LinkedResourcesField';
+import {
+  useLinkFields,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { useSync } from '@/src/context/SyncContext';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import {
@@ -47,6 +47,7 @@ import {
 } from './consultationService';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import type { Condition } from 'fhir/r5';
+import { goBackOr } from '@/src/utils/navigation';
 
 export interface ConsultationStatusOption {
   id: string;
@@ -99,6 +100,7 @@ export interface ConsultationFormValues {
   date: Date;
   time?: string | null;
   doctorName?: string;
+  serviceProviderName?: string;
   serviceType?: string;
   conditionIds?: string[];
   reasonConditionIds?: string[];
@@ -110,8 +112,12 @@ export interface ConsultationFormProps {
   initialValues?: Partial<ConsultationFormValues>;
   initialConditionIds?: string[];
   isEdit?: boolean;
-  onDelete?: () => Promise<void>;
-  onSave: (values: ConsultationInput) => Promise<void>;
+  onSave: (
+    values: ConsultationInput,
+    links: Record<string, LinkSelection>
+  ) => Promise<void>;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 function showAlert(title: string, message: string) {
@@ -127,10 +133,10 @@ export function ConsultationForm({
   initialConditionIds,
   isEdit = false,
   onSave,
-  onDelete,
+  linkFields = [],
 }: ConsultationFormProps) {
+  const links = useLinkFields(linkFields);
   const router = useRouter();
-  const { triggerSync } = useSync();
   const { activePatientId } = useActivePatient();
 
   const statusOptions = useMemo(() => {
@@ -175,6 +181,13 @@ export function ConsultationForm({
   );
   const [doctorName, setDoctorName] = useState(initialValues?.doctorName || '');
 
+  const [showServiceProvider, setShowServiceProvider] = useState<boolean>(
+    Boolean(initialValues?.serviceProviderName)
+  );
+  const [serviceProviderName, setServiceProviderName] = useState(
+    initialValues?.serviceProviderName || ''
+  );
+
   const [showServiceType, setShowServiceType] = useState<boolean>(
     Boolean(initialValues?.serviceType)
   );
@@ -193,26 +206,36 @@ export function ConsultationForm({
   const [showCondition, setShowCondition] = useState(
     Boolean((initialValues?.reasonConditionIds ?? initialConditionIds)?.length)
   );
-  const [conditionQuery, setConditionQuery] = useState('');
-  const [isConditionFocused, setIsConditionFocused] = useState(false);
-  const conditionSearchRef = useRef<View>(null);
 
   const [availableConditions, setAvailableConditions] = useState<Condition[]>(
     []
   );
   const [knownDoctors, setKnownDoctors] = useState<string[]>([]);
+  const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
+    []
+  );
   const [knownServiceTypes, setKnownServiceTypes] = useState<string[]>([]);
-  const [isDoctorFocused, setIsDoctorFocused] = useState(false);
-  const [isServiceTypeFocused, setIsServiceTypeFocused] = useState(false);
   const [diagnoses, setDiagnoses] = useState<ConsultationDiagnosisInput[]>(
     initialValues?.diagnoses || []
   );
   const [diagnosisQueries, setDiagnosisQueries] = useState<
     Record<number, string>
   >({});
+  const hasChanges = useHasChanges({
+    title,
+    status: selectedStatus.id,
+    date,
+    time,
+    doctorName,
+    serviceProviderName,
+    serviceType,
+    notes,
+    selectedConditionIds,
+    diagnoses,
+    links: links.values,
+  });
   const [focusedDiagnosis, setFocusedDiagnosis] = useState<number | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load patient conditions, doctors, and service types
@@ -222,13 +245,17 @@ export function ConsultationForm({
       getAllConditions(activePatientId),
       getDistinctDoctorNames(activePatientId),
       getDistinctServiceTypes(activePatientId),
+      getOrganizationNames(activePatientId),
     ])
-      .then(([conditionsData, doctorsData, serviceTypesData]) => {
-        if (!isMounted) return;
-        setAvailableConditions(conditionsData);
-        setKnownDoctors(doctorsData);
-        setKnownServiceTypes(serviceTypesData);
-      })
+      .then(
+        ([conditionsData, doctorsData, serviceTypesData, providersData]) => {
+          if (!isMounted) return;
+          setAvailableConditions(conditionsData);
+          setKnownDoctors(doctorsData);
+          setKnownServiceProviders(providersData);
+          setKnownServiceTypes(serviceTypesData);
+        }
+      )
       .catch((err) => {
         console.warn('Failed to load consultation context data:', err);
       });
@@ -238,55 +265,16 @@ export function ConsultationForm({
     };
   }, [activePatientId]);
 
-  // Autocomplete matching doctors
-  const matchingDoctors = useMemo(() => {
-    const trimmed = doctorName.trim().toLowerCase();
-    if (!trimmed) {
-      return knownDoctors;
-    }
-    return knownDoctors.filter((doc) => doc.toLowerCase().includes(trimmed));
-  }, [doctorName, knownDoctors]);
+  // Previously used service types first, then common ones.
+  const serviceTypeSuggestions = useMemo(
+    () => Array.from(new Set([...knownServiceTypes, ...COMMON_SERVICE_TYPES])),
+    [knownServiceTypes]
+  );
 
-  // Autocomplete matching service types
-  const matchingServiceTypes = useMemo(() => {
-    const all = Array.from(
-      new Set([...knownServiceTypes, ...COMMON_SERVICE_TYPES])
-    );
-    const trimmed = serviceType.trim().toLowerCase();
-    if (!trimmed) {
-      return all;
-    }
-    return all.filter((st) => st.toLowerCase().includes(trimmed));
-  }, [serviceType, knownServiceTypes]);
-
-  const handleStatusPress = () => {
-    if (Platform.OS === 'ios') {
-      const options = [...statusOptions.map((s) => s.label), 'Cancel'];
-      const cancelButtonIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Select Status',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            setSelectedStatus(statusOptions[buttonIndex]);
-          }
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowStatusModal(true);
-    }
-  };
-
-  const conditionOptions = availableConditions.filter(
-    (condition) =>
-      condition.id &&
-      !selectedConditionIds.includes(condition.id) &&
-      getConditionTitle(condition)
-        .toLowerCase()
-        .includes(conditionQuery.trim().toLowerCase())
+  const conditionOptions = availableConditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
   );
 
   const handleSubmit = async () => {
@@ -315,37 +303,42 @@ export function ConsultationForm({
         ? `${formattedDate}T${time}:00${zone}`
         : formattedDate;
 
-      await onSave({
-        id: initialValues?.id,
-        title: trimmedTitle,
-        status: selectedStatus.status,
-        date: fullDate,
-        doctorName:
-          showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
-        serviceType:
-          showServiceType && serviceType.trim()
-            ? serviceType.trim()
-            : undefined,
-        reasonConditionIds: selectedConditionIds.filter(Boolean),
-        diagnoses,
-        notes: showNotes && notes.trim() ? notes.trim() : undefined,
-      });
-
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on consultation change:', err)
+      await onSave(
+        {
+          id: initialValues?.id,
+          title: trimmedTitle,
+          status: selectedStatus.status,
+          date: fullDate,
+          doctorName:
+            showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
+          // Removing a provider the consultation had clears it; otherwise an
+          // unshown provider (e.g. a reference with no name) is kept.
+          serviceProviderName: showServiceProvider
+            ? serviceProviderName.trim() || null
+            : initialValues?.serviceProviderName
+              ? null
+              : undefined,
+          serviceType:
+            showServiceType && serviceType.trim()
+              ? serviceType.trim()
+              : undefined,
+          reasonConditionIds: selectedConditionIds.filter(Boolean),
+          diagnoses,
+          notes: showNotes && notes.trim() ? notes.trim() : undefined,
+        },
+        links.values
       );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      if (router.canGoBack()) {
-        router.back();
-      } else if (showCondition && selectedConditionIds[0]) {
-        router.replace(`/condition/${selectedConditionIds[0]}` as any);
-      } else {
-        router.replace('/');
-      }
+      goBackOr(
+        router,
+        showCondition && selectedConditionIds[0]
+          ? `/condition/${selectedConditionIds[0]}`
+          : '/'
+      );
     } catch (err) {
       console.error('Failed to save consultation:', err);
       showAlert('Error', 'Failed to save consultation. Please try again.');
@@ -358,7 +351,7 @@ export function ConsultationForm({
   const plusMenuOptions: AddOptionItem[] = [
     {
       id: 'add-diagnosis',
-      label: 'Add Diagnosis',
+      label: 'Diagnosis',
       icon: (
         <Stethoscope
           color={COLORS.light.primary}
@@ -374,7 +367,7 @@ export function ConsultationForm({
   if (time === null) {
     plusMenuOptions.push({
       id: 'add-time',
-      label: 'Add Time',
+      label: 'Time',
       icon: (
         <Clock
           color={COLORS.light.primary}
@@ -391,10 +384,10 @@ export function ConsultationForm({
       },
     });
   }
-  if (!showCondition) {
+  if (!showCondition && conditionOptions.length > 0) {
     plusMenuOptions.push({
       id: 'add-reason',
-      label: 'Add Reasons for Visit',
+      label: 'Reasons for Visit',
       icon: (
         <FolderPlus
           color={COLORS.light.primary}
@@ -409,7 +402,7 @@ export function ConsultationForm({
   if (!showDoctor) {
     plusMenuOptions.push({
       id: 'add-doctor',
-      label: 'Add Doctor',
+      label: 'Specialist',
       icon: (
         <User
           color={COLORS.light.primary}
@@ -421,10 +414,25 @@ export function ConsultationForm({
       onPress: () => setShowDoctor(true),
     });
   }
+  if (!showServiceProvider) {
+    plusMenuOptions.push({
+      id: 'add-service-provider',
+      label: 'Service provider',
+      icon: (
+        <Hospital
+          color={COLORS.light.primary}
+          size={20}
+          style={{ marginRight: 12 }}
+        />
+      ),
+      testID: 'menu-add-service-provider',
+      onPress: () => setShowServiceProvider(true),
+    });
+  }
   if (!showServiceType) {
     plusMenuOptions.push({
       id: 'add-service-type',
-      label: 'Add Service Type',
+      label: 'Service Type',
       icon: (
         <Activity
           color={COLORS.light.primary}
@@ -439,7 +447,7 @@ export function ConsultationForm({
   if (!showNotes) {
     plusMenuOptions.push({
       id: 'add-notes',
-      label: 'Add Notes',
+      label: 'Notes',
       icon: (
         <FileText
           color={COLORS.light.primary}
@@ -452,603 +460,393 @@ export function ConsultationForm({
     });
   }
 
+  const menuOptions = [...plusMenuOptions, ...links.menuOptions];
+
+  const { reveal, scrollViewProps } = useFieldReveal();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-      <View style={styles.keyboardContainer}>
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeading testID="header-title">
-            {isEdit ? 'Edit Consultation' : 'New Consultation'}
-          </ScreenHeading>
-          {/* Top Pill Row: Status, Date, Time, Plus Button */}
-          <View style={styles.pillRow}>
-            {/* Status Pill */}
-            <TouchableOpacity
-              testID="status-picker-button"
-              style={styles.statusPill}
-              onPress={handleStatusPress}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: selectedStatus.dotColor },
-                ]}
-              />
-              <Text style={styles.statusPillText}>{selectedStatus.label}</Text>
-              <ChevronDown
-                color={COLORS.light.iconClear}
-                size={16}
-                style={{ marginLeft: 4 }}
-              />
-
-              {Platform.OS === 'web' &&
-                React.createElement(
-                  'select',
-                  {
-                    id: 'consultation-status-select',
-                    name: 'status',
-                    'aria-label': 'Consultation status',
-                    value: selectedStatus.id,
-                    onChange: (e: any) => {
-                      const found = statusOptions.find(
-                        (s) => s.id === e.target.value
-                      );
-                      if (found) setSelectedStatus(found);
-                    },
-                    style: {
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      opacity: 0,
-                      width: '100%',
-                      height: '100%',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                    },
-                    'data-testid': 'status-picker-select',
-                  },
-                  statusOptions.map((opt) =>
-                    React.createElement(
-                      'option',
-                      { key: opt.id, value: opt.id },
-                      opt.label
-                    )
-                  )
-                )}
-            </TouchableOpacity>
-
-            {/* Date Pill (can be in future, no validation on date) */}
-            <NativeDatePicker
-              value={date}
-              onChange={(newDate) => {
-                if (newDate) setDate(newDate);
+    <FieldRevealProvider value={reveal}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <View style={styles.keyboardContainer}>
+          <ScrollView
+            {...scrollViewProps}
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <ScreenHeading testID="header-title">
+              {isEdit ? 'Edit Consultation' : 'New Consultation'}
+            </ScreenHeading>
+            {/* Consultation Title Input (Required) */}
+            <FormField
+              label="Consultation / Service"
+              required
+              nativeID="consultation-title-input"
+              inputProps={{
+                testID: 'consultation-title-input',
+                id: 'consultation-title-input',
+                nativeID: 'consultation-title-input',
+                name: 'title',
+                autoFocus: !isEdit,
+                accessibilityLabel: 'Consultation Title',
+                placeholder: 'e.g. Cardiology Follow-up, Annual Checkup',
+                value: title,
+                onChangeText: setTitle,
               }}
-              allowFuture={true}
-              testID="date-picker-button"
             />
 
-            {/* Optional Time Pill */}
+            <FormField label="Status" nativeID="status-picker-select" required>
+              <NativeSelect
+                testID="status-picker-select"
+                name="status"
+                label="Consultation status"
+                value={selectedStatus.id}
+                options={statusOptions.map(({ id, label }) => ({ id, label }))}
+                onChange={(value) => {
+                  const found = statusOptions.find(
+                    (option) => option.id === value
+                  );
+                  if (found) setSelectedStatus(found);
+                }}
+              />
+            </FormField>
+
+            {/* The date can be in the future (planned consultations). */}
+            <FormField label="Date" nativeID="consultation-date" required>
+              <NativeDatePicker
+                value={date}
+                onChange={(newDate) => {
+                  if (newDate) setDate(newDate);
+                }}
+                allowFuture={true}
+                testID="date-picker-button"
+                id="consultation-date"
+                name="date"
+                variant="input"
+              />
+            </FormField>
+
             {time !== null && (
-              <NativeTimePicker
-                value={time}
-                onChange={setTime}
+              <FormField
+                label="Time"
+                nativeID="consultation-time"
+                removeTestID="remove-time-button"
+                removeLabel="Remove time"
                 onRemove={() => setTime(null)}
-                testID="time-picker-button"
+              >
+                <NativeTimePicker
+                  value={time}
+                  onChange={setTime}
+                  testID="time-picker-button"
+                  id="consultation-time"
+                  name="time"
+                />
+              </FormField>
+            )}
+
+            {showCondition && (
+              <LinkedResourcesField
+                label="Reasons for visit"
+                searchLabel="Select reasons for visit"
+                options={conditionOptions}
+                selectedIds={selectedConditionIds}
+                onChange={setSelectedConditionIds}
+                testID="consultation-conditions-section"
+                removeTestID="remove-conditions-section-button"
+                onRemove={() => {
+                  setShowCondition(false);
+                  setSelectedConditionIds([]);
+                }}
               />
             )}
 
-            {/* Plus Action Button */}
-          </View>
-
-          {/* Consultation Title Input (Required) */}
-          <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Consultation / Service</Text>
-            <TextInput
-              testID="consultation-title-input"
-              id="consultation-title-input"
-              nativeID="consultation-title-input"
-              name="title"
-              accessibilityLabel="Consultation Title"
-              style={styles.textInput}
-              placeholder="e.g. Cardiology Follow-up, Annual Checkup"
-              placeholderTextColor={COLORS.light.placeholder}
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-
-          {showCondition && (
-            <View
-              style={styles.inputSection}
-              testID="consultation-conditions-section"
-            >
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Reasons for visit</Text>
-                <TouchableOpacity
-                  testID="remove-conditions-section-button"
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove reasons for visit"
-                  onPress={() => {
-                    setShowCondition(false);
-                    setSelectedConditionIds([]);
-                    setConditionQuery('');
-                    setIsConditionFocused(false);
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              {selectedConditionIds.map((conditionId, index) => (
-                <View
-                  key={conditionId}
-                  style={styles.selectedConditionRow}
-                  testID={`selected-condition-${conditionId}`}
-                >
-                  <Text style={styles.selectedConditionText}>
-                    {availableConditions
-                      .filter((condition) => condition.id === conditionId)
-                      .map(getConditionTitle)[0] || conditionId}
-                  </Text>
-                  <TouchableOpacity
-                    testID={
-                      index === 0
-                        ? 'remove-condition-button'
-                        : `remove-condition-button-${index}`
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove condition ${availableConditions.filter((condition) => condition.id === conditionId).map(getConditionTitle)[0] || conditionId}`}
-                    onPress={() =>
-                      setSelectedConditionIds((current) =>
-                        current.filter((id) => id !== conditionId)
-                      )
-                    }
-                  >
-                    <X color={COLORS.light.iconClear} size={16} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <View
-                ref={conditionSearchRef}
-                onFocus={() => setIsConditionFocused(true)}
-                onBlur={(event: any) => {
-                  const next = event.relatedTarget;
-                  if (
-                    next &&
-                    (conditionSearchRef.current as any)?.contains?.(next)
-                  )
-                    return;
-                  setIsConditionFocused(false);
-                }}
+            {diagnoses.length > 0 && (
+              <FormField
+                label="Diagnoses"
+                testID="consultation-diagnoses-section"
+                style={focusedDiagnosis !== null && styles.raised}
               >
-                <TextInput
-                  testID="condition-search-input"
-                  id="condition-search-input"
-                  nativeID="condition-search-input"
-                  name="conditionSearch"
-                  accessibilityLabel="Select reasons for visit"
-                  style={styles.textInput}
-                  placeholder="Select..."
-                  placeholderTextColor={COLORS.light.mutedForeground}
-                  value={conditionQuery}
-                  onChangeText={(value) => {
-                    setConditionQuery(value);
-                    setIsConditionFocused(true);
-                  }}
-                  onFocus={() => setIsConditionFocused(true)}
-                  onPressIn={() => setIsConditionFocused(true)}
-                />
-                {isConditionFocused && (
-                  <AutocompleteDropdown
-                    testID="condition-autocomplete-list"
-                    itemTestIDPrefix="condition-autocomplete-item-"
-                    items={conditionOptions.map((condition) => ({
-                      id: condition.id!,
-                      label: getConditionTitle(condition),
-                    }))}
-                    onSelect={(item) => {
-                      setSelectedConditionIds((current) =>
-                        current.includes(item.id)
-                          ? current
-                          : [...current, item.id]
-                      );
-                      setConditionQuery('');
-                      setIsConditionFocused(false);
-                    }}
-                  />
-                )}
-              </View>
-            </View>
-          )}
-
-          {diagnoses.length > 0 && (
-            <View
-              style={styles.inputSection}
-              testID="consultation-diagnoses-section"
-            >
-              <Text style={styles.inputLabel}>Diagnoses</Text>
-              {diagnoses.map((diagnosis, index) => (
-                <View
-                  key={index}
-                  style={styles.diagnosisItem}
-                  testID={`consultation-diagnosis-${index}`}
-                >
-                  {(['title', 'system', 'code', 'display'] as const).map(
-                    (field) => {
-                      const label =
-                        field === 'title'
-                          ? 'Diagnosis'
-                          : field === 'system'
-                            ? 'Terminology System (optional)'
-                            : field === 'code'
-                              ? 'Diagnosis Code (optional)'
-                              : 'Terminology Display (optional)';
-                      return (
-                        <React.Fragment key={field}>
-                          <View style={styles.inputSection}>
-                            {field === 'title' ? (
-                              <View style={styles.sectionHeaderRow}>
-                                <Text style={styles.inputLabel}>{label}</Text>
-                                <TouchableOpacity
-                                  testID={`remove-diagnosis-${index}`}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Remove diagnosis ${index + 1}`}
-                                  onPress={() =>
-                                    setDiagnoses((current) =>
-                                      current.filter((_, i) => i !== index)
-                                    )
-                                  }
-                                >
-                                  <X color={COLORS.light.iconClear} size={16} />
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <Text style={styles.inputLabel}>{label}</Text>
-                            )}
-                            <TextInput
-                              testID={`diagnosis-${index}-${field}-input`}
-                              id={`diagnosis-${index}-${field}-input`}
+                {diagnoses.map((diagnosis, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.diagnosisItem,
+                      focusedDiagnosis === index && styles.raised,
+                    ]}
+                    testID={`consultation-diagnosis-${index}`}
+                  >
+                    {(['title', 'system', 'code', 'display'] as const).map(
+                      (field) => {
+                        const label =
+                          field === 'title'
+                            ? 'Diagnosis'
+                            : field === 'system'
+                              ? 'Terminology System (optional)'
+                              : field === 'code'
+                                ? 'Diagnosis Code (optional)'
+                                : 'Terminology Display (optional)';
+                        return (
+                          <React.Fragment key={field}>
+                            <FormField
+                              label={label}
+                              required={field === 'title'}
                               nativeID={`diagnosis-${index}-${field}-input`}
-                              name={`diagnosis${index}${field}`}
-                              accessibilityLabel={label}
-                              style={styles.textInput}
-                              autoCapitalize={
-                                field === 'title' || field === 'display'
-                                  ? 'sentences'
-                                  : 'none'
-                              }
-                              autoCorrect={
-                                field === 'title' || field === 'display'
-                              }
-                              value={
+                              removeTestID={`remove-diagnosis-${index}`}
+                              removeLabel={`Remove diagnosis ${index + 1}`}
+                              onRemove={
                                 field === 'title'
-                                  ? diagnosis.title
-                                  : diagnosis.terminology?.[field] || ''
-                              }
-                              onFocus={() => setFocusedDiagnosis(null)}
-                              onChangeText={(value) =>
-                                setDiagnoses((current) =>
-                                  current.map((item, i) =>
-                                    i !== index
-                                      ? item
-                                      : field === 'title'
-                                        ? { ...item, title: value }
-                                        : {
-                                            ...item,
-                                            terminology: {
-                                              ...item.terminology,
-                                              [field]: value,
-                                            },
-                                          }
-                                  )
-                                )
-                              }
-                            />
-                          </View>
-                          {field === 'title' && (
-                            <View style={styles.inputSection}>
-                              <Text style={styles.inputLabel}>
-                                Referenced Condition (optional)
-                              </Text>
-                              <TextInput
-                                testID={`diagnosis-${index}-condition-input`}
-                                id={`diagnosis-${index}-condition-input`}
-                                nativeID={`diagnosis-${index}-condition-input`}
-                                name={`diagnosis${index}Condition`}
-                                accessibilityLabel="Referenced Condition (optional)"
-                                style={styles.textInput}
-                                value={
-                                  diagnosisQueries[index] ??
-                                  (diagnosis.createCondition
-                                    ? 'Create new condition'
-                                    : availableConditions.find(
-                                        (condition) =>
-                                          condition.id === diagnosis.conditionId
-                                      )?.code?.text || '')
-                                }
-                                onChangeText={(query) => {
-                                  setDiagnosisQueries((current) => ({
-                                    ...current,
-                                    [index]: query,
-                                  }));
-                                  setFocusedDiagnosis(index);
-                                }}
-                                onFocus={() => setFocusedDiagnosis(index)}
-                                onPressIn={() => setFocusedDiagnosis(index)}
-                              />
-                              {focusedDiagnosis === index && (
-                                <AutocompleteDropdown
-                                  testID={`diagnosis-${index}-condition-list`}
-                                  itemTestIDPrefix={`diagnosis-${index}-condition-item-`}
-                                  items={[
-                                    ...availableConditions
-                                      .filter((condition) =>
-                                        getConditionTitle(condition)
-                                          .toLowerCase()
-                                          .includes(
-                                            (
-                                              diagnosisQueries[index] || ''
-                                            ).toLowerCase()
-                                          )
+                                  ? () =>
+                                      setDiagnoses((current) =>
+                                        current.filter((_, i) => i !== index)
                                       )
-                                      .map((condition) => ({
-                                        id: condition.id!,
-                                        label: getConditionTitle(condition),
-                                      })),
-                                    {
-                                      id: '__none__',
-                                      label: 'No referenced condition',
-                                    },
-                                    {
-                                      id: '__create__',
-                                      label: 'Create new condition',
-                                    },
-                                  ]}
-                                  onSelect={(item) => {
-                                    setDiagnoses((current) =>
-                                      current.map((entry, i) =>
-                                        i !== index
-                                          ? entry
+                                  : undefined
+                              }
+                              inputProps={{
+                                testID: `diagnosis-${index}-${field}-input`,
+                                id: `diagnosis-${index}-${field}-input`,
+                                nativeID: `diagnosis-${index}-${field}-input`,
+                                name: `diagnosis${index}${field}`,
+                                accessibilityLabel: label,
+                                autoCapitalize:
+                                  field === 'title' || field === 'display'
+                                    ? 'sentences'
+                                    : 'none',
+                                autoCorrect:
+                                  field === 'title' || field === 'display',
+                                value:
+                                  field === 'title'
+                                    ? diagnosis.title
+                                    : diagnosis.terminology?.[field] || '',
+                                onFocus: () => setFocusedDiagnosis(null),
+                                onChangeText: (value) =>
+                                  setDiagnoses((current) =>
+                                    current.map((item, i) =>
+                                      i !== index
+                                        ? item
+                                        : field === 'title'
+                                          ? { ...item, title: value }
                                           : {
-                                              ...entry,
-                                              conditionId: item.id.startsWith(
-                                                '__'
-                                              )
-                                                ? undefined
-                                                : item.id,
-                                              createCondition:
-                                                item.id === '__create__',
-                                              title:
-                                                entry.title ||
-                                                (item.id.startsWith('__')
-                                                  ? ''
-                                                  : item.label),
+                                              ...item,
+                                              terminology: {
+                                                ...item.terminology,
+                                                [field]: value,
+                                              },
                                             }
-                                      )
-                                    );
-                                    setDiagnosisQueries((current) => {
-                                      const next = { ...current };
-                                      delete next[index];
-                                      return next;
-                                    });
-                                    setFocusedDiagnosis(null);
-                                  }}
-                                />
-                              )}
-                            </View>
-                          )}
-                        </React.Fragment>
-                      );
-                    }
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
+                                    )
+                                  ),
+                              }}
+                            />
+                            {field === 'title' && (
+                              <FormField
+                                label="Referenced Condition (optional)"
+                                style={
+                                  focusedDiagnosis === index && styles.raised
+                                }
+                                nativeID={`diagnosis-${index}-condition-input`}
+                                inputProps={{
+                                  testID: `diagnosis-${index}-condition-input`,
+                                  id: `diagnosis-${index}-condition-input`,
+                                  nativeID: `diagnosis-${index}-condition-input`,
+                                  name: `diagnosis${index}Condition`,
+                                  accessibilityLabel:
+                                    'Referenced Condition (optional)',
+                                  value:
+                                    diagnosisQueries[index] ??
+                                    (diagnosis.createCondition
+                                      ? 'New condition'
+                                      : availableConditions.find(
+                                          (condition) =>
+                                            condition.id ===
+                                            diagnosis.conditionId
+                                        )?.code?.text || ''),
+                                  onChangeText: (query) => {
+                                    setDiagnosisQueries((current) => ({
+                                      ...current,
+                                      [index]: query,
+                                    }));
+                                    setFocusedDiagnosis(index);
+                                  },
+                                  onFocus: () => setFocusedDiagnosis(index),
+                                  onPressIn: () => setFocusedDiagnosis(index),
+                                }}
+                              >
+                                {focusedDiagnosis === index && (
+                                  <AutocompleteDropdown
+                                    testID={`diagnosis-${index}-condition-list`}
+                                    itemTestIDPrefix={`diagnosis-${index}-condition-item-`}
+                                    items={[
+                                      ...availableConditions
+                                        .filter((condition) =>
+                                          getConditionTitle(condition)
+                                            .toLowerCase()
+                                            .includes(
+                                              (
+                                                diagnosisQueries[index] || ''
+                                              ).toLowerCase()
+                                            )
+                                        )
+                                        .map((condition) => ({
+                                          id: condition.id!,
+                                          label: getConditionTitle(condition),
+                                        })),
+                                      {
+                                        id: '__none__',
+                                        label: 'No referenced condition',
+                                      },
+                                      {
+                                        id: '__create__',
+                                        label: 'New condition',
+                                      },
+                                    ]}
+                                    onSelect={(item) => {
+                                      setDiagnoses((current) =>
+                                        current.map((entry, i) =>
+                                          i !== index
+                                            ? entry
+                                            : {
+                                                ...entry,
+                                                conditionId: item.id.startsWith(
+                                                  '__'
+                                                )
+                                                  ? undefined
+                                                  : item.id,
+                                                createCondition:
+                                                  item.id === '__create__',
+                                                title:
+                                                  entry.title ||
+                                                  (item.id.startsWith('__')
+                                                    ? ''
+                                                    : item.label),
+                                              }
+                                        )
+                                      );
+                                      setDiagnosisQueries((current) => {
+                                        const next = { ...current };
+                                        delete next[index];
+                                        return next;
+                                      });
+                                      setFocusedDiagnosis(null);
+                                    }}
+                                  />
+                                )}
+                              </FormField>
+                            )}
+                          </React.Fragment>
+                        );
+                      }
+                    )}
+                  </View>
+                ))}
+              </FormField>
+            )}
 
-          {/* Service Type / Specialty Section (Optional) */}
-          {showServiceType && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Specialty / Service Type</Text>
-                <TouchableOpacity
-                  testID="remove-service-type-button"
-                  onPress={() => {
-                    setShowServiceType(false);
-                    setServiceType('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove service type"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-service-type-input"
-                id="consultation-service-type-input"
-                nativeID="consultation-service-type-input"
+            {/* Service Type / Specialty Section (Optional) */}
+            {showServiceType && (
+              <AutocompleteTextField
+                label="Specialty / Service Type"
                 name="serviceType"
-                accessibilityLabel="Specialty or Service Type"
-                style={styles.textInput}
                 placeholder="e.g. Cardiology, General practice"
-                placeholderTextColor={COLORS.light.placeholder}
+                accessibilityLabel="Specialty or Service Type"
+                inputID="consultation-service-type-input"
+                autocompleteTestID="service-type-autocomplete"
                 value={serviceType}
-                onChangeText={(text) => {
-                  setServiceType(text);
-                  setIsServiceTypeFocused(true);
+                onChangeText={setServiceType}
+                suggestions={serviceTypeSuggestions}
+                removeTestID="remove-service-type-button"
+                removeLabel="Remove service type"
+                onRemove={() => {
+                  setShowServiceType(false);
+                  setServiceType('');
                 }}
-                onFocus={() => setIsServiceTypeFocused(true)}
               />
+            )}
 
-              {/* Service Type Autocomplete Suggestions */}
-              {isServiceTypeFocused && matchingServiceTypes.length > 0 && (
-                <AutocompleteDropdown
-                  testID="service-type-autocomplete-list"
-                  itemTestIDPrefix="service-type-autocomplete-item-"
-                  items={matchingServiceTypes.map((st, idx) => ({
-                    id: String(idx),
-                    label: st,
-                  }))}
-                  onSelect={(item) => {
-                    setServiceType(item.label);
-                    setIsServiceTypeFocused(false);
-                  }}
-                />
-              )}
-            </View>
-          )}
-
-          {/* Doctor / Specialist Input with Autocomplete (Optional) */}
-          {showDoctor && (
-            <View style={styles.inputSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Doctor or Specialist</Text>
-                <TouchableOpacity
-                  testID="remove-doctor-button"
-                  onPress={() => {
-                    setShowDoctor(false);
-                    setDoctorName('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove doctor"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-doctor-input"
-                id="consultation-doctor-input"
-                nativeID="consultation-doctor-input"
-                name="doctorName"
-                accessibilityLabel="Doctor or Specialist"
-                style={styles.textInput}
+            {showDoctor && (
+              <AutocompleteTextField
+                label="Specialist"
+                name="specialistName"
                 placeholder="e.g. Dr. Sarah Adams"
-                placeholderTextColor={COLORS.light.placeholder}
+                inputID="consultation-doctor-input"
+                autocompleteTestID="doctor-autocomplete"
                 value={doctorName}
-                onChangeText={(text) => {
-                  setDoctorName(text);
-                  setIsDoctorFocused(true);
+                onChangeText={setDoctorName}
+                suggestions={knownDoctors}
+                removeTestID="remove-doctor-button"
+                onRemove={() => {
+                  setShowDoctor(false);
+                  setDoctorName('');
                 }}
-                onFocus={() => setIsDoctorFocused(true)}
               />
+            )}
 
-              {/* Doctor Autocomplete Suggestions */}
-              {isDoctorFocused && matchingDoctors.length > 0 && (
-                <AutocompleteDropdown
-                  testID="doctor-autocomplete-list"
-                  itemTestIDPrefix="doctor-autocomplete-item-"
-                  items={matchingDoctors.map((doc, idx) => ({
-                    id: String(idx),
-                    label: doc,
-                  }))}
-                  onSelect={(item) => {
-                    setDoctorName(item.label);
-                    setIsDoctorFocused(false);
-                  }}
-                />
-              )}
-            </View>
-          )}
+            {showServiceProvider && (
+              <AutocompleteTextField
+                label="Service provider"
+                name="serviceProviderName"
+                placeholder="e.g. City Hospital"
+                inputID="consultation-service-provider-input"
+                autocompleteTestID="service-provider-autocomplete"
+                value={serviceProviderName}
+                onChangeText={setServiceProviderName}
+                suggestions={knownServiceProviders}
+                removeTestID="remove-service-provider-button"
+                onRemove={() => {
+                  setShowServiceProvider(false);
+                  setServiceProviderName('');
+                }}
+              />
+            )}
 
-          {/* Consultation Notes Textarea (Optional) */}
-          {showNotes && (
-            <View style={styles.descriptionContainer}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.inputLabel}>Notes</Text>
-                <TouchableOpacity
-                  testID="remove-notes-button"
-                  onPress={() => {
-                    setShowNotes(false);
-                    setNotes('');
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove notes"
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="consultation-notes-input"
-                id="consultation-notes-input"
+            {/* Consultation Notes Textarea (Optional) */}
+            {showNotes && (
+              <FormField
+                label="Notes"
                 nativeID="consultation-notes-input"
-                name="notes"
-                accessibilityLabel="Notes"
-                style={styles.descriptionInput}
-                placeholder="Add consultation notes, instructions, advice..."
-                placeholderTextColor={COLORS.light.placeholder}
-                multiline
-                numberOfLines={5}
-                value={notes}
-                onChangeText={setNotes}
-              />
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Bottom Save Action */}
-        <FormActionDock
-          onAdd={() => setShowPlusMenu((visible) => !visible)}
-          addExpanded={showPlusMenu}
-          addDisabled={plusMenuOptions.length === 0}
-          addTestID="add-option-button"
-          onSave={handleSubmit}
-          isSaving={isSaving}
-          deleteLabel="Delete consultation"
-          deleteTestID="delete-consultation-button"
-          deleteConfirmation={
-            isEdit && onDelete
-              ? {
-                  title: 'Delete Consultation',
-                  message:
-                    'Are you sure you want to delete this consultation? This action cannot be undone.',
-                  onConfirm: onDelete,
-                }
-              : undefined
-          }
-        />
-
-        {/* Plus Menu Modal for adding optional fields */}
-        <FloatingAddMenu
-          testID="form-add-menu"
-          visible={showPlusMenu}
-          onClose={() => setShowPlusMenu(false)}
-          options={plusMenuOptions}
-        />
-
-        {/* Status Selection Modal for Android */}
-        <AddOptionsModal
-          visible={showStatusModal}
-          onClose={() => setShowStatusModal(false)}
-          overlayTestID="status-menu-overlay"
-          cardTestID="status-menu-card"
-          options={statusOptions.map((opt) => ({
-            id: opt.id,
-            label: opt.label,
-            icon: (
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: opt.dotColor,
-                  marginRight: 12,
+                removeTestID="remove-notes-button"
+                onRemove={() => {
+                  setShowNotes(false);
+                  setNotes('');
+                }}
+                inputProps={{
+                  testID: 'consultation-notes-input',
+                  id: 'consultation-notes-input',
+                  nativeID: 'consultation-notes-input',
+                  name: 'notes',
+                  accessibilityLabel: 'Notes',
+                  placeholder:
+                    'Add consultation notes, instructions, advice...',
+                  multiline: true,
+                  numberOfLines: 5,
+                  value: notes,
+                  onChangeText: setNotes,
                 }}
               />
-            ),
-            testID: `status-option-${opt.id}`,
-            onPress: () => setSelectedStatus(opt),
-          }))}
-        />
-      </View>
-    </SafeAreaView>
+            )}
+
+            {links.fields}
+          </ScrollView>
+
+          {/* Bottom Save Action */}
+          <FormActionDock
+            onAdd={() => setShowPlusMenu((visible) => !visible)}
+            addExpanded={showPlusMenu}
+            addDisabled={menuOptions.length === 0}
+            addTestID="add-option-button"
+            onSave={handleSubmit}
+            isSaving={isSaving}
+            hasChanges={hasChanges}
+          />
+
+          {/* Plus Menu Modal for adding optional fields */}
+          <FloatingAddMenu
+            testID="form-add-menu"
+            visible={showPlusMenu}
+            onClose={() => setShowPlusMenu(false)}
+            options={menuOptions}
+          />
+        </View>
+      </SafeAreaView>
+    </FieldRevealProvider>
   );
 }
 
@@ -1067,52 +865,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 132,
   },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  statusPill: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  selectedConditionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  selectedConditionText: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
   diagnosisItem: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -1120,37 +872,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 20,
   },
-  inputSection: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  textInput: {
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
-  descriptionContainer: {
-    marginBottom: 20,
-  },
-  descriptionInput: {
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.light.foreground,
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
+  // Lifts a field above later siblings while its autocomplete overlays them.
+  raised: { zIndex: 10 },
 });

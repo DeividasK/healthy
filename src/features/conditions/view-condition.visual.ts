@@ -1,17 +1,17 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Condition View - Visual Regression', () => {
   test('Condition View - Details with Consultations', async ({
     page,
   }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const cond = await seedTestCondition(page, {
       id: 'cond-view-visual-test',
@@ -25,9 +25,6 @@ test.describe('View Condition View - Visual Regression', () => {
       notes: 'Persistent ache after running on tarmac.',
       onsetDate: '2026-10-02',
     });
-    await page.goto(`/condition/${cond.id}`);
-    await page.getByTestId('condition-title').waitFor();
-    await takeSnapshot(page, 'Condition View - No consultations', testInfo);
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-follow-up',
       conditionIds: [cond.id],
@@ -49,6 +46,21 @@ test.describe('View Condition View - Visual Regression', () => {
       date: '2026-10-04',
       notes: 'MRI recommended for ligament check.',
       status: 'completed',
+    });
+    await seedTestTreatment(page, {
+      id: 'treat-cond-view-visual',
+      title: 'Ibuprofen 400mg',
+      status: 'active',
+      authoredOn: '2026-10-04',
+      reasonConditionIds: [cond.id],
+      requesterName: 'Dr. Sarah Connor',
+    });
+    await seedTestServiceRequest(page, {
+      id: 'planned-cond-view-visual',
+      title: 'Physiotherapy referral',
+      category: '3457005',
+      authoredOn: '2026-10-04',
+      reasonConditionIds: [cond.id],
     });
 
     await page.goto(`/condition/${cond.id}`);

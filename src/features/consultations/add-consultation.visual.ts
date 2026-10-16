@@ -1,24 +1,26 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
+  waitForMenuToggle,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Consultation View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
   test('Consultation View - Add New Form', async ({ page }, testInfo) => {
+    // Reasons for visit are only offered when a condition exists.
+    await seedTestCondition(page, { title: 'Scalp condition' });
     await page.goto('/consultation/add');
     await page.getByTestId('consultation-title-input').waitFor();
 
     await takeSnapshot(page, 'Consultation View - Add New Form', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
+    await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('diagnosis-0-title-input').fill('Scalp irritation');
     await page.getByTestId('diagnosis-0-code-input').fill('L21');
     await page
@@ -30,20 +32,11 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await takeSnapshot(page, 'Consultation View - Add Diagnosis', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
+    await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('diagnosis-1-title-input').fill('Second diagnosis');
     await takeSnapshot(
       page,
       'Consultation View - Separate diagnosis items',
-      testInfo
-    );
-    await page.getByTestId('remove-diagnosis-1').click();
-    await page.getByTestId('remove-diagnosis-0').click();
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-condition').click();
-    await page.getByTestId('condition-search-input').waitFor();
-    await takeSnapshot(
-      page,
-      'Consultation View - Empty conditions section',
       testInfo
     );
     await seedTestCondition(page, {
@@ -60,7 +53,14 @@ test.describe('Add Consultation View - Visual Regression', () => {
       .fill('Dermatology review');
     await page.getByTestId('condition-search-input').fill('Androgenic');
     await page.getByTestId('condition-autocomplete-item-add-second').waitFor();
-    await takeSnapshot(page, 'Consultation View - Conditions search', testInfo);
+    await takeSnapshot(
+      page,
+      'Consultation View - Conditions search',
+      testInfo,
+      {
+        keepFocus: true,
+      }
+    );
     await page.getByTestId('condition-autocomplete-item-add-second').click();
     await page.getByTestId('selected-condition-add-second').waitFor();
     await takeSnapshot(

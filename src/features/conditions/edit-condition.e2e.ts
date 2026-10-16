@@ -1,16 +1,13 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
-  createTestConditionViaUI,
   DEFAULT_CONDITION_TITLE,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -23,9 +20,8 @@ test.describe('Edit Condition Flow', () => {
       title: 'Condition to delete',
     });
     await page.reload();
-    await page.getByTestId(`condition-card-${condition.id}`).click();
-    await page.getByTestId('edit-condition-button').click();
-    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+    await page.getByTestId(`condition-open-${condition.id}`).click();
+    await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
     );
     await page.evaluate(async () => {
@@ -49,8 +45,8 @@ test.describe('Edit Condition Flow', () => {
     await dialog.accept();
     await clickPromise;
     await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}/edit$`));
-    await expect(page.getByTestId('condition-title-input')).toHaveValue(
+    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}$`));
+    await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
     );
 
@@ -75,11 +71,11 @@ test.describe('Edit Condition Flow', () => {
     { tag: ['@smoke'] },
     async ({ page }) => {
       await test.step('Create an initial condition', async () => {
-        await createTestConditionViaUI(page);
+        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
-        await page.getByTestId(/^condition-card-/).click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await page.getByTestId('edit-condition-button').click();
         await expect(page).toHaveURL(/.*condition\/.*\/edit/);
         await expect(page.getByText('Edit Condition')).toBeVisible();
@@ -101,27 +97,29 @@ test.describe('Edit Condition Flow', () => {
   );
 
   test(
-    'should open Condition View and delete from edit mode',
+    'should open Condition View and delete from its island',
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create a condition', async () => {
-        await createTestConditionViaUI(page);
+        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
       });
 
       await test.step('Click condition card to open Condition View', async () => {
-        const condCard = page.getByTestId(/^condition-card-/);
-        await condCard.click();
+        await page.getByRole('button', { name: /^View condition:/ }).click();
         await expect(page).toHaveURL(/.*condition\/[a-zA-Z0-9_-]+$/);
         await expect(page.getByTestId('condition-title')).toHaveText(
           DEFAULT_CONDITION_TITLE
         );
       });
 
-      await test.step('Delete condition from edit mode', async () => {
+      await test.step('Delete condition from the view page', async () => {
+        // Edit forms no longer delete; the view page's island does.
+        await page.getByTestId('edit-condition-button').click();
+        await expect(page.getByTestId('condition-title-input')).toBeVisible();
         await expect(page.getByTestId('delete-condition-button')).toHaveCount(
           0
         );
-        await page.getByTestId('edit-condition-button').click();
+        await page.getByTestId('cancel-button').click();
         const deleteBtn = page.getByTestId('delete-condition-button');
         await deleteBtn.click();
 
@@ -131,7 +129,7 @@ test.describe('Edit Condition Flow', () => {
         const cancelBtn = page.getByTestId('delete-modal-cancel-button');
         await cancelBtn.click();
         await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('condition-title-input')).toHaveValue(
+        await expect(page.getByTestId('condition-title')).toHaveText(
           DEFAULT_CONDITION_TITLE
         );
 
@@ -153,7 +151,7 @@ test.describe('Edit Condition Flow', () => {
       });
     }
   );
-  test('opens the one-item add menu and creates a linked Consultation', async ({
+  test('opens the add menu and creates a linked Consultation', async ({
     page,
   }) => {
     const initial = await seedTestCondition(page, {
@@ -173,9 +171,15 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole('button')).toHaveCount(1);
+    await expect(menu.getByRole('button')).toHaveCount(3);
     await expect(
-      menu.getByRole('button', { name: 'Add Consultation', exact: true })
+      menu.getByRole('button', { name: 'Consultation', exact: true })
+    ).toBeVisible();
+    await expect(
+      menu.getByRole('button', { name: 'Treatment', exact: true })
+    ).toBeVisible();
+    await expect(
+      menu.getByRole('button', { name: 'Service Request', exact: true })
     ).toBeVisible();
     await expect(addButton).toHaveAttribute('aria-expanded', 'true');
     await expect(addButton).toHaveAccessibleName('Close add menu');
@@ -235,7 +239,7 @@ test.describe('Edit Condition Flow', () => {
       )
     ).toBe(true);
     await expect(addButton).toHaveAttribute('aria-expanded', 'false');
-    await expect(addButton).toHaveAccessibleName('Add consultation');
+    await expect(addButton).toHaveAccessibleName('Add record');
     await expect(addButton).toHaveCSS('background-color', 'rgb(61, 100, 80)');
     await expect(page.getByTestId('condition-add-button-icon')).toHaveCSS(
       'transform',
@@ -249,7 +253,7 @@ test.describe('Edit Condition Flow', () => {
 
     await addButton.click();
     await menu
-      .getByRole('button', { name: 'Add Consultation', exact: true })
+      .getByRole('button', { name: 'Consultation', exact: true })
       .click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation/add\\?conditionId=${initial.id}$`)
@@ -277,11 +281,14 @@ test.describe('Edit Condition Flow', () => {
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
 
-    const consultationRow = view.getByTestId(/^condition-consultation-item-/);
+    const consultationRow = view.getByTestId(
+      /^condition-consultation-item-.*-row$/
+    );
     expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
       viewportWidth
     );
-    await consultationRow.click();
+    // The whole row opens the consultation
+    await consultationRow.getByText('Linked Consultation').click();
     const consultationView = page.getByTestId('consultation-view');
     await expect(consultationView.getByTestId('consultation-title')).toHaveText(
       'Linked Consultation'
@@ -295,14 +302,14 @@ test.describe('Edit Condition Flow', () => {
 
     await page.getByRole('button', { name: 'Home', exact: true }).click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(page.getByText('Linked Consultation')).not.toBeVisible();
+    // Linked consultations are listed on the homepage too.
+    await expect(page.getByText('Linked Consultation')).toBeVisible();
   });
 });
 
 test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'preservation-patient' });
   const seeded = await seedTestCondition(page, {
     id: 'preserved-condition',
@@ -446,7 +453,6 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
 test('edits verification independently and roundtrips source and standard categories', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   const condition = await seedTestCondition(page, {
     title: 'Seborėjinis dermatitas',
@@ -525,12 +531,7 @@ test('edits verification independently and roundtrips source and standard catego
   expect(saved.verificationStatus.coding[0].code).toBe('differential');
   await page.goto(`/condition/${condition.id}/edit`);
   const dock = page.getByTestId('resource-action-dock');
-  const ids = [
-    'delete-condition-button',
-    'cancel-button',
-    'save-button',
-    'add-option-button',
-  ];
+  const ids = ['cancel-button', 'save-button', 'add-option-button'];
   const positions = await Promise.all(
     ids.map(async (id) => {
       await expect(dock.getByTestId(id)).toBeVisible();

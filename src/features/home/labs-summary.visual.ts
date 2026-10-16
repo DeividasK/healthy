@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
@@ -9,7 +8,6 @@ import {
 test('Labs Summary page - full and filtered latest results', async ({
   page,
 }, testInfo) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   await seedTestReport(page, {
     date: '2026-10-02',

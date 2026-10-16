@@ -69,7 +69,13 @@ export function AutocompleteDropdown({
 }
 
 const styles = StyleSheet.create({
+  // Overlays the fields below; the parent needs a raised zIndex while open.
   card: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    zIndex: 10,
     marginTop: 6,
     backgroundColor: COLORS.light.card,
     borderRadius: 8,

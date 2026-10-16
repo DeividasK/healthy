@@ -11,12 +11,14 @@ export function NativeSelect({
   label,
   testID,
   name,
+  disabled,
 }: NativeSelectProps) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <select
         id={testID}
         name={name}
+        disabled={disabled}
         data-testid={testID}
         aria-label={label}
         value={value}

@@ -1,13 +1,12 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
+  waitForMenuToggle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Condition View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -27,6 +26,7 @@ test.describe('Add Condition View - Visual Regression', () => {
     await page.getByTestId('remove-category-button').click();
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').waitFor({ state: 'visible' });
+    await waitForMenuToggle(page, 'add-option-button', true);
     await takeSnapshot(page, 'Condition optional fields menu', testInfo);
   });
 });

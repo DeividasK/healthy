@@ -1,22 +1,40 @@
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
-import type { Condition, Encounter } from 'fhir/r5';
+import { ClipboardList, FolderPlus, Hash, Pill } from 'lucide-react-native';
+import type {
+  Condition,
+  Encounter,
+  MedicationRequest,
+  ServiceRequest,
+} from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import { ResourceTextSection } from '@/src/components/ResourceTextSection';
+import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
+import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import { getConsultationById } from '@/src/features/consultations/consultationService';
+import {
+  deleteConsultation,
+  getConsultationById,
+} from '@/src/features/consultations/consultationService';
+import { goBackOr } from '@/src/utils/navigation';
 import { getConditionById } from '@/src/features/conditions/conditionService';
-import { formatDisplayDateTime } from '@/src/utils/dateUtils';
+import { getLinkedTreatmentsForConsultation } from '@/src/features/treatments/treatmentService';
+import {
+  getBasedOnServiceRequestsForConsultation,
+  getLinkedServiceRequestsForConsultation,
+} from '@/src/features/service-requests/serviceRequestService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
+import { RelatedResourceList } from './RelatedResourceList';
+import { getConsultationMeta } from './ConsultationRelatedRow';
 import {
   getConditionTitle,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
-  getConsultationDoctor,
   getConsultationNotes,
-  getConsultationServiceType,
   getConsultationTitle,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -28,23 +46,42 @@ export function ViewConsultationView() {
   const loadGeneration = useRef(0);
   const [consultation, setConsultation] = useState<Encounter | null>(null);
   const [relatedConditions, setRelatedConditions] = useState<Condition[]>([]);
+  const [linkedTreatments, setLinkedTreatments] = useState<MedicationRequest[]>(
+    []
+  );
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [basedOn, setBasedOn] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const loadData = useCallback(async () => {
     const generation = ++loadGeneration.current;
     if (!id || !activePatientId) return;
     try {
-      const value = await getConsultationById(id, activePatientId);
+      const [value, treatments, planned] = await Promise.all([
+        getConsultationById(id, activePatientId),
+        getLinkedTreatmentsForConsultation(id, activePatientId).catch(() => []),
+        getLinkedServiceRequestsForConsultation(id, activePatientId).catch(
+          () => []
+        ),
+      ]);
       if (generation !== loadGeneration.current) return;
       if (!value) {
         setConsultation(null);
         setRelatedConditions([]);
+        setLinkedTreatments([]);
+        setServiceRequests([]);
+        setBasedOn([]);
         setNotFound(true);
         setHasLoadError(false);
         return;
       }
+      const basedOnRequests = await getBasedOnServiceRequestsForConsultation(
+        value,
+        activePatientId
+      ).catch(() => []);
       const conditions = await Promise.all(
         [
           ...new Set([
@@ -65,6 +102,9 @@ export function ViewConsultationView() {
           Boolean(condition)
         )
       );
+      setLinkedTreatments(treatments);
+      setServiceRequests(planned);
+      setBasedOn(basedOnRequests);
       setNotFound(false);
       setHasLoadError(false);
     } catch (error) {
@@ -76,7 +116,16 @@ export function ViewConsultationView() {
   }, [id, activePatientId]);
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
-  useDatabaseSubscription(['consultations', 'conditions'], loadData);
+  useDatabaseSubscription(
+    [
+      'consultations',
+      'conditions',
+      'medication_requests',
+      'service_requests',
+      'clinical_documents',
+    ],
+    loadData
+  );
 
   if (isLoading) {
     return <ResourceViewLayout testID="consultation-view" isLoading />;
@@ -101,41 +150,99 @@ export function ViewConsultationView() {
   }
 
   const title = getConsultationTitle(consultation);
-  const date =
-    consultation.actualPeriod?.start || consultation.plannedStartDate || '';
-  const doctor = getConsultationDoctor(consultation);
-  const serviceType = getConsultationServiceType(consultation);
   const notes = getConsultationNotes(consultation);
-  const status = consultation.status
-    ? consultation.status.charAt(0).toUpperCase() + consultation.status.slice(1)
-    : 'Unknown';
 
   return (
     <ResourceViewLayout
       testID="consultation-view"
       title={title}
       titleTestID="consultation-title"
-      date={date ? formatDisplayDateTime(date) : undefined}
-      status={{ label: status }}
+      meta={getConsultationMeta(consultation, { withTestIDs: true })}
       actions={
-        <ResourceActionDock
-          editLabel="Edit consultation"
-          onEdit={() => router.push(`/consultation/${id}/edit`)}
-          editTestID="edit-consultation-button"
-        />
+        <>
+          <FloatingAddMenu
+            visible={showAddMenu}
+            onClose={() => setShowAddMenu(false)}
+            testID="consultation-add-menu"
+            options={[
+              {
+                id: 'create-treatment',
+                label: 'Treatment',
+                testID: 'option-create-new-treatment',
+                icon: (
+                  <Pill
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/treatment/add',
+                    params: { consultationId: id },
+                  }),
+              },
+              {
+                id: 'create-service-request',
+                label: 'Service Request',
+                testID: 'option-create-new-service-request',
+                icon: (
+                  <ClipboardList
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/service-request/add',
+                    params: { consultationId: id },
+                  }),
+              },
+            ]}
+          />
+          <ResourceActionDock
+            editLabel="Edit consultation"
+            onEdit={() => {
+              setShowAddMenu(false);
+              router.push(`/consultation/${id}/edit`);
+            }}
+            editTestID="edit-consultation-button"
+            onAdd={() => setShowAddMenu((visible) => !visible)}
+            addLabel="Add record"
+            addMenuExpanded={showAddMenu}
+            addTestID="consultation-add-treatment"
+            deleteLabel="Delete consultation"
+            deleteTestID="delete-consultation-button"
+            deleteConfirmation={{
+              title: 'Delete Consultation',
+              message:
+                'Are you sure you want to delete this consultation? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteConsultation(consultation.id!);
+                goBackOr(router, '/');
+              },
+            }}
+          />
+        </>
       }
     >
-      {(doctor || serviceType || notes) && (
+      {notes && (
         <View style={styles.details}>
-          {doctor && <InfoRow label="Practitioner" value={doctor} />}
-          {serviceType && <InfoRow label="Service" value={serviceType} />}
-          {notes && <Text style={styles.notes}>{notes}</Text>}
+          <ResourceTextSection
+            title="Notes"
+            text={notes}
+            testID="consultation-notes"
+          />
         </View>
       )}
 
       {getConsultationReasonConditionIds(consultation).length > 0 && (
-        <View style={styles.relatedSection} testID="consultation-reasons">
-          <Text style={styles.sectionTitle}>Reasons for visit</Text>
+        <ResourceSection
+          icon={FolderPlus}
+          title="Reasons for visit"
+          testID="consultation-reasons"
+        >
           {relatedConditions
             .filter((condition) =>
               getConsultationReasonConditionIds(consultation).includes(
@@ -143,29 +250,39 @@ export function ViewConsultationView() {
               )
             )
             .map((condition, index) => (
-              <TouchableOpacity
+              <ConditionRelatedRow
                 key={condition.id}
+                condition={condition}
                 testID={
                   index === 0
                     ? 'consultation-related-condition'
                     : `consultation-related-condition-${condition.id}`
                 }
-                accessibilityRole="button"
-                accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
-                style={styles.conditionRow}
-                onPress={() => router.dismissTo(`/condition/${condition.id}`)}
-              >
-                <Text style={styles.conditionTitle}>
-                  {getConditionTitle(condition)}
-                </Text>
-                <ChevronRight color={COLORS.light.muted} size={18} />
-              </TouchableOpacity>
+                onPress={() => router.push(`/condition/${condition.id}`)}
+              />
             ))}
-        </View>
+        </ResourceSection>
       )}
+      <ResourceSection
+        icon={ClipboardList}
+        title="Based on"
+        testID="consultation-based-on"
+      >
+        {basedOn.map((request) => (
+          <ServiceRequestRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-based-on-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
       {Boolean(consultation.diagnosis?.length) && (
-        <View style={styles.relatedSection} testID="consultation-diagnoses">
-          <Text style={styles.sectionTitle}>Diagnoses</Text>
+        <ResourceSection
+          icon={FolderPlus}
+          title="Diagnoses"
+          testID="consultation-diagnoses"
+        >
           {consultation.diagnosis?.flatMap((diagnosis, index) =>
             (diagnosis.condition || []).map((value, valueIndex) => {
               const id = value.reference?.reference?.startsWith('Condition/')
@@ -181,57 +298,50 @@ export function ViewConsultationView() {
                   ? getConditionTitle(condition)
                   : value.reference?.display);
               if (!label) return null;
-              const contents = (
-                <>
-                  <Text style={styles.conditionTitle}>{label}</Text>
-                  {value.concept?.coding?.map((coding, codingIndex) => (
-                    <Text key={codingIndex} style={styles.notes}>
-                      {[coding.system, coding.code, coding.display]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Text>
-                  ))}
-                </>
-              );
-              return condition ? (
-                <TouchableOpacity
+              return (
+                <ResourceRow
                   key={`${index}-${valueIndex}`}
-                  testID={
-                    index === 0
-                      ? 'consultation-diagnosis-condition'
-                      : `consultation-diagnosis-condition-${id}`
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel={`View condition: ${getConditionTitle(condition)}`}
-                  style={styles.conditionRow}
-                  onPress={() => router.dismissTo(`/condition/${id}`)}
-                >
-                  <View style={{ flex: 1 }}>{contents}</View>
-                  <ChevronRight color={COLORS.light.muted} size={18} />
-                </TouchableOpacity>
-              ) : (
-                <View
-                  key={`${index}-${valueIndex}`}
-                  testID={`consultation-diagnosis-${index}`}
-                  style={styles.details}
-                >
-                  {contents}
-                </View>
+                  title={label}
+                  meta={(value.concept?.coding || []).map((coding) => ({
+                    icon: Hash,
+                    text: [coding.system, coding.code, coding.display]
+                      .filter(Boolean)
+                      .join(' · '),
+                  }))}
+                  {...(condition
+                    ? {
+                        testID:
+                          index === 0
+                            ? 'consultation-diagnosis-condition'
+                            : `consultation-diagnosis-condition-${id}`,
+                        accessibilityLabel: `View condition: ${getConditionTitle(condition)}`,
+                        onPress: () => router.push(`/condition/${id}`),
+                      }
+                    : { testID: `consultation-diagnosis-${index}` })}
+                />
               );
             })
           )}
-        </View>
+        </ResourceSection>
       )}
-    </ResourceViewLayout>
-  );
-}
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
+      <RelatedResourceList linkedTreatments={linkedTreatments} />
+
+      <ResourceSection
+        icon={ClipboardList}
+        title="Service requests"
+        testID="consultation-service-request"
+      >
+        {serviceRequests.map((request) => (
+          <ServiceRequestRelatedRow
+            key={request.id}
+            request={request}
+            testID={`consultation-service-request-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
+          />
+        ))}
+      </ResourceSection>
+    </ResourceViewLayout>
   );
 }
 
@@ -239,57 +349,5 @@ const styles = StyleSheet.create({
   details: {
     gap: 12,
     marginBottom: 28,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 20,
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: COLORS.light.mutedForeground,
-  },
-  infoValue: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-    textAlign: 'right',
-  },
-  notes: {
-    marginTop: 4,
-    fontSize: 14,
-    lineHeight: 21,
-    color: COLORS.light.textSecondary,
-  },
-  relatedSection: {
-    marginTop: 2,
-  },
-  sectionTitle: {
-    marginBottom: 8,
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  conditionRow: {
-    minHeight: 52,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.cardBorder,
-    backgroundColor: COLORS.light.dropdownSeparator,
-  },
-  conditionTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
   },
 });

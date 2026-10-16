@@ -1,5 +1,7 @@
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
+import { FormField } from '@/src/components/FormField';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -13,11 +15,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Clock, FileText } from 'lucide-react-native';
+import { X, Clock, FileText, Hospital } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
+import {
+  FieldRevealProvider,
+  useFieldReveal,
+} from '@/src/components/FieldReveal';
+import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
+import {
+  getOrganizationNames,
+  getServiceProviderName,
+} from '@/src/features/organizations/organizationService';
+import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
   CBC_MARKERS,
   CBCBiomarkerDefinition,
@@ -32,7 +44,6 @@ import {
   deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { useSync } from '@/src/context/SyncContext';
 import { convertBiomarkerValue } from './biomarkerMeasurements';
 
 export interface ActiveMarkerItem {
@@ -88,7 +99,6 @@ export function LabResultForm({
 }: LabResultFormProps) {
   const router = useRouter();
   const { activePatientId } = useActivePatient();
-  const { triggerSync } = useSync();
   const reportId = initialReportId;
 
   // Test Date (defaults to today)
@@ -98,12 +108,35 @@ export function LabResultForm({
   const [testTime, setTestTime] = useState<string | null>(null);
   const [testNotes, setTestNotes] = useState<string | null>(null);
   const [showNotesInput, setShowNotesInput] = useState(false);
+  const [serviceProviderName, setServiceProviderName] = useState<string | null>(
+    null
+  );
+  // Whether the loaded report showed a provider, so removing it is explicit.
+  const [hadServiceProvider, setHadServiceProvider] = useState(false);
+  const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
+    []
+  );
 
   // Plus menu dropdown
   const [showPlusMenu, setShowPlusMenu] = useState(false);
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
+  const [isReportLoaded, setIsReportLoaded] = useState(!reportId);
+  const hasChanges = useHasChanges(
+    {
+      selectedDate,
+      testTime,
+      testNotes,
+      serviceProviderName,
+      activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
+        id,
+        valueStr,
+        selectedUnit,
+      })),
+    },
+    isReportLoaded
+  );
 
   // Add Test search query
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,6 +168,14 @@ export function LabResultForm({
             setTestTime(null);
           }
         }
+
+        const providerName = await getServiceProviderName(
+          record.report.performer?.find(isOrganizationReference),
+          activePatientId
+        );
+        if (!isMounted) return;
+        setServiceProviderName(providerName);
+        setHadServiceProvider(providerName !== null);
 
         // Notes
         if (record.report.note && record.report.note.length > 0) {
@@ -189,13 +230,27 @@ export function LabResultForm({
         setActiveItems(loadedItems);
       } catch (err) {
         console.error('Failed to load report for editing:', err);
+      } finally {
+        if (isMounted) setIsReportLoaded(true);
       }
     })();
 
     return () => {
       isMounted = false;
     };
-  }, [reportId]);
+  }, [reportId, activePatientId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getOrganizationNames(activePatientId)
+      .then((names) => {
+        if (isMounted) setKnownServiceProviders(names);
+      })
+      .catch((err) => console.warn('Failed to load service providers:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [activePatientId]);
 
   // Autocomplete matching items
   const autocompleteResults = useMemo(() => {
@@ -213,7 +268,8 @@ export function LabResultForm({
 
   const hasTime = testTime !== null;
   const hasNotes = showNotesInput;
-  const showPlusButton = !hasTime || !hasNotes;
+  const hasServiceProvider = serviceProviderName !== null;
+  const showPlusButton = !hasTime || !hasNotes || !hasServiceProvider;
 
   const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
@@ -315,12 +371,16 @@ export function LabResultForm({
         date: effectiveDateStr,
         time: testTime || undefined,
         notes: testNotes ? testNotes.trim() : undefined,
+        // Removing a provider the report had clears it; otherwise an unshown
+        // provider (e.g. a reference with no name) is kept.
+        serviceProviderName:
+          serviceProviderName !== null
+            ? serviceProviderName.trim() || null
+            : hadServiceProvider
+              ? null
+              : undefined,
         items: biomarkers,
       });
-
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on lab result save:', err)
-      );
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();
@@ -383,287 +443,327 @@ export function LabResultForm({
 
   const titleText = isEdit || reportId ? 'Edit Lab Results' : 'Add Lab Results';
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-      <View style={styles.keyboardContainer}>
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeading>{titleText}</ScreenHeading>
-          {/* Top Pill Row: Date, Optional Time, Plus Action */}
-          <View style={styles.pillRow}>
-            {/* Native Date Picker */}
-            <NativeDatePicker
-              value={selectedDate}
-              onChange={(date) => {
-                if (date) handleDateChange(date);
-              }}
-              testID="date-picker-button"
-            />
+  const { reveal, scrollViewProps } = useFieldReveal();
 
-            {/* Optional Time Pill */}
+  return (
+    <FieldRevealProvider value={reveal}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <View style={styles.keyboardContainer}>
+          <ScrollView
+            {...scrollViewProps}
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <ScreenHeading>{titleText}</ScreenHeading>
+            <FormField label="Date" nativeID="lab-result-date" required>
+              <NativeDatePicker
+                value={selectedDate}
+                onChange={(date) => {
+                  if (date) handleDateChange(date);
+                }}
+                testID="date-picker-button"
+                id="lab-result-date"
+                name="date"
+                variant="input"
+              />
+            </FormField>
+
             {hasTime && (
-              <NativeTimePicker
-                value={testTime}
-                onChange={setTestTime}
+              <FormField
+                label="Time"
+                nativeID="lab-result-time"
+                removeTestID="remove-time-button"
+                removeLabel="Remove time"
                 onRemove={() => setTestTime(null)}
-                maxTime={
-                  formatLocalDate(selectedDate) === formatLocalDate(new Date())
-                    ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`
-                    : undefined
-                }
-                testID="time-picker-button"
+              >
+                <NativeTimePicker
+                  value={testTime}
+                  onChange={setTestTime}
+                  maxTime={
+                    formatLocalDate(selectedDate) ===
+                    formatLocalDate(new Date())
+                      ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`
+                      : undefined
+                  }
+                  testID="time-picker-button"
+                  id="lab-result-time"
+                  name="time"
+                />
+              </FormField>
+            )}
+
+            {hasServiceProvider && (
+              <AutocompleteTextField
+                label="Service provider"
+                name="serviceProviderName"
+                placeholder="e.g. City Laboratory"
+                inputID="lab-result-service-provider-input"
+                autocompleteTestID="service-provider-autocomplete"
+                value={serviceProviderName}
+                onChangeText={setServiceProviderName}
+                suggestions={knownServiceProviders}
+                removeTestID="remove-service-provider-button"
+                onRemove={() => setServiceProviderName(null)}
               />
             )}
 
-            {/* Plus Action Button */}
-          </View>
-
-          {/* Optional Notes Section if added */}
-          {showNotesInput && (
-            <View style={styles.notesSection}>
-              <View style={styles.notesHeader}>
-                <Text style={styles.notesLabel}>Notes</Text>
-                <TouchableOpacity
-                  testID="remove-notes-button"
-                  onPress={() => {
-                    setShowNotesInput(false);
-                    setTestNotes(null);
-                  }}
-                >
-                  <X color={COLORS.light.iconClear} size={16} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                testID="notes-input"
-                id="notes-input"
+            {/* Optional Notes Section if added */}
+            {showNotesInput && (
+              <FormField
+                label="Notes"
                 nativeID="notes-input"
-                name="notes"
-                accessibilityLabel="Report Notes"
-                style={styles.notesInput}
-                placeholder="Enter report notes (e.g., fasting, laboratory name)..."
-                placeholderTextColor={COLORS.light.placeholder}
-                multiline
-                numberOfLines={3}
-                value={testNotes || ''}
-                onChangeText={setTestNotes}
+                removeTestID="remove-notes-button"
+                onRemove={() => {
+                  setShowNotesInput(false);
+                  setTestNotes(null);
+                }}
+                inputProps={{
+                  testID: 'notes-input',
+                  id: 'notes-input',
+                  nativeID: 'notes-input',
+                  name: 'notes',
+                  accessibilityLabel: 'Report Notes',
+                  placeholder:
+                    'Enter report notes (e.g., fasting, laboratory name)...',
+                  multiline: true,
+                  numberOfLines: 3,
+                  value: testNotes || '',
+                  onChangeText: setTestNotes,
+                }}
               />
-            </View>
-          )}
+            )}
 
-          {/* Active Tests List */}
-          <View style={styles.activeTestsList}>
-            {activeItems.map((item, index) => (
-              <View
-                key={item.id}
-                style={styles.markerItem}
-                testID={`marker-card-${index}`}
-              >
-                {/* Marker Header */}
-                <View style={styles.markerHeader}>
-                  <Text style={styles.markerTitle} numberOfLines={1}>
-                    {item.definition.name}
-                  </Text>
+            {/* Active Tests List */}
+            <View style={styles.activeTestsList}>
+              {activeItems.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={styles.markerItem}
+                  testID={`marker-card-${index}`}
+                >
+                  {/* Marker Header */}
+                  <View style={styles.markerHeader}>
+                    <Text style={styles.markerTitle} numberOfLines={1}>
+                      {item.definition.name}
+                    </Text>
+                    <TouchableOpacity
+                      testID={`remove-marker-${index}`}
+                      style={styles.iconAction}
+                      onPress={() => handleRemoveMarker(index)}
+                    >
+                      <X color={COLORS.light.iconClear} size={18} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Input Row: = [value] [unit v] */}
+                  <View style={styles.valueRow}>
+                    <Text style={styles.equalsSign}>=</Text>
+                    <TextInput
+                      testID={`marker-value-input-${index}`}
+                      id={`marker-value-input-${index}`}
+                      nativeID={`marker-value-input-${index}`}
+                      name={`marker-value-${item.id}`}
+                      accessibilityLabel={item.definition.name}
+                      style={styles.valueInput}
+                      placeholder="Value"
+                      placeholderTextColor={COLORS.light.placeholderInput}
+                      keyboardType="decimal-pad"
+                      value={item.valueStr}
+                      onChangeText={(val) => handleValueChange(index, val)}
+                    />
+                    <NativeUnitPicker
+                      testID={`unit-picker-button-${index}`}
+                      selectedUnit={item.selectedUnit}
+                      units={item.definition.units}
+                      onSelect={(unitLabel, ucum) =>
+                        handleSelectUnit(index, unitLabel, ucum)
+                      }
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Test Section */}
+            <View
+              ref={searchContainerRef}
+              style={styles.addTestSection}
+              onFocus={handleContainerFocus}
+              onBlur={handleContainerBlur}
+            >
+              <Text style={styles.addTestLabel}>Select Test</Text>
+              <View style={styles.searchInputContainer}>
+                <TextInput
+                  testID="test-search-input"
+                  id="test-search-input"
+                  nativeID="test-search-input"
+                  name="test-search"
+                  // New-resource forms start with their first field focused.
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus={!isEdit && !reportId}
+                  accessibilityLabel="Select Test"
+                  style={styles.searchInput}
+                  placeholder="Enter test, e.g., HbA1c, ASP..."
+                  placeholderTextColor={COLORS.light.placeholder}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onFocus={() => setIsSearchFocused(true)}
+                />
+                {searchQuery.length > 0 && (
                   <TouchableOpacity
-                    testID={`remove-marker-${index}`}
-                    style={styles.iconAction}
-                    onPress={() => handleRemoveMarker(index)}
+                    testID="clear-search-button"
+                    onPress={() => setSearchQuery('')}
+                    style={styles.searchClearButton}
                   >
                     <X color={COLORS.light.iconClear} size={18} />
                   </TouchableOpacity>
-                </View>
-
-                {/* Input Row: = [value] [unit v] */}
-                <View style={styles.valueRow}>
-                  <Text style={styles.equalsSign}>=</Text>
-                  <TextInput
-                    testID={`marker-value-input-${index}`}
-                    id={`marker-value-input-${index}`}
-                    nativeID={`marker-value-input-${index}`}
-                    name={`marker-value-${item.id}`}
-                    accessibilityLabel={item.definition.name}
-                    style={styles.valueInput}
-                    placeholder="Value"
-                    placeholderTextColor={COLORS.light.placeholderInput}
-                    keyboardType="decimal-pad"
-                    value={item.valueStr}
-                    onChangeText={(val) => handleValueChange(index, val)}
-                  />
-                  <NativeUnitPicker
-                    testID={`unit-picker-button-${index}`}
-                    selectedUnit={item.selectedUnit}
-                    units={item.definition.units}
-                    onSelect={(unitLabel, ucum) =>
-                      handleSelectUnit(index, unitLabel, ucum)
-                    }
-                  />
-                </View>
+                )}
               </View>
-            ))}
-          </View>
 
-          {/* Test Section */}
-          <View
-            ref={searchContainerRef}
-            style={styles.addTestSection}
-            onFocus={handleContainerFocus}
-            onBlur={handleContainerBlur}
-          >
-            <Text style={styles.addTestLabel}>Select Test</Text>
-            <View style={styles.searchInputContainer}>
-              <TextInput
-                testID="test-search-input"
-                id="test-search-input"
-                nativeID="test-search-input"
-                name="test-search"
-                accessibilityLabel="Select Test"
-                style={styles.searchInput}
-                placeholder="Enter test, e.g., HbA1c, ASP..."
-                placeholderTextColor={COLORS.light.placeholder}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                onFocus={() => setIsSearchFocused(true)}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  testID="clear-search-button"
-                  onPress={() => setSearchQuery('')}
-                  style={styles.searchClearButton}
+              {/* Autocomplete Dropdown */}
+              {isSearchFocused && autocompleteResults.length > 0 && (
+                <View
+                  style={styles.autocompleteCard}
+                  testID="autocomplete-list"
                 >
-                  <X color={COLORS.light.iconClear} size={18} />
-                </TouchableOpacity>
+                  <ScrollView
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    style={styles.autocompleteScroll}
+                  >
+                    {autocompleteResults.map((marker) => {
+                      const isFocused = focusedMarkerId === marker.id;
+                      return (
+                        <TouchableOpacity
+                          key={marker.id}
+                          testID={`autocomplete-item-${marker.id}`}
+                          style={[
+                            styles.autocompleteItem,
+                            isFocused && styles.autocompleteItemFocused,
+                          ]}
+                          onFocus={() => setFocusedMarkerId(marker.id)}
+                          onBlur={() => {
+                            if (focusedMarkerId === marker.id) {
+                              setFocusedMarkerId(null);
+                            }
+                          }}
+                          onPress={() => handleSelectBiomarker(marker)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.autocompleteItemName,
+                              isFocused && styles.autocompleteItemNameFocused,
+                            ]}
+                          >
+                            {marker.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               )}
             </View>
+          </ScrollView>
 
-            {/* Autocomplete Dropdown */}
-            {isSearchFocused && autocompleteResults.length > 0 && (
-              <View style={styles.autocompleteCard} testID="autocomplete-list">
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled
-                  style={styles.autocompleteScroll}
-                >
-                  {autocompleteResults.map((marker) => {
-                    const isFocused = focusedMarkerId === marker.id;
-                    return (
-                      <TouchableOpacity
-                        key={marker.id}
-                        testID={`autocomplete-item-${marker.id}`}
-                        style={[
-                          styles.autocompleteItem,
-                          isFocused && styles.autocompleteItemFocused,
-                        ]}
-                        onFocus={() => setFocusedMarkerId(marker.id)}
-                        onBlur={() => {
-                          if (focusedMarkerId === marker.id) {
-                            setFocusedMarkerId(null);
-                          }
-                        }}
-                        onPress={() => handleSelectBiomarker(marker)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.autocompleteItemName,
-                            isFocused && styles.autocompleteItemNameFocused,
-                          ]}
-                        >
-                          {marker.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Bottom Save Action */}
-        <FormActionDock
-          onAdd={() => setShowPlusMenu((visible) => !visible)}
-          addExpanded={showPlusMenu}
-          addDisabled={!showPlusButton}
-          addTestID="plus-menu-button"
-          onSave={handleSave}
-          isSaving={isSaving}
-          saveDisabled={activeItems.length === 0}
-          deleteLabel="Delete lab result"
-          deleteTestID="delete-report-button"
-          deleteConfirmation={
-            isEdit && reportId
-              ? {
-                  title: 'Delete Lab Result',
-                  message:
-                    'Are you sure you want to delete this lab result? This action cannot be undone.',
-                  onConfirm: async () => {
-                    await deleteReport(reportId);
-                    triggerSync().catch((error) =>
-                      console.warn(
-                        'Background sync failed on delete report:',
-                        error
-                      )
-                    );
-                    router.dismissTo('/');
-                  },
-                }
-              : undefined
-          }
-        />
-
-        {/* Plus Action Overlay ("Add Time", "Add Notes") */}
-        <FloatingAddMenu
-          testID="form-add-menu"
-          visible={showPlusMenu}
-          onClose={() => setShowPlusMenu(false)}
-          options={[
-            ...(!hasTime
-              ? [
-                  {
-                    id: 'add-time',
-                    label: 'Add Time',
-                    icon: (
-                      <Clock
-                        color={COLORS.light.primary}
-                        size={20}
-                        style={{ marginRight: 12 }}
-                      />
-                    ),
-                    testID: 'menu-add-time',
-                    onPress: () => {
-                      const now = new Date();
-                      const h = now.getHours().toString().padStart(2, '0');
-                      const m = now.getMinutes().toString().padStart(2, '0');
-                      setTestTime(`${h}:${m}`);
+          {/* Bottom Save Action */}
+          <FormActionDock
+            onAdd={() => setShowPlusMenu((visible) => !visible)}
+            addExpanded={showPlusMenu}
+            addDisabled={!showPlusButton}
+            addTestID="plus-menu-button"
+            onSave={handleSave}
+            isSaving={isSaving}
+            saveDisabled={activeItems.length === 0}
+            hasChanges={hasChanges}
+            deleteLabel="Delete lab result"
+            deleteTestID="delete-report-button"
+            deleteConfirmation={
+              isEdit && reportId
+                ? {
+                    title: 'Delete Lab Result',
+                    message:
+                      'Are you sure you want to delete this lab result? This action cannot be undone.',
+                    onConfirm: async () => {
+                      await deleteReport(reportId);
+                      router.dismissTo('/');
                     },
-                  },
-                ]
-              : []),
-            ...(!hasNotes
-              ? [
-                  {
-                    id: 'add-notes',
-                    label: 'Add Notes',
-                    icon: (
-                      <FileText
-                        color={COLORS.light.primary}
-                        size={20}
-                        style={{ marginRight: 12 }}
-                      />
-                    ),
-                    testID: 'menu-add-notes',
-                    onPress: () => {
-                      setShowNotesInput(true);
+                  }
+                : undefined
+            }
+          />
+
+          {/* Plus Action Overlay ("Add Time", "Add Service provider", "Add Notes") */}
+          <FloatingAddMenu
+            testID="form-add-menu"
+            visible={showPlusMenu}
+            onClose={() => setShowPlusMenu(false)}
+            options={[
+              ...(!hasTime
+                ? [
+                    {
+                      id: 'add-time',
+                      label: 'Time',
+                      icon: (
+                        <Clock
+                          color={COLORS.light.primary}
+                          size={20}
+                          style={{ marginRight: 12 }}
+                        />
+                      ),
+                      testID: 'menu-add-time',
+                      onPress: () => {
+                        const now = new Date();
+                        const h = now.getHours().toString().padStart(2, '0');
+                        const m = now.getMinutes().toString().padStart(2, '0');
+                        setTestTime(`${h}:${m}`);
+                      },
                     },
-                  },
-                ]
-              : []),
-          ]}
-        />
-      </View>
-    </SafeAreaView>
+                  ]
+                : []),
+              ...(!hasServiceProvider
+                ? [
+                    {
+                      id: 'add-service-provider',
+                      label: 'Service provider',
+                      icon: (
+                        <Hospital
+                          color={COLORS.light.primary}
+                          size={20}
+                          style={{ marginRight: 12 }}
+                        />
+                      ),
+                      testID: 'menu-add-service-provider',
+                      onPress: () => setServiceProviderName(''),
+                    },
+                  ]
+                : []),
+              ...(!hasNotes
+                ? [
+                    {
+                      id: 'add-notes',
+                      label: 'Notes',
+                      icon: (
+                        <FileText
+                          color={COLORS.light.primary}
+                          size={20}
+                          style={{ marginRight: 12 }}
+                        />
+                      ),
+                      testID: 'menu-add-notes',
+                      onPress: () => {
+                        setShowNotesInput(true);
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </View>
+      </SafeAreaView>
+    </FieldRevealProvider>
   );
 }
 
@@ -681,39 +781,6 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     padding: 16,
     paddingBottom: 132,
-  },
-  pillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  notesSection: {
-    marginBottom: 16,
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  notesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 8,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: COLORS.light.foreground,
-    minHeight: 60,
-    textAlignVertical: 'top',
   },
   activeTestsList: {
     gap: 16,

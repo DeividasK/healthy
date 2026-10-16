@@ -2,15 +2,13 @@ import { formatLocalDate } from '@/src/utils/dateUtils';
 import {
   test,
   expect,
-  clearAppStorage,
-  createPatientViaUI,
+  seedTestPatient,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
   });
 
   test(
@@ -28,11 +26,17 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
           page.getByRole('heading', { name: 'Add Lab Results', exact: true })
         ).toBeVisible();
         await expect(addLabResultsMenuBtn).not.toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        await checkA11y(page);
       });
 
       await test.step('Search and select Hemoglobin and WBC biomarkers', async () => {
         const searchInput = page.getByTestId('test-search-input');
+        await searchInput.fill('Platelets');
+        await page.getByTestId('autocomplete-item-cbc_platelets').click();
+        await expect(page.getByTestId('marker-card-0')).toBeVisible();
+        await page.getByTestId('remove-marker-0').click();
+        await expect(page.getByTestId('marker-card-0')).toHaveCount(0);
+
         await searchInput.fill('Hemoglobin');
         const hemoglobinOption = page.getByTestId(
           'autocomplete-item-cbc_hemoglobin'
@@ -52,6 +56,12 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(wbcOption).toBeVisible();
         await wbcOption.click();
 
+        const nativeSelect = page
+          .getByTestId('unit-picker-button-1')
+          .locator('select');
+        await expect(nativeSelect).toHaveValue('10*3/uL');
+        await nativeSelect.selectOption('10*9/L');
+        await expect(nativeSelect).toHaveValue('10*9/L');
         const wbcCard = page.getByTestId('marker-card-1');
         await expect(wbcCard).toBeVisible();
         await expect(
@@ -94,7 +104,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(
           page
             .getByTestId('results-scroll-view')
-            .locator('[data-testid^=\"report-card-\"]')
+            .locator('[data-testid^="report-card-"]')
             .getByText('14.5')
         ).toBeVisible();
         await expect(
@@ -106,35 +116,25 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(
           page
             .getByTestId('results-scroll-view')
-            .locator('[data-testid^=\"report-card-\"]')
+            .locator('[data-testid^="report-card-"]')
             .getByText('6.8')
         ).toBeVisible();
+        const stored = await page.evaluate(() =>
+          (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+            'SELECT fhir_json FROM observations'
+          )
+        );
+        expect(
+          stored
+            .map((row: { fhir_json: string }) => JSON.parse(row.fhir_json))
+            .find((resource: any) => resource.code.coding[0].code === '6690-2')
+            .valueQuantity.code
+        ).toBe('10*9/L');
+
         await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
       });
     }
   );
-
-  test('should allow removing a test from the active list before saving', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Add Platelets
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Platelets');
-    const plateletsOption = page.getByTestId('autocomplete-item-cbc_platelets');
-    await plateletsOption.click();
-
-    await expect(page.getByTestId('marker-card-0')).toBeVisible();
-
-    // Click remove button (X)
-    const removeBtn = page.getByTestId('remove-marker-0');
-    await removeBtn.click();
-
-    // Verify card is removed
-    await expect(page.getByTestId('marker-card-0')).not.toBeVisible();
-  });
 
   test('should open and update date and time via native dropdown inputs', async ({
     page,
@@ -192,6 +192,17 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     // 3. Add Notes
     await page.getByTestId('menu-add-notes').click();
     await expect(page.getByTestId('notes-input')).toBeVisible();
+
+    // Add Service provider once the previous menu has closed
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+    await plusBtn.click();
+    await page
+      .getByTestId('form-add-menu')
+      .getByTestId('menu-add-service-provider')
+      .click();
+    await expect(
+      page.getByTestId('lab-result-service-provider-input')
+    ).toBeVisible();
 
     // 4. Keep the primary add action in place, disabled when all fields are present
     await expect(plusBtn).toBeDisabled();
@@ -303,29 +314,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     }
   });
 
-  test('should change biomarker unit using native dropdown', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Add WBC (units: '10*3/uL', '10*9/L', '/uL')
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('WBC');
-    await page.getByTestId('autocomplete-item-cbc_wbc').click();
-
-    const unitPicker = page.getByTestId('unit-picker-button-0');
-    await expect(unitPicker).toContainText('10*3/uL');
-
-    // Native select element should exist
-    const nativeSelect = unitPicker.locator('select');
-    await expect(nativeSelect).toBeAttached();
-
-    // Select alternative unit: '10*9/L'
-    await nativeSelect.selectOption('10*9/L');
-    await expect(unitPicker).toContainText('10*9/L');
-  });
-
   test('should validate that date and time cannot be set to the future', async ({
     page,
   }) => {
@@ -405,5 +393,45 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await expect(page.getByTestId('time-picker-button')).not.toContainText(
       '23:55'
     );
+  });
+
+  test('records a service provider as an Organization performer', async ({
+    page,
+  }) => {
+    await page.goto('/lab-result/add');
+    await page.getByTestId('test-search-input').fill('Hemoglobin');
+    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
+    await page.getByTestId('marker-value-input-0').fill('14.5');
+    await page.getByTestId('plus-menu-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await page
+      .getByTestId('lab-result-service-provider-input')
+      .fill('City Laboratory');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/lab-result\/add/);
+
+    const stored = await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        report: JSON.parse(
+          (
+            await bridge.querySql('SELECT fhir_json FROM diagnostic_reports;')
+          )[0].fhir_json
+        ),
+        organizations: await bridge.querySql(
+          'SELECT id, name FROM organizations;'
+        ),
+      };
+    });
+    expect(stored.organizations).toEqual([
+      { id: expect.stringMatching(/^org-/), name: 'City Laboratory' },
+    ]);
+    expect(stored.report.performer).toEqual([
+      {
+        reference: `Organization/${stored.organizations[0].id}`,
+        type: 'Organization',
+        display: 'City Laboratory',
+      },
+    ]);
   });
 });

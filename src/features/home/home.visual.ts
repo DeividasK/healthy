@@ -1,16 +1,17 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
+  seedTestResources,
   seedTestReport,
   seedTestCondition,
   seedTestConsultation,
+  seedTestTreatment,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -36,15 +37,19 @@ test.describe('Home View - Visual Regression', () => {
       doctorName: 'Dr. Sarah Connor',
       notes: 'Follow-up next year.',
     });
-    await page.goto('/');
-    await page
-      .getByTestId('consultation-card-consultation-home-visual')
-      .waitFor();
-    await takeSnapshot(
-      page,
-      'Home View - Condition and Consultation cards',
-      testInfo
-    );
+    await seedTestTreatment(page, {
+      id: 'home-treatment',
+      title: 'Lisinopril 10mg',
+      dosageInstructions: 'Take 1 tablet daily.',
+    });
+    await seedTestServiceRequest(page, {
+      id: 'home-service-request',
+      title: 'Knee MRI',
+      category: '363679005',
+      authoredOn: '2026-10-04',
+      consultationId: 'consultation-home-visual',
+      reasonConditionIds: ['condition-home-visual'],
+    });
     await seedTestCondition(page, {
       id: 'second-home-visual',
       title: 'Ligament injury',
@@ -143,5 +148,30 @@ test.describe('Home View - Visual Regression', () => {
     await page.screenshot({
       path: testInfo.outputPath('labs-summary-search.png'),
     });
+  });
+  test('Home View - Collapsed and expanded sections', async ({
+    page,
+  }, testInfo) => {
+    await seedTestResources(page, {
+      conditions: [1, 2, 3, 4].map((n) => ({
+        id: `collapse-condition-${n}`,
+        title: `Condition ${n}`,
+        onsetDate: `2026-0${n}-01`,
+      })),
+      consultations: [1, 2, 3, 4].map((n) => ({
+        id: `collapse-consultation-${n}`,
+        title: `Consultation ${n}`,
+        date: `2026-0${n}-15`,
+        doctorName: `Specialist ${n}`,
+        conditionIds: [`collapse-condition-${n}`],
+      })),
+    });
+
+    await page.getByTestId('conditions-list-toggle').waitFor();
+    await takeSnapshot(page, 'Home View - Collapsed sections', testInfo);
+    await page.getByTestId('conditions-list-toggle').click();
+    await page.getByTestId('consultations-list-toggle').click();
+    await page.getByTestId('condition-card-collapse-condition-1').waitFor();
+    await takeSnapshot(page, 'Home View - Expanded sections', testInfo);
   });
 });

@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -12,7 +11,6 @@ import {
 
 test.describe('Multiple consultation diagnoses', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, { id: 'diagnosis-patient' });
   });
 
@@ -58,7 +56,7 @@ test.describe('Multiple consultation diagnoses', () => {
     );
     const id = rows[0].id;
     await page.goto('/');
-    await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(0);
+    await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
     for (const conditionId of ['first', 'third']) {
       await page.goto(`/condition/${conditionId}`);
       await expect(
@@ -66,12 +64,12 @@ test.describe('Multiple consultation diagnoses', () => {
       ).toHaveCount(1);
     }
     await page.goto(`/consultation/${id}`);
-    await expect(page.getByTestId('consultation-related-condition')).toHaveText(
-      'First diagnosis'
-    );
     await expect(
-      page.getByTestId('consultation-related-condition-third')
-    ).toHaveText('Third diagnosis');
+      page.getByTestId('consultation-related-condition-row')
+    ).toContainText('First diagnosis');
+    await expect(
+      page.getByTestId('consultation-related-condition-third-row')
+    ).toContainText('Third diagnosis');
     await page.reload();
     await expect(
       page.getByTestId('consultation-related-condition-third')
@@ -85,9 +83,9 @@ test.describe('Multiple consultation diagnoses', () => {
       'Updated review'
     );
     await page.reload();
-    await expect(page.getByTestId('consultation-related-condition')).toHaveText(
-      'Third diagnosis'
-    );
+    await expect(
+      page.getByTestId('consultation-related-condition-row')
+    ).toContainText('Third diagnosis');
     await page.goto('/condition/first');
     await expect(
       page.getByTestId(`condition-consultation-item-${id}`)

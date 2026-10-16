@@ -2,26 +2,21 @@ import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
+  connectTestSync,
 } from '@/src/features/testing/testStorage';
-import { mockGoogleDrive } from '@/src/features/testing/mockGoogleDrive';
 
 for (const transport of ['ZIP', 'encrypted Drive'] as const) {
   for (const scenario of [
     'valid CBC',
-    'unknown unit',
-    'unknown biomarker',
+    transport === 'ZIP' ? 'unknown unit' : 'unknown biomarker',
   ] as const) {
     test(`${transport} import validates ${scenario} before restoring records`, async ({
       page,
+      consoleMonitor,
     }) => {
-      await clearAppStorage(page);
-      await seedTestPatient(page, {
-        id: 'cbc-import-patient',
-        syncAccount: 'cbc-import-user',
-      });
+      await seedTestPatient(page, { id: 'cbc-import-patient' });
       await seedTestReport(page, {
         id: 'cbc-import-report',
         biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
@@ -56,10 +51,6 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
           );
         }, scenario);
       }
-      const config = {
-        accessToken: 'synthetic-token',
-        userSub: 'cbc-import-user',
-      };
       let archive: number[] = [];
       if (transport === 'ZIP') {
         const download = page.waitForEvent('download');
@@ -68,21 +59,21 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
         );
         archive = Array.from(await readFile((await (await download).path())!));
       } else {
-        await mockGoogleDrive(page);
-        await page.evaluate(
-          (config) =>
-            (window as any).__HEALTHY_TEST_BRIDGE__.backupToGoogleDrive(config),
-          config
+        await connectTestSync(page);
+        await page.evaluate(() =>
+          (window as any).__HEALTHY_TEST_BRIDGE__.syncNow()
         );
+        // Sync defers an invalid change instead of failing the whole round.
+        consoleMonitor.ignore('Deferred sync change DiagnosticReport/');
       }
       const restored = await page.evaluate(
-        async ({ transport, config, archive }) => {
+        async ({ transport, archive }) => {
           const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
           await bridge.clearDatabase();
           let error = '';
           try {
             if (transport === 'ZIP') await bridge.restoreArchive(archive);
-            else await bridge.restoreFromGoogleDrive(config);
+            else await bridge.syncAllProfiles();
           } catch (failure) {
             error = (failure as Error).message;
           }
@@ -93,9 +84,12 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
             observations: await bridge.querySql(
               'SELECT fhir_json FROM observations'
             ),
+            deferred: await bridge.querySql(
+              'SELECT error FROM sync_pending_apply'
+            ),
           };
         },
-        { transport, config, archive }
+        { transport, archive }
       );
       if (scenario === 'valid CBC') {
         expect(restored.error).toBe('');
@@ -107,15 +101,21 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
           code: 'g/L',
         });
         expect(observation.referenceRange[0].low.value).toBe(135);
-      } else {
-        expect(restored.error).toContain(
-          scenario === 'unknown unit'
-            ? 'Unsupported unit "g/l-typo"'
-            : 'is not in the CBC catalog'
-        );
+      } else if (transport === 'ZIP') {
+        expect(restored.error).toContain('Unsupported unit "g/l-typo"');
         expect(restored.patients).toHaveLength(0);
         expect(restored.reports).toHaveLength(0);
         expect(restored.observations).toHaveLength(0);
+      } else {
+        // The profile syncs; the invalid report waits, unapplied.
+        expect(restored.error).toBe('');
+        expect(restored.patients).toHaveLength(1);
+        expect(restored.reports).toHaveLength(0);
+        expect(restored.observations).toHaveLength(0);
+        expect(restored.deferred).toHaveLength(1);
+        expect(restored.deferred[0].error).toContain(
+          'is not in the CBC catalog'
+        );
       }
     });
   }

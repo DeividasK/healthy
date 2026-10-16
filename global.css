@@ -51,7 +51,53 @@
   }
 }
 
-/* Keep this field's text color when NativeWind applies its placeholder-shown reset. */
-#condition-search-input:placeholder-shown {
-  color: rgb(var(--foreground));
+/* Form field states on web: hover, pressed and keyboard focus. Date, time
+   and unit pickers hide their native control inside a visible wrapper, so
+   the wrapper carries the state. */
+@layer components {
+  input:not([type]),
+  input[type='text'],
+  input[type='number'],
+  textarea,
+  select,
+  div:has(> input[type='date']),
+  div:has(> input[type='time']),
+  div:has(> select[name$='-unit']) {
+    transition:
+      border-color 120ms,
+      outline-color 120ms;
+  }
+  input:not([type]):hover,
+  input[type='text']:hover,
+  input[type='number']:hover,
+  textarea:hover,
+  select:hover:not(:disabled),
+  div:has(> input[type='date']):hover,
+  div:has(> input[type='time']):hover {
+    border-color: rgb(var(--muted-foreground)) !important;
+  }
+  input:not([type]):active,
+  input[type='text']:active,
+  input[type='number']:active,
+  textarea:active,
+  select:active:not(:disabled),
+  div:has(> input[type='date']):active,
+  div:has(> input[type='time']):active {
+    border-color: rgb(var(--primary)) !important;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  div:has(> input[type='date']:focus-visible),
+  div:has(> input[type='time']:focus-visible),
+  div:has(> select[name$='-unit']:focus-visible) {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 1px;
+    border-color: rgb(var(--ring)) !important;
+  }
+  /* The hidden native controls must not draw their own ring. */
+  input[type='date']:focus-visible,
+  input[type='time']:focus-visible {
+    outline: none;
+  }
 }

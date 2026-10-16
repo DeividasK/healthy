@@ -1,22 +1,15 @@
 import type { Patient } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 export const DEFAULT_PATIENT_ID = 'patient-default';
-
-export interface StoredPatient {
-  patient: Patient;
-  syncAccount?: string | null;
-}
 
 /**
  * Persists a Patient record using SQLite.
  */
 export async function insertPatientRecord(
   patient: Patient,
-  syncAccount?: string | null,
-  isRemoteSync: boolean = false
+  withinTransaction: boolean = false
 ): Promise<void> {
   if (!patient.id) {
     throw new Error('Patient requires an id to be persisted');
@@ -37,43 +30,32 @@ export async function insertPatientRecord(
   const familyName = patient.name?.[0]?.family || null;
   const gender = patient.gender || null;
   const birthDate = patient.birthDate || null;
-  const patientId = patient.id;
 
-  const existing = await db.getFirstAsync<{ updated_at: string }>(
-    `SELECT updated_at FROM patients WHERE id = ?;`,
-    [patientId]
-  );
-  if (
-    isRemoteSync &&
-    existing?.updated_at &&
-    isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-  ) {
-    return;
-  }
-
-  await db.runAsync(
-    `INSERT INTO patients (id, given_name, family_name, gender, birth_date, fhir_json, sync_account, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       given_name = excluded.given_name,
-       family_name = excluded.family_name,
-       gender = excluded.gender,
-       birth_date = excluded.birth_date,
-       fhir_json = excluded.fhir_json,
-       sync_account = COALESCE(excluded.sync_account, patients.sync_account),
-       updated_at = excluded.updated_at;`,
-    [
-      patientId,
-      givenName,
-      familyName,
-      gender,
-      birthDate,
-      JSON.stringify(patientWithMeta),
-      syncAccount ?? null,
-      now,
-      incomingTimestamp,
-    ]
-  );
+  const persist = async () => {
+    await db.runAsync(
+      `INSERT INTO patients (id, given_name, family_name, gender, birth_date, fhir_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         given_name = excluded.given_name,
+         family_name = excluded.family_name,
+         gender = excluded.gender,
+         birth_date = excluded.birth_date,
+         fhir_json = excluded.fhir_json,
+         updated_at = excluded.updated_at;`,
+      [
+        patient.id!,
+        givenName,
+        familyName,
+        gender,
+        birthDate,
+        JSON.stringify(patientWithMeta),
+        now,
+        incomingTimestamp,
+      ]
+    );
+  };
+  if (withinTransaction) await persist();
+  else await db.withTransactionAsync(persist);
 
   notifyDatabaseChanged(['patients']);
 }
@@ -92,30 +74,6 @@ export async function fetchAllPatients(): Promise<Patient[]> {
       pat.meta = { ...pat.meta, lastUpdated: r.updated_at };
     }
     return pat;
-  });
-}
-
-/**
- * Retrieves all stored Patient records along with their sync_account.
- */
-export async function fetchAllStoredPatients(): Promise<StoredPatient[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<{
-    fhir_json: string;
-    sync_account: string | null;
-    updated_at: string;
-  }>(
-    `SELECT fhir_json, sync_account, updated_at FROM patients ORDER BY created_at ASC, id ASC;`
-  );
-  return rows.map((r) => {
-    const pat: Patient = JSON.parse(r.fhir_json);
-    if (!pat.meta?.lastUpdated && r.updated_at) {
-      pat.meta = { ...pat.meta, lastUpdated: r.updated_at };
-    }
-    return {
-      patient: pat,
-      syncAccount: r.sync_account,
-    };
   });
 }
 
@@ -148,41 +106,23 @@ export async function fetchPatientById(id: string): Promise<Patient | null> {
 }
 
 /**
- * Retrieves a Patient record with syncAccount by ID.
- */
-export async function fetchStoredPatientById(
-  id: string
-): Promise<StoredPatient | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<{
-    fhir_json: string;
-    sync_account: string | null;
-    updated_at: string;
-  }>(`SELECT fhir_json, sync_account, updated_at FROM patients WHERE id = ?;`, [
-    id,
-  ]);
-  if (!row) return null;
-  const pat: Patient = JSON.parse(row.fhir_json);
-  if (!pat.meta?.lastUpdated && row.updated_at) {
-    pat.meta = { ...pat.meta, lastUpdated: row.updated_at };
-  }
-  return {
-    patient: pat,
-    syncAccount: row.sync_account,
-  };
-}
-
-/**
  * Deletes a Patient record by ID. Also removes associated records via cascade.
+ * Captured as deletions, so synced devices delete the profile too.
  */
 export async function deletePatientRecord(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM patients WHERE id = ?;`, [id]);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM patients WHERE id = ?;`, [id]);
+  });
   notifyDatabaseChanged([
     'patients',
     'conditions',
     'consultations',
     'consultation_conditions',
+    'medication_requests',
+    'service_requests',
+    'clinical_documents',
+    'organizations',
   ]);
 }
 
@@ -208,21 +148,6 @@ export async function setActivePatientId(patientId: string): Promise<void> {
     [patientId]
   );
   notifyDatabaseChanged(['app_settings']);
-}
-
-/**
- * Updates the sync_account associated with a patient.
- */
-export async function updatePatientSyncAccount(
-  id: string,
-  syncAccount: string | null
-): Promise<void> {
-  const db = await getDb();
-  await db.runAsync(`UPDATE patients SET sync_account = ? WHERE id = ?;`, [
-    syncAccount,
-    id,
-  ]);
-  notifyDatabaseChanged(['patients']);
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { Encounter } from 'fhir/r5';
+import type { Encounter, MedicationRequest, ServiceRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import {
   getConsultationTitle,
@@ -7,15 +7,11 @@ import {
   getConsultationNotes,
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
+  getConsultationBasedOnIds,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
-import {
-  recordPendingConsultationDeletion,
-  clearPendingConsultationDeletions,
-  recordPendingClinicalResourceDeletion,
-} from '@/src/services/syncDeletions';
+import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
 
 /**
  * Persists an Encounter (Consultation) record using SQLite.
@@ -24,7 +20,6 @@ import {
 export async function insertConsultationRecord(
   consultation: Encounter,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!consultation.id) {
@@ -97,15 +92,6 @@ export async function insertConsultationRecord(
       );
     }
 
-    // Last-write-wins: during remote sync, if existing record is newer than or same as incoming change, keep existing
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
-    }
-
     for (const conditionId of new Set([
       ...conditionIds,
       ...getConsultationReasonConditionIds(consultation),
@@ -117,6 +103,24 @@ export async function insertConsultationRecord(
       if (!condition)
         throw new Error(
           'Diagnosis must reference an existing condition belonging to the same patient'
+        );
+    }
+
+    await assertOrganizationReferences(
+      [consultation.serviceProvider?.reference],
+      patientId
+    );
+
+    // A referenced ServiceRequest must belong to the same patient. One not
+    // stored yet is tolerated, so restores and sync can apply in any order.
+    for (const requestId of getConsultationBasedOnIds(consultation)) {
+      const request = await db.getFirstAsync<{ patient_id: string }>(
+        'SELECT patient_id FROM service_requests WHERE id = ?;',
+        [requestId]
+      );
+      if (request && request.patient_id !== patientId)
+        throw new Error(
+          'Encounter basedOn must reference a service request for the same patient'
         );
     }
 
@@ -162,7 +166,6 @@ export async function insertConsultationRecord(
   else await db.withTransactionAsync(persist);
 
   if (didUpdate && !withinTransaction) {
-    await clearPendingConsultationDeletions([consId]);
     notifyDatabaseChanged(['consultations', 'consultation_conditions']);
   }
 }
@@ -244,28 +247,41 @@ export async function fetchConsultationById(
 export async function deleteConsultationRecord(id: string): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
-    const doc = await db.getFirstAsync<{ id: string; patient_id: string }>(
-      `SELECT id, patient_id FROM clinical_documents WHERE consultation_id = ?;`,
-      [id]
-    );
-    const deleted = await db.runAsync(
-      `DELETE FROM consultations WHERE id = ?;`,
-      [id]
-    );
-    if (doc && deleted.changes) {
-      await recordPendingClinicalResourceDeletion(
-        'Composition',
-        doc.id,
-        doc.patient_id,
-        true
-      );
+    // Retain independent requests and clear their originating encounter in
+    // both FHIR and SQL. Failures abort the whole deletion so the projection
+    // never diverges from the canonical resource.
+    const now = new Date().toISOString();
+    for (const table of ['medication_requests', 'service_requests']) {
+      const originating = await db.getAllAsync<{
+        id: string;
+        fhir_json: string;
+      }>(`SELECT id, fhir_json FROM ${table} WHERE consultation_id = ?;`, [id]);
+      for (const row of originating) {
+        const req: MedicationRequest | ServiceRequest = JSON.parse(
+          row.fhir_json
+        );
+        delete req.encounter;
+        req.meta = { ...req.meta, lastUpdated: now };
+        await db.runAsync(
+          `UPDATE ${table}
+           SET consultation_id = NULL,
+               fhir_json = ?,
+               updated_at = ?
+           WHERE id = ?;`,
+          [JSON.stringify(req), now, row.id]
+        );
+      }
     }
+
+    // The Composition goes with it (ON DELETE CASCADE).
+    await db.runAsync(`DELETE FROM consultations WHERE id = ?;`, [id]);
   });
-  await recordPendingConsultationDeletion(id);
   notifyDatabaseChanged([
     'consultations',
     'consultation_conditions',
     'clinical_documents',
+    'medication_requests',
+    'service_requests',
   ]);
 }
 

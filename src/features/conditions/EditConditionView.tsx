@@ -2,25 +2,46 @@ import { getConditionCategoryLabel } from './conditionCategories';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ConditionForm, ConditionFormValues } from './ConditionForm';
 import {
   getConditionById,
   createOrUpdateCondition,
   type ConditionInput,
-  deleteCondition,
 } from './conditionService';
 import { getConditionTitle, getConditionNotes } from '@/src/utils/fhirUtils';
-import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
+import { ClipboardList, Pill, Stethoscope } from 'lucide-react-native';
+import {
+  diffLinkIds,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
+import {
+  CONSULTATION_CONDITION_ROLE_OPTIONS,
+  getConsultationConditionRole,
+  getConsultationLinkOptions,
+  getConsultationsByConditionId,
+  setConsultationConditionRole,
+  type ConsultationConditionRole,
+} from '@/src/features/consultations/consultationService';
+import {
+  getTreatmentLinkOptions,
+  getTreatmentsByConditionId,
+  setTreatmentConditionLink,
+} from '@/src/features/treatments/treatmentService';
+import {
+  getServiceRequestsByConditionId,
+  getServiceRequestLinkOptions,
+  setServiceRequestConditionLink,
+} from '@/src/features/service-requests/serviceRequestService';
 
 export function EditConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
-  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConditionFormValues | null>(null);
+  const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
 
@@ -34,8 +55,57 @@ export function EditConditionView() {
     let isMounted = true;
     (async () => {
       try {
-        const condition = await getConditionById(id, activePatientId);
+        const [
+          condition,
+          consultationOptions,
+          linkedConsultations,
+          treatmentOptions,
+          linkedTreatments,
+          serviceRequestOptions,
+          linkedServiceRequests,
+        ] = await Promise.all([
+          getConditionById(id, activePatientId),
+          getConsultationLinkOptions(activePatientId),
+          getConsultationsByConditionId(id),
+          getTreatmentLinkOptions(activePatientId),
+          getTreatmentsByConditionId(id, activePatientId),
+          getServiceRequestLinkOptions(activePatientId),
+          getServiceRequestsByConditionId(id, activePatientId),
+        ]);
         if (!isMounted) return;
+        setLinkFields([
+          {
+            type: 'consultation',
+            label: 'Consultations',
+            icon: Stethoscope,
+            options: consultationOptions,
+            initialIds: linkedConsultations.map((item) => item.id!),
+            roles: {
+              options: CONSULTATION_CONDITION_ROLE_OPTIONS,
+              defaultRole: 'reason',
+              initial: Object.fromEntries(
+                linkedConsultations.map((item) => [
+                  item.id!,
+                  getConsultationConditionRole(item, id) || 'reason',
+                ])
+              ),
+            },
+          },
+          {
+            type: 'treatment',
+            label: 'Treatments',
+            icon: Pill,
+            options: treatmentOptions,
+            initialIds: linkedTreatments.map((item) => item.id!),
+          },
+          {
+            type: 'service-request',
+            label: 'Service requests',
+            icon: ClipboardList,
+            options: serviceRequestOptions,
+            initialIds: linkedServiceRequests.map((item) => item.id!),
+          },
+        ]);
         if (!condition) {
           setNotFound(true);
           return;
@@ -122,30 +192,50 @@ export function EditConditionView() {
     );
   }
 
-  const handleSave = async (values: ConditionInput) => {
-    await createOrUpdateCondition({
-      ...values,
-      id,
-      patientId: activePatientId || initialPatientId,
-    });
-    triggerSync().catch((err) =>
-      console.warn('Background sync failed on edit condition:', err)
+  const handleSave = async (
+    values: ConditionInput,
+    links: Record<string, LinkSelection>
+  ) => {
+    const patientId = activePatientId || initialPatientId!;
+    await createOrUpdateCondition({ ...values, id, patientId });
+    const [consultations, treatments, serviceRequests] = linkFields;
+    const consultationLinks = links.consultation;
+    for (const consultationId of diffLinkIds(
+      consultations.initialIds,
+      consultationLinks.ids
+    ).removed)
+      await setConsultationConditionRole(consultationId, id, patientId, null);
+    for (const consultationId of consultationLinks.ids)
+      await setConsultationConditionRole(
+        consultationId,
+        id,
+        patientId,
+        consultationLinks.roles[consultationId] as ConsultationConditionRole
+      );
+    const treatmentChanges = diffLinkIds(
+      treatments.initialIds,
+      links.treatment.ids
     );
+    for (const treatmentId of treatmentChanges.added)
+      await setTreatmentConditionLink(treatmentId, id, patientId, true);
+    for (const treatmentId of treatmentChanges.removed)
+      await setTreatmentConditionLink(treatmentId, id, patientId, false);
+    const serviceRequestChanges = diffLinkIds(
+      serviceRequests.initialIds,
+      links['service-request'].ids
+    );
+    for (const requestId of serviceRequestChanges.added)
+      await setServiceRequestConditionLink(requestId, id, patientId, true);
+    for (const requestId of serviceRequestChanges.removed)
+      await setServiceRequestConditionLink(requestId, id, patientId, false);
   };
 
   return (
     <ConditionForm
       isEdit
       initialValues={initialValues}
+      linkFields={linkFields}
       onSave={handleSave}
-      onDelete={async () => {
-        if (!id) return;
-        await deleteCondition(id);
-        triggerSync().catch((error) =>
-          console.warn('Background sync failed on delete condition:', error)
-        );
-        router.dismissTo('/');
-      }}
     />
   );
 }

@@ -234,7 +234,7 @@ export async function createOrUpdateCondition(
     else delete condition.code.coding;
   }
 
-  await insertConditionRecord(condition, patientId, false, withinTransaction);
+  await insertConditionRecord(condition, patientId, withinTransaction);
   return condition;
 }
 

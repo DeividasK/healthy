@@ -11,6 +11,10 @@ import {
   deleteDiagnosticReportRecord,
 } from './labResultsRepository';
 import { DiagnosticReportRecord } from '@/src/database/types';
+import { getDb } from '@/src/database/db';
+import { notifyDatabaseChanged } from '@/src/database/dbEvents';
+import { resolveOrganizationReference } from '@/src/features/organizations/organizationService';
+import { isOrganizationReference } from '@/src/utils/fhirUtils';
 
 export interface DiagnosticReportBundle {
   report: DiagnosticReport;
@@ -34,6 +38,11 @@ export interface CreateReportOptions {
   date: string; // YYYY-MM-DD
   time?: string; // e.g. "09:30"
   notes?: string;
+  /**
+   * Service provider (Organization) name, found or created on save. Omit to
+   * keep the stored performers; `null` or blank removes the Organization.
+   */
+  serviceProviderName?: string | null;
   items: BiomarkerInputItem[];
 }
 
@@ -179,12 +188,10 @@ export async function createAndSaveDiagnosticReport(
     ? 'Complete blood count (hemogram) panel - Blood by Automated count'
     : 'Laboratory report';
 
-  const report: DiagnosticReport = {
+  // Elements the form edits; everything else comes from the stored report.
+  const fields: DiagnosticReport = {
     resourceType: 'DiagnosticReport',
     id: reportId,
-    meta: {
-      lastUpdated: now,
-    },
     status: 'final',
     category: [
       {
@@ -219,17 +226,60 @@ export async function createAndSaveDiagnosticReport(
       display: obs.code.coding?.[0]?.display || obs.code.text,
     })),
   };
+  const notes = options.notes?.trim();
+  const providerName = options.serviceProviderName?.trim();
 
-  if (options.notes && options.notes.trim()) {
-    report.note = [
-      {
-        text: options.notes.trim(),
-        time: now,
-      },
-    ];
-  }
+  const db = await getDb();
+  let report!: DiagnosticReport;
+  // Read and merge the stored report in the saving transaction, so a sync
+  // change applied meanwhile is never overwritten by a stale copy.
+  await db.withTransactionAsync(async () => {
+    const stored = options.reportId
+      ? (await getReportById(options.reportId))?.report
+      : undefined;
+    const existing = stored ? { ...stored } : undefined;
+    // Observations are stored separately; drop any `contained` copy left by
+    // older ZIP restores.
+    delete existing?.contained;
 
-  await insertDiagnosticReportRecord(report, observations, patientId);
+    report = {
+      ...existing,
+      ...fields,
+      meta: { ...existing?.meta, lastUpdated: now },
+    };
+    if (notes) report.note = [{ text: notes, time: now }];
+    else delete report.note;
+
+    const performers = existing?.performer || [];
+    const providerIndex = performers.findIndex(isOrganizationReference);
+    const current = performers[providerIndex];
+    const keep = options.serviceProviderName === undefined;
+    const provider = keep
+      ? current
+      : !providerName
+        ? undefined
+        : current?.display === providerName
+          ? current
+          : await resolveOrganizationReference(providerName, patientId);
+    const updated = keep
+      ? performers
+      : providerIndex >= 0
+        ? performers.flatMap((performer, index) =>
+            index !== providerIndex ? [performer] : provider ? [provider] : []
+          )
+        : provider
+          ? [provider, ...performers]
+          : performers;
+    if (updated.length) report.performer = updated;
+    else delete report.performer;
+
+    await insertDiagnosticReportRecord(report, observations, patientId, true);
+  });
+  notifyDatabaseChanged([
+    'organizations',
+    'diagnostic_reports',
+    'observations',
+  ]);
 
   return { report, observations };
 }

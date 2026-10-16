@@ -1,10 +1,10 @@
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { clearPendingConsultationDeletions } from '@/src/services/syncDeletions';
 import {
   createOrUpdateCondition,
   type ConditionInput,
 } from '@/src/features/conditions/conditionService';
+import { resolveOrganizationReference } from '@/src/features/organizations/organizationService';
 import * as Crypto from 'expo-crypto';
 import type { Encounter, CodeableReference, Composition } from 'fhir/r5';
 import {
@@ -26,7 +26,13 @@ import {
   withConsultationConditions,
   getConsultationConditionIds,
   withConsultationReasons,
+  getConsultationReasonConditionIds,
+  getConsultationTitle,
+  withoutEncounterReference,
+  withConsultationBasedOn,
 } from '@/src/utils/fhirUtils';
+import { fetchServiceRequestById } from '@/src/features/service-requests/serviceRequestsRepository';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
 
 export interface ConsultationDiagnosisInput {
   title: string;
@@ -42,12 +48,19 @@ export interface ConsultationDiagnosisInput {
 export interface ConsultationInput {
   diagnoses?: ConsultationDiagnosisInput[];
   reasonConditionIds?: string[];
+  /** Service request this consultation is based on; undefined keeps them. */
+  basedOnServiceRequestIds?: string[];
   id?: string;
   patientId?: string;
   conditionIds?: string[];
   date: string; // FHIR date or date-time with timezone offset
   title: string;
   doctorName?: string;
+  /**
+   * Service provider (Organization) name, found or created on save. Omit to
+   * keep the stored reference; `null` or blank removes it.
+   */
+  serviceProviderName?: string | null;
   serviceType?: string;
   notes?: string;
   status?: string; // 'completed' | 'planned'
@@ -66,9 +79,9 @@ export async function createOrUpdateConsultation(
     await db.withTransactionAsync(async () => {
       saved = await createOrUpdateConsultation(input, true);
     });
-    await clearPendingConsultationDeletions([saved!.id!]);
     notifyDatabaseChanged([
       'conditions',
+      'organizations',
       'consultations',
       'consultation_conditions',
       'clinical_documents',
@@ -111,6 +124,8 @@ export async function createOrUpdateConsultation(
   if (!trimmedTitle) throw new Error('Consultation title is required');
   const trimmedDoctor = processedInput.doctorName?.trim() || undefined;
   const trimmedServiceType = processedInput.serviceType?.trim() || undefined;
+  const trimmedServiceProvider =
+    processedInput.serviceProviderName?.trim() || undefined;
   const trimmedNotes = processedInput.notes?.trim() || undefined;
   const existing = processedInput.id
     ? await fetchConsultationById(processedInput.id)
@@ -223,6 +238,17 @@ export async function createOrUpdateConsultation(
           };
           return updated.actor || updated.type?.length ? [updated] : [];
         }),
+    serviceProvider:
+      processedInput.serviceProviderName === undefined
+        ? existing?.serviceProvider
+        : trimmedServiceProvider
+          ? existing?.serviceProvider?.display === trimmedServiceProvider
+            ? existing.serviceProvider
+            : await resolveOrganizationReference(
+                trimmedServiceProvider,
+                patientId
+              )
+          : undefined,
     text: trimmedNotes
       ? {
           ...existing?.text,
@@ -235,6 +261,15 @@ export async function createOrUpdateConsultation(
   let result = withConsultationConditions(encounter, conditionIds);
   if (processedInput.reasonConditionIds !== undefined)
     result = withConsultationReasons(result, processedInput.reasonConditionIds);
+  if (processedInput.basedOnServiceRequestIds !== undefined) {
+    for (const requestId of processedInput.basedOnServiceRequestIds)
+      if (!(await fetchServiceRequestById(requestId, patientId)))
+        throw new Error(`Service request ${requestId} not found`);
+    result = withConsultationBasedOn(
+      result,
+      processedInput.basedOnServiceRequestIds
+    );
+  }
   if (processedInput.diagnoses !== undefined) {
     result.diagnosis = processedInput.diagnoses.map((diagnosis) => {
       if (!diagnosis.title.trim())
@@ -285,7 +320,8 @@ export async function createOrUpdateConsultation(
   }
   if (!result.serviceType?.length) delete result.serviceType;
   if (!result.participant?.length) delete result.participant;
-  await insertConsultationRecord(result, patientId, false, withinTransaction);
+  if (!result.serviceProvider) delete result.serviceProvider;
+  await insertConsultationRecord(result, patientId, withinTransaction);
 
   const existingDoc = await fetchClinicalDocumentByConsultationId(
     consId,
@@ -364,7 +400,6 @@ export async function createOrUpdateConsultation(
     await insertClinicalDocumentRecord(
       composition,
       patientId,
-      false,
       withinTransaction
     );
   } else if (existingDoc && notesSectionIndex >= 0) {
@@ -393,7 +428,6 @@ export async function createOrUpdateConsultation(
       await insertClinicalDocumentRecord(
         updatedComposition,
         patientId,
-        false,
         withinTransaction
       );
     }
@@ -409,6 +443,27 @@ export async function getAllConsultations(
   patientId?: string
 ): Promise<Encounter[]> {
   return await fetchAllConsultationRecords(patientId);
+}
+
+/**
+ * The patient's consultations as link options. Titles repeat, so the date
+ * is part of the label.
+ */
+export async function getConsultationLinkOptions(
+  patientId: string
+): Promise<{ id: string; label: string }[]> {
+  return (await getAllConsultations(patientId)).flatMap((consultation) => {
+    if (!consultation.id) return [];
+    const date =
+      consultation.actualPeriod?.start || consultation.plannedStartDate;
+    const title = getConsultationTitle(consultation);
+    return [
+      {
+        id: consultation.id,
+        label: date ? `${title} · ${formatDisplayDate(date)}` : title,
+      },
+    ];
+  });
 }
 
 /**
@@ -435,6 +490,64 @@ export async function getConsultationById(
  */
 export async function deleteConsultation(id: string): Promise<void> {
   await deleteConsultationRecord(id);
+}
+
+/** How a consultation refers to a condition. */
+export type ConsultationConditionRole = 'reason' | 'diagnosis';
+
+export const CONSULTATION_CONDITION_ROLE_OPTIONS: {
+  id: ConsultationConditionRole;
+  label: string;
+}[] = [
+  { id: 'reason', label: 'Reason for visit' },
+  { id: 'diagnosis', label: 'Diagnosis' },
+];
+
+/** The condition's role in the consultation, or null when not linked. */
+export function getConsultationConditionRole(
+  consultation: Encounter,
+  conditionId: string
+): ConsultationConditionRole | null {
+  if (getConsultationReasonConditionIds(consultation).includes(conditionId))
+    return 'reason';
+  if (getConsultationConditionIds(consultation).includes(conditionId))
+    return 'diagnosis';
+  return null;
+}
+
+/**
+ * Links a condition to a consultation as a reason for visit or diagnosis, or
+ * unlinks it (role null). Unlinking keeps any wording on the entry.
+ */
+export async function setConsultationConditionRole(
+  consultationId: string,
+  conditionId: string,
+  patientId: string,
+  role: ConsultationConditionRole | null
+): Promise<void> {
+  const consultation = await fetchConsultationById(consultationId, patientId);
+  if (!consultation)
+    throw new Error(`Consultation ${consultationId} not found`);
+  if (getConsultationConditionRole(consultation, conditionId) === role) return;
+  let updated = withoutEncounterReference(
+    consultation,
+    `Condition/${conditionId}`
+  );
+  if (role === 'reason')
+    updated = withConsultationReasons(updated, [
+      ...getConsultationReasonConditionIds(updated),
+      conditionId,
+    ]);
+  if (role === 'diagnosis')
+    updated = withConsultationConditions(updated, [
+      ...getConsultationConditionIds(updated),
+      conditionId,
+    ]);
+  updated.meta = {
+    ...consultation.meta,
+    lastUpdated: new Date().toISOString(),
+  };
+  await insertConsultationRecord(updated, patientId);
 }
 
 /**

@@ -20,11 +20,13 @@ export function NativeSelect({
   label,
   testID,
   name,
+  disabled,
 }: NativeSelectProps) {
   if (Platform.OS === 'ios')
     return (
       <TouchableOpacity
         testID={testID}
+        disabled={disabled}
         id={testID}
         {...{ name }}
         accessibilityRole="button"
@@ -61,6 +63,7 @@ export function NativeSelect({
       <Picker
         testID={testID}
         nativeID={testID}
+        enabled={!disabled}
         accessibilityLabel={label}
         {...{ name }}
         mode="dropdown"

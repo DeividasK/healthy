@@ -1,14 +1,13 @@
 import type { ConsultationInput } from './consultationService';
+import { getServiceProviderName } from '@/src/features/organizations/organizationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSync } from '@/src/context/SyncContext';
+import { useLocalSearchParams } from 'expo-router';
 import { ConsultationForm, ConsultationFormValues } from './ConsultationForm';
 import {
   getConsultationById,
   createOrUpdateConsultation,
-  deleteConsultation,
 } from './consultationService';
 import {
   getConsultationTitle,
@@ -21,17 +20,35 @@ import {
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
+import { ClipboardList, Pill } from 'lucide-react-native';
+import {
+  diffLinkIds,
+  type LinkFieldConfig,
+  type LinkSelection,
+} from '@/src/components/useLinkFields';
+import {
+  getLinkedTreatmentsForConsultation,
+  getTreatmentLinkOptions,
+  linkTreatmentToConsultation,
+  unlinkTreatmentFromConsultation,
+} from '@/src/features/treatments/treatmentService';
+import {
+  getConsultationServiceRequestRoles,
+  getServiceRequestLinkOptions,
+  setServiceRequestConsultationRole,
+  SERVICE_REQUEST_ROLE_OPTIONS,
+  type ServiceRequestConsultationRole,
+} from '@/src/features/service-requests/serviceRequestService';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
-  const { triggerSync } = useSync();
   const [initialValues, setInitialValues] =
     useState<ConsultationFormValues | null>(null);
   const [initialPatientId, setInitialPatientId] = useState<string | undefined>(
     undefined
   );
+  const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
 
@@ -41,8 +58,41 @@ export function EditConsultationView() {
     let isMounted = true;
     (async () => {
       try {
-        const encounter = await getConsultationById(id, activePatientId);
+        const [
+          encounter,
+          treatmentOptions,
+          linkedTreatments,
+          serviceRequestOptions,
+          serviceRequestRoles,
+        ] = await Promise.all([
+          getConsultationById(id, activePatientId),
+          getTreatmentLinkOptions(activePatientId),
+          getLinkedTreatmentsForConsultation(id, activePatientId),
+          getServiceRequestLinkOptions(activePatientId),
+          getConsultationServiceRequestRoles(id, activePatientId),
+        ]);
         if (!isMounted) return;
+        setLinkFields([
+          {
+            type: 'treatment',
+            label: 'Treatments',
+            icon: Pill,
+            options: treatmentOptions,
+            initialIds: linkedTreatments.map((item) => item.id!),
+          },
+          {
+            type: 'service-request',
+            label: 'Service requests',
+            icon: ClipboardList,
+            options: serviceRequestOptions,
+            initialIds: Object.keys(serviceRequestRoles),
+            roles: {
+              options: SERVICE_REQUEST_ROLE_OPTIONS,
+              initial: serviceRequestRoles,
+              defaultRole: 'planned',
+            },
+          },
+        ]);
         if (!encounter) {
           setNotFound(true);
           return;
@@ -70,6 +120,11 @@ export function EditConsultationView() {
 
         const title = getConsultationTitle(encounter);
         const doctorName = getConsultationDoctor(encounter) || undefined;
+        const serviceProviderName =
+          (await getServiceProviderName(
+            encounter.serviceProvider,
+            activePatientId
+          )) || undefined;
         const serviceType = getConsultationServiceType(encounter) || undefined;
         const notes = getConsultationNotes(encounter) || undefined;
         const conditionIds = getConsultationConditionIds(encounter);
@@ -111,6 +166,7 @@ export function EditConsultationView() {
           date: dateObj,
           time: timeStr,
           doctorName,
+          serviceProviderName,
           serviceType,
           conditionIds,
           reasonConditionIds: getConsultationReasonConditionIds(encounter),
@@ -146,31 +202,50 @@ export function EditConsultationView() {
     );
   }
 
-  const handleSave = async (values: ConsultationInput) => {
+  const handleSave = async (
+    values: ConsultationInput,
+    links: Record<string, LinkSelection>
+  ) => {
     await createOrUpdateConsultation({
       ...values,
       id,
       patientId: initialPatientId,
     });
+    const changes = diffLinkIds(linkFields[0].initialIds, links.treatment.ids);
+    for (const treatmentId of changes.added)
+      await linkTreatmentToConsultation(treatmentId, id, initialPatientId);
+    for (const treatmentId of changes.removed)
+      await unlinkTreatmentFromConsultation(treatmentId, id, initialPatientId);
+
+    const serviceRequests = linkFields[1];
+    const roles = links['service-request'].roles as Record<
+      string,
+      ServiceRequestConsultationRole
+    >;
+    for (const requestId of serviceRequests.initialIds)
+      if (!roles[requestId])
+        await setServiceRequestConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          null
+        );
+    for (const [requestId, role] of Object.entries(roles))
+      if (serviceRequests.roles?.initial[requestId] !== role)
+        await setServiceRequestConsultationRole(
+          requestId,
+          id,
+          initialPatientId!,
+          role
+        );
   };
 
   return (
     <ConsultationForm
       isEdit
       initialValues={initialValues}
+      linkFields={linkFields}
       onSave={handleSave}
-      onDelete={async () => {
-        if (!id) return;
-        await deleteConsultation(id);
-        triggerSync().catch((error) =>
-          console.warn('Background sync failed on delete consultation:', error)
-        );
-        router.dismissTo(
-          initialValues.conditionIds?.[0]
-            ? `/condition/${initialValues.conditionIds?.[0]}`
-            : '/'
-        );
-      }}
     />
   );
 }

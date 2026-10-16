@@ -1,26 +1,17 @@
+import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
+import { FormField } from '@/src/components/FormField';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  Alert,
-  ActionSheetIOS,
-} from 'react-native';
+import { StyleSheet, View, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronDown, User } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
-import { AddOptionsModal } from '@/src/components/AddOptionsModal';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { PatientInput } from './patientService';
-import { useSync } from '@/src/context/SyncContext';
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
@@ -60,7 +51,6 @@ export function ProfileForm({
   onDelete,
 }: ProfileFormProps) {
   const router = useRouter();
-  const { triggerSync } = useSync();
   const [givenName, setGivenName] = useState(initialValues?.givenName || '');
   const [familyName, setFamilyName] = useState(initialValues?.familyName || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | 'unknown'>(
@@ -74,30 +64,14 @@ export function ProfileForm({
     }
     return null;
   });
+  const hasChanges = useHasChanges({
+    givenName,
+    familyName,
+    gender,
+    birthDate,
+  });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [showGenderModal, setShowGenderModal] = useState(false);
-
-  const handleGenderPress = () => {
-    if (Platform.OS === 'ios') {
-      const options = [...GENDER_OPTIONS.map((g) => g.label), 'Cancel'];
-      const cancelIndex = options.length - 1;
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: cancelIndex,
-          title: 'Select Gender',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelIndex) {
-            setGender(GENDER_OPTIONS[buttonIndex].id);
-          }
-        }
-      );
-    } else if (Platform.OS === 'android') {
-      setShowGenderModal(true);
-    }
-  };
 
   const handleSubmit = async () => {
     const trimmedGiven = givenName.trim();
@@ -120,10 +94,6 @@ export function ProfileForm({
         birthDate: formattedBirthDate,
       });
 
-      triggerSync().catch((err) =>
-        console.warn('Background sync failed on profile save:', err)
-      );
-
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         (document.activeElement as HTMLElement)?.blur?.();
       }
@@ -142,9 +112,6 @@ export function ProfileForm({
       setIsSaving(false);
     }
   };
-
-  const selectedGenderLabel =
-    GENDER_OPTIONS.find((g) => g.id === gender)?.label || 'Unknown';
 
   const formContent = (
     <>
@@ -169,91 +136,57 @@ export function ProfileForm({
         </View>
 
         {/* Given Name Field */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Given Name *</Text>
-          <TextInput
-            testID="patient-given-name-input"
-            id="patient-given-name-input"
-            nativeID="patient-given-name-input"
-            name="patientGivenName"
-            accessibilityLabel="Given Name"
-            style={styles.input}
-            placeholder="e.g. Jane"
-            placeholderTextColor={COLORS.light.placeholder}
-            value={givenName}
-            onChangeText={setGivenName}
-            autoCapitalize="words"
-          />
-        </View>
+        <FormField
+          label="Given Name"
+          required
+          nativeID="patient-given-name-input"
+          inputProps={{
+            testID: 'patient-given-name-input',
+            id: 'patient-given-name-input',
+            nativeID: 'patient-given-name-input',
+            name: 'patientGivenName',
+            autoFocus: !isEdit,
+            accessibilityLabel: 'Given Name',
+            placeholder: 'e.g. Jane',
+            value: givenName,
+            onChangeText: setGivenName,
+            autoCapitalize: 'words',
+          }}
+        />
 
         {/* Family Name Field */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Family Name</Text>
-          <TextInput
-            testID="patient-family-name-input"
-            id="patient-family-name-input"
-            nativeID="patient-family-name-input"
-            name="patientFamilyName"
-            accessibilityLabel="Family Name"
-            style={styles.input}
-            placeholder="e.g. Doe"
-            placeholderTextColor={COLORS.light.placeholder}
-            value={familyName}
-            onChangeText={setFamilyName}
-            autoCapitalize="words"
-          />
-        </View>
+        <FormField
+          label="Family Name"
+          nativeID="patient-family-name-input"
+          inputProps={{
+            testID: 'patient-family-name-input',
+            id: 'patient-family-name-input',
+            nativeID: 'patient-family-name-input',
+            name: 'patientFamilyName',
+            accessibilityLabel: 'Family Name',
+            placeholder: 'e.g. Doe',
+            value: familyName,
+            onChangeText: setFamilyName,
+            autoCapitalize: 'words',
+          }}
+        />
 
         {/* Gender Selector */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Gender</Text>
-          {Platform.OS === 'web' ? (
-            <View style={styles.webSelectWrapper}>
-              <select
-                data-testid="patient-gender-select"
-                id="patient-gender-select"
-                name="patientGender"
-                value={gender}
-                onChange={(e) =>
-                  setGender(
-                    e.target.value as 'male' | 'female' | 'other' | 'unknown'
-                  )
-                }
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: `1px solid ${COLORS.light.border}`,
-                  backgroundColor: COLORS.light.card,
-                  color: COLORS.light.foreground,
-                  fontSize: 16,
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {GENDER_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </View>
-          ) : (
-            <TouchableOpacity
-              testID="patient-gender-picker"
-              style={styles.pickerButton}
-              onPress={handleGenderPress}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.pickerButtonText}>{selectedGenderLabel}</Text>
-              <ChevronDown size={18} color={COLORS.light.iconMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+        <FormField label="Gender" nativeID="patient-gender-select">
+          <NativeSelect
+            testID="patient-gender-select"
+            name="patientGender"
+            label="Gender"
+            value={gender}
+            options={GENDER_OPTIONS}
+            onChange={(value) =>
+              setGender(value as (typeof GENDER_OPTIONS)[number]['id'])
+            }
+          />
+        </FormField>
 
         {/* Date of Birth Field */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Date of Birth</Text>
+        <FormField label="Date of Birth" nativeID="patient-birth-date-picker">
           <NativeDatePicker
             testID="patient-birth-date-picker"
             id="patient-birth-date-picker"
@@ -262,7 +195,7 @@ export function ProfileForm({
             value={birthDate}
             onChange={(date) => setBirthDate(date)}
           />
-        </View>
+        </FormField>
       </ScrollView>
 
       <FormActionDock
@@ -271,27 +204,10 @@ export function ProfileForm({
         saveLabel="Save Profile"
         saveTestID="save-profile-button"
         showCancel={showBackButton}
+        hasChanges={hasChanges}
         onDelete={isEdit ? onDelete : undefined}
         deleteLabel="Delete Profile"
         deleteTestID="delete-profile-button"
-      />
-
-      {/* Gender Selection Modal for Android */}
-      <AddOptionsModal
-        visible={showGenderModal}
-        onClose={() => setShowGenderModal(false)}
-        overlayTestID="gender-menu-overlay"
-        cardTestID="gender-menu-card"
-        options={GENDER_OPTIONS.map((opt) => ({
-          id: opt.id,
-          label: opt.label,
-          icon: null,
-          testID: `gender-option-${opt.id}`,
-          onPress: () => {
-            setGender(opt.id);
-            setShowGenderModal(false);
-          },
-        }))}
       />
     </>
   );
@@ -341,42 +257,5 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.pillBorder,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fieldContainer: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: COLORS.light.foreground,
-  },
-  webSelectWrapper: {
-    width: '100%',
-  },
-  pickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    borderRadius: 10,
-    backgroundColor: COLORS.light.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  pickerButtonText: {
-    fontSize: 16,
-    color: COLORS.light.foreground,
   },
 });

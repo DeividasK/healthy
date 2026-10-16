@@ -1,8 +1,4 @@
-import {
-  test,
-  expect,
-  clearAppStorage,
-} from '@/src/features/testing/testStorage';
+import { test, expect } from '@/src/features/testing/testStorage';
 import {
   seedTestPatient,
   seedTestReport,
@@ -12,7 +8,6 @@ test.describe('Biomarker detail', () => {
   test('rejects seed biomarkers and units outside the CBC catalog', async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     await expect(
       seedTestReport(page, {
@@ -46,7 +41,6 @@ test.describe('Biomarker detail', () => {
   test('shows only the active patient on direct entry and patient changes', async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, {
       id: 'history-patient-a',
       givenName: 'First',
@@ -87,12 +81,13 @@ test.describe('Biomarker detail', () => {
   test('uses matching reference units and normalizes mixed-unit history', async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
-    for (const result of [
-      { date: '2026-09-01', value: '14.5', unit: 'g/dL' },
-      { date: '2026-10-01', value: '150', unit: 'g/L' },
-    ]) {
+    await seedTestReport(page, {
+      date: '2026-09-01',
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+    });
+    {
+      const result = { date: '2026-10-01', value: '150', unit: 'g/L' };
       await page.goto('/lab-result/add');
       await page.getByTestId('test-search-input').fill('Hemoglobin');
       await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
@@ -272,7 +267,6 @@ test.describe('Biomarker detail', () => {
   test('opens a biomarker and shows its description, history, and trend', async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     await seedTestReport(page, {
       id: 'rbc-history-low',
@@ -305,7 +299,7 @@ test.describe('Biomarker detail', () => {
     );
     await page.getByTestId('floating-add-button').click();
     await expect(page.getByTestId('menu-add-lab-results')).toHaveText(
-      'Add Lab Results'
+      'Lab Results'
     );
     await page.getByTestId('floating-add-menu-backdrop').click();
     await expect(

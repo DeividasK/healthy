@@ -2,11 +2,7 @@ import type { Composition } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
-import {
-  recordPendingClinicalResourceDeletion,
-  clearPendingClinicalResourceDeletions,
-} from '@/src/services/syncDeletions';
+import { getCompositionEntryReferences } from '@/src/utils/fhirUtils';
 
 const VALID_COMPOSITION_STATUSES: Composition['status'][] = [
   'registered',
@@ -29,7 +25,6 @@ const VALID_COMPOSITION_STATUSES: Composition['status'][] = [
 export async function insertClinicalDocumentRecord(
   document: Composition,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!document.id) {
@@ -107,15 +102,6 @@ export async function insertClinicalDocumentRecord(
       );
     }
 
-    // Last-write-wins for remote sync
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
-    }
-
     await db.runAsync(
       `INSERT INTO clinical_documents (id, consultation_id, patient_id, status, fhir_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -134,10 +120,6 @@ export async function insertClinicalDocumentRecord(
         now,
         incomingTimestamp,
       ]
-    );
-    await clearPendingClinicalResourceDeletions(
-      [{ resourceType: 'Composition', id: docId, patientId }],
-      true
     );
     didUpdate = true;
   };
@@ -178,6 +160,33 @@ export async function fetchClinicalDocumentByConsultationId(
     comp.meta = { ...comp.meta, lastUpdated: row.updated_at };
   }
   return comp;
+}
+
+/**
+ * Returns the IDs of consultations whose document has an entry pointing at
+ * the exact resource reference (e.g. `MedicationRequest/abc`).
+ */
+export async function fetchConsultationIdsReferencingResource(
+  reference: string,
+  patientId: string
+): Promise<string[]> {
+  const db = await getDb();
+  // LIKE narrows the scan; exact matching happens on the parsed document.
+  const rows = await db.getAllAsync<{
+    consultation_id: string;
+    fhir_json: string;
+  }>(
+    `SELECT consultation_id, fhir_json FROM clinical_documents
+     WHERE patient_id = ? AND fhir_json LIKE ?;`,
+    [patientId, `%${reference}%`]
+  );
+  return rows
+    .filter((row) =>
+      getCompositionEntryReferences(
+        JSON.parse(row.fhir_json) as Composition
+      ).includes(reference)
+    )
+    .map((row) => row.consultation_id);
 }
 
 /**
@@ -259,14 +268,7 @@ export async function deleteClinicalDocumentRecord(
       `DELETE FROM clinical_documents WHERE id = ? AND patient_id = ?;`,
       [id, existing.patient_id]
     );
-    if (!result.changes) return;
-    await recordPendingClinicalResourceDeletion(
-      'Composition',
-      id,
-      existing.patient_id,
-      true
-    );
-    didDelete = true;
+    didDelete = result.changes > 0;
   };
 
   if (withinTransaction) {

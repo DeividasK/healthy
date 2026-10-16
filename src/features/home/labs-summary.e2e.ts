@@ -1,13 +1,11 @@
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
-  await clearAppStorage(page);
   await page.clock.setFixedTime(new Date('2026-10-14T10:00:00Z'));
   await seedTestPatient(page, { id: 'summary-patient-a' });
 });

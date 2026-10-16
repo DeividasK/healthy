@@ -1,14 +1,19 @@
-import type { Condition, Encounter } from 'fhir/r5';
+import type {
+  Condition,
+  Encounter,
+  MedicationRequest,
+  ServiceRequest,
+} from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import {
   getConditionTitle,
   getConditionNotes,
   getConsultationConditionIds,
-  withConsultationConditions,
+  withoutEncounterReference,
+  withoutReasonReference,
 } from '@/src/utils/fhirUtils';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 
 /**
  * Persists a Condition record using SQLite.
@@ -17,7 +22,6 @@ import { isExistingNewerOrEqual } from '@/src/utils/dateUtils';
 export async function insertConditionRecord(
   condition: Condition,
   patientId: string = DEFAULT_PATIENT_ID,
-  isRemoteSync: boolean = false,
   withinTransaction: boolean = false
 ): Promise<void> {
   if (!condition.id) {
@@ -56,15 +60,6 @@ export async function insertConditionRecord(
       throw new Error(
         `Cannot update condition ${condId}: belongs to patient ${existing.patient_id}, not ${patientId}`
       );
-    }
-
-    // Last-write-wins: during remote sync, if existing record is newer than or same as incoming change, keep existing
-    if (
-      isRemoteSync &&
-      existing?.updated_at &&
-      isExistingNewerOrEqual(existing.updated_at, incomingTimestamp)
-    ) {
-      return;
     }
 
     await db.runAsync(
@@ -175,43 +170,36 @@ export async function deleteConditionRecord(id: string): Promise<void> {
       );
       if (!getConsultationConditionIds(encounter).includes(id) && !hasReason)
         continue;
-      const updated = withConsultationConditions(
-        encounter,
-        getConsultationConditionIds(encounter).filter(
-          (conditionId) => conditionId !== id
-        )
-      );
-      updated.diagnosis = encounter.diagnosis?.flatMap((entry) => {
-        const condition = entry.condition?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return condition?.length ? [{ ...entry, condition }] : [];
-      });
-      if (!updated.diagnosis?.length) delete updated.diagnosis;
-      updated.reason = encounter.reason?.flatMap((reason) => {
-        if (
-          !reason.value?.some(
-            (value) => value.reference?.reference === reference
-          )
-        )
-          return [reason];
-        const value = reason.value?.flatMap((value) => {
-          if (value.reference?.reference !== reference) return [value];
-          const retained = { ...value };
-          delete retained.reference;
-          return retained.concept ? [retained] : [];
-        });
-        return value?.length ? [{ ...reason, value }] : [];
-      });
-      if (!updated.reason?.length) delete updated.reason;
+      const updated = withoutEncounterReference(encounter, reference);
       updated.meta = { ...encounter.meta, lastUpdated: now };
       await db.runAsync(
         'UPDATE consultations SET fhir_json = ?, updated_at = ? WHERE id = ?;',
         [JSON.stringify(updated), now, row.id]
       );
+    }
+    // Requests keep their indication wording; only the Condition link goes.
+    for (const table of ['medication_requests', 'service_requests']) {
+      const requestRows = await db.getAllAsync<{
+        id: string;
+        fhir_json: string;
+      }>(
+        `SELECT id, fhir_json FROM ${table}
+         WHERE patient_id = (SELECT patient_id FROM conditions WHERE id = ?)
+         AND fhir_json LIKE ?;`,
+        [id, `%Condition/${id}%`]
+      );
+      for (const row of requestRows) {
+        const request: MedicationRequest | ServiceRequest = JSON.parse(
+          row.fhir_json
+        );
+        const updated = withoutReasonReference(request, `Condition/${id}`);
+        if (updated === request) continue;
+        updated.meta = { ...request.meta, lastUpdated: now };
+        await db.runAsync(
+          `UPDATE ${table} SET fhir_json = ?, updated_at = ? WHERE id = ?;`,
+          [JSON.stringify(updated), now, row.id]
+        );
+      }
     }
     await db.runAsync('DELETE FROM conditions WHERE id = ?;', [id]);
   });
@@ -219,5 +207,7 @@ export async function deleteConditionRecord(id: string): Promise<void> {
     'conditions',
     'consultations',
     'consultation_conditions',
+    'medication_requests',
+    'service_requests',
   ]);
 }

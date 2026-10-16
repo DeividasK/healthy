@@ -9,7 +9,10 @@ export type DatabaseTable =
   | 'app_settings'
   | 'consultations'
   | 'consultation_conditions'
-  | 'clinical_documents';
+  | 'clinical_documents'
+  | 'medication_requests'
+  | 'organizations'
+  | 'service_requests';
 
 type Listener = (tables: DatabaseTable[]) => void;
 

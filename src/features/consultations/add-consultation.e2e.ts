@@ -2,7 +2,6 @@ import type { Page } from '@playwright/test';
 import {
   test,
   expect,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
@@ -14,12 +13,13 @@ async function openAddConsultationForCondition(
   conditionId: string
 ) {
   await page.goto('/');
-  await page.getByTestId(`condition-card-${conditionId}`).click();
+  await page.getByTestId(`condition-open-${conditionId}`).click();
   await page.getByTestId('condition-add-button').click();
   await page
     .getByTestId('condition-add-menu')
     .getByTestId('menu-add-consultation')
     .click();
+  await expect(page.getByTestId('condition-add-menu')).not.toBeVisible();
   await expect(
     page.getByTestId(`selected-condition-${conditionId}`)
   ).toBeVisible();
@@ -27,7 +27,6 @@ async function openAddConsultationForCondition(
 
 test.describe('Add Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
   });
 
@@ -43,11 +42,10 @@ test.describe('Add Consultation Flow', () => {
           status: 'active',
         });
         conditionId = cond.id;
-        await page.reload();
 
         const condCard = page.getByTestId(`condition-card-${conditionId}`);
         await expect(condCard).toBeVisible();
-        await condCard.click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
 
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
@@ -60,7 +58,7 @@ test.describe('Add Consultation Flow', () => {
       await test.step('Open the Condition’s linked Consultation form', async () => {
         await openAddConsultationForCondition(page, conditionId);
         await expect(page.getByText('New Consultation')).toBeVisible();
-        await checkA11y(page, { disableRules: ['color-contrast'] });
+        await checkA11y(page);
       });
 
       await test.step('Fill consultation form fields', async () => {
@@ -103,7 +101,7 @@ test.describe('Add Consultation Flow', () => {
         ).toBeVisible();
 
         const consultationRow = page.getByTestId(
-          /^condition-consultation-item-/
+          /^condition-consultation-item-(?!.*-row$)/
         );
         await expect(consultationRow).toBeVisible();
         await consultationRow.click();
@@ -113,18 +111,16 @@ test.describe('Add Consultation Flow', () => {
         );
       });
 
-      await test.step('Verify consultation is not on Home view', async () => {
+      await test.step('Verify consultation is listed on Home view', async () => {
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
         );
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
-        // Home view should NOT have consultations
-        await expect(
-          page.getByText('General Cardiology Review')
-        ).not.toBeVisible();
-        await expect(page.getByText('Dr. Marcus Welby')).not.toBeVisible();
+        // Home lists recent consultations, including linked ones.
+        await expect(page.getByText('General Cardiology Review')).toBeVisible();
+        await expect(page.getByText('Dr. Marcus Welby')).toBeVisible();
       });
     }
   );
@@ -146,7 +142,6 @@ test.describe('Add Consultation Flow', () => {
           doctorName: 'Dr. Gregory House',
           date: '2026-10-01',
         });
-        await page.reload();
       });
 
       await test.step('Open the Condition’s linked Consultation form', async () => {
@@ -187,11 +182,10 @@ test.describe('Add Consultation Flow', () => {
           title: 'Knee Arthroscopy Review',
           doctorName: 'Dr. John Doe',
         });
-        await page.reload();
       });
 
       await test.step('Open Condition View and navigate to Condition Edit', async () => {
-        await page.getByTestId(`condition-card-${conditionId}`).click();
+        await page.getByTestId(`condition-open-${conditionId}`).click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -280,13 +274,10 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByText('Consultations')).toBeVisible();
         await expect(page.getByText('Annual Physical Exam')).toBeVisible();
         await expect(page.getByText('Dr. Beverly Crusher')).toBeVisible();
-        await expect(
-          page.getByText('"All vital signs optimal. Recommended vitamins."')
-        ).toBeVisible();
       });
 
       await test.step('Open the new standalone consultation view from Home', async () => {
-        await page.getByTestId(/^consultation-card-/).click();
+        await page.getByRole('button', { name: /^View consultation:/ }).click();
         await expect(page).toHaveURL(/.*consultation\/.*$/);
         const view = page.getByTestId('consultation-view');
         await expect(view.getByTestId('consultation-title')).toHaveText(
@@ -350,7 +341,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Set future consultation date without validation restriction', async () => {
-        const dateInput = page.locator('#date-picker-button-native-input');
+        const dateInput = page.locator('#consultation-date');
         await dateInput.fill('2028-11-20');
         await expect(page.getByTestId('date-picker-button')).toContainText(
           '2028'
@@ -365,7 +356,7 @@ test.describe('Add Consultation Flow', () => {
         const timePicker = page.getByTestId('time-picker-button');
         await expect(timePicker).toBeVisible();
 
-        const timeInput = page.locator('#time-picker-button-native-input');
+        const timeInput = page.locator('#consultation-time');
         await timeInput.fill('15:45');
         await expect(timePicker).toContainText('15:45');
       });
@@ -430,7 +421,6 @@ for (const terminology of [
   test(`keeps reasons and independently entered diagnoses separate: ${terminology.system || 'code only'}`, async ({
     page,
   }) => {
-    await clearAppStorage(page);
     await seedTestPatient(page, { id: 'separate-patient' });
     const reason = await seedTestCondition(page, {
       id: 'reason-condition',
@@ -451,7 +441,8 @@ for (const terminology of [
       .fill('Seborrhoeic dermatitis');
     for (const [field, value] of Object.entries(terminology))
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
-    await checkA11y(page, { disableRules: ['color-contrast'] });
+    // Both variants render the same controls; audit the fully populated one.
+    if (terminology.system) await checkA11y(page);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/consultation\/add/);
     const stored = await page.evaluate(async () => {
@@ -528,7 +519,6 @@ for (const terminology of [
 test('blank diagnoses prevent saving; removed drafts create no Conditions', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page);
   await page.goto('/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
@@ -536,7 +526,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   await page.getByTestId('menu-add-diagnosis').click();
   await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   const item = page.getByTestId('consultation-diagnosis-0');
-  await expect(item.getByText('Diagnosis', { exact: true })).toHaveCount(1);
+  await expect(item.getByText('Diagnosis *', { exact: true })).toHaveCount(1);
   await expect(item.getByText('Diagnosis Name', { exact: true })).toHaveCount(
     0
   );
@@ -560,7 +550,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
     .boundingBox();
   expect(titleBox!.y).toBeLessThan(referenceBox!.y);
   const labelBox = await item
-    .getByText('Diagnosis', { exact: true })
+    .getByText('Diagnosis *', { exact: true })
     .boundingBox();
   const removeBox = await item.getByTestId('remove-diagnosis-0').boundingBox();
   expect(
@@ -589,7 +579,6 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
 test('a diagnosis may create a Condition atomically, and failed links roll back both resources', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'atomic-patient' });
   await page.goto('/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
@@ -648,7 +637,6 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
 test('rejects foreign references for either list and retains diagnosis text when its Condition is deleted', async ({
   page,
 }) => {
-  await clearAppStorage(page);
   await seedTestPatient(page, { id: 'foreign-patient' });
   await seedTestCondition(page, {
     id: 'foreign-condition',
@@ -713,4 +701,123 @@ test('rejects foreign references for either list and retains diagnosis text when
     'Separate outcome'
   );
   await expect(page.getByTestId('consultation-reasons')).toHaveCount(0);
+});
+
+test('records a service provider and reuses its Organization', async ({
+  page,
+}) => {
+  await seedTestPatient(page);
+  const stored = async () =>
+    await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      return {
+        organizations: await bridge.querySql(
+          'SELECT id, name FROM organizations;'
+        ),
+        providers: (
+          await bridge.querySql(
+            'SELECT fhir_json FROM consultations ORDER BY created_at;'
+          )
+        ).map(
+          (row: { fhir_json: string }) =>
+            JSON.parse(row.fhir_json).serviceProvider
+        ),
+      };
+    });
+
+  await test.step('Add a new service provider', async () => {
+    await page.goto('/consultation/add');
+    await page.getByTestId('consultation-title-input').fill('Annual check-up');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+    await page
+      .getByTestId('consultation-service-provider-input')
+      .fill('City Hospital');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/consultation\/add/);
+  });
+
+  await test.step('Store an Organization reference', async () => {
+    const { organizations, providers } = await stored();
+    expect(organizations).toEqual([
+      { id: expect.stringMatching(/^org-/), name: 'City Hospital' },
+    ]);
+    expect(providers).toEqual([
+      {
+        reference: `Organization/${organizations[0].id}`,
+        type: 'Organization',
+        display: 'City Hospital',
+      },
+    ]);
+  });
+
+  await test.step('Show it on the consultation view', async () => {
+    const [{ id }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM consultations;'
+      )
+    );
+    await page.goto(`/consultation/${id}`);
+    await expect(
+      page.getByTestId('consultation-service-provider')
+    ).toContainText('City Hospital');
+  });
+
+  await test.step('Reuse it from autocomplete', async () => {
+    await page.goto('/consultation/add');
+    await page.getByTestId('consultation-title-input').fill('Follow-up');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await page.getByTestId('consultation-service-provider-input').fill('city');
+    const suggestion = page.getByTestId('service-provider-autocomplete-item-0');
+    await expect(suggestion).toHaveText('City Hospital');
+    await suggestion.click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/consultation\/add/);
+
+    const { organizations, providers } = await stored();
+    expect(organizations).toHaveLength(1);
+    expect(providers.map((p: { reference: string }) => p.reference)).toEqual([
+      `Organization/${organizations[0].id}`,
+      `Organization/${organizations[0].id}`,
+    ]);
+  });
+});
+
+test('scrolls a field added from the + menu into view and focuses it', async ({
+  page,
+}) => {
+  await seedTestPatient(page);
+  await page.goto('/consultation/add');
+  const addField = async (testID: string) => {
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('form-add-menu').getByTestId(testID).click();
+    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+  };
+  const expectRevealed = async (field: ReturnType<typeof page.getByTestId>) => {
+    await expect(field).toBeFocused();
+    await expect(field).toBeInViewport({ ratio: 1 });
+    // The floating action dock must not cover it.
+    await expect
+      .poll(async () => {
+        const box = await field.boundingBox();
+        const dock = await page.getByTestId('add-option-button').boundingBox();
+        return box!.y + box!.height <= dock!.y;
+      })
+      .toBe(true);
+  };
+
+  // Two diagnoses make the form taller than the viewport.
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-0-title-input')).toBeFocused();
+  await addField('menu-add-diagnosis');
+  await expect(page.getByTestId('diagnosis-1-title-input')).toBeFocused();
+
+  await addField('menu-add-notes');
+  await expectRevealed(page.getByTestId('consultation-notes-input'));
+
+  // Non-text controls are focused too.
+  await addField('menu-add-time');
+  await expectRevealed(page.getByTestId('time-picker-button').locator('input'));
 });

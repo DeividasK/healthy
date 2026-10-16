@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Alert, Keyboard, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Check, Plus, Trash2, X } from 'lucide-react-native';
-import { ResourceActionDock, type DockAction } from './ResourceActionDock';
+import { Keyboard } from 'react-native';
+import { useIsFocused, useRouter } from 'expo-router';
+import { Check, ChevronLeft, Plus } from 'lucide-react-native';
+import { useEscapeKey } from '@/src/utils/escapeKey';
+import {
+  ResourceActionDock,
+  type DeleteConfirmation,
+  type DockAction,
+} from './ResourceActionDock';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 export function FormActionDock({
@@ -20,6 +25,7 @@ export function FormActionDock({
   deleteLabel = 'Delete',
   deleteTestID = 'delete-button',
   deleteConfirmation,
+  hasChanges = false,
 }: {
   onAdd?: () => void;
   addDisabled?: boolean;
@@ -34,43 +40,46 @@ export function FormActionDock({
   onDelete?: () => void;
   deleteLabel?: string;
   deleteTestID?: string;
-  deleteConfirmation?: {
-    title: string;
-    message: string;
-    onConfirm: () => Promise<void>;
-  };
+  deleteConfirmation?: DeleteConfirmation;
+  /** Entered values would be lost, so cancelling asks to confirm first. */
+  hasChanges?: boolean;
 }) {
   const router = useRouter();
-  const [deleteVisible, setDeleteVisible] = useState(false);
-  const actions: DockAction[] = [];
-  const cancelAction: DockAction = {
-    label: 'Cancel',
-    testID: 'cancel-button',
-    icon: X,
-    disabled: isSaving,
-    onPress: () => {
-      Keyboard.dismiss();
-      if (router.canGoBack()) router.back();
-      else router.replace('/');
-    },
+  const isFocused = useIsFocused();
+  const [discardVisible, setDiscardVisible] = useState(false);
+  const leave = () => {
+    Keyboard.dismiss();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
   };
-  const hasDelete = Boolean(onDelete || deleteConfirmation);
-  if (hasDelete)
+  const cancel = () => {
+    if (hasChanges) setDiscardVisible(true);
+    else leave();
+  };
+  useEscapeKey(
+    () => {
+      if (discardVisible) setDiscardVisible(false);
+      else cancel();
+    },
+    showCancel && isFocused && !isSaving
+  );
+  const actions: DockAction[] = [];
+  if (showCancel)
     actions.push({
-      label: deleteLabel,
-      testID: deleteTestID,
-      icon: Trash2,
-      onPress: onDelete ?? (() => setDeleteVisible(true)),
+      label: 'Cancel',
+      testID: 'cancel-button',
+      icon: ChevronLeft,
       disabled: isSaving,
+      onPress: cancel,
     });
-  if (showCancel) actions.push(cancelAction);
   actions.push({
     label: isSaving ? 'Saving...' : saveLabel,
     testID: saveTestID,
     icon: Check,
     onPress: onSave,
     primary: true,
-    disabled: isSaving || saveDisabled,
+    // Not while asking whether to discard (Cmd/Ctrl+Enter would save).
+    disabled: isSaving || saveDisabled || discardVisible,
     busy: isSaving,
   });
   if (onAdd)
@@ -84,30 +93,30 @@ export function FormActionDock({
     });
   return (
     <>
-      <ResourceActionDock actions={actions} showBack={false} />
-      {deleteConfirmation && (
-        <DeleteConfirmationModal
-          visible={deleteVisible}
-          title={deleteConfirmation.title}
-          message={deleteConfirmation.message}
-          requireCountdown
-          onConfirm={async () => {
-            try {
-              await deleteConfirmation.onConfirm();
-              setDeleteVisible(false);
-            } catch (error) {
-              console.error('Failed to delete resource:', error);
-              const message = 'Failed to delete. Please try again.';
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                window.alert(`Error\n${message}`);
-              } else {
-                Alert.alert('Error', message);
-              }
-            }
-          }}
-          onCancel={() => setDeleteVisible(false)}
-        />
-      )}
+      <ResourceActionDock
+        actions={actions}
+        showBack={false}
+        onDelete={onDelete}
+        deleteConfirmation={deleteConfirmation}
+        deleteLabel={deleteLabel}
+        deleteTestID={deleteTestID}
+        deleteDisabled={isSaving}
+      />
+      <DeleteConfirmationModal
+        visible={discardVisible}
+        testID="discard-changes-modal"
+        title="Are you sure?"
+        message="You'll lose the data you entered."
+        cancelLabel="No"
+        confirmLabel="Yes"
+        focusCancel
+        requireCountdown={false}
+        onConfirm={() => {
+          setDiscardVisible(false);
+          leave();
+        }}
+        onCancel={() => setDiscardVisible(false)}
+      />
     </>
   );
 }

@@ -1,14 +1,12 @@
 import {
   test,
   takeSnapshot,
-  clearAppStorage,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Condition View - Visual Regression', () => {
   test('Condition View - Edit Existing Mode', async ({ page }, testInfo) => {
-    await clearAppStorage(page);
     await seedTestPatient(page);
     const cond = await seedTestCondition(page, {
       id: 'cond-visual-test',

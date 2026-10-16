@@ -1,0 +1,207 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  TextInput,
+  type TextInputProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import { COLORS } from '@/src/theme/colors';
+import { X } from 'lucide-react-native';
+import { useFieldRevealContext } from './FieldReveal';
+
+export interface FormFieldProps {
+  label: string;
+  nativeID?: string;
+  error?: string | null;
+  required?: boolean;
+  style?: StyleProp<ViewStyle>;
+  /** Custom control, or content rendered below `inputProps` (e.g. suggestions). */
+  children?: React.ReactNode;
+  /** Renders the standard text input. Multiline inputs get text-area sizing. */
+  inputProps?: TextInputProps;
+  onRemove?: () => void;
+  removeTestID?: string;
+  /** Accessible name of the remove button; defaults to "Remove <label>". */
+  removeLabel?: string;
+  testID?: string;
+}
+
+interface FieldInputRegistry {
+  register(input: TextInput): void;
+  unregister(input: TextInput | null): void;
+}
+
+/** Collects the first text input inside a FormField, focused on reveal. */
+const FieldInputContext = createContext<FieldInputRegistry | null>(null);
+
+/** The standard bordered text input used by every form field. */
+export function FormTextInput({ style, multiline, ...props }: TextInputProps) {
+  const fieldInput = useContext(FieldInputContext);
+  const ownRef = useRef<TextInput | null>(null);
+  return (
+    <TextInput
+      placeholderTextColor={COLORS.light.placeholder}
+      multiline={multiline}
+      {...props}
+      ref={(node) => {
+        if (node) {
+          ownRef.current = node;
+          fieldInput?.register(node);
+        } else {
+          fieldInput?.unregister(ownRef.current);
+          ownRef.current = null;
+        }
+      }}
+      style={[styles.input, multiline && styles.textArea, style]}
+    />
+  );
+}
+
+/**
+ * Scrolls a field that a `+` menu just added into view and focuses its
+ * control (see `useFieldReveal`). Fields present on first render are left
+ * alone, since no menu choice is pending for them.
+ */
+function useRevealWhenAdded(
+  container: React.RefObject<View | null>,
+  input: React.RefObject<TextInput | null>
+) {
+  const reveal = useFieldRevealContext();
+  useEffect(() => {
+    const field = container.current;
+    if (!reveal?.claim() || !field) return;
+    reveal.scrollIntoView(field);
+    if (Platform.OS === 'web') {
+      // Covers text inputs and native selects, date and time inputs alike;
+      // scrolling is left to scrollIntoView so the field clears the dock.
+      (field as unknown as HTMLElement)
+        .querySelector<HTMLElement>('input, textarea, select')
+        ?.focus({ preventScroll: true });
+    } else {
+      input.current?.focus();
+    }
+    // Runs once, when the field mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
+/**
+ * Labelled form field shell shared by all forms: label row with an optional
+ * remove button, then either a standard text input or a custom control.
+ */
+export function FormField({
+  label,
+  nativeID,
+  error,
+  required,
+  style,
+  children,
+  inputProps,
+  onRemove,
+  removeTestID,
+  removeLabel,
+  testID,
+}: FormFieldProps) {
+  const containerRef = useRef<View>(null);
+  const inputRef = useRef<TextInput | null>(null);
+  const inputRegistry = useMemo<FieldInputRegistry>(
+    () => ({
+      register(input) {
+        inputRef.current ??= input;
+      },
+      unregister(input) {
+        if (inputRef.current === input) inputRef.current = null;
+      },
+    }),
+    []
+  );
+  useRevealWhenAdded(containerRef, inputRef);
+  return (
+    <FieldInputContext.Provider value={inputRegistry}>
+      <View
+        ref={containerRef}
+        style={[styles.container, style]}
+        testID={testID}
+      >
+        <View style={styles.header}>
+          <Text
+            nativeID={nativeID ? `${nativeID}-label` : undefined}
+            style={styles.label}
+          >
+            {label}
+            {required && <Text style={styles.required}> *</Text>}
+          </Text>
+          {onRemove && (
+            <TouchableOpacity
+              onPress={onRemove}
+              testID={removeTestID}
+              accessibilityRole="button"
+              accessibilityLabel={
+                removeLabel || `Remove ${label.toLowerCase()}`
+              }
+              hitSlop={10}
+              activeOpacity={0.7}
+            >
+              <X size={16} color={COLORS.light.iconClear} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {inputProps && <FormTextInput {...inputProps} />}
+        {children}
+        {Boolean(error) && <Text style={styles.errorText}>{error}</Text>}
+      </View>
+    </FieldInputContext.Provider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 20,
+    width: '100%',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  label: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.light.foreground,
+  },
+  required: {
+    color: COLORS.light.destructive,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    borderRadius: 10,
+    backgroundColor: COLORS.light.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.light.foreground,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.light.destructive,
+    marginTop: 4,
+  },
+});

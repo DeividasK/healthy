@@ -46,6 +46,8 @@ yarn-error.*
 # Playwright & tests
 test-results/
 playwright-report/
+blob-report/
+all-blob-reports/
 storybook-static/
 
 # Storybook
@@ -54,3 +56,6 @@ chromatic.log
 
 # Local implementation plans (never commit)
 /.agents/plans/
+
+# Local scratch files (never commit)
+/.agents/tmp/
