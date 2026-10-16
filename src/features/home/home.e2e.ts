@@ -60,7 +60,11 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
     });
     await page.goto('/');
-    await page.getByText('Hemoglobin (Hgb)').waitFor();
+    await page
+      .getByTestId('results-scroll-view')
+      .locator('[data-testid^="report-card-"]')
+      .getByText('Hemoglobin (Hgb)')
+      .waitFor();
     // A lone section needs no heading
     await expect(page.getByText('Lab Results', { exact: true })).toHaveCount(0);
 
@@ -366,8 +370,18 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
         await page.goto('/');
         const reportCard = page.getByTestId(/^report-card-/).first();
         await expect(reportCard).toBeVisible();
-        await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-        await expect(page.getByText('15.5')).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('Hemoglobin (Hgb)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('15.5')
+        ).toBeVisible();
         await expect(
           page.getByText('"Database persistence inspection test"')
         ).toBeVisible();
@@ -377,8 +391,18 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
         await page.reload();
         const reportCard = page.getByTestId(/^report-card-/).first();
         await expect(reportCard).toBeVisible();
-        await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-        await expect(page.getByText('15.5')).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('Hemoglobin (Hgb)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('15.5')
+        ).toBeVisible();
       });
     }
   );
@@ -591,7 +615,11 @@ test('lists lab results after every other section', async ({ page }) => {
     biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
   });
   await page.goto('/');
-  await page.getByText('Hemoglobin (Hgb)').waitFor();
+  await page
+    .getByTestId('results-scroll-view')
+    .locator('[data-testid^="report-card-"]')
+    .getByText('Hemoglobin (Hgb)')
+    .waitFor();
   const top = async (text: string) =>
     (await page.getByText(text, { exact: true }).first().boundingBox())!.y;
   const order = [
@@ -601,4 +629,112 @@ test('lists lab results after every other section', async ({ page }) => {
     await top('Lab Results'),
   ];
   expect(order).toEqual([...order].sort((a, b) => a - b));
+});
+
+test('Labs Summary uses the latest measurement per biomarker regardless of import order', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-10-14T10:00:00Z'));
+  await seedTestPatient(page);
+  await seedTestCondition(page, {
+    id: 'summary-condition',
+    title: 'Summary order',
+  });
+  await seedTestReport(page, {
+    id: 'summary-newer',
+    date: '2026-10-10',
+    biomarkers: [
+      { name: 'Hemoglobin', value: 15.2 },
+      { name: 'White Blood Cells', value: 3.1 },
+      { name: 'Platelets', value: 480 },
+    ],
+  });
+  await seedTestReport(page, {
+    id: 'summary-older',
+    date: '2020-10-01',
+    biomarkers: [
+      { name: 'Hemoglobin', value: 8 },
+      { name: 'Red Blood Cells', value: 4.7 },
+    ],
+  });
+  await page.goto('/');
+  const summary = page.getByTestId('labs-summary');
+  await expect(summary.getByTestId('labs-summary-divider')).toHaveCount(1);
+  const conditionY = (await page
+    .getByTestId('condition-card-summary-condition')
+    .boundingBox())!.y;
+  const summaryY = (await summary.boundingBox())!.y;
+  expect(summaryY).toBeGreaterThan(conditionY);
+  await expect(summary.getByTestId('labs-summary-total')).toHaveText('4');
+  await expect(summary.getByText('Biomarkers', { exact: true })).toBeVisible();
+  await expect(summary.getByTestId('labs-summary-count-Low')).toHaveText(
+    'Low1'
+  );
+  await expect(summary.getByTestId('labs-summary-count-Normal')).toHaveText(
+    'Normal2'
+  );
+  await expect(summary.getByTestId('labs-summary-count-High')).toHaveText(
+    'High1'
+  );
+  await expect(
+    summary.locator('[data-testid^="labs-summary-result-"]')
+  ).toHaveCount(2);
+  await expect(
+    summary.getByText('Out of Range', { exact: true })
+  ).toBeVisible();
+  await expect(summary.getByTestId('labs-summary-result-718-7')).toHaveCount(0);
+  await expect(summary.getByTestId('labs-summary-result-6690-2')).toContainText(
+    'Low'
+  );
+  await expect(summary.getByTestId('labs-summary-result-777-3')).toContainText(
+    'High'
+  );
+  await expect(
+    summary.getByTestId('labs-summary-segment-718-7')
+  ).toHaveAttribute('stroke', '#10B981');
+  await expect(
+    summary.getByTestId('labs-summary-segment-6690-2')
+  ).toHaveAttribute('stroke', '#3B82F6');
+  await expect(
+    summary.getByTestId('labs-summary-segment-777-3')
+  ).toHaveAttribute('stroke', '#EF4444');
+  await expect(summary.getByTestId('labs-summary-chart')).toHaveAttribute(
+    'aria-label',
+    '4 biomarkers: 2 normal, 1 low, 1 high'
+  );
+  const period = summary.getByRole('combobox', { name: 'Period' });
+  await expect(period.locator('option')).toHaveText([
+    'All time',
+    '10 years',
+    '5 years',
+    '2 years',
+    '1 year',
+    '6 months',
+    '1 month',
+  ]);
+  for (const [label, count] of [
+    ['10 years', 4],
+    ['5 years', 3],
+    ['2 years', 3],
+    ['1 year', 3],
+    ['6 months', 3],
+    ['1 month', 3],
+    ['All time', 4],
+  ] as const) {
+    await period.selectOption({ label });
+    await expect(summary.getByTestId('labs-summary-total')).toHaveText(
+      String(count)
+    );
+    await expect(
+      summary
+        .locator('[data-testid^="labs-summary-result-"]')
+        .filter({ has: page.getByText(/LOINC:/) })
+    ).toHaveCount(2);
+    await expect(
+      summary.locator('[data-testid^="labs-summary-segment-"]')
+    ).toHaveCount(count);
+  }
+  await summary.getByTestId('labs-summary-result-6690-2').click();
+  await expect(page).toHaveURL(/biomarker\/6690-2/);
+  await expect(page.getByTestId('biomarker-latest-status')).toHaveText('Low');
 });

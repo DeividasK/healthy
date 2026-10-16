@@ -4,6 +4,7 @@ export interface NativeSelectOption {
 }
 
 export interface NativeSelectProps {
+  compact?: boolean;
   value: string;
   options: NativeSelectOption[];
   onChange: (value: string) => void;

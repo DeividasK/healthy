@@ -95,10 +95,30 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
       await test.step('Verify saved results render on Home', async () => {
         await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Hemoglobin (Hgb)')).toBeVisible();
-        await expect(page.getByText('14.5')).toBeVisible();
-        await expect(page.getByText('White Blood Cells (WBC)')).toBeVisible();
-        await expect(page.getByText('6.8')).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('Hemoglobin (Hgb)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('14.5')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('White Blood Cells (WBC)')
+        ).toBeVisible();
+        await expect(
+          page
+            .getByTestId('results-scroll-view')
+            .locator('[data-testid^="report-card-"]')
+            .getByText('6.8')
+        ).toBeVisible();
         const stored = await page.evaluate(() =>
           (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
             'SELECT fhir_json FROM observations'

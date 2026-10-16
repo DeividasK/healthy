@@ -13,6 +13,7 @@ import { COLORS } from '@/src/theme/colors';
 import type { NativeSelectProps } from './NativeSelect.types';
 
 export function NativeSelect({
+  compact = false,
   value,
   options,
   onChange,
@@ -21,17 +22,23 @@ export function NativeSelect({
   name,
   disabled,
 }: NativeSelectProps) {
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === 'ios')
     return (
       <TouchableOpacity
         testID={testID}
         disabled={disabled}
+        id={testID}
+        {...{ name }}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityValue={{
           text: options.find((option) => option.id === value)?.label || value,
         }}
-        style={[styles.container, styles.button]}
+        style={[
+          styles.container,
+          styles.button,
+          compact && styles.compactButton,
+        ]}
         onPress={() =>
           ActionSheetIOS.showActionSheetWithOptions(
             {
@@ -45,14 +52,12 @@ export function NativeSelect({
           )
         }
       >
-        <Text style={styles.text}>
+        <Text style={[styles.text, compact && styles.compactText]}>
           {options.find((option) => option.id === value)?.label || value}
         </Text>
         <ChevronDown size={18} color={COLORS.light.iconMuted} />
       </TouchableOpacity>
     );
-  }
-
   return (
     <View style={styles.container}>
       <Picker
@@ -64,7 +69,7 @@ export function NativeSelect({
         mode="dropdown"
         selectedValue={value}
         onValueChange={(next) => onChange(String(next))}
-        style={styles.text}
+        style={[styles.text, compact && styles.compactText]}
         dropdownIconColor={COLORS.light.iconMuted}
       >
         {options.map((option) => (
@@ -74,7 +79,6 @@ export function NativeSelect({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     borderWidth: 1,
@@ -90,5 +94,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  compactButton: { minHeight: 44, paddingHorizontal: 8 },
+  compactText: { fontSize: 13 },
   text: { fontSize: 16, color: COLORS.light.foreground },
 });
