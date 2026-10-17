@@ -30,6 +30,11 @@ test.describe('Edit Consultation View - Visual Regression', () => {
     await page.goto(`/consultation/${cons.id}/edit`);
     await page.getByTestId('consultation-title-input').waitFor();
     await page.getByTestId('diagnosis-1-title-input').waitFor();
+    await page.getByTestId('diagnosis-1-add').click();
+    await page.getByTestId('diagnosis-option-code').click();
+    await page.getByTestId('diagnosis-options-menu').waitFor({
+      state: 'detached',
+    });
     await page.getByTestId('diagnosis-1-code-input').fill('L21');
     await takeSnapshot(
       page,

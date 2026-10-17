@@ -203,6 +203,20 @@ export function createDoseDraft(): DoseDraft {
   };
 }
 
+/**
+ * A new dose with the same values, e.g. the same amount again in the evening.
+ * It is a separate Dosage, so it does not keep the source dose's link to a
+ * stored Dosage.
+ */
+export function duplicateDoseDraft(dose: DoseDraft): DoseDraft {
+  const { sourceIndex: _sourceIndex, shownFields, timing, ...values } = dose;
+  return {
+    ...values,
+    timing: { ...timing },
+    ...(shownFields ? { shownFields: [...shownFields] } : {}),
+  };
+}
+
 const numberText = (value: number | undefined) =>
   value === undefined ? '' : String(value);
 const quantityKey = (quantity?: Quantity) =>

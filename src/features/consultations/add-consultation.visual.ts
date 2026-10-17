@@ -22,13 +22,19 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await page.getByTestId('menu-add-diagnosis').click();
     await waitForMenuToggle(page, 'add-option-button', false);
     await page.getByTestId('diagnosis-0-title-input').fill('Scalp irritation');
-    await page.getByTestId('diagnosis-0-code-input').fill('L21');
-    await page
-      .getByTestId('diagnosis-0-system-input')
-      .fill('http://hl7.org/fhir/sid/icd-10');
-    await page
-      .getByTestId('diagnosis-0-display-input')
-      .fill('Seborrhoeic dermatitis');
+    // Optional diagnosis fields are added from the + next to its heading
+    for (const [field, value] of [
+      ['system', 'http://hl7.org/fhir/sid/icd-10'],
+      ['code', 'L21'],
+      ['display', 'Seborrhoeic dermatitis'],
+    ]) {
+      await page.getByTestId('diagnosis-0-add').click();
+      await page.getByTestId(`diagnosis-option-${field}`).click();
+      await page.getByTestId('diagnosis-options-menu').waitFor({
+        state: 'detached',
+      });
+      await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
+    }
     await takeSnapshot(page, 'Consultation View - Add Diagnosis', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();

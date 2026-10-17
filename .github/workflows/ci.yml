@@ -26,6 +26,8 @@ jobs:
         run: pnpm expo lint
       - name: Format Check
         run: pnpm format:check
+      - name: Expo Doctor
+        run: pnpm dlx expo-doctor
       - name: Pure Function Tests
         run: pnpm test:unit
 
@@ -174,4 +176,4 @@ jobs:
       - name: Publish to Chromatic
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: pnpm chromatic --exit-zero-on-changes
+        run: pnpm chromatic:publish --exit-zero-on-changes

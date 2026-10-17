@@ -102,10 +102,14 @@ test.describe('Add Treatment Flow', () => {
   test('creates a treatment from a consultation and keeps it when the consultation is deleted', async ({
     page,
   }) => {
+    const migraine = await seedTestCondition(page, { title: 'Migraine' });
+    const headache = await seedTestCondition(page, { title: 'Headache' });
     const consultation = await seedTestConsultation(page, {
       title: 'Neurology Consultation',
       doctorName: 'Dr. Julian Bashir',
       date: '2026-03-02',
+      conditionIds: [migraine.id],
+      reasonConditionIds: [headache.id],
     });
 
     await page.goto(`/consultation/${consultation.id}`);
@@ -153,6 +157,11 @@ test.describe('Add Treatment Flow', () => {
     expect(created.requester).toEqual({ display: 'Dr. Julian Bashir' });
     // The date defaults to the consultation's.
     expect(created.authoredOn).toBe('2026-03-02');
+    // The consultation's diagnoses and reasons for visit become its reasons.
+    expect(created.reason).toEqual([
+      { reference: { reference: `Condition/${migraine.id}` } },
+      { reference: { reference: `Condition/${headache.id}` } },
+    ]);
     const doc = await getTestClinicalDocument(page, consultation.id);
     expect(doc.author).toEqual([{ reference: consultation.subject.reference }]);
     const section = findTreatmentsSection(doc);
@@ -372,15 +381,21 @@ test.describe('Treatment form keyboard support', () => {
     await expect(dose(1, 1, 'boundsValue-input')).toHaveValue('');
     await dose(1, 1, 'boundsValue-input').fill('7');
 
-    await addFrom('p1', 'dose');
-    await expect(dose(1, 2, 'amount-input')).toBeFocused();
+    // Duplicating copies every value into a new dose right after it, e.g. the
+    // same again in the evening
+    await addFrom('p1-d1', 'duplicate');
+    await expect(dose(1, 2, 'amount-input')).toHaveValue('2');
+    await expect(dose(1, 2, 'frequency-input')).toHaveValue('1');
+    await expect(dose(1, 2, 'route-select')).toHaveValue('26643006');
+    await expect(dose(1, 2, 'when-select')).toHaveValue('MORN');
+    await expect(dose(1, 2, 'boundsValue-input')).toHaveValue('7');
     await dose(1, 2, 'amount-input').fill('1');
-    await dose(1, 2, 'frequency-input').fill('1');
-    await addFrom('p1-d2', 'route');
-    await addFrom('p1-d2', 'when');
     await dose(1, 2, 'when-select').selectOption('EVE');
-    await addFrom('p1-d2', 'bounds');
-    await dose(1, 2, 'boundsValue-input').fill('7');
+    // Another dose starts empty and takes focus
+    await addFrom('p1', 'dose');
+    await expect(dose(1, 3, 'amount-input')).toBeFocused();
+    await expect(dose(1, 3, 'amount-input')).toHaveValue('');
+    await dose(1, 3, 'remove').click();
 
     await addFrom('p1', 'phase');
     await dose(2, 1, 'amount-input').fill('1');

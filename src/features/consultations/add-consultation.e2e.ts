@@ -410,6 +410,13 @@ test.describe('Add Consultation Flow', () => {
   );
 });
 
+/** Adds one of a diagnosis's optional fields from the + next to its heading. */
+async function addDiagnosisField(page: Page, index: number, field: string) {
+  await page.getByTestId(`diagnosis-${index}-add`).click();
+  await page.getByTestId(`diagnosis-option-${field}`).click();
+  await expect(page.getByTestId('diagnosis-options-menu')).toHaveCount(0);
+}
+
 for (const terminology of [
   { code: 'L21' },
   {
@@ -439,8 +446,10 @@ for (const terminology of [
     await page
       .getByTestId('diagnosis-0-title-input')
       .fill('Seborrhoeic dermatitis');
-    for (const [field, value] of Object.entries(terminology))
+    for (const [field, value] of Object.entries(terminology)) {
+      await addDiagnosisField(page, 0, field);
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
+    }
     // Both variants render the same controls; audit the fully populated one.
     if (terminology.system) await checkA11y(page);
     await page.getByTestId('save-button').click();
@@ -481,7 +490,9 @@ for (const terminology of [
       'Seborrhoeic dermatitis'
     );
     await page.getByTestId('edit-consultation-button').click();
+    // Filled optional fields show without being added again
     await expect(page.getByTestId('diagnosis-0-code-input')).toHaveValue('L21');
+    await addDiagnosisField(page, 0, 'condition');
     await page.getByTestId('diagnosis-0-condition-input').click();
     await page.getByTestId(`diagnosis-0-condition-item-${reason.id}`).click();
     await page
@@ -510,7 +521,7 @@ for (const terminology of [
       'Updated diagnosis wording'
     );
     await page.getByTestId('edit-consultation-button').click();
-    await page.getByTestId('remove-diagnosis-0').click();
+    await page.getByTestId('diagnosis-0-remove').click();
     await page.getByTestId('save-button').click();
     await expect(page.getByTestId('consultation-diagnoses')).toHaveCount(0);
   });
@@ -526,20 +537,27 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   await page.getByTestId('menu-add-diagnosis').click();
   await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   const item = page.getByTestId('consultation-diagnosis-0');
-  await expect(item.getByText('Diagnosis *', { exact: true })).toHaveCount(1);
-  await expect(item.getByText('Diagnosis Name', { exact: true })).toHaveCount(
-    0
-  );
-  await expect(
-    item.getByText('Referenced Condition (optional)', { exact: true })
-  ).toBeVisible();
-  for (const label of [
-    'Terminology System (optional)',
-    'Diagnosis Code (optional)',
-    'Terminology Display (optional)',
-  ]) {
-    await expect(item.getByText(label, { exact: true })).toBeVisible();
-  }
+  await expect(item.getByText('Diagnosis 1', { exact: true })).toBeVisible();
+  await expect(item.getByText('Name *', { exact: true })).toHaveCount(1);
+  // Optional fields stay behind the diagnosis's + until added
+  const optionalLabels = [
+    'Referenced Condition',
+    'Terminology System',
+    'Diagnosis Code',
+    'Terminology Display',
+  ];
+  for (const label of optionalLabels)
+    await expect(item.getByText(label, { exact: true })).toHaveCount(0);
+  await page.getByTestId('diagnosis-0-add').click();
+  for (const label of optionalLabels)
+    await expect(
+      page.getByTestId('diagnosis-options-menu').getByText(label, {
+        exact: true,
+      })
+    ).toBeVisible();
+  await page.getByTestId('diagnosis-option-condition').click();
+  await expect(page.getByTestId('diagnosis-options-menu')).toHaveCount(0);
+  await expect(item.getByTestId('diagnosis-0-condition-input')).toBeVisible();
   await expect(item).toHaveCSS('border-top-width', '1px');
   await expect(item).toHaveCSS('border-bottom-width', '1px');
   const titleBox = await item
@@ -549,13 +567,20 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
     .getByTestId('diagnosis-0-condition-input')
     .boundingBox();
   expect(titleBox!.y).toBeLessThan(referenceBox!.y);
-  const labelBox = await item
-    .getByText('Diagnosis *', { exact: true })
+  // A removed optional field goes back to the menu
+  await page.getByTestId('remove-diagnosis-0-condition').click();
+  await expect(item.getByTestId('diagnosis-0-condition-input')).toHaveCount(0);
+  // The heading carries the diagnosis's remove button
+  const headingBox = await item
+    .getByText('Diagnosis 1', { exact: true })
     .boundingBox();
-  const removeBox = await item.getByTestId('remove-diagnosis-0').boundingBox();
+  const removeBox = await item.getByTestId('diagnosis-0-remove').boundingBox();
   expect(
     Math.abs(
-      labelBox!.y + labelBox!.height / 2 - removeBox!.y - removeBox!.height / 2
+      headingBox!.y +
+        headingBox!.height / 2 -
+        removeBox!.y -
+        removeBox!.height / 2
     )
   ).toBeLessThanOrEqual(2);
   const dialogPromise = page.waitForEvent('dialog');
@@ -564,7 +589,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   expect(dialog.message()).toContain('Please enter a diagnosis name.');
   await dialog.accept();
   await save;
-  await page.getByTestId('remove-diagnosis-0').click();
+  await page.getByTestId('diagnosis-0-remove').click();
   await page.getByTestId('save-button').click();
   await expect(page).not.toHaveURL(/consultation\/add/);
   expect(
@@ -586,6 +611,7 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
   await page.getByTestId('menu-add-diagnosis').click();
   await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   await page.getByTestId('diagnosis-0-title-input').fill('New diagnosis');
+  await addDiagnosisField(page, 0, 'condition');
   await page.getByTestId('diagnosis-0-condition-input').click();
   await page.getByTestId('diagnosis-0-condition-item-__create__').click();
   await page.getByTestId('save-button').click();

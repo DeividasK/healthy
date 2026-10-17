@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   CalendarRange,
+  Copy,
   Layers,
   Clock,
   MapPin,
@@ -10,18 +11,18 @@ import {
   ScrollText,
   Tablets,
   Weight,
-  X,
   type LucideIcon,
 } from 'lucide-react-native';
 import type { AddOptionItem } from '@/src/components/AddOptionsModal';
 import { useFieldRevealContext } from '@/src/components/FieldReveal';
 import { FormField } from '@/src/components/FormField';
 import { NativeSelect } from '@/src/components/NativeSelect';
-import { PlusCircleButton } from '@/src/components/PlusCircleButton';
+import { GroupHeader } from '@/src/components/GroupHeader';
 import { COLORS } from '@/src/theme/colors';
 import { fieldRowStyles, NumberInput, TimingFields } from './TimingFields';
 import {
   createDoseDraft,
+  duplicateDoseDraft,
   getAmountUnitOptions,
   getRouteOptions,
   hideDoseField,
@@ -64,7 +65,7 @@ const menuIcon = (Icon: LucideIcon) => (
  * Structured regimen: sequential phases, each with one or more doses taken
  * together (e.g. 2 tablets in the morning and 1 in the evening). The `+` next
  * to a phase adds a dose or the next phase; the `+` next to a dose adds its
- * optional fields.
+ * optional fields or duplicates it.
  */
 export function DosageEditor({
   value,
@@ -123,6 +124,31 @@ export function DosageEditor({
       })
     );
   };
+  const duplicateDose = (
+    phaseIndex: number,
+    doseIndex: number
+  ): AddOptionItem => ({
+    id: 'duplicate',
+    label: 'Duplicate Dose',
+    icon: menuIcon(Copy),
+    testID: 'treatment-regimen-option-duplicate',
+    // The copy goes right after its source, in the same phase.
+    onPress: added(() =>
+      setPhases(
+        phases.map((phase, p) =>
+          p === phaseIndex
+            ? {
+                doses: [
+                  ...phase.doses.slice(0, doseIndex + 1),
+                  duplicateDoseDraft(phase.doses[doseIndex]),
+                  ...phase.doses.slice(doseIndex + 1),
+                ],
+              }
+            : phase
+        )
+      )
+    ),
+  });
   const anotherDose = (phaseIndex: number): AddOptionItem => ({
     id: 'dose',
     label: 'Another Dose',
@@ -168,7 +194,7 @@ export function DosageEditor({
             style={styles.phase}
             testID={`treatment-regimen-phase-${phaseNumber}`}
           >
-            <SectionHeader
+            <GroupHeader
               title={`Phase ${phaseNumber}`}
               titleStyle={styles.phaseTitle}
               idPrefix={`treatment-regimen-p${phaseNumber}`}
@@ -185,12 +211,15 @@ export function DosageEditor({
               const idPrefix = `treatment-regimen-p${phaseNumber}-d${doseIndex + 1}`;
               return (
                 <View key={doseIndex} style={styles.dose} testID={idPrefix}>
-                  <SectionHeader
+                  <GroupHeader
                     title={`Dose ${doseIndex + 1}`}
                     titleStyle={styles.doseTitle}
                     idPrefix={idPrefix}
                     onAdd={() =>
-                      onShowOptions(fieldOptions(phaseIndex, doseIndex))
+                      onShowOptions([
+                        ...fieldOptions(phaseIndex, doseIndex),
+                        duplicateDose(phaseIndex, doseIndex),
+                      ])
                     }
                     // A phase's only dose goes with the phase.
                     onRemove={
@@ -211,48 +240,6 @@ export function DosageEditor({
         );
       })}
     </FormField>
-  );
-}
-
-/** A phase or dose heading with its `+` (add fields) and remove buttons. */
-function SectionHeader({
-  title,
-  titleStyle,
-  idPrefix,
-  onAdd,
-  onRemove,
-}: {
-  title: string;
-  titleStyle: object;
-  idPrefix: string;
-  onAdd: () => void;
-  onRemove?: () => void;
-}) {
-  return (
-    <View style={styles.header}>
-      <Text style={titleStyle}>{title}</Text>
-      <PlusCircleButton
-        size={28}
-        iconSize={16}
-        onPress={onAdd}
-        testID={`${idPrefix}-add`}
-        accessibilityRole="button"
-        accessibilityLabel={`Add to ${title.toLowerCase()}`}
-      />
-      {onRemove && (
-        <TouchableOpacity
-          onPress={onRemove}
-          testID={`${idPrefix}-remove`}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${title.toLowerCase()}`}
-          hitSlop={10}
-          activeOpacity={0.7}
-          style={styles.headerRemove}
-        >
-          <X size={16} color={COLORS.light.iconClear} />
-        </TouchableOpacity>
-      )}
-    </View>
   );
 }
 
@@ -411,15 +398,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.border,
     paddingTop: 16,
     marginBottom: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  headerRemove: {
-    marginLeft: 'auto',
   },
   phaseTitle: {
     fontSize: 16,

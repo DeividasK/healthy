@@ -15,7 +15,11 @@ import {
   getConsultationById,
   getDistinctDoctorNames,
 } from '@/src/features/consultations/consultationService';
-import { getConsultationDoctor } from '@/src/utils/fhirUtils';
+import {
+  getConsultationConditionIds,
+  getConsultationDoctor,
+  getConsultationReasonConditionIds,
+} from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
 import { COLORS } from '@/src/theme/colors';
@@ -54,8 +58,11 @@ function AddTreatmentForPatient({
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [specialists, setSpecialists] = useState<string[]>([]);
   // Added through a consultation, the treatment defaults to that visit's
-  // date and specialist.
+  // date, specialist and conditions (its diagnoses and reasons for visit).
   const [consultationSpecialist, setConsultationSpecialist] = useState('');
+  const [consultationConditionIds, setConsultationConditionIds] = useState<
+    string[]
+  >([]);
   const [consultationDate, setConsultationDate] = useState<Date>();
   // Only a consultation that loaded for the active patient is the origin.
   const [originId, setOriginId] = useState<string>();
@@ -78,6 +85,17 @@ function AddTreatmentForPatient({
         const date =
           consultation?.actualPeriod?.start || consultation?.plannedStartDate;
         setConsultationDate(date ? parseLocalDate(date) : undefined);
+        const patientConditionIds = new Set(
+          patientConditions.map((condition) => condition.id)
+        );
+        setConsultationConditionIds(
+          consultation
+            ? [
+                ...getConsultationConditionIds(consultation),
+                ...getConsultationReasonConditionIds(consultation),
+              ].filter((id) => patientConditionIds.has(id))
+            : []
+        );
         setOriginId(consultation?.id);
         setLoadState('ready');
       })
@@ -135,7 +153,12 @@ function AddTreatmentForPatient({
       initialValues={{
         requesterName: consultationSpecialist,
         authoredDate: consultationDate,
-        reasonConditionIds: conditionId ? [conditionId] : [],
+        reasonConditionIds: [
+          ...new Set([
+            ...(conditionId ? [conditionId] : []),
+            ...consultationConditionIds,
+          ]),
+        ],
       }}
       specialistSuggestions={specialists}
     />
