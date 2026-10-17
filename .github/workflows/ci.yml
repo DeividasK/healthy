@@ -29,6 +29,27 @@ jobs:
       - name: Pure Function Tests
         run: pnpm test:unit
 
+  android:
+    name: Android Debug Build
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          save-cache: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Generate Native Project
+        run: pnpm expo prebuild --platform android --no-install
+      - name: Build Debug APK
+        run: ./android/gradlew -p android assembleDebug -PreactNativeArchitectures=x86_64
+
   build:
     name: Production Web Build
     runs-on: ubuntu-26.04

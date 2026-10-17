@@ -1,6 +1,10 @@
 packages:
   - '.'
 
+# React Native tooling (Metro, Babel presets, Gradle autolinking) expects a
+# flat node_modules. pnpm 11+ ignores node-linker in .npmrc, so it lives here.
+nodeLinker: hoisted
+
 allowBuilds:
   esbuild: true
   unrs-resolver: false

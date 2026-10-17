@@ -7,6 +7,7 @@ import {
   Platform,
 } from 'react-native';
 import { COLORS } from '@/src/theme/colors';
+import { useDismissKey } from '@/src/utils/dismissKey';
 
 export interface AddOptionItem {
   id: string;
@@ -31,6 +32,8 @@ export function AddOptionsModal({
   overlayTestID = 'plus-menu-overlay',
   cardTestID = 'plus-menu-card',
 }: AddOptionsModalProps) {
+  useDismissKey(onClose, visible && options.length > 0);
+
   if (!visible || options.length === 0) {
     return null;
   }

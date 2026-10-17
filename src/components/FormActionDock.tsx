@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Keyboard } from 'react-native';
 import { useIsFocused, useRouter } from 'expo-router';
 import { Check, ChevronLeft, Plus } from 'lucide-react-native';
-import { useEscapeKey } from '@/src/utils/escapeKey';
+import { useDismissKey } from '@/src/utils/dismissKey';
 import {
   ResourceActionDock,
   type DeleteConfirmation,
@@ -56,7 +56,7 @@ export function FormActionDock({
     if (hasChanges) setDiscardVisible(true);
     else leave();
   };
-  useEscapeKey(
+  useDismissKey(
     () => {
       if (discardVisible) setDiscardVisible(false);
       else cancel();

@@ -20,6 +20,8 @@ export function NativeDatePicker({
   onChange,
   placeholder = 'Not specified',
   testID = 'date-picker-button',
+  id,
+  name,
   variant = 'pill',
   allowFuture = false,
 }: NativeDatePickerProps) {
@@ -60,6 +62,8 @@ export function NativeDatePicker({
       onPress={handlePress}
       activeOpacity={0.8}
       testID={testID}
+      id={id ?? testID}
+      {...{ name }}
     >
       <Calendar
         color={COLORS.light.iconMuted}

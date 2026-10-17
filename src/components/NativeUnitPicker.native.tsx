@@ -2,11 +2,12 @@ import React from 'react';
 import {
   TouchableOpacity,
   Text,
+  View,
   StyleSheet,
   Platform,
   ActionSheetIOS,
-  Alert,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { ChevronDown } from 'lucide-react-native';
 import { UnitOption } from '@/src/data/cbcMarkers';
 import { COLORS } from '@/src/theme/colors';
@@ -41,24 +42,42 @@ export function NativeUnitPicker({
           }
         }
       );
-    } else if (Platform.OS === 'android') {
-      Alert.alert(
-        'Select Unit',
-        undefined,
-        [
-          ...units.map((u) => ({
-            text: u.label,
-            onPress: () => onSelect(u.label, u.ucum),
-          })),
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ],
-        { cancelable: true }
-      );
     }
   };
+
+  // Android's alert dialog holds three buttons at most, so the units go in a
+  // native single-choice dialog laid transparently over the button.
+  if (Platform.OS === 'android') {
+    return (
+      <View style={styles.unitPickerButton} testID={testID}>
+        <Text style={styles.unitPickerText}>{selectedUnit}</Text>
+        <ChevronDown color={COLORS.light.iconClear} size={16} />
+        <Picker
+          testID={`${testID}-select`}
+          nativeID={`${testID}-native-select`}
+          accessibilityLabel="Select unit"
+          {...{ name: `${testID}-unit` }}
+          mode="dialog"
+          prompt="Select Unit"
+          selectedValue={selectedUnit}
+          onValueChange={(label) => {
+            const found = units.find((u) => u.label === label);
+            if (found && found.label !== selectedUnit)
+              onSelect(found.label, found.ucum);
+          }}
+          style={styles.overlayPicker}
+        >
+          {units.map((u) => (
+            <Picker.Item
+              key={u.ucum || u.label}
+              label={u.label}
+              value={u.label}
+            />
+          ))}
+        </Picker>
+      </View>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -86,6 +105,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     flexShrink: 0,
+    position: 'relative',
+  },
+  overlayPicker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
   },
   unitPickerText: {
     fontSize: 13,

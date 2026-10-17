@@ -23,7 +23,7 @@ import { COLORS } from '@/src/theme/colors';
 import { isKeyboardInput } from '@/src/utils/inputModality';
 import { focusWhenReady } from '@/src/utils/focus';
 import { useFieldRevealContext } from './FieldReveal';
-import { useEscapeKey } from '@/src/utils/escapeKey';
+import { useDismissKey } from '@/src/utils/dismissKey';
 
 const backdropEntry = FadeIn.duration(180).reduceMotion(ReduceMotion.System);
 const menuEntry = FadeInDown.duration(200)
@@ -105,7 +105,7 @@ export function FloatingAddMenu({
     };
   }, [isOpen]);
 
-  useEscapeKey(onClose, isOpen);
+  useDismissKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

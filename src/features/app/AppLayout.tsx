@@ -1,6 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 import 'react-native-reanimated';
@@ -84,6 +85,7 @@ function RootLayoutNav() {
   useBlurOnScreenChange();
   return (
     <ThemeProvider value={NAV_THEME.light}>
+      <StatusBar style="dark" />
       <AppChrome>
         <Stack
           screenOptions={{

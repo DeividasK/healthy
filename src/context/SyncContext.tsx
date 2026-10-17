@@ -20,6 +20,7 @@ import {
 } from '@/src/features/sync/googleAccount';
 import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
 import { GoogleAuthExpiredError } from '@/src/services/googleDriveService';
+import { refreshNativeAccessToken } from '@/src/features/profile/nativeGoogleSignIn';
 import type { CloudStorageProvider } from '@/src/features/sync/providers/types';
 import {
   VaultAlreadyExistsError,
@@ -125,6 +126,10 @@ async function refreshAccessToken(
         ? Date.now() + refreshed.expiresIn * 1000
         : undefined,
     };
+  }
+  if (Platform.OS === 'android') {
+    const refreshed = await refreshNativeAccessToken();
+    return refreshed ? { ...config, ...refreshed } : null;
   }
   if (Platform.OS === 'web') {
     const refreshed = await silentRefreshWebAccessToken(config.userEmail);
