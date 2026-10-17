@@ -383,7 +383,7 @@ test.describe('Treatment form keyboard support', () => {
 
     // Duplicating copies every value into a new dose right after it, e.g. the
     // same again in the evening
-    await addFrom('p1-d1', 'duplicate');
+    await page.getByTestId('treatment-regimen-p1-d1-duplicate').click();
     await expect(dose(1, 2, 'amount-input')).toHaveValue('2');
     await expect(dose(1, 2, 'frequency-input')).toHaveValue('1');
     await expect(dose(1, 2, 'route-select')).toHaveValue('26643006');

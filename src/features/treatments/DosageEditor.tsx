@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   CalendarRange,
-  Copy,
   Layers,
   Clock,
   MapPin,
@@ -65,7 +64,7 @@ const menuIcon = (Icon: LucideIcon) => (
  * Structured regimen: sequential phases, each with one or more doses taken
  * together (e.g. 2 tablets in the morning and 1 in the evening). The `+` next
  * to a phase adds a dose or the next phase; the `+` next to a dose adds its
- * optional fields or duplicates it.
+ * optional fields, and the button beside it duplicates the dose.
  */
 export function DosageEditor({
   value,
@@ -124,31 +123,23 @@ export function DosageEditor({
       })
     );
   };
-  const duplicateDose = (
-    phaseIndex: number,
-    doseIndex: number
-  ): AddOptionItem => ({
-    id: 'duplicate',
-    label: 'Duplicate Dose',
-    icon: menuIcon(Copy),
-    testID: 'treatment-regimen-option-duplicate',
-    // The copy goes right after its source, in the same phase.
-    onPress: added(() =>
-      setPhases(
-        phases.map((phase, p) =>
-          p === phaseIndex
-            ? {
-                doses: [
-                  ...phase.doses.slice(0, doseIndex + 1),
-                  duplicateDoseDraft(phase.doses[doseIndex]),
-                  ...phase.doses.slice(doseIndex + 1),
-                ],
-              }
-            : phase
-        )
+  // The copy goes right after its source, in the same phase.
+  const duplicateDose = (phaseIndex: number, doseIndex: number) => {
+    reveal?.expectField();
+    setPhases(
+      phases.map((phase, p) =>
+        p === phaseIndex
+          ? {
+              doses: [
+                ...phase.doses.slice(0, doseIndex + 1),
+                duplicateDoseDraft(phase.doses[doseIndex]),
+                ...phase.doses.slice(doseIndex + 1),
+              ],
+            }
+          : phase
       )
-    ),
-  });
+    );
+  };
   const anotherDose = (phaseIndex: number): AddOptionItem => ({
     id: 'dose',
     label: 'Another Dose',
@@ -216,11 +207,9 @@ export function DosageEditor({
                     titleStyle={styles.doseTitle}
                     idPrefix={idPrefix}
                     onAdd={() =>
-                      onShowOptions([
-                        ...fieldOptions(phaseIndex, doseIndex),
-                        duplicateDose(phaseIndex, doseIndex),
-                      ])
+                      onShowOptions(fieldOptions(phaseIndex, doseIndex))
                     }
+                    onDuplicate={() => duplicateDose(phaseIndex, doseIndex)}
                     // A phase's only dose goes with the phase.
                     onRemove={
                       phase.doses.length > 1

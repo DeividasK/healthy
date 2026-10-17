@@ -7,20 +7,21 @@ import {
   type StyleProp,
   type TextStyle,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { Copy, X } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 import { PlusCircleButton } from './PlusCircleButton';
 
 /**
  * Heading of a group inside a form field (a regimen phase or dose, a
- * consultation diagnosis): its `+` opens the group's options and the `x`
- * removes the group.
+ * consultation diagnosis): its `+` opens the group's options, an optional
+ * duplicate button beside it copies the group, and the `x` removes it.
  */
 export function GroupHeader({
   title,
   titleStyle,
   idPrefix,
   onAdd,
+  onDuplicate,
   onRemove,
 }: {
   title: string;
@@ -28,6 +29,7 @@ export function GroupHeader({
   idPrefix: string;
   /** Omitted when the group has nothing left to add. */
   onAdd?: () => void;
+  onDuplicate?: () => void;
   onRemove?: () => void;
 }) {
   return (
@@ -42,6 +44,17 @@ export function GroupHeader({
           accessibilityRole="button"
           accessibilityLabel={`Add to ${title.toLowerCase()}`}
         />
+      )}
+      {onDuplicate && (
+        <PlusCircleButton
+          size={28}
+          onPress={onDuplicate}
+          testID={`${idPrefix}-duplicate`}
+          accessibilityRole="button"
+          accessibilityLabel={`Duplicate ${title.toLowerCase()}`}
+        >
+          <Copy color={COLORS.light.iconMuted} size={14} />
+        </PlusCircleButton>
       )}
       {onRemove && (
         <TouchableOpacity
