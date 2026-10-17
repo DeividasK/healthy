@@ -341,6 +341,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       'consultations',
       'clinical_documents',
       'medication_requests',
+      'medication_statements',
+      'medication_administrations',
       'service_requests',
       'organizations',
     ],
