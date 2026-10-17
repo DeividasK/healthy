@@ -109,9 +109,14 @@ function isAuthError(err: unknown): boolean {
   );
 }
 
-/** Obtains a new Google access token without user interaction, if possible. */
+/**
+ * Obtains a new Google access token without user interaction, if possible.
+ * On web that needs Google's popup, which browsers block unless a click
+ * opened it, so only `interactive` refreshes (started by the user) try it.
+ */
 async function refreshAccessToken(
-  config: GoogleDriveConfig
+  config: GoogleDriveConfig,
+  { interactive }: { interactive: boolean }
 ): Promise<GoogleDriveConfig | null> {
   const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
   if (config.refreshToken && clientId) {
@@ -132,6 +137,7 @@ async function refreshAccessToken(
     return refreshed ? { ...config, ...refreshed } : null;
   }
   if (Platform.OS === 'web') {
+    if (!interactive) return null;
     const refreshed = await silentRefreshWebAccessToken(config.userEmail);
     return {
       ...config,
@@ -225,7 +231,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
    */
   const withProvider = useCallback(
     async <T,>(
-      operation: (provider: CloudStorageProvider) => Promise<T>
+      operation: (provider: CloudStorageProvider) => Promise<T>,
+      // Background syncs never prompt; everything else is a user action.
+      { interactive = true }: { interactive?: boolean } = {}
     ): Promise<T> => {
       let active = configRef.current;
       if (!active) throw new Error('Google Drive is not connected.');
@@ -234,7 +242,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       let refreshAttempted = false;
       const refresh = async (cause: unknown) => {
         refreshAttempted = true;
-        const refreshed = await refreshAccessToken(active!).catch((err) => {
+        const refreshed = await refreshAccessToken(active!, {
+          interactive,
+        }).catch((err) => {
           console.warn('Google token refresh failed:', err);
           return null;
         });
@@ -284,7 +294,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setSyncError(null);
         markAuthExpired(false);
         try {
-          await withProvider((provider) => syncOnce(provider, keys));
+          await withProvider((provider) => syncOnce(provider, keys), {
+            interactive: manual,
+          });
           const now = new Date();
           if (configRef.current)
             await updateConfig({
@@ -297,9 +309,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           resetTimerRef.current = setTimeout(() => setSyncState('idle'), 1000);
         } catch (err: unknown) {
           if (isAuthError(err)) {
-            // Automatic syncs pause until the user syncs or reconnects.
+            // Automatic syncs pause until the user syncs or reconnects; the
+            // sync card shows it, so this expected state is not logged.
             markAuthExpired(true);
-            console.warn('Google Drive session expired; sync paused:', err);
             setSyncState('idle');
             setIsUpToDate(false);
             return;
