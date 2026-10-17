@@ -9,6 +9,7 @@ import {
   bootstrapApp,
   openSecondDevice,
   syncAllTestProfiles,
+  getBrowserLocalDate,
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
@@ -174,6 +175,50 @@ test.describe('Sync between devices', () => {
       expect(
         (await bridge(device, (b) => b.getCondition('eczema'))) as any
       ).toMatchObject({ code: { text: 'Edited on second device' } });
+    await second.close();
+  });
+
+  test('uploads a journal entry shortly after it is marked, without a manual sync', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    await seedTestPatient(page, { id: 'shared-patient', givenName: 'Alice' });
+    const started = await getBrowserLocalDate(page, -3);
+    await seedTestResources(page, {
+      treatments: [
+        {
+          id: 'vitamin-d',
+          title: 'Vitamin D',
+          status: 'active',
+          authoredOn: started,
+          takingSince: started,
+        },
+      ],
+    });
+    const { store, phrase } = await connectTestSync(page);
+    await syncTestDevice(page);
+    await page.goto('/journal');
+    // Let the sync that runs on start finish before marking the entry.
+    await page.waitForLoadState('networkidle');
+    const uploads = () =>
+      store.requests.filter((request) => request.method !== 'GET').length;
+    const before = uploads();
+
+    await page.getByTestId('treatment-log-taken-vitamin-d').click();
+    // Saves upload about 2 s later; the next poll is a minute away.
+    await expect.poll(uploads, { timeout: 15_000 }).toBeGreaterThan(before);
+
+    const second = await openSecondDevice(browser, testInfo);
+    await bootstrapApp(second.page);
+    await connectTestSync(second.page, { store, phrase });
+    await syncAllTestProfiles(second.page);
+    expect(
+      await bridge(second.page, (b) =>
+        b.querySql(
+          'SELECT medication_request_id FROM medication_administrations'
+        )
+      )
+    ).toEqual([{ medication_request_id: 'vitamin-d' }]);
     await second.close();
   });
 
