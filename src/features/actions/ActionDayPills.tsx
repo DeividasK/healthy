@@ -304,6 +304,9 @@ function DayStrip({
       })}
       initialNumToRender={ITEM_COUNT}
       windowSize={ITEM_COUNT}
+      // Android detaches subviews it deems off-screen, and the outline's layer
+      // sits at the strip's start, so it would vanish once the strip scrolls.
+      removeClippedSubviews={false}
       onScroll={(event) => {
         offset.current = event.nativeEvent.contentOffset.x;
       }}

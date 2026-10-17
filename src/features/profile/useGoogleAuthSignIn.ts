@@ -6,6 +6,7 @@ import {
   loadGisScript,
   requestWebAccessToken,
 } from '@/src/services/googleAuthWebService';
+import { signInNative } from './nativeGoogleSignIn';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -198,6 +199,18 @@ export function useGoogleAuthSignIn(
           onSuccessRef.current,
           () => mountedRef.current
         );
+      } else if (Platform.OS === 'android') {
+        // Google rejects custom-scheme redirects for the web client, so
+        // Android signs in through the Google Play services account chooser.
+        const tokens = await signInNative();
+        if (!tokens) return;
+        await resolveUserAndNotify(
+          tokens.accessToken,
+          tokens.tokenExpiresAt,
+          undefined,
+          onSuccessRef.current,
+          () => mountedRef.current
+        );
       } else {
         if (!request) return;
         await promptAsync();
@@ -216,6 +229,9 @@ export function useGoogleAuthSignIn(
     // On web: ready once the GIS script has loaded (so the popup is available
     // synchronously inside the user gesture). On native: ready once the
     // auth request has been prepared by expo-auth-session.
-    isReady: Platform.OS === 'web' ? isGisReady : Boolean(request),
+    isReady:
+      Platform.OS === 'web'
+        ? isGisReady
+        : Platform.OS === 'android' || Boolean(request),
   };
 }

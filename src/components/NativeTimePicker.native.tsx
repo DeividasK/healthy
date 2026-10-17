@@ -18,6 +18,8 @@ export function NativeTimePicker({
   onChange,
   maxTime,
   testID = 'time-picker-button',
+  id,
+  name,
 }: NativeTimePickerProps) {
   const handlePress = () => {
     if (Platform.OS === 'android') {
@@ -50,6 +52,8 @@ export function NativeTimePicker({
       onPress={handlePress}
       activeOpacity={0.8}
       testID={testID}
+      id={id ?? testID}
+      {...{ name }}
     >
       <Clock color={COLORS.light.iconMuted} size={18} style={styles.icon} />
       <Text style={styles.timeText}>{value}</Text>

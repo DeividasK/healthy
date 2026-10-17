@@ -351,6 +351,13 @@ test.describe('Treatment form keyboard support', () => {
     };
     await dose(1, 1, 'amount-input').fill('2');
     await dose(1, 1, 'frequency-input').fill('1');
+    // Escape (Android back) closes only the open menu, not the form
+    await page.getByTestId('treatment-regimen-p1-d1-add').click();
+    await expect(page.getByTestId('regimen-options-menu')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('regimen-options-menu')).toHaveCount(0);
+    await expect(page.getByTestId('discard-changes-modal')).toHaveCount(0);
+    await expect(dose(1, 1, 'amount-input')).toHaveValue('2');
     await addFrom('p1-d1', 'route');
     await expect(dose(1, 1, 'route-select')).toHaveValue('26643006');
     await addFrom('p1-d1', 'when');

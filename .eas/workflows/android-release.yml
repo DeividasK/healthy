@@ -1,0 +1,27 @@
+name: Android release
+
+# Every push to main that can change the app builds a production AAB and
+# submits it to Google Play's internal testing track (see eas.json `submit`).
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!public/**'
+      - '!.github/**'
+
+jobs:
+  build_android:
+    name: Build Android
+    type: build
+    params:
+      platform: android
+      profile: production
+  submit_android:
+    name: Submit to internal testing
+    needs: [build_android]
+    type: submit
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
