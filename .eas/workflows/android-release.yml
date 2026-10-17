@@ -19,6 +19,10 @@ jobs:
     params:
       platform: android
       profile: production
+  # Uploads as a draft (eas.json `submit.production.android.releaseStatus`), so
+  # each release still needs "Start rollout" in Play Console. Google Play only
+  # accepts drafts until the app has been published once; after that, switch
+  # releaseStatus to "completed" to roll out to internal testers automatically.
   submit_android:
     name: Submit to internal testing
     needs: [build_android]
