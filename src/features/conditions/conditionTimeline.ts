@@ -4,7 +4,7 @@ import type {
   MedicationRequest,
   ServiceRequest,
 } from 'fhir/r5';
-import { parseLocalDate } from '@/src/utils/dateUtils';
+import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 
 /**
  * How a timeline step reads at a glance: still to come, under way, paused,
@@ -104,10 +104,70 @@ function monthLabel(date: string) {
 }
 
 /**
- * Every step related to a condition, newest first, grouped by month. Each
- * step is dated as its meta line is; undated steps come last.
+ * Which steps the timeline shows. Empty tone and type lists match every
+ * step; a period other than `all` leaves out undated steps.
  */
-export function buildConditionTimeline({
+export interface TimelineFilters {
+  tones: StatusTone[];
+  types: TimelineItem['type'][];
+  period: TimelinePeriod;
+}
+
+export type TimelinePeriod = 'all' | 'upcoming' | 'past3' | 'past6' | 'past12';
+
+export const NO_TIMELINE_FILTERS: TimelineFilters = {
+  tones: [],
+  types: [],
+  period: 'all',
+};
+
+export function hasTimelineFilters(filters: TimelineFilters) {
+  return (
+    filters.tones.length > 0 ||
+    filters.types.length > 0 ||
+    filters.period !== 'all'
+  );
+}
+
+const PAST_MONTHS: Partial<Record<TimelinePeriod, number>> = {
+  past3: 3,
+  past6: 6,
+  past12: 12,
+};
+
+function inPeriod(
+  date: string | undefined,
+  period: TimelinePeriod,
+  today: string
+) {
+  if (period === 'all') return true;
+  if (!date) return false;
+  const day = date.slice(0, 10);
+  if (period === 'upcoming') return day > today;
+  const start = parseLocalDate(today);
+  start.setMonth(start.getMonth() - (PAST_MONTHS[period] ?? 0));
+  return day >= formatLocalDate(start) && day <= today;
+}
+
+/** The steps matching every filter, in their original order. */
+export function filterTimelineItems(
+  items: TimelineItem[],
+  filters: TimelineFilters,
+  today = formatLocalDate(new Date())
+) {
+  return items.filter(
+    (item) =>
+      (!filters.tones.length || filters.tones.includes(item.tone)) &&
+      (!filters.types.length || filters.types.includes(item.type)) &&
+      inPeriod(item.date, filters.period, today)
+  );
+}
+
+/**
+ * Every step related to a condition, newest first. Each step is dated as its
+ * meta line is; undated steps come last.
+ */
+export function buildTimelineItems({
   consultations = [],
   serviceRequests = [],
   treatments = [],
@@ -117,8 +177,8 @@ export function buildConditionTimeline({
   serviceRequests?: ServiceRequest[];
   treatments?: MedicationRequest[];
   labResults?: DiagnosticReport[];
-}): TimelineGroup[] {
-  const items: TimelineItem[] = [
+}): TimelineItem[] {
+  return [
     ...consultations.map((resource): TimelineItem => ({
       type: 'consultation',
       resource,
@@ -144,7 +204,10 @@ export function buildConditionTimeline({
       tone: getStatusTone('labResult', resource.status),
     })),
   ].sort(compareItems);
+}
 
+/** Sorted steps grouped by month, with undated steps under "No date". */
+export function groupTimelineItems(items: TimelineItem[]): TimelineGroup[] {
   const groups: TimelineGroup[] = [];
   for (const item of items) {
     const label = item.date ? monthLabel(item.date) : 'No date';
@@ -153,4 +216,11 @@ export function buildConditionTimeline({
     else groups.push({ label, items: [item] });
   }
   return groups;
+}
+
+/** Every step related to a condition, newest first, grouped by month. */
+export function buildConditionTimeline(
+  resources: Parameters<typeof buildTimelineItems>[0]
+): TimelineGroup[] {
+  return groupTimelineItems(buildTimelineItems(resources));
 }

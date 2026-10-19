@@ -8,7 +8,7 @@ import { ClipboardList, MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ConditionTimeline } from './ConditionTimeline';
-import { buildConditionTimeline } from './conditionTimeline';
+import { buildTimelineItems } from './conditionTimeline';
 import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -295,7 +295,7 @@ export function ViewConditionView() {
       )}
 
       <ConditionTimeline
-        groups={buildConditionTimeline({
+        items={buildTimelineItems({
           consultations,
           serviceRequests,
           treatments,

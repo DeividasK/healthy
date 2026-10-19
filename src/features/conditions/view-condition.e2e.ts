@@ -135,6 +135,99 @@ test.describe('View Condition', () => {
       await expect(page.getByTestId('condition-title')).toHaveText('Knee pain');
     }
   });
+  test('filters the timeline by status, type and time period', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(new Date('2026-10-19T10:00:00'));
+    const condition = await seedTestCondition(page, { title: 'Knee pain' });
+    await seedTestConsultation(page, {
+      title: 'MRI review',
+      conditionIds: [condition.id],
+      date: '2026-11-03',
+      status: 'planned',
+    });
+    await seedTestConsultation(page, {
+      title: 'Orthopaedic review',
+      conditionIds: [condition.id],
+      date: '2026-10-04',
+      status: 'completed',
+    });
+    await seedTestServiceRequest(page, {
+      title: 'Knee MRI',
+      authoredOn: '2026-10-04',
+      status: 'active',
+      reasonConditionIds: [condition.id],
+    });
+    await seedTestTreatment(page, {
+      title: 'Ibuprofen 400mg',
+      authoredOn: '2026-03-02',
+      status: 'on-hold',
+      reasonConditionIds: [condition.id],
+    });
+    await page.goto(`/condition/${condition.id}`);
+
+    const timeline = page.getByTestId('condition-timeline');
+    const rows = timeline.getByTestId(/^condition-timeline-item-.*-row$/);
+    const count = timeline.getByTestId('condition-timeline-count');
+    const button = page.getByTestId('condition-timeline-filter-button');
+    await expect(count).toHaveText('4');
+    await expect(button).toHaveAccessibleName('Filter timeline');
+
+    // Status and type chips narrow the steps as they are picked
+    await button.click();
+    const filters = page.getByTestId('condition-timeline-filters-card');
+    await expect(filters.getByRole('checkbox')).toHaveText([
+      'Planned',
+      'Active',
+      'Paused',
+      'Done',
+      'Cancelled',
+      'Consultations',
+      'Service requests',
+      'Treatments',
+    ]);
+    await page.getByTestId('condition-timeline-filter-tone-planned').click();
+    await page.getByTestId('condition-timeline-filter-tone-active').click();
+    await expect(
+      page.getByTestId('condition-timeline-filter-tone-active')
+    ).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('condition-timeline-filters-done').click();
+    await expect(filters).toHaveCount(0);
+    await expect(rows).toHaveText([/MRI review/, /Knee MRI/]);
+    await expect(count).toHaveText('2');
+    await expect(button).toHaveAccessibleName('Filter timeline, filters on');
+
+    await button.click();
+    await page
+      .getByTestId('condition-timeline-filter-type-consultation')
+      .click();
+    await page.keyboard.press('Escape');
+    await expect(filters).toHaveCount(0);
+    await expect(rows).toHaveText([/MRI review/]);
+
+    // Reset clears every filter; then the time period alone
+    await button.click();
+    await page.getByTestId('condition-timeline-filters-reset').click();
+    await expect(rows).toHaveCount(4);
+    await page
+      .getByTestId('condition-timeline-filter-period')
+      .selectOption('past3');
+    await expect(rows).toHaveText([/Knee MRI/, /Orthopaedic review/]);
+    await page
+      .getByTestId('condition-timeline-filter-period')
+      .selectOption('upcoming');
+    await expect(rows).toHaveText([/MRI review/]);
+
+    // Nothing matching keeps the section and its filter button
+    await page.getByTestId('condition-timeline-filter-tone-paused').click();
+    await page.getByTestId('condition-timeline-filters-done').click();
+    await expect(rows).toHaveCount(0);
+    await expect(
+      timeline.getByTestId('condition-timeline-no-matches')
+    ).toHaveText('No steps match these filters.');
+    await expect(count).toHaveText('0');
+    await expect(button).toBeVisible();
+  });
 });
 
 test.describe('Condition view island', () => {
