@@ -1,8 +1,15 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Copy, Pill } from 'lucide-react-native';
+import Animated, {
+  ReduceMotion,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+} from 'react-native-reanimated';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
@@ -21,8 +28,7 @@ import {
 import {
   addDays,
   getCopyableAnswers,
-  daysEndingOn,
-  STRIP_DAYS,
+  getJournalDays,
   todayKey,
   type ActionDay,
   type ActionItem,
@@ -30,6 +36,23 @@ import {
 } from './actionDays';
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A later day's rows come in from the right, an earlier day's from the left.
+const ROWS_SLIDE_MS = 300;
+const rowsSlide = {
+  laterIn: SlideInRight.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  laterOut: SlideOutLeft.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  earlierIn: SlideInLeft.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  earlierOut: SlideOutRight.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+};
 
 /** Logs, day by day, whether each treatment was taken. */
 export function ActionsView() {
@@ -78,35 +101,102 @@ function ActionsForPatient({
   const [copiesByDate, setCopiesByDate] = useState<
     Record<string, Record<string, TreatmentLogAnswer>>
   >({});
-  const loadSequence = useRef(0);
+  // Bumped by each refresh, so loads started before it are dropped.
+  const generation = useRef(0);
+  // Days being loaded in this generation, so they are not asked for twice.
+  const pendingDates = useRef(new Set<string>());
+  const hasLoaded = useRef(false);
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
+  /**
+   * Loads days the journal does not have yet, batch by batch, adding them to
+   * those loaded. Stepping between loaded days loads nothing.
+   */
+  const loadMissingDays = useCallback(
+    async (batches: string[][]) => {
+      const started = generation.current;
+      for (const date of batches.flat()) pendingDates.current.add(date);
+      try {
+        for (const dates of batches) {
+          if (started !== generation.current) return;
+          if (!dates.length) continue;
+          const loaded = await getActionDays(activePatientId, dates);
+          if (started !== generation.current) return;
+          hasLoaded.current = true;
+          setDaysByDate((current) => ({
+            ...current,
+            ...Object.fromEntries(loaded.map((day) => [day.date, day])),
+          }));
+          setHasLoadError(false);
+          setLoadedPatientId(activePatientId);
+        }
+      } catch (err) {
+        if (started !== generation.current) return;
+        console.error('Failed to load actions:', err);
+        setHasLoadError(true);
+      } finally {
+        if (started === generation.current)
+          for (const date of batches.flat()) pendingDates.current.delete(date);
+      }
+    },
+    [activePatientId]
+  );
+
+  // The selected day and its neighbours first, then the rest of the strip.
+  useEffect(() => {
+    if (!activePatientId || hasLoadError) return;
+    const { nearby, strip } = getJournalDays(selected, today);
+    const isMissing = (date: string) =>
+      !(date in daysByDate) && !pendingDates.current.has(date);
+    const batches = [nearby.filter(isMissing), strip.filter(isMissing)];
+    if (batches.some((dates) => dates.length)) void loadMissingDays(batches);
+  }, [
+    activePatientId,
+    daysByDate,
+    hasLoadError,
+    loadMissingDays,
+    selected,
+    today,
+  ]);
+
+  /**
+   * Reloads the journal's days after its data changes. Days loaded for
+   * earlier selections are dropped rather than reloaded; they load again when
+   * needed.
+   */
   const loadData = useCallback(async () => {
     if (!activePatientId) return;
-    const sequence = ++loadSequence.current;
+    // Before the first load, the load above is under way, or failed: clearing
+    // the error starts it again.
+    if (!hasLoaded.current) {
+      setHasLoadError(false);
+      return;
+    }
+    const started = ++generation.current;
+    pendingDates.current.clear();
+    const { nearby, strip } = getJournalDays(selectedRef.current, today);
     try {
-      // The recent days, and any strip around an older selection: every day
-      // within 21 of it (including the day before, for copying answers).
-      const dates = new Set(
-        [
-          ...daysEndingOn(today, STRIP_DAYS),
-          ...daysEndingOn(addDays(selected, STRIP_DAYS), 2 * STRIP_DAYS + 1),
-        ].filter((date) => date <= today)
+      const loaded = await getActionDays(activePatientId, [
+        ...nearby,
+        ...strip,
+      ]);
+      if (started !== generation.current) return;
+      setDaysByDate(
+        Object.fromEntries(
+          loaded.map((loadedDay) => [loadedDay.date, loadedDay])
+        )
       );
-      const loaded = await getActionDays(activePatientId, [...dates]);
-      if (sequence !== loadSequence.current) return;
-      setDaysByDate((current) => {
-        const next = { ...current };
-        for (const loadedDay of loaded) next[loadedDay.date] = loadedDay;
-        return next;
-      });
       setHasLoadError(false);
       setLoadedPatientId(activePatientId);
     } catch (err) {
-      if (sequence !== loadSequence.current) return;
+      if (started !== generation.current) return;
       console.error('Failed to load actions:', err);
       setHasLoadError(true);
     }
-  }, [activePatientId, selected, today]);
+  }, [activePatientId, today]);
 
   const loadCalendarDays = useCallback(
     (dates: string[]) => getActionDays(activePatientId, dates),
@@ -122,6 +212,23 @@ function ActionsForPatient({
     ],
     loadData
   );
+
+  // The day whose rows are shown, which follows the selected one a commit
+  // later: the outgoing rows first learn which way to slide out, and stop
+  // taking answers, which would otherwise be saved for the new day.
+  const [shown, setShown] = useState<{
+    date: string;
+    isLater: boolean | null;
+  }>({ date: selected, isLater: null });
+  const isLeaving = selected !== shown.date;
+  useEffect(() => {
+    if (!isLeaving) return;
+    // A separate commit, so the outgoing rows slide out with it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShown({ date: selected, isLater: selected > shown.date });
+  }, [isLeaving, selected, shown.date]);
+  const isLeavingForLater = isLeaving ? selected > shown.date : shown.isLater;
+  const shownDay = daysByDate[shown.date];
 
   const day = daysByDate[selected];
   const isLoading =
@@ -291,20 +398,44 @@ function ActionsForPatient({
               title="Treatments"
               testID="actions-treatments-section"
             >
-              {day?.items.map((item) => (
-                <TreatmentLogRow
-                  key={item.key}
-                  item={item}
-                  disabled={savingKeys.includes(item.key)}
-                  onAnswer={(answer) => void handleAnswer(item, answer)}
-                  onOpen={() =>
-                    router.push({
-                      pathname: '/treatment/[id]',
-                      params: { id: item.treatment.id || '' },
-                    })
+              {!!shownDay?.items.length && (
+                <Animated.View
+                  key={shown.date}
+                  entering={
+                    shown.isLater === null
+                      ? undefined
+                      : shown.isLater
+                        ? rowsSlide.laterIn
+                        : rowsSlide.earlierIn
                   }
-                />
-              ))}
+                  exiting={
+                    isLeavingForLater === false
+                      ? rowsSlide.earlierOut
+                      : rowsSlide.laterOut
+                  }
+                  pointerEvents={isLeaving ? 'none' : 'auto'}
+                  aria-hidden={isLeaving}
+                  importantForAccessibility={
+                    isLeaving ? 'no-hide-descendants' : 'auto'
+                  }
+                >
+                  {shownDay.items.map((item) => (
+                    <TreatmentLogRow
+                      key={item.key}
+                      item={item}
+                      isLeaving={isLeaving}
+                      disabled={isLeaving || savingKeys.includes(item.key)}
+                      onAnswer={(answer) => void handleAnswer(item, answer)}
+                      onOpen={() =>
+                        router.push({
+                          pathname: '/treatment/[id]',
+                          params: { id: item.treatment.id || '' },
+                        })
+                      }
+                    />
+                  ))}
+                </Animated.View>
+              )}
             </ResourceSection>
           </>
         )}
