@@ -642,7 +642,14 @@ export function HomeView() {
                     >
                       {/* Card Header: Date & Action Icons */}
                       <View style={styles.cardHeader}>
-                        <View style={styles.cardHeaderLeft}>
+                        <TouchableOpacity
+                          testID={`view-report-button-${reportId}`}
+                          style={styles.cardHeaderLeft}
+                          accessibilityRole="button"
+                          accessibilityLabel={`View lab result: ${formatDate(record.report.effectiveDateTime || '')}`}
+                          onPress={() => router.push(`/lab-result/${reportId}`)}
+                          activeOpacity={0.6}
+                        >
                           <Calendar
                             color={COLORS.light.iconMuted}
                             size={16}
@@ -651,7 +658,7 @@ export function HomeView() {
                           <Text style={styles.cardDate}>
                             {formatDate(record.report.effectiveDateTime || '')}
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                         <View style={styles.cardHeaderActions}>
                           <TouchableOpacity
                             testID={`edit-report-button-${reportId}`}
