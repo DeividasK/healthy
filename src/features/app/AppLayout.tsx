@@ -14,6 +14,7 @@ import { ActivePatientProvider } from '@/src/features/profile/ActivePatientConte
 import { SyncProvider } from '@/src/context/SyncContext';
 import { DatabaseProvider } from '@/src/database/db';
 import { setupTestBridge } from '@/src/features/testing/testBridge';
+import { registerPwa } from './registerPwa';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -22,6 +23,7 @@ function AppReadyHandler() {
   useEffect(() => {
     SplashScreen.hideAsync();
     setupTestBridge();
+    registerPwa();
   }, []);
 
   return null;
