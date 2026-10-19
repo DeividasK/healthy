@@ -1,8 +1,13 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Stethoscope } from 'lucide-react-native';
-import type { Condition, Encounter, ServiceRequest } from 'fhir/r5';
+import { FlaskConical, FolderPlus, Stethoscope } from 'lucide-react-native';
+import type {
+  Condition,
+  DiagnosticReport,
+  Encounter,
+  ServiceRequest,
+} from 'fhir/r5';
 import { getServiceRequestMeta } from './ServiceRequestRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -11,6 +16,8 @@ import { ResourceSection } from '@/src/components/ResourceSection';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
+import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelatedRow';
+import { getLabResultsByServiceRequestId } from '@/src/features/lab-results/diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
@@ -51,6 +58,7 @@ interface RelatedRecords {
   origin: Encounter | null;
   linked: Encounter[];
   basedOn: Encounter[];
+  labResults: DiagnosticReport[];
 }
 
 const NO_RELATED: RelatedRecords = {
@@ -58,6 +66,7 @@ const NO_RELATED: RelatedRecords = {
   origin: null,
   linked: [],
   basedOn: [],
+  labResults: [],
 };
 
 async function loadConsultations(ids: string[], patientId: string) {
@@ -97,18 +106,20 @@ function ServiceRequestForPatient({
         return;
       }
       const originId = getServiceRequestOriginId(loaded);
-      const [conditions, origin, linkedIds, basedOnIds] = await Promise.all([
-        Promise.all(
-          getReasonConditionIds(loaded).map((conditionId) =>
-            getConditionById(conditionId, activePatientId).catch(() => null)
-          )
-        ),
-        originId
-          ? getConsultationById(originId, activePatientId).catch(() => null)
-          : null,
-        getConsultationIdsLinkingServiceRequest(id, activePatientId),
-        getConsultationIdsBasedOnServiceRequest(id, activePatientId),
-      ]);
+      const [conditions, origin, linkedIds, basedOnIds, labResults] =
+        await Promise.all([
+          Promise.all(
+            getReasonConditionIds(loaded).map((conditionId) =>
+              getConditionById(conditionId, activePatientId).catch(() => null)
+            )
+          ),
+          originId
+            ? getConsultationById(originId, activePatientId).catch(() => null)
+            : null,
+          getConsultationIdsLinkingServiceRequest(id, activePatientId),
+          getConsultationIdsBasedOnServiceRequest(id, activePatientId),
+          getLabResultsByServiceRequestId(id, activePatientId),
+        ]);
       const [linked, basedOn] = await Promise.all([
         loadConsultations(
           linkedIds.filter((cId) => cId !== originId),
@@ -124,6 +135,7 @@ function ServiceRequestForPatient({
         origin,
         linked,
         basedOn,
+        labResults,
       });
     } catch (err) {
       if (sequence !== loadSequence.current) return;
@@ -136,7 +148,13 @@ function ServiceRequestForPatient({
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['service_requests', 'consultations', 'clinical_documents', 'conditions'],
+    [
+      'service_requests',
+      'consultations',
+      'clinical_documents',
+      'conditions',
+      'diagnostic_reports',
+    ],
     loadData
   );
 
@@ -310,6 +328,22 @@ function ServiceRequestForPatient({
             consultation={consultation}
             testID={`based-on-consultation-${consultation.id}`}
             onPress={() => openConsultation(consultation)}
+          />
+        ))}
+      </ResourceSection>
+
+      <ResourceSection
+        icon={FlaskConical}
+        title="Lab results"
+        count={related.labResults.length}
+        testID="service-request-lab-results-section"
+      >
+        {related.labResults.map((report) => (
+          <LabResultRelatedRow
+            key={report.id}
+            report={report}
+            testID={`service-request-lab-result-${report.id}`}
+            onPress={() => router.push(`/lab-result/${report.id}`)}
           />
         ))}
       </ResourceSection>

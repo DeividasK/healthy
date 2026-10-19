@@ -71,10 +71,10 @@ test.describe('Edit Condition links', () => {
       { reference: { reference } },
     ]);
     await expect(
-      page.getByTestId(`condition-consultation-item-${visit.id}`)
+      page.getByTestId(`condition-timeline-item-consultation-${visit.id}`)
     ).toBeVisible();
     await expect(
-      page.getByTestId(`condition-treatment-item-${treatment.id}`)
+      page.getByTestId(`condition-timeline-item-treatment-${treatment.id}`)
     ).toBeVisible();
 
     // Switching a role moves the link; unlinking keeps the treatment wording
@@ -100,10 +100,10 @@ test.describe('Edit Condition links', () => {
       { concept: { text: 'Attacks' } },
     ]);
     await expect(
-      page.getByTestId(`condition-consultation-item-${review.id}`)
+      page.getByTestId(`condition-timeline-item-consultation-${review.id}`)
     ).toHaveCount(0);
-    await expect(page.getByTestId('condition-treatments-section')).toHaveCount(
-      0
-    );
+    await expect(
+      page.getByTestId(`condition-timeline-item-treatment-${treatment.id}`)
+    ).toHaveCount(0);
   });
 });

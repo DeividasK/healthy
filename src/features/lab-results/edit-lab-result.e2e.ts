@@ -3,6 +3,8 @@ import {
   expect,
   seedTestPatient,
   seedTestReport,
+  seedTestServiceRequest,
+  evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
@@ -289,5 +291,60 @@ test.describe('Edit Lab Results Flow', () => {
       )
     );
     expect(stored.performer).toEqual([performer]);
+  });
+
+  test('links service requests from the edit form and keeps them on unrelated edits', async ({
+    page,
+  }) => {
+    const request = await seedTestServiceRequest(page, {
+      title: 'Blood count',
+    });
+    const { report } = await seedTestReport(page, {
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+    });
+    const storedBasedOn = async () =>
+      JSON.parse(
+        (
+          await bridge(
+            page,
+            (b, id) =>
+              b.querySql(
+                'SELECT fhir_json FROM diagnostic_reports WHERE id = ?;',
+                [id]
+              ),
+            report.id
+          )
+        )[0].fhir_json
+      ).basedOn;
+
+    await page.goto(`/lab-result/${report.id}/edit`);
+    await page.getByTestId('plus-menu-button').click();
+    await page.getByTestId('menu-link-service-request').click();
+    await page.getByTestId('link-service-request-search-input').click();
+    await page
+      .getByTestId(`link-service-request-autocomplete-item-${request.id}`)
+      .click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    const linked = [
+      { reference: `ServiceRequest/${request.id}`, type: 'ServiceRequest' },
+    ];
+    expect(await storedBasedOn()).toEqual(linked);
+
+    // Saving other changes keeps the link
+    await page.goto(`/lab-result/${report.id}/edit`);
+    await expect(
+      page.getByTestId(`link-selected-service-request-${request.id}`)
+    ).toBeVisible();
+    await page.getByTestId('marker-value-input-0').fill('14.2');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    expect(await storedBasedOn()).toEqual(linked);
+
+    await page.goto(`/lab-result/${report.id}/edit`);
+    await page.getByTestId('remove-link-service-request-button').click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    expect(await storedBasedOn()).toBeUndefined();
   });
 });

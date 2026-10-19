@@ -10,6 +10,7 @@ import type { Encounter } from 'fhir/r5';
 import {
   ResourceRow,
   type ResourceMeta,
+  type ResourceRowAppearance,
 } from '@/src/components/ResourceSection';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
@@ -72,6 +73,7 @@ export function ConsultationRelatedRow({
   onPress,
   showNotes = false,
   extraMeta = [],
+  appearance,
 }: {
   consultation: Encounter;
   testID?: string;
@@ -80,6 +82,8 @@ export function ConsultationRelatedRow({
   showNotes?: boolean;
   /** Further meta items appended to the row, e.g. association counts. */
   extraMeta?: ResourceMeta[];
+  /** Timeline node, status wash or fading. */
+  appearance?: ResourceRowAppearance;
 }) {
   const title = getConsultationTitle(consultation);
   return (
@@ -90,6 +94,7 @@ export function ConsultationRelatedRow({
       meta={[...getConsultationMeta(consultation), ...extraMeta]}
       note={showNotes ? getConsultationNotes(consultation) : null}
       onPress={onPress}
+      {...appearance}
     />
   );
 }

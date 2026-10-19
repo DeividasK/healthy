@@ -5,6 +5,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestServiceRequest,
+  seedTestReport,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Service Request - Visual Regression', () => {
@@ -34,6 +35,11 @@ test.describe('Edit Service Request - Visual Regression', () => {
       title: 'Ultrasound appointment',
       date: '2026-04-20',
       basedOnServiceRequestIds: [request.id],
+    });
+    await seedTestReport(page, {
+      date: '2026-04-21',
+      serviceRequestIds: [request.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 13.1 }],
     });
 
     await page.goto(`/service-request/${request.id}/edit`);

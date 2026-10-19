@@ -55,6 +55,15 @@ export const THEME_COLORS = {
     badgeHighBorder: '#FECACA',
     badgeHighText: '#EF4444',
 
+    // Timeline status tones: row wash, node circle and node icon
+    statusPlannedWash: '#f3f7fc',
+    statusPlannedNode: '#e3edf9',
+    statusPlannedIcon: '#2c5a94',
+    statusActiveWash: '#f1f8ef',
+    statusPausedWash: '#fdf8ec',
+    statusPausedNode: '#fbefd5',
+    statusPausedIcon: '#8a5d00',
+
     // Generic semantic alerts
     destructive: '#F43F5E',
     destructiveForeground: '#FFFFFF',

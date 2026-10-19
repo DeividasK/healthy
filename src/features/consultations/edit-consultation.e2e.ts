@@ -44,7 +44,7 @@ test.describe('Edit Consultation Flow', () => {
         );
 
         await page
-          .getByTestId(`condition-consultation-item-${consultationId}`)
+          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
           .click();
         await expect(page).toHaveURL(
           new RegExp(`.*consultation\\/${consultationId}$`)
@@ -114,7 +114,7 @@ test.describe('Edit Consultation Flow', () => {
         );
 
         await page
-          .getByTestId(`condition-consultation-item-${consultationId}`)
+          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
           .click();
         await expect(page).toHaveURL(
           new RegExp(`.*consultation\\/${consultationId}$`)
@@ -156,9 +156,7 @@ test.describe('Edit Consultation Flow', () => {
         await expect(
           page.getByText('Consultation To Delete')
         ).not.toBeVisible();
-        await expect(
-          page.getByTestId('condition-consultations-section')
-        ).toHaveCount(0);
+        await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
 
         const deletions = await page.evaluate(async () => {
           const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;

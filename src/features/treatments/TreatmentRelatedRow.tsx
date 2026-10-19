@@ -4,6 +4,7 @@ import type { MedicationRequest } from 'fhir/r5';
 import {
   ResourceRow,
   type ResourceMeta,
+  type ResourceRowAppearance,
 } from '@/src/components/ResourceSection';
 import {
   formatDisplayDate,
@@ -52,12 +53,15 @@ export function TreatmentRelatedRow({
   testID,
   onPress,
   extraMeta = [],
+  appearance,
 }: {
   treatment: MedicationRequest;
   testID?: string;
   onPress: () => void;
   /** Further meta items appended to the row, e.g. association counts. */
   extraMeta?: ResourceMeta[];
+  /** Timeline node, status wash or fading. */
+  appearance?: ResourceRowAppearance;
 }) {
   const title = getTreatmentTitle(treatment);
   return (
@@ -67,6 +71,7 @@ export function TreatmentRelatedRow({
       accessibilityLabel={`View treatment: ${title}`}
       meta={[...getTreatmentMeta(treatment), ...extraMeta]}
       onPress={onPress}
+      {...appearance}
     />
   );
 }

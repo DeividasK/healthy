@@ -8,13 +8,22 @@ import {
 import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,
+  fetchDiagnosticReportsByConditionId,
+  fetchDiagnosticReportsByServiceRequestId,
   deleteDiagnosticReportRecord,
+  updateDiagnosticReportJson,
 } from './labResultsRepository';
 import { DiagnosticReportRecord } from '@/src/database/types';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { resolveOrganizationReference } from '@/src/features/organizations/organizationService';
-import { isOrganizationReference } from '@/src/utils/fhirUtils';
+import {
+  getBasedOnServiceRequestIds,
+  isOrganizationReference,
+  withBasedOnServiceRequests,
+} from '@/src/utils/fhirUtils';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { getLabResultTitle } from './labResultMeta';
 
 export interface DiagnosticReportBundle {
   report: DiagnosticReport;
@@ -43,6 +52,8 @@ export interface CreateReportOptions {
    * keep the stored performers; `null` or blank removes the Organization.
    */
   serviceProviderName?: string | null;
+  /** ServiceRequests the report is based on; omit to keep the stored ones. */
+  serviceRequestIds?: string[];
   items: BiomarkerInputItem[];
 }
 
@@ -273,6 +284,9 @@ export async function createAndSaveDiagnosticReport(
     if (updated.length) report.performer = updated;
     else delete report.performer;
 
+    if (options.serviceRequestIds)
+      report = withBasedOnServiceRequests(report, options.serviceRequestIds);
+
     await insertDiagnosticReportRecord(report, observations, patientId, true);
   });
   notifyDatabaseChanged([
@@ -308,4 +322,65 @@ export async function getReportById(
 ): Promise<DiagnosticReportRecord | null> {
   const reports = await getAllReports();
   return reports.find((r) => r.report.id === reportId) || null;
+}
+
+/** Lab results based on a service request whose reason is the condition. */
+export async function getLabResultsByConditionId(
+  conditionId: string,
+  patientId: string
+): Promise<DiagnosticReport[]> {
+  return await fetchDiagnosticReportsByConditionId(conditionId, patientId);
+}
+
+/** Lab results based on the service request. */
+export async function getLabResultsByServiceRequestId(
+  requestId: string,
+  patientId: string
+): Promise<DiagnosticReport[]> {
+  return await fetchDiagnosticReportsByServiceRequestId(requestId, patientId);
+}
+
+/** The patient's lab results as link options, labelled with their date. */
+export async function getLabResultLinkOptions(
+  patientId: string
+): Promise<{ id: string; label: string }[]> {
+  return (await getAllReports(patientId)).flatMap(({ report }) => {
+    if (!report.id) return [];
+    const date = report.effectiveDateTime || report.effectivePeriod?.start;
+    const title = getLabResultTitle(report);
+    return [
+      {
+        id: report.id,
+        label: date ? `${title} (${formatDisplayDate(date)})` : title,
+      },
+    ];
+  });
+}
+
+/** Records that the lab result is based on the service request, or removes it. */
+export async function setLabResultServiceRequestLink(
+  reportId: string,
+  requestId: string,
+  patientId: string,
+  linked: boolean
+): Promise<void> {
+  const db = await getDb();
+  let changed = false;
+  await db.withTransactionAsync(async () => {
+    const stored = await getReportById(reportId);
+    if (!stored || stored.report.subject?.reference !== `Patient/${patientId}`)
+      throw new Error(`Lab result ${reportId} not found`);
+    const ids = getBasedOnServiceRequestIds(stored.report);
+    if (ids.includes(requestId) === linked) return;
+    const report = withBasedOnServiceRequests(
+      stored.report,
+      linked ? [...ids, requestId] : ids.filter((id) => id !== requestId)
+    );
+    // Observations are stored separately, as when saving the form.
+    delete report.contained;
+    report.meta = { ...report.meta, lastUpdated: new Date().toISOString() };
+    await updateDiagnosticReportJson(report, patientId);
+    changed = true;
+  });
+  if (changed) notifyDatabaseChanged(['diagnostic_reports']);
 }

@@ -60,7 +60,7 @@ test.describe('Multiple consultation diagnoses', () => {
     for (const conditionId of ['first', 'third']) {
       await page.goto(`/condition/${conditionId}`);
       await expect(
-        page.getByTestId(`condition-consultation-item-${id}`)
+        page.getByTestId(`condition-timeline-item-consultation-${id}`)
       ).toHaveCount(1);
     }
     await page.goto(`/consultation/${id}`);
@@ -88,7 +88,7 @@ test.describe('Multiple consultation diagnoses', () => {
     ).toContainText('Third diagnosis');
     await page.goto('/condition/first');
     await expect(
-      page.getByTestId(`condition-consultation-item-${id}`)
+      page.getByTestId(`condition-timeline-item-consultation-${id}`)
     ).toHaveCount(0);
     await page.goto(`/consultation/${id}/edit`);
     await page.getByTestId('remove-conditions-section-button').click();

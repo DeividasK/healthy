@@ -5,6 +5,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestServiceRequest,
+  seedTestReport,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Service Request - Visual Regression', () => {
@@ -62,6 +63,12 @@ test.describe('View Service Request - Visual Regression', () => {
       title: 'Holter fitting',
       date: '2026-03-10',
       basedOnServiceRequestIds: [request.id],
+    });
+    await seedTestReport(page, {
+      date: '2026-03-11',
+      serviceProviderName: 'City Lab',
+      serviceRequestIds: [request.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
     });
 
     await page.goto(`/service-request/${request.id}`);

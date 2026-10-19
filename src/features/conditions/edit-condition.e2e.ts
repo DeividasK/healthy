@@ -271,18 +271,18 @@ test.describe('Edit Condition Flow', () => {
     );
     await expect(
       view
-        .getByTestId('condition-consultations-section')
+        .getByTestId('condition-timeline')
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
     await page.reload();
     await expect(
       view
-        .getByTestId('condition-consultations-section')
+        .getByTestId('condition-timeline')
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
 
     const consultationRow = view.getByTestId(
-      /^condition-consultation-item-.*-row$/
+      /^condition-timeline-item-consultation-.*-row$/
     );
     expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
       viewportWidth

@@ -98,7 +98,9 @@ test.describe('View Consultation Flow', () => {
     await page.reload();
     await page.getByTestId(`condition-open-${condition.id}`).click();
     await expect(
-      page.getByTestId(`condition-consultation-item-${consultation.id}`)
+      page.getByTestId(
+        `condition-timeline-item-consultation-${consultation.id}`
+      )
     ).toBeVisible();
     // Invalid FHIR JSON makes only the linked-condition lookup throw.
     await page.evaluate(async (conditionId) => {
@@ -110,7 +112,7 @@ test.describe('View Consultation Flow', () => {
     consoleMonitor.ignore('Failed to load related condition:');
 
     await page
-      .getByTestId(`condition-consultation-item-${consultation.id}`)
+      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
       .click();
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Available consultation'

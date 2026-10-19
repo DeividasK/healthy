@@ -5,6 +5,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   seedTestServiceRequest,
+  seedTestReport,
   getTestServiceRequest,
   getTestClinicalDocument,
   findServiceRequestSection,
@@ -217,7 +218,7 @@ test.describe('Edit Service Request', () => {
     ).toBeVisible();
     await page.goto(`/condition/${condition.id}`);
     await expect(
-      page.getByTestId(`condition-service-request-item-${request.id}`)
+      page.getByTestId(`condition-timeline-item-service-request-${request.id}`)
     ).toBeVisible();
     expect((await getTestServiceRequest(page, request.id)).reason).toEqual([
       { reference: { reference: `Condition/${condition.id}` } },
@@ -234,5 +235,71 @@ test.describe('Edit Service Request', () => {
     expect(
       (await getTestServiceRequest(page, request.id)).reason
     ).toBeUndefined();
+  });
+
+  test('links lab results and lists them on the request, the result and the condition', async ({
+    page,
+  }) => {
+    const condition = await seedTestCondition(page, { title: 'Anaemia' });
+    const request = await seedTestServiceRequest(page, {
+      title: 'Blood count',
+      reasonConditionIds: [condition.id],
+    });
+    const { report } = await seedTestReport(page, {
+      date: '2026-10-05',
+      biomarkers: [{ name: 'Hemoglobin', value: 11.2 }],
+    });
+    const storedBasedOn = async () =>
+      JSON.parse(
+        (
+          await bridge(
+            page,
+            (b, id) =>
+              b.querySql(
+                'SELECT fhir_json FROM diagnostic_reports WHERE id = ?;',
+                [id]
+              ),
+            report.id
+          )
+        )[0].fhir_json
+      ).basedOn;
+
+    await page.goto(`/service-request/${request.id}/edit`);
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-lab-result').click();
+    await page.getByTestId('link-lab-result-search-input').click();
+    await page
+      .getByTestId(`link-lab-result-autocomplete-item-${report.id}`)
+      .click();
+    await page.getByTestId('save-service-request-button').click();
+    await expect(
+      page.getByTestId(`service-request-lab-result-${report.id}`)
+    ).toBeVisible();
+    expect(await storedBasedOn()).toEqual([
+      { reference: `ServiceRequest/${request.id}`, type: 'ServiceRequest' },
+    ]);
+
+    // The request lists the result, and the result lists the request
+    await page.getByTestId(`service-request-lab-result-${report.id}`).click();
+    await expect(page.getByTestId('lab-result-title')).toBeVisible();
+    await page.getByTestId(`lab-result-service-request-${request.id}`).click();
+    await expect(page.getByTestId('service-request-title')).toHaveText(
+      'Blood count'
+    );
+
+    // The request's condition shows the result on its timeline
+    await page.goto(`/condition/${condition.id}`);
+    await expect(
+      page.getByTestId(`condition-timeline-item-lab-result-${report.id}`)
+    ).toBeVisible();
+
+    await page.goto(`/service-request/${request.id}/edit`);
+    await page.getByTestId('link-remove-lab-result-button').click();
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-title')).toBeVisible();
+    await expect(
+      page.getByTestId('service-request-lab-results-section')
+    ).toHaveCount(0);
+    expect(await storedBasedOn()).toBeUndefined();
   });
 });

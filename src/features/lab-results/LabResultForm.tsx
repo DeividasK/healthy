@@ -26,6 +26,10 @@ import {
 } from '@/src/components/FieldReveal';
 import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
 import {
+  useLinkFields,
+  type LinkFieldConfig,
+} from '@/src/components/useLinkFields';
+import {
   getOrganizationNames,
   getServiceProviderName,
 } from '@/src/features/organizations/organizationService';
@@ -90,14 +94,18 @@ function showAlert(title: string, message: string) {
 export interface LabResultFormProps {
   initialReportId?: string;
   isEdit?: boolean;
+  /** Related resources this form can link to (edit only). */
+  linkFields?: LinkFieldConfig[];
 }
 
 /** Creates or edits lab observations with reference bounds in their selected units. */
 export function LabResultForm({
   initialReportId,
   isEdit = false,
+  linkFields = [],
 }: LabResultFormProps) {
   const router = useRouter();
+  const links = useLinkFields(linkFields);
   const { activePatientId } = useActivePatient();
   const reportId = initialReportId;
 
@@ -134,6 +142,7 @@ export function LabResultForm({
         valueStr,
         selectedUnit,
       })),
+      links: links.values,
     },
     isReportLoaded
   );
@@ -269,7 +278,11 @@ export function LabResultForm({
   const hasTime = testTime !== null;
   const hasNotes = showNotesInput;
   const hasServiceProvider = serviceProviderName !== null;
-  const showPlusButton = !hasTime || !hasNotes || !hasServiceProvider;
+  const showPlusButton =
+    !hasTime ||
+    !hasNotes ||
+    !hasServiceProvider ||
+    links.menuOptions.length > 0;
 
   const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
@@ -379,6 +392,7 @@ export function LabResultForm({
             : hadServiceProvider
               ? null
               : undefined,
+        serviceRequestIds: links.values['service-request']?.ids,
         items: biomarkers,
       });
 
@@ -533,6 +547,8 @@ export function LabResultForm({
                 }}
               />
             )}
+
+            {links.fields}
 
             {/* Active Tests List */}
             <View style={styles.activeTestsList}>
@@ -759,6 +775,7 @@ export function LabResultForm({
                     },
                   ]
                 : []),
+              ...links.menuOptions,
             ]}
           />
         </View>

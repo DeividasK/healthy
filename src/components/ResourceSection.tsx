@@ -78,7 +78,20 @@ export interface ResourceMeta {
   testID?: string;
 }
 
-interface ResourceRowProps {
+/** How a row stands out within its list, e.g. a timeline node and status. */
+export interface ResourceRowAppearance {
+  /**
+   * Column before the title, e.g. a timeline node. The divider then starts
+   * after it, and the column spans the row's full height.
+   */
+  leading?: React.ReactNode;
+  /** Fills the whole row, e.g. a timeline status wash. */
+  backgroundColor?: string;
+  /** Fades the title, meta and note, e.g. for a cancelled step. */
+  dimmed?: boolean;
+}
+
+interface ResourceRowProps extends ResourceRowAppearance {
   title: string;
   meta?: ResourceMeta[];
   /** Quoted text below the row, e.g. consultation notes. */
@@ -135,6 +148,9 @@ export function ResourceRow({
   accessory,
   accessibilityLabel,
   testID,
+  leading,
+  backgroundColor,
+  dimmed = false,
 }: ResourceRowProps) {
   if (onPress && accessory) {
     return (
@@ -154,10 +170,13 @@ export function ResourceRow({
       </View>
     );
   }
-  const content = (
+  const body = (
     <>
-      <View style={styles.row} testID={onPress ? `${testID}-row` : testID}>
-        <View style={styles.main}>
+      <View
+        style={[styles.row, leading ? styles.rowAfterLeading : undefined]}
+        testID={onPress ? `${testID}-row` : testID}
+      >
+        <View style={[styles.main, dimmed && styles.dimmed]}>
           <Text style={styles.rowTitle}>{title}</Text>
           <ResourceMetaLine meta={meta} />
         </View>
@@ -169,10 +188,28 @@ export function ResourceRow({
           accessory
         )}
       </View>
-      {note && <Text style={styles.note}>&quot;{note}&quot;</Text>}
+      {note && (
+        <Text
+          style={[
+            styles.note,
+            leading ? styles.noteAfterLeading : undefined,
+            dimmed && styles.dimmed,
+          ]}
+        >
+          &quot;{note}&quot;
+        </Text>
+      )}
     </>
   );
-  const style = note ? styles.itemWithNote : undefined;
+  const content = leading ? (
+    <View style={[styles.leadingRow, { backgroundColor }]}>
+      {leading}
+      <View style={styles.leadingBody}>{body}</View>
+    </View>
+  ) : (
+    body
+  );
+  const style = note && !leading ? styles.itemWithNote : undefined;
   return onPress ? (
     <TouchableOpacity
       testID={testID}
@@ -242,6 +279,29 @@ const styles = StyleSheet.create({
   },
   itemWithNote: {
     marginBottom: 16,
+  },
+  // Spans the screen width like a row; the divider moves to the body.
+  leadingRow: {
+    marginHorizontal: -20,
+    paddingLeft: 20,
+    flexDirection: 'row',
+  },
+  leadingBody: {
+    flex: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.light.cardBorder,
+  },
+  rowAfterLeading: {
+    marginHorizontal: 0,
+    paddingLeft: 0,
+    borderTopWidth: 0,
+  },
+  noteAfterLeading: {
+    paddingRight: 20,
+    paddingBottom: 16,
+  },
+  dimmed: {
+    opacity: 0.6,
   },
   main: {
     flex: 1,

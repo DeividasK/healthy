@@ -3,12 +3,21 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestReport,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Lab Result - Visual Regression', () => {
   test('Notes, provider and results', async ({ page }, testInfo) => {
     await seedTestPatient(page);
+    const request = await seedTestServiceRequest(page, {
+      title: 'Full blood count',
+      intent: 'order',
+      status: 'completed',
+      authoredOn: '2026-03-10',
+      requesterName: 'Dr. Ana Ruiz',
+    });
     const { report } = await seedTestReport(page, {
+      serviceRequestIds: [request.id],
       date: '2026-03-14',
       notes: 'Fasting sample taken at 8am.\nRepeat in three months.',
       serviceProviderName: 'City Lab',

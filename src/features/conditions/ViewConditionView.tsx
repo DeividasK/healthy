@@ -7,10 +7,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ClipboardList, MapPin, Pill, Stethoscope } from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import { ResourceSection } from '@/src/components/ResourceSection';
-import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
-import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
-import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
+import { ConditionTimeline } from './ConditionTimeline';
+import { buildConditionTimeline } from './conditionTimeline';
 import { getConditionMeta } from './ConditionRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -18,6 +16,7 @@ import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
 import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentService';
 import { getServiceRequestsByConditionId } from '@/src/features/service-requests/serviceRequestService';
+import { getLabResultsByConditionId } from '@/src/features/lab-results/diagnosticReportService';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -25,6 +24,7 @@ import { deleteCondition, getConditionById } from './conditionService';
 import { goBackOr } from '@/src/utils/navigation';
 import type {
   Condition,
+  DiagnosticReport,
   Encounter,
   MedicationRequest,
   ServiceRequest,
@@ -38,6 +38,7 @@ export function ViewConditionView() {
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
+  const [labResults, setLabResults] = useState<DiagnosticReport[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -53,11 +54,13 @@ export function ViewConditionView() {
         consultationData,
         treatmentData,
         serviceRequestsData,
+        labResultsData,
       ] = await Promise.all([
         getConditionById(id, activePatientId),
         getConsultationsByConditionId(id),
         getTreatmentsByConditionId(id, activePatientId),
         getServiceRequestsByConditionId(id, activePatientId),
+        getLabResultsByConditionId(id, activePatientId),
       ]);
       if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
@@ -67,12 +70,14 @@ export function ViewConditionView() {
         setConsultations([]);
         setTreatments([]);
         setServiceRequests([]);
+        setLabResults([]);
       } else {
         setNotFound(false);
         setCondition(conditionData);
         setConsultations(consultationData);
         setTreatments(treatmentData);
         setServiceRequests(serviceRequestsData);
+        setLabResults(labResultsData);
       }
     } catch (error) {
       if (sequence !== loadSequence.current) return;
@@ -85,7 +90,13 @@ export function ViewConditionView() {
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['conditions', 'consultations', 'medication_requests', 'service_requests'],
+    [
+      'conditions',
+      'consultations',
+      'medication_requests',
+      'service_requests',
+      'diagnostic_reports',
+    ],
     loadData
   );
 
@@ -283,66 +294,14 @@ export function ViewConditionView() {
         </View>
       )}
 
-      <ResourceSection
-        icon={Stethoscope}
-        title="Recent Consultations"
-        count={consultations.length}
-        testID="condition-consultations-section"
-      >
-        {consultations.map((consultation) => (
-          <ConsultationRelatedRow
-            key={consultation.id}
-            consultation={consultation}
-            testID={`condition-consultation-item-${consultation.id}`}
-            showNotes
-            onPress={() =>
-              router.push({
-                pathname: '/consultation/[id]',
-                params: { id: consultation.id! },
-              })
-            }
-          />
-        ))}
-      </ResourceSection>
-
-      {treatments.length > 0 && (
-        <ResourceSection
-          icon={Pill}
-          title="Treatments"
-          count={treatments.length}
-          testID="condition-treatments-section"
-        >
-          {treatments.map((treatment) => (
-            <TreatmentRelatedRow
-              key={treatment.id}
-              treatment={treatment}
-              testID={`condition-treatment-item-${treatment.id}`}
-              onPress={() =>
-                router.push({
-                  pathname: '/treatment/[id]',
-                  params: { id: treatment.id! },
-                })
-              }
-            />
-          ))}
-        </ResourceSection>
-      )}
-
-      <ResourceSection
-        icon={ClipboardList}
-        title="Service requests"
-        count={serviceRequests.length}
-        testID="condition-service-request-section"
-      >
-        {serviceRequests.map((request) => (
-          <ServiceRequestRelatedRow
-            key={request.id}
-            request={request}
-            testID={`condition-service-request-item-${request.id}`}
-            onPress={() => router.push(`/service-request/${request.id}`)}
-          />
-        ))}
-      </ResourceSection>
+      <ConditionTimeline
+        groups={buildConditionTimeline({
+          consultations,
+          serviceRequests,
+          treatments,
+          labResults,
+        })}
+      />
     </ResourceViewLayout>
   );
 }

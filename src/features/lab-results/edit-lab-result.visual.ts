@@ -3,12 +3,18 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestReport,
+  seedTestServiceRequest,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Lab Result View - Visual Regression', () => {
   test('Add Report View - Edit Existing Mode', async ({ page }, testInfo) => {
     await seedTestPatient(page);
+    const request = await seedTestServiceRequest(page, {
+      title: 'Full blood count',
+      authoredOn: '2026-10-01',
+    });
     const bundle = await seedTestReport(page, {
+      serviceRequestIds: [request.id],
       id: 'report-edit-test',
       date: '2026-10-02',
       biomarkers: [
