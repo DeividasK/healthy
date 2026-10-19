@@ -3,6 +3,7 @@ import type { Dosage, MedicationRequest } from 'fhir/r5';
 import {
   applyRegimen,
   createDoseDraft,
+  duplicateDoseDraft,
   formatRegimenLines,
   getRegimenDraft,
   hideDoseField,
@@ -248,4 +249,22 @@ test('optional fields show when added or filled and clear when removed', () => {
       'when'
     )
   ).toBe(true);
+});
+
+test('a duplicated dose copies its values but not its stored Dosage link', () => {
+  const source = dose({
+    sourceIndex: 0,
+    amount: '2',
+    route: '26643006',
+    shownFields: ['bounds'],
+    timing: { frequency: '1', when: 'MORN' } as DoseDraft['timing'],
+  });
+  const copy = duplicateDoseDraft(source);
+  expect(copy).toEqual({ ...source, sourceIndex: undefined });
+  expect('sourceIndex' in copy).toBe(false);
+  // Editing the copy leaves the source alone.
+  copy.timing.when = 'EVE';
+  copy.shownFields!.push('site');
+  expect(source.timing.when).toBe('MORN');
+  expect(source.shownFields).toEqual(['bounds']);
 });

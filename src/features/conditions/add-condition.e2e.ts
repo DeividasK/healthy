@@ -10,6 +10,29 @@ test.describe('Add Condition Flow', () => {
     await seedTestPatient(page);
   });
 
+  test('field labels are labels for their controls and mark required ones', async ({
+    page,
+  }) => {
+    await page.goto('/condition/add');
+    // A required text input and a required native select
+    for (const id of ['condition-title-input', 'status-picker-select']) {
+      await expect(page.locator(`label[for="${id}"]`)).toHaveText(/ \*$/);
+      await expect(page.getByTestId(id)).toHaveAttribute(
+        'aria-required',
+        'true'
+      );
+    }
+    // Clicking a label focuses its control
+    await page.locator('label[for="condition-title-input"]').click();
+    await expect(page.getByTestId('condition-title-input')).toBeFocused();
+    // An optional field has a bound label without the required mark
+    const category = page.getByTestId('condition-category-input');
+    await expect(
+      page.locator('label[for="condition-category-input"]')
+    ).toHaveText('Category');
+    await expect(category).not.toHaveAttribute('aria-required', 'true');
+  });
+
   test(
     'should allow creating a Condition with status, title, and optional fields via plus modal',
     { tag: ['@smoke', '@critical'] },

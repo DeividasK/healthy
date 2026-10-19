@@ -49,7 +49,7 @@ jobs:
       - name: Accept Snapshots in Chromatic
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: pnpm chromatic --auto-accept-changes=main
+        run: pnpm chromatic:publish --auto-accept-changes=main
 
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages

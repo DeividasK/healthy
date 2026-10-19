@@ -96,6 +96,40 @@ function useRevealWhenAdded(
   }, []);
 }
 
+// React Native Web renders role="label" as a <label> element; React Native's
+// types do not list that role.
+const WEB_LABEL_ROLE = (
+  Platform.OS === 'web' ? { role: 'label' } : {}
+) as object;
+
+/**
+ * Makes the label a real `<label>` for the field's control on web, and marks
+ * the control required, so assistive technology and clicks on the label work
+ * as with native form fields. Fields with several controls (e.g. a regimen)
+ * have no single control to name, so their label stays unbound.
+ */
+function useLabelForControl(
+  container: React.RefObject<View | null>,
+  label: React.RefObject<Text | null>,
+  required?: boolean
+) {
+  // Runs after every render: the control can mount after the field.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const field = container.current as unknown as HTMLElement | null;
+    const labelNode = label.current as unknown as HTMLLabelElement | null;
+    if (!field || !labelNode) return;
+    const controls = field.querySelectorAll<HTMLElement>(
+      'input, select, textarea'
+    );
+    const control = controls.length === 1 ? controls[0] : null;
+    if (control?.id) labelNode.setAttribute('for', control.id);
+    else labelNode.removeAttribute('for');
+    if (control && required) control.setAttribute('aria-required', 'true');
+    else control?.removeAttribute('aria-required');
+  });
+}
+
 /**
  * Labelled form field shell shared by all forms: label row with an optional
  * remove button, then either a standard text input or a custom control.
@@ -115,6 +149,7 @@ export function FormField({
 }: FormFieldProps) {
   const containerRef = useRef<View>(null);
   const inputRef = useRef<TextInput | null>(null);
+  const labelRef = useRef<Text>(null);
   const inputRegistry = useMemo<FieldInputRegistry>(
     () => ({
       register(input) {
@@ -127,6 +162,7 @@ export function FormField({
     []
   );
   useRevealWhenAdded(containerRef, inputRef);
+  useLabelForControl(containerRef, labelRef, required);
   return (
     <FieldInputContext.Provider value={inputRegistry}>
       <View
@@ -136,6 +172,8 @@ export function FormField({
       >
         <View style={styles.header}>
           <Text
+            ref={labelRef}
+            {...WEB_LABEL_ROLE}
             nativeID={nativeID ? `${nativeID}-label` : undefined}
             style={styles.label}
           >
