@@ -27,8 +27,11 @@ runs:
     - name: Build Debug APK
       shell: bash
       # CMake reads these on configure, so every native module (the app,
-      # Reanimated, Gesture Handler, ...) compiles through ccache.
+      # Reanimated, Gesture Handler, ...) compiles through ccache. Gradle
+      # installs the NDK afresh each run, so ccache identifies the compiler by
+      # its content rather than its modification time.
       env:
         CMAKE_C_COMPILER_LAUNCHER: ccache
         CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        CCACHE_COMPILERCHECK: content
       run: ./android/gradlew -p android assembleDebug -PreactNativeArchitectures=x86_64
