@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test';
-import type { MedicationRequest, MedicationStatement } from 'fhir/r5';
+import type { Dosage, MedicationRequest, MedicationStatement } from 'fhir/r5';
 import {
   buildUsageStatement,
+  editUsageStatement,
   getCurrentUsage,
   getFirstTakingDay,
+  getLatestRegimen,
+  getRegimenOn,
   getUsagePeriods,
   isTakingOn,
   planUsageChange,
@@ -35,9 +38,11 @@ function apply(
 }
 
 /** Runs usage changes in order and returns the resulting statements. */
-function run(changes: [UsageAction, string][]): MedicationStatement[] {
+function run(
+  changes: [UsageAction, string, Dosage[]?][]
+): MedicationStatement[] {
   return changes.reduce(
-    (statements, [action, date], index) =>
+    (statements, [action, date, dosage], index) =>
       apply(
         statements,
         planUsageChange(
@@ -47,7 +52,10 @@ function run(changes: [UsageAction, string][]): MedicationStatement[] {
           TODAY,
           `use-${index}`,
           treatment,
-          'p1'
+          'p1',
+          undefined,
+          undefined,
+          dosage
         )
       ),
     [] as MedicationStatement[]
@@ -187,4 +195,153 @@ test('imported adherence codes are grouped and other treatments ignored', () => 
     ['taking', 'Taking As Directed'],
   ]);
   expect(getCurrentUsage([])).toBe('not-started');
+});
+
+const ONE: Dosage[] = [{ text: '1 capsule daily' }];
+const TWO: Dosage[] = [{ text: '2 capsules daily' }];
+const regimens = (statements: MedicationStatement[]) =>
+  getUsagePeriods(statements, 'vit-d').map(
+    ({ state, dosage }) => `${state} ${dosage?.[0]?.text ?? '-'}`
+  );
+
+test('a new regimen starts a taking period; on its first day it replaces it', () => {
+  const changed = run([
+    ['start', '2026-10-01', ONE],
+    ['pause', '2026-10-04'],
+    ['resume', '2026-10-06', ONE],
+    ['change', '2026-10-09', TWO],
+  ]);
+  expect(summary(changed)).toEqual([
+    'taking 2026-10-01 2026-10-03',
+    'on-hold 2026-10-04 2026-10-05',
+    'taking 2026-10-06 2026-10-08',
+    'taking 2026-10-09 ',
+  ]);
+  // Only periods of taking it record a regimen.
+  expect(regimens(changed)).toEqual([
+    'taking 1 capsule daily',
+    'on-hold -',
+    'taking 1 capsule daily',
+    'taking 2 capsules daily',
+  ]);
+  expect(
+    summary(
+      run([
+        ['start', '2026-10-01', ONE],
+        ['change', '2026-10-01', TWO],
+      ])
+    )
+  ).toEqual(['taking 2026-10-01 ']);
+  const paused = getUsagePeriods(
+    run([
+      ['start', '2026-10-01', ONE],
+      ['pause', '2026-10-04'],
+    ]),
+    'vit-d'
+  );
+  expect(
+    planUsageChange(paused, 'change', TODAY, TODAY, 'x', treatment, 'p1')
+  ).toEqual({ error: 'A new regimen needs the treatment to be taken' });
+});
+
+test('each day follows the regimen of its period, counted from that regimen start', () => {
+  const prescribed = { ...treatment, dosageInstruction: ONE };
+  const periods = getUsagePeriods(
+    run([
+      ['start', '2026-10-01', ONE],
+      ['pause', '2026-10-04'],
+      ['resume', '2026-10-06', ONE],
+      ['change', '2026-10-09', TWO],
+    ]),
+    'vit-d'
+  );
+  // A pause does not restart the regimen; a new one does.
+  expect(getRegimenOn(periods, '2026-10-07', prescribed)).toEqual({
+    dosage: ONE,
+    start: '2026-10-01',
+  });
+  expect(getRegimenOn(periods, '2026-10-12', prescribed)).toEqual({
+    dosage: TWO,
+    start: '2026-10-09',
+  });
+  expect(getLatestRegimen(periods, prescribed)).toEqual(TWO);
+  // A period without a recorded regimen follows the prescription.
+  const unrecorded = getUsagePeriods(run([['start', '2026-10-01']]), 'vit-d');
+  expect(getRegimenOn(unrecorded, '2026-10-02', prescribed)).toEqual({
+    dosage: ONE,
+    start: '2026-10-01',
+  });
+  expect(getLatestRegimen([], prescribed)).toEqual(ONE);
+});
+
+test('removing a period between two regimens keeps both', () => {
+  const statements = run([
+    ['start', '2026-10-01', ONE],
+    ['pause', '2026-10-04'],
+    ['resume', '2026-10-06', TWO],
+  ]);
+  const periods = getUsagePeriods(statements, 'vit-d');
+  const removed = apply(statements, planUsageRemoval(periods, 'use-1'));
+  expect(summary(removed)).toEqual([
+    'taking 2026-10-01 2026-10-05',
+    'taking 2026-10-06 ',
+  ]);
+  expect(regimens(removed)).toEqual([
+    'taking 1 capsule daily',
+    'taking 2 capsules daily',
+  ]);
+});
+
+test('editing a period changes its state, notes and regimen but not its dates', () => {
+  const [statement] = run([['start', '2026-10-01', ONE]]);
+  const withReason = {
+    ...statement,
+    adherence: { ...statement.adherence!, reason: { text: 'Imported' } },
+  };
+  const paused = editUsageStatement(withReason, {
+    state: 'on-hold',
+    notes: ' Waiting for a refill ',
+    dosage: ONE,
+  });
+  expect(paused.effectivePeriod).toEqual(statement.effectivePeriod);
+  expect(paused.adherence).toEqual({
+    code: {
+      coding: [
+        {
+          system:
+            'http://hl7.org/fhir/CodeSystem/medication-statement-adherence',
+          code: 'on-hold',
+          display: 'On Hold',
+        },
+      ],
+    },
+    reason: { text: 'Imported' },
+  });
+  expect(paused.note).toEqual([{ text: 'Waiting for a refill' }]);
+  // Only periods of taking it keep a regimen.
+  expect(paused.dosage).toBeUndefined();
+  const taking = editUsageStatement(paused, {
+    state: 'taking',
+    notes: '',
+    dosage: TWO,
+  });
+  expect(taking.dosage).toEqual(TWO);
+  expect(taking.note).toBeUndefined();
+  // An unchanged or imported state keeps its stored coding.
+  const imported = {
+    ...statement,
+    adherence: {
+      code: {
+        coding: [{ code: 'taking-as-directed', display: 'As directed' }],
+      },
+    },
+  };
+  expect(
+    editUsageStatement(imported, { state: 'taking', notes: '', dosage: [] })
+      .adherence
+  ).toEqual(imported.adherence);
+  expect(
+    editUsageStatement(imported, { state: 'taking', notes: '', dosage: [] })
+      .dosage
+  ).toBeUndefined();
 });

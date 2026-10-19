@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { MedicationRequest } from 'fhir/r5';
+import type { Dosage, MedicationRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import {
@@ -8,10 +8,13 @@ import {
   insertMedicationStatementRecord,
 } from './medicationStatementsRepository';
 import {
+  editUsageStatement,
+  getLatestRegimen,
   getUsagePeriods,
   planUsageChange,
   planUsageRemoval,
   type UsageAction,
+  type UsageEdit,
   type UsageChangePlan,
   type UsagePeriod,
 } from './treatmentUsage';
@@ -41,9 +44,10 @@ async function applyPlan(plan: UsageChangePlan, patientId: string) {
 }
 
 /**
- * Records starting, pausing, resuming or stopping a treatment on `date`
- * (YYYY-MM-DD) as MedicationStatement periods. Throws when the date is in the
- * future or before the current period.
+ * Records starting, pausing, resuming or stopping a treatment, or a new
+ * regimen while taking it, on `date` (YYYY-MM-DD) as MedicationStatement
+ * periods. Throws when the date is in the future or before the current
+ * period.
  */
 export async function changeTreatmentUsage(
   treatment: MedicationRequest,
@@ -51,9 +55,16 @@ export async function changeTreatmentUsage(
   action: UsageAction,
   date: string,
   reason?: string,
-  notes?: string
+  notes?: string,
+  /**
+   * The regimen followed from `date` when taking it; required for `change`.
+   * Without it, starting or resuming continues the regimen last followed.
+   */
+  dosage?: Dosage[]
 ): Promise<void> {
   if (!treatment.id) throw new Error('Treatment requires an id');
+  if (action === 'change' && !dosage?.length)
+    throw new Error('Enter the new dosage or regimen');
   const periods = await getTreatmentUsage(patientId, treatment.id);
   const plan = planUsageChange(
     periods,
@@ -64,7 +75,8 @@ export async function changeTreatmentUsage(
     treatment,
     patientId,
     reason,
-    notes
+    notes,
+    dosage ?? getLatestRegimen(periods, treatment)
   );
   if ('error' in plan) throw new Error(plan.error);
   await applyPlan(plan, patientId);
@@ -81,6 +93,32 @@ export async function removeTreatmentUsage(
       await getTreatmentUsage(patientId, treatmentId),
       statementId
     ),
+    patientId
+  );
+}
+
+/** Edits one period's state, notes and regimen; its dates stay. */
+export async function editTreatmentUsage(
+  treatmentId: string,
+  statementId: string,
+  patientId: string,
+  edit: UsageEdit
+): Promise<void> {
+  const period = (await getTreatmentUsage(patientId, treatmentId)).find(
+    (candidate) => candidate.statement.id === statementId
+  );
+  if (!period) throw new Error('This period no longer exists');
+  const statement = editUsageStatement(period.statement, edit);
+  await applyPlan(
+    {
+      save: [
+        {
+          ...statement,
+          meta: { ...statement.meta, lastUpdated: new Date().toISOString() },
+        },
+      ],
+      remove: [],
+    },
     patientId
   );
 }

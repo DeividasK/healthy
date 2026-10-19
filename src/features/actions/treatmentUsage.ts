@@ -1,4 +1,4 @@
-import type { MedicationRequest, MedicationStatement } from 'fhir/r5';
+import type { Dosage, MedicationRequest, MedicationStatement } from 'fhir/r5';
 import { addDays } from '@/src/utils/dateUtils';
 
 /** FHIR R5 MedicationStatement adherence codes. */
@@ -11,7 +11,8 @@ export type UsageState = 'taking' | 'on-hold' | 'stopped' | 'other';
 /** The current usage of a treatment. */
 export type CurrentUsage = 'not-started' | 'taking' | 'on-hold' | 'stopped';
 
-export type UsageAction = 'start' | 'pause' | 'resume' | 'stop';
+/** `change` starts a new regimen while taking it. */
+export type UsageAction = 'start' | 'pause' | 'resume' | 'stop' | 'change';
 
 /** One MedicationStatement read as a period of use. */
 export interface UsagePeriod {
@@ -26,6 +27,8 @@ export interface UsagePeriod {
   reason?: string;
   /** Free-text notes (`note`), e.g. why it was stopped. */
   notes?: string;
+  /** The regimen followed while taking it (`dosage`), if recorded. */
+  dosage?: Dosage[];
 }
 
 const ACTION_STATE: Record<UsageAction, Exclude<UsageState, 'other'>> = {
@@ -33,6 +36,7 @@ const ACTION_STATE: Record<UsageAction, Exclude<UsageState, 'other'>> = {
   pause: 'on-hold',
   resume: 'taking',
   stop: 'stopped',
+  change: 'taking',
 };
 
 const STATE_DISPLAY: Record<Exclude<UsageState, 'other'>, string> = {
@@ -109,6 +113,7 @@ export function getUsagePeriods(
             coding?.display ||
             (state !== 'other' ? STATE_DISPLAY[state] : code || 'Unknown'),
           reason: statement.adherence?.reason?.text,
+          dosage: statement.dosage,
           notes:
             statement.note
               ?.map((note) => note.text)
@@ -148,7 +153,7 @@ export function getCurrentUsage(periods: UsagePeriod[]): CurrentUsage {
 
 /** The changes offered for the current usage. */
 export function getAvailableActions(current: CurrentUsage): UsageAction[] {
-  if (current === 'taking') return ['pause', 'stop'];
+  if (current === 'taking') return ['pause', 'stop', 'change'];
   if (current === 'on-hold') return ['resume', 'stop'];
   return ['start'];
 }
@@ -169,7 +174,9 @@ export function buildUsageStatement(
   start: string,
   id: string,
   reason?: string,
-  notes?: string
+  notes?: string,
+  /** The regimen followed, kept only on a period of taking it. */
+  dosage?: Dosage[]
 ): MedicationStatement {
   return {
     resourceType: 'MedicationStatement',
@@ -192,6 +199,7 @@ export function buildUsageStatement(
       ...(reason?.trim() && { reason: { text: reason.trim() } }),
     },
     ...(notes?.trim() && { note: [{ text: notes.trim() }] }),
+    ...(state === 'taking' && dosage?.length && { dosage }),
     dateAsserted: new Date().toISOString(),
   };
 }
@@ -227,11 +235,15 @@ export function planUsageChange(
   treatment: MedicationRequest,
   patientId: string,
   reason?: string,
-  notes?: string
+  notes?: string,
+  /** The regimen followed from `date` when taking it. */
+  dosage?: Dosage[]
 ): UsageChangePlan | { error: string } {
   if (date > today) return { error: 'The date cannot be in the future' };
   const last = periods[periods.length - 1];
   const open = getOpenPeriod(periods);
+  if (action === 'change' && open?.state !== 'taking')
+    return { error: 'A new regimen needs the treatment to be taken' };
   const earliest = open ? open.start : last?.end ? addDays(last.end, 1) : null;
   if (earliest && date < earliest)
     return { error: `The date cannot be before ${earliest}` };
@@ -252,16 +264,61 @@ export function planUsageChange(
       date,
       newId,
       reason,
-      notes
+      notes,
+      dosage
     )
   );
   return plan;
 }
 
+/** Changes to one period of use; its dates are not edited. */
+export interface UsageEdit {
+  /** `other` only for an imported state left as it is. */
+  state: UsageState;
+  /** Replaces the notes; empty removes them. */
+  notes: string;
+  /** The regimen followed, kept only while taking it; empty removes it. */
+  dosage: Dosage[];
+}
+
+/**
+ * A period with its state, notes and regimen edited. A changed state
+ * replaces the adherence code (keeping the reason); an unchanged one keeps
+ * the stored coding, including imported codes. Other elements are kept.
+ */
+export function editUsageStatement(
+  statement: MedicationStatement,
+  edit: UsageEdit
+): MedicationStatement {
+  const { note: _note, dosage: _dosage, ...rest } = statement;
+  const notes = edit.notes.trim();
+  const { state } = edit;
+  return {
+    ...rest,
+    adherence:
+      state === 'other' || state === getUsageState(getAdherenceCode(statement))
+        ? statement.adherence
+        : {
+            ...statement.adherence,
+            code: {
+              coding: [
+                {
+                  system: ADHERENCE_SYSTEM,
+                  code: state,
+                  display: STATE_DISPLAY[state],
+                },
+              ],
+            },
+          },
+    ...(notes && { note: [{ ...statement.note?.[0], text: notes }] }),
+    ...(state === 'taking' && edit.dosage.length && { dosage: edit.dosage }),
+  };
+}
+
 /**
  * Removes one period. The period before it then runs up to the next one, or
  * stays open when the removed one was current; neighbours in the same state
- * merge into one period.
+ * with the same regimen merge into one period.
  */
 export function planUsageRemoval(
   periods: UsagePeriod[],
@@ -277,11 +334,59 @@ export function planUsageRemoval(
   if (!previous) return plan;
   if (!next) {
     plan.save.push(withEnd(previous.statement));
-  } else if (previous.state === next.state && next.statement.id) {
+  } else if (
+    previous.state === next.state &&
+    isSameRegimen(previous.dosage, next.dosage) &&
+    next.statement.id
+  ) {
     plan.remove.push(next.statement.id);
     plan.save.push(withEnd(previous.statement, next.end));
   } else {
     plan.save.push(withEnd(previous.statement, addDays(next.start, -1)));
   }
   return plan;
+}
+
+/** Whether two recorded regimens are the same, e.g. across a pause. */
+export const isSameRegimen = (a?: Dosage[], b?: Dosage[]) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * The regimen followed on a day the treatment is taken: the `dosage` of the
+ * taking period covering it, or the prescribed one when that period has
+ * none. `start` is the first day of that regimen, counting back over taking
+ * periods with the same one (pauses do not interrupt it), so its phases
+ * continue across a pause and restart after a new regimen.
+ */
+export function getRegimenOn(
+  periods: UsagePeriod[],
+  date: string,
+  treatment: MedicationRequest
+): { dosage?: Dosage[]; start?: string } {
+  const taking = periods.filter((period) => period.state === 'taking');
+  const regimenOf = (period: UsagePeriod) =>
+    period.dosage ?? treatment.dosageInstruction;
+  const index = taking.findIndex(
+    (period) => period.start <= date && (!period.end || date <= period.end)
+  );
+  if (index < 0) return { dosage: treatment.dosageInstruction };
+  const dosage = regimenOf(taking[index]);
+  let first = index;
+  while (first > 0 && isSameRegimen(regimenOf(taking[first - 1]), dosage))
+    first--;
+  return { dosage, start: taking[first].start };
+}
+
+/**
+ * The regimen a new period of taking starts with: the one last followed,
+ * else the prescribed one.
+ */
+export function getLatestRegimen(
+  periods: UsagePeriod[],
+  treatment: MedicationRequest
+): Dosage[] | undefined {
+  const last = [...periods]
+    .reverse()
+    .find((period) => period.state === 'taking');
+  return last?.dosage ?? treatment.dosageInstruction;
 }

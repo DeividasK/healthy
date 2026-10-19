@@ -65,6 +65,7 @@ export const THEME_COLORS = {
     statusPausedIcon: '#8a5d00',
 
     // Generic semantic alerts
+    warning: '#B45309',
     destructive: '#F43F5E',
     destructiveForeground: '#FFFFFF',
     alertRose: '#F43F5E',

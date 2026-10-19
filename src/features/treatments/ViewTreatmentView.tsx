@@ -19,13 +19,12 @@ import { getConsultationById } from '@/src/features/consultations/consultationSe
 import { getConditionById } from '@/src/features/conditions/conditionService';
 import {
   getTreatmentTitle,
-  getTreatmentInstructions,
   getTreatmentNotes,
   getTreatmentReason,
   getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { formatQuantityText, formatRegimenLines } from './regimen';
+import { formatDosingLines, formatQuantityText } from './regimen';
 import { TreatmentLogHistory } from '@/src/features/actions/TreatmentLogHistory';
 import {
   TreatmentUsageSection,
@@ -190,13 +189,11 @@ function TreatmentForPatient({
   const title = getTreatmentTitle(treatment);
   const notes = getTreatmentNotes(treatment);
   const reasonText = getTreatmentReason(treatment);
-  // Free text or regimen lines; imported records may carry both.
-  const dosage = [
-    getTreatmentInstructions(treatment),
-    ...formatRegimenLines(treatment),
-  ]
-    .filter(Boolean)
-    .join('\n');
+  // What was prescribed, and the regimen of the current period of taking it.
+  const dosage = formatDosingLines(treatment.dosageInstruction).join('\n');
+  const currentRegimen = formatDosingLines(
+    usage.isTaking ? usage.periods[usage.periods.length - 1]?.dosage : []
+  ).join('\n');
   const dispenseQuantity = formatQuantityText(
     treatment.dispenseRequest?.quantity
   );
@@ -211,7 +208,7 @@ function TreatmentForPatient({
         actions={
           <ResourceActionDock
             actions={[
-              // Play to start or resume taking it; stop while taking it.
+              // Play to start or resume taking it; change usage while taking it.
               { ...usage.primaryAction, primary: true },
               {
                 label: 'Edit treatment',
@@ -225,7 +222,6 @@ function TreatmentForPatient({
             deleteTestID="delete-treatment-button"
           />
         }
-        modal={usage.modals}
       >
         <View style={styles.details}>
           {Boolean(reasonText) && (
@@ -237,10 +233,18 @@ function TreatmentForPatient({
           )}
           {Boolean(dosage) && (
             <ResourceTextSection
-              title="Dosage"
+              title="Prescribed Dosage"
               text={dosage}
               testID="treatment-dosage-section"
               textTestID="treatment-dosage"
+            />
+          )}
+          {Boolean(currentRegimen) && (
+            <ResourceTextSection
+              title="Current Regimen"
+              text={currentRegimen}
+              testID="treatment-current-regimen-section"
+              textTestID="treatment-current-regimen"
             />
           )}
           {Boolean(dispenseQuantity) && (
@@ -280,7 +284,7 @@ function TreatmentForPatient({
 
         <TreatmentUsageSection
           periods={usage.periods}
-          onRemove={usage.requestRemove}
+          onEdit={usage.editPeriod}
         />
 
         <TreatmentLogHistory

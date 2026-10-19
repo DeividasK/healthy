@@ -69,6 +69,10 @@ import {
 import { changeTreatmentUsage } from '@/src/features/actions/treatmentUsageService';
 import { fetchMedicationStatements } from '@/src/features/actions/medicationStatementsRepository';
 import type { UsageAction } from '@/src/features/actions/treatmentUsage';
+import {
+  applyDosing,
+  type RegimenDraft,
+} from '@/src/features/treatments/regimen';
 import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleDriveProvider';
 import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
@@ -454,10 +458,17 @@ export function setupTestBridge() {
       action: UsageAction;
       date: string;
       notes?: string;
+      /** The regimen followed from `date`, e.g. for a new regimen. */
+      regimen?: RegimenDraft;
+      dosageInstructions?: string;
       patientId?: string;
     }) => {
       const patientId = await resolvePatientId(input.patientId);
       if (!patientId) throw new Error('No patient to record usage for');
+      const dosage =
+        input.regimen || input.dosageInstructions
+          ? applyDosing([], input.regimen, input.dosageInstructions)
+          : undefined;
       const treatment = await fetchMedicationRequestById(
         input.treatmentId,
         patientId
@@ -470,7 +481,8 @@ export function setupTestBridge() {
         input.action,
         input.date,
         undefined,
-        input.notes
+        input.notes,
+        dosage
       );
     },
     getTreatmentUsageStatements: async (

@@ -7,49 +7,42 @@ import {
   FileText,
   History,
   MessageSquareText,
+  Pencil,
   Play,
-  Square,
-  X,
+  Repeat,
+  SlidersHorizontal,
 } from 'lucide-react-native';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
-import { formatUsageDuration } from './usageDuration';
+import { formatUsageDuration, formatUsagePeriod } from './usageDuration';
+import { formatDosingLines } from '@/src/features/treatments/regimen';
 import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
-import { FormErrorBanner } from '@/src/components/FormErrorBanner';
-import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
-import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { getCurrentUsage, type UsagePeriod } from './treatmentUsage';
-import { getUsageChangeLabel } from './TreatmentUsageFormView';
 import {
-  getTreatmentUsage,
-  removeTreatmentUsage,
-} from './treatmentUsageService';
+  getCurrentUsage,
+  isSameRegimen,
+  type UsagePeriod,
+} from './treatmentUsage';
+import { getUsageChangeLabel } from './TreatmentUsageFormView';
+import { getTreatmentUsage } from './treatmentUsageService';
 
 /** The concept icon for treatment usage, e.g. its section heading. */
 export const USAGE_ICON = History;
+/** The concept icon for treatment regimens. */
+const REGIMEN_ICON = Repeat;
 
-/** e.g. "Oct 13, 2026 – Oct 19, 2026", "Oct 20, 2026" or "Since Oct 25, 2026". */
 const formatPeriod = (period: UsagePeriod) =>
-  !period.end
-    ? `Since ${formatDisplayDate(period.start)}`
-    : period.end === period.start
-      ? formatDisplayDate(period.start)
-      : `${formatDisplayDate(period.start)} – ${formatDisplayDate(period.end)}`;
+  formatUsagePeriod(period.start, period.end);
 
 /**
  * A treatment's usage (FHIR MedicationStatement periods). `primaryAction` is
- * the screen's main button: play to start or resume taking, or stop while
- * taking, each opening the usage form. Periods are removed from the list
- * after confirming; `modals` holds that confirmation, rendered at the
- * screen's top level.
+ * the screen's main button: play to start or resume taking, or change its
+ * usage while taking it, each opening the usage form. `editPeriod` opens a
+ * recorded period's edit form, where it can also be removed.
  */
 export function useTreatmentUsage(treatmentId: string, patientId: string) {
   const router = useRouter();
   const [periods, setPeriods] = useState<UsagePeriod[]>([]);
-  // The period the user asked to remove, awaiting confirmation.
-  const [removing, setRemoving] = useState<UsagePeriod | null>(null);
-  const [removalError, setRemovalError] = useState<string | null>(null);
   const loadSequence = useRef(0);
 
   const loadData = useCallback(async () => {
@@ -66,24 +59,13 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(['medication_statements'], loadData);
 
-  const confirmRemove = async () => {
-    if (!removing?.statement.id) return;
-    setRemovalError(null);
-    try {
-      await removeTreatmentUsage(treatmentId, removing.statement.id, patientId);
-      setRemoving(null);
-    } catch (err) {
-      console.error('Failed to remove treatment usage:', err);
-      setRemovalError('Failed to remove period. Please try again.');
-    }
-  };
-
   const current = getCurrentUsage(periods);
   const isTaking = current === 'taking';
+  // Start or resume taking it; while taking it, change its usage.
   const primaryAction = {
     label: getUsageChangeLabel(current),
-    testID: isTaking ? 'treatment-usage-stop' : 'treatment-usage-start',
-    icon: isTaking ? Square : Play,
+    testID: isTaking ? 'treatment-usage-change' : 'treatment-usage-start',
+    icon: isTaking ? SlidersHorizontal : Play,
     onPress: () =>
       router.push({
         pathname: '/treatment/[id]/usage',
@@ -91,59 +73,45 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
       }),
   };
 
-  const modals = (
-    <DeleteConfirmationModal
-      visible={removing !== null}
-      title="Remove period"
-      message={
-        removing
-          ? `Remove "${removing.label}" (${formatPeriod(removing)})? The period before it will run up to the next one.`
-          : ''
-      }
-      confirmLabel="Remove"
-      requireCountdown={false}
-      onConfirm={confirmRemove}
-      onCancel={() => {
-        setRemoving(null);
-        setRemovalError(null);
-      }}
-      testID="treatment-usage-remove-dialog"
-    >
-      {removalError && (
-        <FormErrorBanner
-          message={removalError}
-          testID="treatment-usage-remove-error"
-        />
-      )}
-    </DeleteConfirmationModal>
-  );
-
   return {
     periods,
-    /** The screen's main button: start or resume, or stop while taking. */
+    isTaking,
+    /** The screen's main button: start or resume, or change while taking. */
     primaryAction,
-    /** Asks to remove a period, after confirmation. */
-    requestRemove: (period: UsagePeriod) => {
-      setRemovalError(null);
-      setRemoving(period);
-    },
-    modals,
+    /** Opens a recorded period's edit form. */
+    editPeriod: (period: UsagePeriod) =>
+      router.push({
+        pathname: '/treatment/[id]/usage',
+        params: { id: treatmentId, period: period.statement.id },
+      }),
   };
 }
 
 /**
  * When the treatment was actually taken, paused or stopped, newest first,
- * each with an x to remove it. The journal only asks about days it was being
- * taken. Left out until a period is recorded.
+ * each with a pencil to edit or remove it. The journal only asks about days
+ * it was being taken. Left out until a period is recorded.
  */
 export function TreatmentUsageSection({
   periods,
-  onRemove,
+  onEdit,
 }: {
   periods: UsagePeriod[];
-  onRemove: (period: UsagePeriod) => void;
+  onEdit: (period: UsagePeriod) => void;
 }) {
   if (!periods.length) return null;
+  // Each period's regimen shows once it has changed, so periods differ.
+  const taking = periods.filter((period) => period.state === 'taking');
+  const hasChanged = taking.some(
+    (period) => !isSameRegimen(period.dosage, taking[0].dosage)
+  );
+  const regimenMeta = (period: UsagePeriod) =>
+    hasChanged && period.state === 'taking'
+      ? formatDosingLines(period.dosage).map((text) => ({
+          icon: REGIMEN_ICON,
+          text,
+        }))
+      : [];
   return (
     <ResourceSection
       icon={USAGE_ICON}
@@ -165,6 +133,7 @@ export function TreatmentUsageSection({
                 text: formatUsageDuration(period.start, period.end),
               },
               { icon: Calendar, text: formatPeriod(period) },
+              ...regimenMeta(period),
               ...(period.reason
                 ? [{ icon: MessageSquareText, text: period.reason }]
                 : []),
@@ -172,15 +141,15 @@ export function TreatmentUsageSection({
             ]}
             accessory={
               <TouchableOpacity
-                testID={`treatment-usage-remove-${period.statement.id}`}
+                testID={`treatment-usage-edit-${period.statement.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${period.label}, ${formatPeriod(period)}`}
+                accessibilityLabel={`Edit ${period.label}, ${formatPeriod(period)}`}
                 hitSlop={10}
-                style={styles.remove}
+                style={styles.edit}
                 activeOpacity={0.6}
-                onPress={() => onRemove(period)}
+                onPress={() => onEdit(period)}
               >
-                <X size={16} color={COLORS.light.iconClear} />
+                <Pencil size={16} color={COLORS.light.iconClear} />
               </TouchableOpacity>
             }
           />
@@ -191,8 +160,8 @@ export function TreatmentUsageSection({
 }
 
 const styles = StyleSheet.create({
-  // Sized and coloured like a form field's remove x.
-  remove: {
+  // Sized like a form field's remove x.
+  edit: {
     padding: 8,
     marginRight: -8,
   },

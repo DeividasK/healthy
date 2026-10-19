@@ -104,10 +104,13 @@ export interface SeedTreatmentLogOptions {
 
 export interface SeedTreatmentUsageOptions {
   treatmentId: string;
-  action: 'start' | 'pause' | 'resume' | 'stop';
+  action: 'start' | 'pause' | 'resume' | 'stop' | 'change';
   /** Local day, YYYY-MM-DD. */
   date: string;
   notes?: string;
+  /** The regimen followed from `date`; required for `change`. */
+  regimen?: RegimenDraft;
+  dosageInstructions?: string;
   patientId?: string;
 }
 

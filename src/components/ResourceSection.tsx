@@ -82,6 +82,8 @@ export interface ResourceMeta {
   /** Accessible description read instead of the bare text, e.g. "2 treatments". */
   accessibilityLabel?: string;
   testID?: string;
+  /** Draws attention, e.g. a journal answer that no longer matches. */
+  tone?: 'warning';
 }
 
 /** How a row stands out within its list, e.g. a timeline node and status. */
@@ -125,7 +127,7 @@ export function ResourceMetaLine({ meta }: { meta: ResourceMeta[] }) {
   return (
     <View style={styles.meta}>
       {meta.map(
-        ({ icon: MetaIcon, text, accessibilityLabel, testID }, index) => (
+        ({ icon: MetaIcon, text, accessibilityLabel, testID, tone }, index) => (
           <View
             key={index}
             style={styles.inlineMeta}
@@ -133,8 +135,13 @@ export function ResourceMetaLine({ meta }: { meta: ResourceMeta[] }) {
             accessible={Boolean(accessibilityLabel)}
             accessibilityLabel={accessibilityLabel}
           >
-            <MetaIcon color={COLORS.light.muted} size={14} />
-            <Text style={styles.metaText}>{text}</Text>
+            <MetaIcon
+              color={tone ? COLORS.light.warning : COLORS.light.muted}
+              size={14}
+            />
+            <Text style={[styles.metaText, tone && styles.metaWarning]}>
+              {text}
+            </Text>
           </View>
         )
       )}
@@ -341,6 +348,9 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     color: COLORS.light.mutedForeground,
+  },
+  metaWarning: {
+    color: COLORS.light.warning,
   },
   note: {
     paddingTop: 8,

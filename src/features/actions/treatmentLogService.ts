@@ -42,11 +42,12 @@ export async function getActionDays(
  *
  * One MedicationAdministration per item and day, with an id derived from both
  * (see `getTreatmentLogId`), so answers given on several devices update the
- * same resource. A dose's log carries the dose in `dosage`. An existing log is
- * updated in place, keeping fields this screen does not show.
+ * same resource. A new log carries the dosage followed that day in `dosage`:
+ * the scheduled dose, or the free-text dosing. An existing log is updated in
+ * place, keeping fields this screen does not show, its dosage included.
  */
 export async function setTreatmentLog(
-  item: Pick<ActionItem, 'key' | 'treatment' | 'dose' | 'log'>,
+  item: Pick<ActionItem, 'key' | 'treatment' | 'dose' | 'instructions' | 'log'>,
   date: string,
   answer: TreatmentLogAnswer | null,
   patientId: string,
@@ -76,7 +77,11 @@ export async function setTreatmentLog(
   if (!existing) {
     // R5 spells this element `occurence[x]`.
     administration.occurenceDateTime = date;
+    // The dosage it was taken under, so the answer stays correct after the
+    // regimen changes.
     if (dose) administration.dosage = getAdministeredDosage(dose);
+    else if (item.instructions)
+      administration.dosage = { text: item.instructions };
   }
   await insertMedicationAdministrationRecord(
     administration,
@@ -91,7 +96,10 @@ export async function setTreatmentLog(
  */
 export async function setTreatmentLogs(
   changes: {
-    item: Pick<ActionItem, 'key' | 'treatment' | 'dose' | 'log'>;
+    item: Pick<
+      ActionItem,
+      'key' | 'treatment' | 'dose' | 'instructions' | 'log'
+    >;
     answer: TreatmentLogAnswer | null;
   }[],
   date: string,
