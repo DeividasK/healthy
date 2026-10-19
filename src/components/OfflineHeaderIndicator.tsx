@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useNetworkState } from 'expo-network';
 import { WifiOff } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
@@ -11,12 +11,16 @@ export function useIsOffline(): boolean {
   return isConnected === false || isInternetReachable === false;
 }
 
-/** Offline icon and status, shown in the sync indicator's place while offline. */
+/** Offline icon, shown in the sync indicator's place while offline. */
 export function OfflineHeaderIndicator() {
   return (
-    <View testID="offline-header-indicator" style={styles.container}>
+    <View
+      testID="offline-header-indicator"
+      accessible
+      accessibilityLabel="Offline"
+      style={styles.container}
+    >
       <WifiOff size={18} color={COLORS.light.muted} strokeWidth={2.2} />
-      <Text style={styles.label}>Offline</Text>
     </View>
   );
 }
@@ -24,14 +28,9 @@ export function OfflineHeaderIndicator() {
 const styles = StyleSheet.create({
   container: {
     marginRight: 8,
+    width: 32,
     height: 32,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.light.muted,
+    justifyContent: 'center',
   },
 });

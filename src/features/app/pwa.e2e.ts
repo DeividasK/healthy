@@ -39,7 +39,7 @@ test.describe('Installable web app', () => {
     await context.setOffline(true);
     const indicator = page.getByTestId('offline-header-indicator');
     await expect(indicator).toBeVisible();
-    await expect(indicator).toHaveText('Offline');
+    await expect(indicator).toHaveAccessibleName('Offline');
     await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 
     await context.setOffline(false);
