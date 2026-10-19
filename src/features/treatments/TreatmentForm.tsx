@@ -33,7 +33,7 @@ import {
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
-import { DosageEditor } from './DosageEditor';
+import { DosingField } from './DosingField';
 import { NumberInput, ValueWithUnit } from './TimingFields';
 import {
   AddOptionsModal,
@@ -384,15 +384,18 @@ export function TreatmentForm({
                 />
               );
             }
-            if (id === 'regimen') {
+            if (id === 'regimen' || id === 'instructions') {
               return (
-                <DosageEditor
+                <DosingField
                   key={id}
-                  value={regimen}
-                  onChange={setRegimen}
+                  kind={id}
+                  instructions={dosageInstructions}
+                  onInstructionsChange={setDosageInstructions}
+                  regimen={regimen}
+                  onRegimenChange={setRegimen}
                   onRemove={fieldProps.onRemove}
-                  removeTestID={fieldProps.removeTestID}
                   onShowOptions={setRegimenOptions}
+                  idPrefix="treatment"
                 />
               );
             }
@@ -448,11 +451,7 @@ export function TreatmentForm({
               );
             }
             const [value, onChangeText] =
-              id === 'instructions'
-                ? [dosageInstructions, setDosageInstructions]
-                : id === 'reason'
-                  ? [reason, setReason]
-                  : [notes, setNotes];
+              id === 'reason' ? [reason, setReason] : [notes, setNotes];
             return (
               <FormField
                 key={id}
@@ -461,14 +460,13 @@ export function TreatmentForm({
                 inputProps={{
                   id: `treatment-${id}-input`,
                   nativeID: `treatment-${id}-input`,
-                  name: id === 'instructions' ? 'dosageInstructions' : id,
+                  name: id,
                   testID: `treatment-${id}-input`,
                   accessibilityLabel: label,
                   value,
                   onChangeText,
                   multiline: id !== 'reason',
-                  numberOfLines:
-                    id === 'instructions' ? 4 : id === 'notes' ? 3 : 1,
+                  numberOfLines: id === 'notes' ? 3 : 1,
                 }}
               />
             );

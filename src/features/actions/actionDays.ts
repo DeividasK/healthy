@@ -13,11 +13,7 @@ import {
   formatDose,
   getScheduledDoses,
 } from '@/src/features/treatments/regimen';
-import {
-  getFirstTakingDay,
-  getUsagePeriods,
-  isTakingOn,
-} from './treatmentUsage';
+import { getRegimenOn, getUsagePeriods, isTakingOn } from './treatmentUsage';
 
 /** How many days the homepage and the actions view show at once. */
 export const ACTION_WINDOW_DAYS = 7;
@@ -40,8 +36,16 @@ export interface ActionItem {
     dosage?: Dosage;
     text: string;
   };
+  /** Free-text dosing followed that day, copied onto a new answer. */
+  instructions?: string;
   answer: TreatmentLogAnswer | null;
   log?: MedicationAdministration;
+  /**
+   * The answer was given under a dosage that no longer matches the regimen
+   * recorded for that day; `takenAs` is that dosage, when known.
+   */
+  mismatch?: boolean;
+  takenAs?: string;
 }
 
 /** One day of actions: what to answer and the answers given. */
@@ -145,47 +149,67 @@ export function buildActionDay(
     const periods = getUsagePeriods(statements, id);
     const isDue = treatment.status === 'active' && isTakingOn(periods, date);
     if (isDue) {
-      // Regimen phases count from the first day it was taken.
+      // The regimen recorded for that day; its phases count from its start.
+      const regimen = getRegimenOn(periods, date, treatment);
       const doses = getScheduledDoses(
-        treatment,
+        { ...treatment, dosageInstruction: regimen.dosage },
         date,
-        getFirstTakingDay(periods)
+        regimen.start
       );
       if (doses === null) {
         const key = getTreatmentLogId(id, date);
-        const log = take(key, true);
-        items.push({ key, rowId: id, treatment, ...withLog(log) });
+        const instructions = regimen.dosage?.[0]?.text;
+        items.push({
+          key,
+          rowId: id,
+          treatment,
+          instructions,
+          ...withLog(take(key, true), instructions),
+        });
       } else {
         for (const { index, dosage } of doses) {
           const key = getTreatmentLogId(id, date, index);
+          const text = formatDose(dosage);
           items.push({
             key,
             rowId: `${id}-${index}`,
             treatment,
-            dose: { index, dosage, text: formatDose(dosage) },
-            ...withLog(take(key)),
+            dose: { index, dosage, text },
+            ...withLog(take(key), text),
           });
         }
       }
     }
-    // Answers no longer matching what is due still show.
+    // Answers no longer matching what is due still show, flagged while the
+    // treatment is still due that day (its regimen changed).
     for (const log of unused) {
       items.push({
         key: log.id!,
         rowId: log.id!,
         treatment,
         dose: log.dosage?.text ? { text: log.dosage.text } : undefined,
-        ...withLog(log),
+        answer: getAnswer(log),
+        log,
+        ...(isDue && { mismatch: true }),
       });
     }
   }
   return { date, items };
 }
 
-const withLog = (log?: MedicationAdministration) => ({
-  answer: log ? getAnswer(log) : null,
-  log,
-});
+/**
+ * An item's answer. A log whose recorded dosage differs from `due`, the
+ * dosage due that day, is flagged with the dosage it was taken under. Logs
+ * without a recorded dosage (from before it was kept) are never flagged.
+ */
+const withLog = (log?: MedicationAdministration, due?: string) => {
+  const takenAs = log?.dosage?.text;
+  return {
+    answer: log ? getAnswer(log) : null,
+    log,
+    ...(takenAs && takenAs !== due && { mismatch: true, takenAs }),
+  };
+};
 
 /**
  * The id of the log answering a treatment, or one of its doses, on a day.

@@ -1,6 +1,12 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Check, Tablets, X, type LucideIcon } from 'lucide-react-native';
+import {
+  Check,
+  Tablets,
+  TriangleAlert,
+  X,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -60,7 +66,24 @@ export function TreatmentLogRow({
     <ResourceRow
       testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
       title={title}
-      meta={item.dose ? [{ icon: Tablets, text: item.dose.text }] : []}
+      meta={[
+        // What it was taken under, once that no longer matches.
+        ...(item.takenAs || item.dose
+          ? [{ icon: Tablets, text: item.takenAs ?? item.dose!.text }]
+          : []),
+        ...(item.mismatch
+          ? [
+              {
+                icon: TriangleAlert,
+                text: "Doesn't match the current regimen",
+                tone: 'warning' as const,
+                testID: isLeaving
+                  ? undefined
+                  : `treatment-log-mismatch-${item.rowId}`,
+              },
+            ]
+          : []),
+      ]}
       accessibilityLabel={`View treatment: ${title}`}
       onPress={onOpen}
       accessory={

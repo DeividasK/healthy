@@ -1,9 +1,12 @@
 import { test, expect } from '@playwright/test';
 import type { Dosage, MedicationRequest } from 'fhir/r5';
 import {
+  applyDosing,
   applyRegimen,
   createDoseDraft,
   duplicateDoseDraft,
+  formatDose,
+  formatDosingLines,
   formatRegimenLines,
   getRegimenDraft,
   hideDoseField,
@@ -267,4 +270,24 @@ test('a duplicated dose copies its values but not its stored Dosage link', () =>
   copy.shownFields!.push('site');
   expect(source.timing.when).toBe('MORN');
   expect(source.shownFields).toEqual(['bounds']);
+});
+
+test('dosing edits replace the regimen or text and read back as lines', () => {
+  const regimenDraft = {
+    phases: [{ doses: [{ ...createDoseDraft(), amount: '2' }] }],
+  };
+  const fromText = applyDosing([{ text: 'Old' }], regimenDraft, null);
+  expect(fromText).toHaveLength(1);
+  expect(fromText[0].doseAndRate?.[0]?.doseQuantity?.value).toBe(2);
+  expect(fromText[0].text).toBeUndefined();
+  expect(applyDosing(fromText, null, '1 capsule daily')).toEqual([
+    { text: '1 capsule daily' },
+  ]);
+  // Undefined keeps either as it is.
+  expect(applyDosing(fromText, undefined, undefined)).toBe(fromText);
+  expect(formatDosingLines([{ text: 'As needed' }, ...fromText])).toEqual([
+    'As needed',
+    formatDose(fromText[0]),
+  ]);
+  expect(formatDosingLines(undefined)).toEqual([]);
 });

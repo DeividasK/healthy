@@ -5,6 +5,7 @@ import {
   checkA11y,
   getBrowserLocalDate,
   getTestTreatment,
+  getTestTreatmentLog,
   getTestTreatmentUsage,
   seedTestPatient,
   seedTestResources,
@@ -13,13 +14,13 @@ import {
 const treatmentId = 'usage-treatment';
 const viewUrl = `/treatment/${treatmentId}`;
 
-async function saveChange(page: Page, date: string) {
+async function saveChange(page: Page, date: string, url = viewUrl) {
   await page
     .getByTestId('treatment-usage-date-picker')
     .locator('input')
     .fill(date);
   await page.getByTestId('save-usage-button').click();
-  await expect(page).toHaveURL(new RegExp(`${viewUrl}$`));
+  await expect(page).toHaveURL(new RegExp(`${url}$`));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -49,7 +50,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   );
   await checkA11y(page);
   await saveChange(page, dates[1]);
-  await page.getByTestId('treatment-usage-stop').click();
+  await page.getByTestId('treatment-usage-change').click();
   await expect(
     page.getByRole('radio', { name: 'On hold', exact: true })
   ).toBeChecked();
@@ -69,7 +70,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
     'Resume taking: Vitamin D'
   );
   await saveChange(page, dates[5]);
-  await page.getByTestId('treatment-usage-stop').click();
+  await page.getByTestId('treatment-usage-change').click();
   await page.getByTestId('treatment-usage-kind-stop').click();
   await saveChange(page, dates[6]);
 
@@ -153,7 +154,7 @@ test('validates dates, removes optional notes and confirms removing a period', a
     treatmentUsage: [{ treatmentId, action: 'start', date: yesterday }],
   });
   await page.goto(viewUrl);
-  await page.getByTestId('treatment-usage-stop').click();
+  await page.getByTestId('treatment-usage-change').click();
   const date = page.getByTestId('treatment-usage-date-picker').locator('input');
   await expect(date).toHaveAttribute('max', await getBrowserLocalDate(page));
   await date.fill(await getBrowserLocalDate(page, -2));
@@ -177,7 +178,7 @@ test('validates dates, removes optional notes and confirms removing a period', a
   await expect(page.getByTestId(/^treatment-usage-period-/)).toHaveCount(2);
   await page.getByTestId(`treatment-usage-remove-${statements[1].id}`).click();
   await page.getByTestId('delete-modal-confirm-button').click();
-  await expect(page.getByTestId('treatment-usage-stop')).toBeVisible();
+  await expect(page.getByTestId('treatment-usage-change')).toBeVisible();
   await expect(page.getByTestId('treatment-usage-section-count')).toHaveText(
     '1'
   );
@@ -227,4 +228,202 @@ test('explains a failed period removal and keeps the dialog open for retry', asy
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId('treatment-usage-section')).toHaveCount(0);
   expect(await getTestTreatmentUsage(page, treatmentId)).toHaveLength(0);
+});
+
+const dailyDose = (amount: string) => ({
+  amount,
+  amountMax: '',
+  unit: '{tablet}',
+  route: '',
+  site: '',
+  patientInstruction: '',
+  timing: {
+    frequency: '1',
+    frequencyMax: '',
+    period: '1',
+    periodUnit: 'd',
+    when: 'MORN',
+    boundsValue: '',
+    boundsUnit: 'd',
+  },
+});
+
+test('a new regimen starts a period, keeps earlier days on the old dose and flags answers it changed', async ({
+  page,
+}) => {
+  const [fourAgo, threeAgo, twoAgo, yesterday, today] = await Promise.all(
+    [-4, -3, -2, -1, 0].map((offset) => getBrowserLocalDate(page, offset))
+  );
+  await seedTestResources(page, {
+    treatments: [
+      {
+        id: 'regimen',
+        title: 'Prednisolone',
+        status: 'active',
+        regimen: { phases: [{ doses: [dailyDose('2')] }] },
+        takingSince: fourAgo,
+      },
+    ],
+    treatmentLogs: [threeAgo, yesterday].map((date) => ({
+      treatmentId: 'regimen',
+      date,
+      answer: 'taken' as const,
+      doseIndex: 0,
+    })),
+  });
+  await page.goto('/treatment/regimen');
+  await expect(page.getByTestId('treatment-dosage')).toHaveText(
+    '2 tablets in the morning'
+  );
+  await expect(page.getByTestId('treatment-current-regimen')).toHaveText(
+    '2 tablets in the morning'
+  );
+  await page.getByTestId('treatment-usage-change').click();
+  await expect(page.getByTestId('treatment-usage-form-title')).toHaveText(
+    'Change usage: Prednisolone'
+  );
+  await expect(page.getByTestId('treatment-regimen-field')).toHaveCount(0);
+  await page.getByTestId('treatment-usage-kind-change').click();
+  const amount = page.getByLabel('Min Amount');
+  await expect(amount).toHaveValue('2');
+  await checkA11y(page);
+  // An unchanged regimen, or one dated before the current period, is not saved.
+  await page.getByTestId('save-usage-button').click();
+  await expect(page.getByTestId('treatment-usage-form-error')).toHaveText(
+    'The new regimen is the same as the current one'
+  );
+  await amount.fill('1');
+  await page
+    .getByTestId('treatment-usage-date-picker')
+    .locator('input')
+    .fill(await getBrowserLocalDate(page, -5));
+  await page.getByTestId('save-usage-button').click();
+  await expect(page.getByTestId('treatment-usage-form-error')).toHaveText(
+    `The date cannot be before ${fourAgo}`
+  );
+  await saveChange(page, twoAgo, '/treatment/regimen');
+
+  const statements = await getTestTreatmentUsage(page, 'regimen');
+  const amountOf = (statement: any) =>
+    statement.dosage[0].doseAndRate[0].doseQuantity.value;
+  expect(statements.map((statement) => statement.effectivePeriod)).toEqual([
+    { start: fourAgo, end: threeAgo },
+    { start: twoAgo },
+  ]);
+  expect(statements.map(amountOf)).toEqual([2, 1]);
+  expect(
+    statements.map((statement) => statement.adherence.code.coding[0].code)
+  ).toEqual(['taking', 'taking']);
+  // The prescription is unchanged.
+  const prescribed = await getTestTreatment(page, 'regimen');
+  expect(
+    prescribed.dosageInstruction[0].doseAndRate[0].doseQuantity.value
+  ).toBe(2);
+  await expect(page.getByTestId('treatment-dosage')).toHaveText(
+    '2 tablets in the morning'
+  );
+  await expect(page.getByTestId('treatment-current-regimen')).toHaveText(
+    '1 tablet in the morning'
+  );
+  const rows = page.getByTestId(/^treatment-usage-period-/);
+  await expect(rows.first()).toContainText('1 tablet in the morning');
+  await expect(rows.nth(1)).toContainText('2 tablets in the morning');
+
+  // Each day lists the dose of its own regimen; an answer given under the
+  // old one on a day the new one covers is flagged.
+  const row = page.getByTestId('treatment-log-row-regimen-0');
+  const warning = page.getByTestId('treatment-log-mismatch-regimen-0');
+  await page.goto(`/journal?date=${threeAgo}`);
+  await expect(row).toContainText('2 tablets in the morning');
+  await expect(warning).toHaveCount(0);
+  await page.goto(`/journal?date=${yesterday}`);
+  await expect(row).toContainText('2 tablets in the morning');
+  await expect(warning).toHaveText("Doesn't match the current regimen");
+  await checkA11y(page);
+  await page.goto(`/journal?date=${today}`);
+  await expect(row).toContainText('1 tablet in the morning');
+  await expect(warning).toHaveCount(0);
+  await page.getByTestId('treatment-log-taken-regimen-0').click();
+  await expect
+    .poll(
+      async () =>
+        (await getTestTreatmentLog(page, `regimen-${today}-0`))?.dosage?.text
+    )
+    .toBe('1 tablet in the morning');
+});
+
+test('free-text dosing starts from the prescription and a same-day new regimen corrects the period', async ({
+  page,
+}) => {
+  const [twoAgo, yesterday, today] = await Promise.all(
+    [-2, -1, 0].map((offset) => getBrowserLocalDate(page, offset))
+  );
+  await seedTestResources(page, {
+    treatments: [
+      {
+        id: 'text-dosing',
+        title: 'Vitamin B12',
+        status: 'active',
+        dosageInstructions: '1 capsule daily',
+      },
+    ],
+  });
+  await page.goto('/treatment/text-dosing');
+  await page.getByTestId('treatment-usage-start').click();
+  await expect(
+    page.getByTestId('treatment-usage-instructions-input')
+  ).toHaveValue('1 capsule daily');
+  await saveChange(page, twoAgo, '/treatment/text-dosing');
+  expect((await getTestTreatmentUsage(page, 'text-dosing'))[0].dosage).toEqual([
+    { text: '1 capsule daily' },
+  ]);
+  await seedTestResources(page, {
+    treatmentLogs: [
+      { treatmentId: 'text-dosing', date: yesterday, answer: 'taken' },
+    ],
+  });
+  await page.goto('/treatment/text-dosing');
+  await page.getByTestId('treatment-usage-change').click();
+  await page.getByTestId('treatment-usage-kind-change').click();
+  const instructions = page.getByTestId('treatment-usage-instructions-input');
+  await expect(instructions).toHaveValue('1 capsule daily');
+  // Without dosing, a new regimen cannot be saved.
+  await page.getByTestId('remove-treatment-usage-instructions-button').click();
+  await page.getByTestId('save-usage-button').click();
+  await expect(page.getByTestId('treatment-usage-form-error')).toHaveText(
+    'Enter the new dosage or regimen'
+  );
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-usage-instructions').click();
+  await instructions.fill('2 capsules daily');
+  await saveChange(page, twoAgo, '/treatment/text-dosing');
+
+  const statements = await getTestTreatmentUsage(page, 'text-dosing');
+  expect(statements).toHaveLength(1);
+  expect(statements[0]).toMatchObject({
+    effectivePeriod: { start: twoAgo },
+    dosage: [{ text: '2 capsules daily' }],
+  });
+  expect(
+    (await getTestTreatment(page, 'text-dosing')).dosageInstruction
+  ).toEqual([{ text: '1 capsule daily' }]);
+  await page.goto(`/journal?date=${yesterday}`);
+  await expect(page.getByTestId('treatment-log-row-text-dosing')).toContainText(
+    '1 capsule daily'
+  );
+  await expect(
+    page.getByTestId('treatment-log-mismatch-text-dosing')
+  ).toBeVisible();
+  await page.goto(`/journal?date=${today}`);
+  await expect(page.getByTestId('treatment-log-row-text-dosing')).toBeVisible();
+  await expect(
+    page.getByTestId('treatment-log-mismatch-text-dosing')
+  ).toHaveCount(0);
+  await page.getByTestId('treatment-log-taken-text-dosing').click();
+  await expect
+    .poll(
+      async () =>
+        (await getTestTreatmentLog(page, `text-dosing-${today}`))?.dosage
+    )
+    .toEqual({ text: '2 capsules daily' });
 });

@@ -244,19 +244,26 @@ day, whether each treatment was taken. Each answer is a FHIR R5
   it, because R5 requires it; `subject` is the patient.
 - One resource per treatment and day, or per scheduled dose and day for a
   structured regimen, with the id `<treatment id>-<day>` or
-  `<treatment id>-<day>-<dosageInstruction index>`. Answers given on several
-  devices then update the same resource and sync keeps the latest. A dose's
-  log carries the dose in `dosage` (text, route, site and a simple dose
-  quantity). Updating an answer keeps fields the screen does not show.
+  `<treatment id>-<day>-<dosage index>`. Answers given on several
+  devices then update the same resource and sync keeps the latest.
+- `dosage`: what it was taken under, copied when the answer is first given:
+  the dose (text, route, site and a simple dose quantity) for a structured
+  regimen, or `dosage.text` for free-text dosing. Updating an answer keeps
+  it, and fields the screen does not show.
 
 A day lists each active treatment on days a "taking" period of its usage
 covers (see Treatment usage); before it is started, while on hold and after it
-is stopped nothing is due. Free-text dosing is one row, a structured regimen
+is stopped nothing is due. What is due follows the regimen recorded for that
+day (see Regimen changes): free-text dosing is one row, a structured regimen
 one row per dose of the phase in effect. Phases follow each other from the
-first day it was taken, each lasting its longest course length (pauses do not
-extend them); a phase without one continues, and nothing is due after the last
-phase ends. Answers already given that day stay listed after a treatment ends
-or its regimen changes. Logs are not compared with expected frequency.
+first day of that regimen, each lasting its longest course length (pauses do
+not extend them); a phase without one continues, and nothing is due after the
+last phase ends. Answers already given that day stay listed after a treatment
+ends or its regimen changes. An answer whose recorded `dosage` differs from
+the dose due under that day's regimen, or that is no longer due while the
+treatment still is, shows "Doesn't match the current regimen" with the dosage
+it was taken under. Answers without a recorded `dosage` are not compared. Logs
+are not compared with expected frequency.
 
 Deleting a treatment or patient deletes its logs by cascade, which sync records
 as deletions. ZIP archives carry `records/medication_administration_*.json`
@@ -275,8 +282,8 @@ delete. No existing table or record changes.
 A treatment's `MedicationRequest.status` is the state of the order. Whether the
 patient actually takes it is reported with FHIR R5 `MedicationStatement`, one
 per period of use, recorded from the treatment page's main button (play to
-start or resume taking; stop, choosing on hold or stopped, while taking) and
-edited by removing periods:
+start or resume taking; "Change usage" while taking, choosing on hold,
+stopped or a new regimen) and edited by removing periods:
 
 - `derivedFrom`: the treatment's `MedicationRequest`; `medication` is copied
   from it and `subject` is the patient. `status` is `recorded`.
@@ -291,12 +298,39 @@ edited by removing periods:
   or before the current period, so periods never overlap.
 - Removing a period deletes it; the period before it then runs up to the next
   one (or stays open when the removed one was current), and neighbours in the
-  same state merge.
+  same state with the same regimen merge.
+- `dosage`: on periods of taking it, the regimen followed (see Regimen
+  changes).
 
 Deleting a treatment or patient deletes its periods by cascade, which sync
 records as deletions. ZIP archives carry `records/medication_statement_*.json`
 envelopes, restored after treatments. Encrypted sync replicates
 `MedicationStatement` after `MedicationRequest`.
+
+### Regimen changes
+
+The treatment's `MedicationRequest.dosageInstruction` is what was prescribed
+or recommended; the treatment form edits it and the treatment page shows it
+as "Prescribed Dosage". The regimen actually followed is
+`MedicationStatement.dosage` on each period of taking it, which R5 defines as
+how the medication is or was taken and illustrates with a dose that changes
+over time; the page shows the current period's as "Current Regimen", and the
+Usage list shows each period's once the regimen has changed.
+
+- Starting copies the prescribed dosage into the form, resuming the regimen
+  last followed; either can be edited or left out (a period without `dosage`
+  follows the prescription).
+- A new regimen (while taking it) ends the current period the day before its
+  date and starts a taking period with the new `dosage`; on the current
+  period's first day it replaces that period, which corrects it. The
+  prescription is unchanged. A changed prescription would be a new
+  MedicationRequest with `priorPrescription`; that is not modelled.
+- Days follow the regimen of the period covering them, so earlier days keep
+  their doses. Its phases count from the first day of that regimen: taking
+  periods with the same `dosage` continue it across pauses, a different one
+  restarts it.
+
+No custom elements are used. Backups and sync carry the complete resources.
 
 ### Migration v16
 
@@ -308,3 +342,13 @@ prescribed start (`effectiveDosePeriod.start`), starting on the
 earlier of the two, so those treatments stay due. Backfilled ids
 (`use-<treatment id>-backfill`) are derived from the treatment, so devices
 migrating separately converge. No existing table or record changes.
+
+### Migration v17
+
+v17 is non-breaking and changes no tables or columns. It fills in canonical
+JSON where absent: each period of taking a treatment gets `dosage`, a copy of
+the treatment's `dosageInstruction` (the regimen the app followed until
+then), and each treatment log without `dosage` gets `dosage.text` from the
+treatment's free-text dosing (logs of structured doses already carry theirs).
+The rows are stamped and captured for sync like any edit; devices migrating
+separately write the same content. Older app versions ignore the elements.

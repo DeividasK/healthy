@@ -42,6 +42,13 @@ test.describe('View Treatment Flow', () => {
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       longInstructions
     );
+    await expect(page.getByTestId('treatment-dosage-section')).toContainText(
+      'Prescribed Dosage'
+    );
+    // Being taken, it shows the regimen followed too.
+    await expect(page.getByTestId('treatment-current-regimen')).toHaveText(
+      longInstructions
+    );
     await checkA11y(page, { include: '[data-testid="treatment-view"]' });
 
     await page.reload();

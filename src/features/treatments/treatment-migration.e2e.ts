@@ -3,6 +3,7 @@ import {
   test,
   expect,
   seedTestPatient,
+  seedTestResources,
   seedTestTreatment,
 } from '@/src/features/testing/testStorage';
 
@@ -235,7 +236,7 @@ test('v16 backfills taking periods from the earliest log or prescribed start and
       };
     });
   const result = await readMigration();
-  expect(result.version[0].user_version).toBe(16);
+  expect(result.version[0].user_version).toBeGreaterThanOrEqual(16);
   expect(result.requests).toEqual(before);
   expect(
     result.periods.map((row: any) => [
@@ -276,5 +277,126 @@ test('v16 backfills taking periods from the earliest log or prescribed start and
   );
   await page.reload();
   await expect(page.getByTestId('treatment-card-logged')).toBeVisible();
+  expect(await readMigration()).toEqual(result);
+});
+
+test('v17 records the regimen on taking periods and the dosage on free-text answers', async ({
+  page,
+}) => {
+  await seedTestPatient(page, { id: 'migration-patient' });
+  await seedTestResources(page, {
+    treatments: [
+      {
+        id: 'text',
+        title: 'Vitamin D',
+        status: 'active',
+        dosageInstructions: '1 capsule daily',
+        takingSince: '2026-10-01',
+      },
+      {
+        id: 'structured',
+        title: 'Prednisolone',
+        status: 'active',
+        regimen: {
+          phases: [
+            {
+              doses: [
+                {
+                  amount: '2',
+                  amountMax: '',
+                  unit: '{tablet}',
+                  route: '',
+                  site: '',
+                  patientInstruction: '',
+                  timing: {
+                    frequency: '1',
+                    frequencyMax: '',
+                    period: '1',
+                    periodUnit: 'd',
+                    when: '',
+                    boundsValue: '',
+                    boundsUnit: 'd',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        takingSince: '2026-10-01',
+      },
+    ],
+    treatmentLogs: [
+      { treatmentId: 'text', date: '2026-10-02', answer: 'taken' },
+      {
+        treatmentId: 'structured',
+        date: '2026-10-02',
+        answer: 'not-taken',
+        doseIndex: 0,
+      },
+    ],
+  });
+  // Data as written before v17: no regimen on periods or free-text answers.
+  const structuredLog = await page.evaluate(async () => {
+    const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+    await b.executeSql(
+      "UPDATE medication_statements SET fhir_json = json_remove(fhir_json, '$.dosage')"
+    );
+    await b.executeSql(
+      "UPDATE medication_administrations SET fhir_json = json_remove(fhir_json, '$.dosage') WHERE medication_request_id = 'text'"
+    );
+    await b.executeSql('DELETE FROM sync_dirty');
+    await b.executeSql('PRAGMA user_version = 16');
+    const [row] = await b.querySql(
+      "SELECT fhir_json FROM medication_administrations WHERE medication_request_id = 'structured'"
+    );
+    return JSON.parse(row.fhir_json);
+  });
+  await page.reload();
+  await expect(page.getByTestId('treatment-card-text')).toBeVisible();
+  const readMigration = () =>
+    page.evaluate(async () => {
+      const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+      const json = async (sql: string) =>
+        Object.fromEntries(
+          (await b.querySql(sql)).map((row: any) => [
+            row.medication_request_id,
+            JSON.parse(row.fhir_json),
+          ])
+        );
+      return {
+        version: await b.querySql('PRAGMA user_version'),
+        requests: await json(
+          'SELECT id AS medication_request_id, fhir_json FROM medication_requests'
+        ),
+        periods: await json(
+          'SELECT medication_request_id, fhir_json FROM medication_statements'
+        ),
+        logs: await json(
+          'SELECT medication_request_id, fhir_json FROM medication_administrations'
+        ),
+        dirty: await b.querySql(
+          "SELECT resource_type, resource_id FROM sync_dirty WHERE resource_type IN ('MedicationAdministration', 'MedicationStatement') ORDER BY resource_type, resource_id"
+        ),
+      };
+    });
+  const result = await readMigration();
+  expect(result.version[0].user_version).toBe(17);
+  for (const id of ['text', 'structured'])
+    expect(result.periods[id].dosage).toEqual(
+      result.requests[id].dosageInstruction
+    );
+  expect(result.logs.text.dosage).toEqual({ text: '1 capsule daily' });
+  expect(result.logs.structured).toEqual(structuredLog);
+  expect(result.dirty).toEqual([
+    {
+      resource_type: 'MedicationAdministration',
+      resource_id: result.logs.text.id,
+    },
+    ...[result.periods.structured.id, result.periods.text.id]
+      .sort()
+      .map((id) => ({ resource_type: 'MedicationStatement', resource_id: id })),
+  ]);
+  await page.reload();
+  await expect(page.getByTestId('treatment-card-text')).toBeVisible();
   expect(await readMigration()).toEqual(result);
 });

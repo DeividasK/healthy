@@ -9,8 +9,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { FileText } from 'lucide-react-native';
-import type { MedicationRequest } from 'fhir/r5';
+import {
+  FileText,
+  Repeat,
+  Tablets,
+  type LucideIcon,
+} from 'lucide-react-native';
+import type { Dosage, MedicationRequest } from 'fhir/r5';
+import {
+  AddOptionsModal,
+  type AddOptionItem,
+} from '@/src/components/AddOptionsModal';
 import { FormField } from '@/src/components/FormField';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormActionDock } from '@/src/components/FormActionDock';
@@ -24,12 +33,25 @@ import {
 import { useHasChanges } from '@/src/components/useHasChanges';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getTreatmentById } from '@/src/features/treatments/treatmentService';
+import {
+  DosingField,
+  type DosingKind,
+} from '@/src/features/treatments/DosingField';
+import {
+  applyDosing,
+  createDoseDraft,
+  getRegimenDraft,
+  hasRegimen,
+  validateRegimen,
+  type RegimenDraft,
+} from '@/src/features/treatments/regimen';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import { goBackOr } from '@/src/utils/navigation';
 import { COLORS } from '@/src/theme/colors';
 import {
   getCurrentUsage,
+  getLatestRegimen,
   type CurrentUsage,
   type UsageAction,
 } from './treatmentUsage';
@@ -38,29 +60,48 @@ import {
   getTreatmentUsage,
 } from './treatmentUsageService';
 
-/** How taking ends: paused for now, or stopped for good. */
-type StopKind = 'pause' | 'stop';
-const STOP_KINDS: { id: StopKind; label: string }[] = [
+/** A change while taking it: on hold, stopped for good, or a new regimen. */
+type ChangeKind = 'pause' | 'stop' | 'change';
+const CHANGE_KINDS: { id: ChangeKind; label: string }[] = [
   { id: 'pause', label: 'On hold' },
   { id: 'stop', label: 'Stopped' },
+  { id: 'change', label: 'New regimen' },
 ];
+
+/** Dosing the `+` menu can add, as in the treatment form. */
+const DOSING_OPTIONS: { id: DosingKind; label: string; icon: LucideIcon }[] = [
+  { id: 'instructions', label: 'Dosage', icon: Tablets },
+  { id: 'regimen', label: 'Regimen', icon: Repeat },
+];
+
+const menuIcon = (Icon: LucideIcon) => (
+  <Icon size={20} color={COLORS.light.primary} style={{ marginRight: 12 }} />
+);
+
+/** A regimen draft as entered, ignoring which optional fields are open. */
+const draftKey = (draft: RegimenDraft) =>
+  JSON.stringify(draft, (key, value) =>
+    key === 'shownFields' ? undefined : value
+  );
 
 /** The heading and save label for a change from the current usage. */
 export function getUsageChangeLabel(current: CurrentUsage): string {
-  if (current === 'taking') return 'Stop taking';
+  if (current === 'taking') return 'Change usage';
   return current === 'on-hold' ? 'Resume taking' : 'Start taking';
 }
 
 /**
  * Records a change to a treatment's usage on a date: starting or resuming
- * taking it, or, while taking it, stopping it as on hold or stopped with
- * optional notes. Opened from the treatment page's main button.
+ * taking it with the regimen followed, or, while taking it, putting it on
+ * hold, stopping it (with optional notes) or following a new regimen.
+ * Opened from the treatment page's main button.
  */
 export function TreatmentUsageFormView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading } = useActivePatient();
   const [treatment, setTreatment] = useState<MedicationRequest | null>(null);
   const [current, setCurrent] = useState<CurrentUsage | null>(null);
+  const [regimen, setRegimen] = useState<Dosage[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +115,15 @@ export function TreatmentUsageFormView() {
         if (!active) return;
         if (!loaded) setLoadError('Treatment not found.');
         setTreatment(loaded);
-        setCurrent(getCurrentUsage(periods));
+        const usage = getCurrentUsage(periods);
+        setCurrent(usage);
+        // Starting follows the prescription; otherwise the regimen continues.
+        if (loaded)
+          setRegimen(
+            (usage === 'not-started' || usage === 'stopped'
+              ? loaded.dosageInstruction
+              : getLatestRegimen(periods, loaded)) ?? []
+          );
       })
       .catch((err) => {
         console.error('Failed to load treatment usage:', err);
@@ -103,6 +152,7 @@ export function TreatmentUsageFormView() {
     <UsageForm
       treatment={treatment}
       current={current}
+      regimen={regimen}
       patientId={activePatientId}
     />
   );
@@ -111,55 +161,125 @@ export function TreatmentUsageFormView() {
 function UsageForm({
   treatment,
   current,
+  regimen,
   patientId,
 }: {
   treatment: MedicationRequest;
   current: CurrentUsage;
+  /** The regimen to start from: the one followed, else the prescribed one. */
+  regimen: Dosage[];
   patientId: string;
 }) {
   const router = useRouter();
-  const isStopping = current === 'taking';
+  const isTaking = current === 'taking';
   const label = getUsageChangeLabel(current);
   const [date, setDate] = useState(() => new Date());
-  const [stopKind, setStopKind] = useState<StopKind>('pause');
+  const [changeKind, setChangeKind] = useState<ChangeKind>('pause');
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
+  // Dosing opens on the regimen (or text) it starts from.
+  const [initialDraft] = useState(() =>
+    getRegimenDraft({ ...treatment, dosageInstruction: regimen })
+  );
+  const initialKind: DosingKind | null = hasRegimen(initialDraft)
+    ? 'regimen'
+    : regimen[0]?.text
+      ? 'instructions'
+      : null;
+  const initialInstructions =
+    initialKind === 'instructions' ? regimen[0].text! : '';
+  const [dosingKind, setDosingKind] = useState(initialKind);
+  const [instructions, setInstructions] = useState(initialInstructions);
+  const [regimenDraft, setRegimenDraft] = useState<RegimenDraft>(initialDraft);
+  // Fields a regimen phase or dose can add, shown in a centered menu.
+  const [regimenOptions, setRegimenOptions] = useState<AddOptionItem[] | null>(
+    null
+  );
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasChanges = useHasChanges({
     date: formatLocalDate(date),
-    stopKind,
+    changeKind,
     notes,
+    dosingKind,
+    instructions,
+    regimenDraft,
   });
   const { reveal, scrollViewProps } = useFieldReveal();
+  // The regimen followed from the date: on starting or resuming, and for a
+  // new regimen.
+  const isNewRegimen = isTaking && changeKind === 'change';
+  const showsDosing = !isTaking || isNewRegimen;
 
   // Optional fields wait behind the + until added.
-  const options =
-    isStopping && !showNotes
+  const options: AddOptionItem[] = [
+    ...(showsDosing && !dosingKind
+      ? DOSING_OPTIONS.map(({ id, label: optionLabel, icon }) => ({
+          id,
+          label: optionLabel,
+          testID: `menu-add-usage-${id}`,
+          icon: menuIcon(icon),
+          onPress: () => {
+            if (id === 'regimen' && !hasRegimen(regimenDraft))
+              setRegimenDraft({ phases: [{ doses: [createDoseDraft()] }] });
+            setDosingKind(id);
+          },
+        }))
+      : []),
+    ...(isTaking && !showNotes
       ? [
           {
             id: 'notes',
             label: 'Notes',
             testID: 'menu-add-usage-notes',
-            icon: (
-              <FileText
-                size={20}
-                color={COLORS.light.primary}
-                style={{ marginRight: 12 }}
-              />
-            ),
+            icon: menuIcon(FileText),
             onPress: () => setShowNotes(true),
           },
         ]
-      : [];
+      : []),
+  ];
+
+  /** The dosage entries for the period, kept from the one it starts from. */
+  const getDosage = (): Dosage[] | undefined => {
+    if (!showsDosing) return undefined;
+    if (!dosingKind) return [];
+    return applyDosing(
+      regimen,
+      dosingKind === 'regimen' ? regimenDraft : null,
+      dosingKind === 'instructions' ? instructions : null
+    );
+  };
 
   const handleSave = async () => {
-    const action: UsageAction = isStopping
-      ? stopKind
+    const action: UsageAction = isTaking
+      ? changeKind
       : current === 'on-hold'
         ? 'resume'
         : 'start';
+    const fieldError =
+      showsDosing && dosingKind === 'regimen'
+        ? validateRegimen(regimenDraft)
+        : null;
+    if (fieldError) {
+      setErrorMessage(fieldError);
+      return;
+    }
+    const dosage = getDosage();
+    if (isNewRegimen && !dosage?.length) {
+      setErrorMessage('Enter the new dosage or regimen');
+      return;
+    }
+    // Compared as entered: saving rewrites the entries it starts from.
+    const isUnchanged =
+      dosingKind === initialKind &&
+      (dosingKind === 'regimen'
+        ? draftKey(regimenDraft) === draftKey(initialDraft)
+        : instructions.trim() === initialInstructions.trim());
+    if (isNewRegimen && isUnchanged) {
+      setErrorMessage('The new regimen is the same as the current one');
+      return;
+    }
     try {
       setIsSaving(true);
       setErrorMessage(null);
@@ -169,7 +289,8 @@ function UsageForm({
         action,
         formatLocalDate(date),
         undefined,
-        showNotes ? notes : undefined
+        showNotes ? notes : undefined,
+        dosage
       );
       goBackOr(router, `/treatment/${treatment.id}`);
     } catch (err: any) {
@@ -213,7 +334,7 @@ function UsageForm({
               variant="input"
             />
           </FormField>
-          {isStopping && (
+          {isTaking && (
             <FormField
               label="Status"
               nativeID="treatment-usage-stop-kind"
@@ -225,8 +346,8 @@ function UsageForm({
                 accessibilityRole="radiogroup"
                 accessibilityLabel="Status"
               >
-                {STOP_KINDS.map(({ id, label: kindLabel }) => {
-                  const selected = stopKind === id;
+                {CHANGE_KINDS.map(({ id, label: kindLabel }) => {
+                  const selected = changeKind === id;
                   return (
                     <TouchableOpacity
                       key={id}
@@ -236,7 +357,10 @@ function UsageForm({
                       accessibilityState={{ checked: selected }}
                       style={[styles.choice, selected && styles.choiceSelected]}
                       activeOpacity={0.7}
-                      onPress={() => setStopKind(id)}
+                      onPress={() => {
+                        setChangeKind(id);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
                     >
                       <Text
                         style={[
@@ -252,7 +376,20 @@ function UsageForm({
               </View>
             </FormField>
           )}
-          {isStopping && showNotes && (
+          {showsDosing && dosingKind && (
+            <DosingField
+              kind={dosingKind}
+              instructions={instructions}
+              onInstructionsChange={setInstructions}
+              regimen={regimenDraft}
+              onRegimenChange={setRegimenDraft}
+              onRemove={() => setDosingKind(null)}
+              onShowOptions={setRegimenOptions}
+              idPrefix="treatment-usage"
+              required={isNewRegimen}
+            />
+          )}
+          {isTaking && showNotes && (
             <FormField
               label="Notes"
               nativeID="treatment-usage-notes-input"
@@ -283,9 +420,7 @@ function UsageForm({
           testID="form-add-menu"
         />
         <FormActionDock
-          onAdd={
-            isStopping ? () => setShowPlusMenu((open) => !open) : undefined
-          }
+          onAdd={() => setShowPlusMenu((open) => !open)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
           saveLabel={label}
@@ -293,6 +428,13 @@ function UsageForm({
           isSaving={isSaving}
           hasChanges={hasChanges}
           saveTestID="save-usage-button"
+        />
+        <AddOptionsModal
+          visible={Boolean(regimenOptions)}
+          onClose={() => setRegimenOptions(null)}
+          options={regimenOptions || []}
+          overlayTestID="regimen-options-overlay"
+          cardTestID="regimen-options-menu"
         />
       </SafeAreaView>
     </FieldRevealProvider>
@@ -327,6 +469,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: 9999,
     borderWidth: 1,
     borderColor: COLORS.light.pillBorder,

@@ -40,6 +40,7 @@ interface DosageEditorProps {
   removeTestID?: string;
   /** Opens the centered menu of fields that can be added. */
   onShowOptions: (options: AddOptionItem[]) => void;
+  required?: boolean;
 }
 
 const OPTIONAL_FIELDS: {
@@ -72,6 +73,7 @@ export function DosageEditor({
   onRemove,
   removeTestID,
   onShowOptions,
+  required = false,
 }: DosageEditorProps) {
   const reveal = useFieldRevealContext();
   const { phases } = value;
@@ -173,6 +175,7 @@ export function DosageEditor({
   return (
     <FormField
       label="Regimen"
+      required={required}
       onRemove={onRemove}
       removeTestID={removeTestID}
       testID="treatment-regimen-field"

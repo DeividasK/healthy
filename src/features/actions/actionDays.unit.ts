@@ -99,13 +99,16 @@ test('the journal loads the neighbouring days before the rest of its strips', ()
 });
 
 /** A "taking" usage period for a treatment, from `start` to `end`. */
-const taking = (id: string, start: string, end?: string) => {
+const taking = (id: string, start: string, end?: string, dosage?: Dosage[]) => {
   const statement = buildUsageStatement(
     treatment(id, 'active'),
     'p1',
     'taking',
     start,
-    `use-${id}-${start}`
+    `use-${id}-${start}`,
+    undefined,
+    undefined,
+    dosage
   );
   if (end) statement.effectivePeriod = { start, end };
   return statement;
@@ -217,4 +220,72 @@ test('labels name today, yesterday and older days', () => {
   expect(formatDayLabel('2026-10-08', '2026-10-08')).toBe('Today');
   expect(formatDayLabel('2026-10-07', '2026-10-08')).toBe('Yesterday');
   expect(formatDayLabel('2026-10-05', '2026-10-08')).toBe('Mon, Oct 5');
+});
+
+test('days follow the regimen recorded for them and flag answers given under another', () => {
+  const regimen: MedicationRequest = {
+    ...treatment('regimen', 'active', '2026-10-01'),
+    dosageInstruction: [dose(1, 'MORN')],
+  };
+  const evening = [dose(1, 'EVE')];
+  const statements = [
+    taking('regimen', '2026-10-01', '2026-10-04', [dose(1, 'MORN')]),
+    taking('regimen', '2026-10-05', undefined, evening),
+  ];
+  const answer = (date: string, text: string): MedicationAdministration => ({
+    ...log('regimen', date, 'completed'),
+    id: `regimen-${date}-0`,
+    dosage: { text },
+  });
+  const item = (date: string, logs: MedicationAdministration[]) => {
+    const [first] = buildActionDay(date, [regimen], logs, statements).items;
+    return [first.dose?.text, first.takenAs, first.mismatch ?? false];
+  };
+  expect(
+    item('2026-10-04', [answer('2026-10-04', '1 tablet in the morning')])
+  ).toEqual(['1 tablet in the morning', undefined, false]);
+  expect(
+    item('2026-10-05', [answer('2026-10-05', '1 tablet in the morning')])
+  ).toEqual(['1 tablet in the evening', '1 tablet in the morning', true]);
+  expect(
+    item('2026-10-06', [answer('2026-10-06', '1 tablet in the evening')])
+  ).toEqual(['1 tablet in the evening', undefined, false]);
+  // Answers from before the dosage was recorded are never flagged.
+  expect(
+    item('2026-10-06', [
+      {
+        ...log('regimen', '2026-10-06', 'completed'),
+        id: 'regimen-2026-10-06-0',
+      },
+    ])
+  ).toEqual(['1 tablet in the evening', undefined, false]);
+});
+
+test('free-text dosing is copied for new answers and compared with the day text', () => {
+  const vitamin: MedicationRequest = {
+    ...treatment('vitamin', 'active'),
+    dosageInstruction: [{ text: '1 capsule daily' }],
+  };
+  const statements = [
+    taking('vitamin', '2026-10-01', undefined, [{ text: '2 capsules daily' }]),
+  ];
+  const day = (logs: MedicationAdministration[]) =>
+    buildActionDay('2026-10-03', [vitamin], logs, statements).items[0];
+  expect(day([]).instructions).toBe('2 capsules daily');
+  expect(
+    day([
+      {
+        ...log('vitamin', '2026-10-03', 'completed'),
+        dosage: { text: '1 capsule daily' },
+      },
+    ])
+  ).toMatchObject({ mismatch: true, takenAs: '1 capsule daily' });
+  expect(
+    day([
+      {
+        ...log('vitamin', '2026-10-03', 'completed'),
+        dosage: { text: '2 capsules daily' },
+      },
+    ]).mismatch
+  ).toBeUndefined();
 });

@@ -147,7 +147,7 @@ test('Taking and paused usage periods with removal confirmation', async ({
     ],
   });
   await page.goto('/treatment/usage-history');
-  await page.getByTestId('treatment-usage-stop').waitFor();
+  await page.getByTestId('treatment-usage-change').waitFor();
   await page.getByTestId('treatment-usage-section').waitFor();
   await takeSnapshot(page, 'Treatment View - Usage periods', testInfo);
   await page.getByTestId('treatment-usage-list-toggle').click();

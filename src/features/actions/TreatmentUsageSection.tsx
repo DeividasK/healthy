@@ -8,18 +8,24 @@ import {
   History,
   MessageSquareText,
   Play,
-  Square,
+  Repeat,
+  SlidersHorizontal,
   X,
 } from 'lucide-react-native';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { formatUsageDuration } from './usageDuration';
+import { formatDosingLines } from '@/src/features/treatments/regimen';
 import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import { getCurrentUsage, type UsagePeriod } from './treatmentUsage';
+import {
+  getCurrentUsage,
+  isSameRegimen,
+  type UsagePeriod,
+} from './treatmentUsage';
 import { getUsageChangeLabel } from './TreatmentUsageFormView';
 import {
   getTreatmentUsage,
@@ -28,6 +34,8 @@ import {
 
 /** The concept icon for treatment usage, e.g. its section heading. */
 export const USAGE_ICON = History;
+/** The concept icon for treatment regimens. */
+const REGIMEN_ICON = Repeat;
 
 /** e.g. "Oct 13, 2026 – Oct 19, 2026", "Oct 20, 2026" or "Since Oct 25, 2026". */
 const formatPeriod = (period: UsagePeriod) =>
@@ -39,8 +47,8 @@ const formatPeriod = (period: UsagePeriod) =>
 
 /**
  * A treatment's usage (FHIR MedicationStatement periods). `primaryAction` is
- * the screen's main button: play to start or resume taking, or stop while
- * taking, each opening the usage form. Periods are removed from the list
+ * the screen's main button: play to start or resume taking, or change its
+ * usage while taking it, each opening the usage form. Periods are removed from the list
  * after confirming; `modals` holds that confirmation, rendered at the
  * screen's top level.
  */
@@ -80,10 +88,11 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
 
   const current = getCurrentUsage(periods);
   const isTaking = current === 'taking';
+  // Start or resume taking it; while taking it, change its usage.
   const primaryAction = {
     label: getUsageChangeLabel(current),
-    testID: isTaking ? 'treatment-usage-stop' : 'treatment-usage-start',
-    icon: isTaking ? Square : Play,
+    testID: isTaking ? 'treatment-usage-change' : 'treatment-usage-start',
+    icon: isTaking ? SlidersHorizontal : Play,
     onPress: () =>
       router.push({
         pathname: '/treatment/[id]/usage',
@@ -120,7 +129,8 @@ export function useTreatmentUsage(treatmentId: string, patientId: string) {
 
   return {
     periods,
-    /** The screen's main button: start or resume, or stop while taking. */
+    isTaking,
+    /** The screen's main button: start or resume, or change while taking. */
     primaryAction,
     /** Asks to remove a period, after confirmation. */
     requestRemove: (period: UsagePeriod) => {
@@ -144,6 +154,18 @@ export function TreatmentUsageSection({
   onRemove: (period: UsagePeriod) => void;
 }) {
   if (!periods.length) return null;
+  // Each period's regimen shows once it has changed, so periods differ.
+  const taking = periods.filter((period) => period.state === 'taking');
+  const hasChanged = taking.some(
+    (period) => !isSameRegimen(period.dosage, taking[0].dosage)
+  );
+  const regimenMeta = (period: UsagePeriod) =>
+    hasChanged && period.state === 'taking'
+      ? formatDosingLines(period.dosage).map((text) => ({
+          icon: REGIMEN_ICON,
+          text,
+        }))
+      : [];
   return (
     <ResourceSection
       icon={USAGE_ICON}
@@ -165,6 +187,7 @@ export function TreatmentUsageSection({
                 text: formatUsageDuration(period.start, period.end),
               },
               { icon: Calendar, text: formatPeriod(period) },
+              ...regimenMeta(period),
               ...(period.reason
                 ? [{ icon: MessageSquareText, text: period.reason }]
                 : []),

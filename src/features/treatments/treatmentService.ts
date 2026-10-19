@@ -29,7 +29,7 @@ import {
   getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import {
-  applyRegimen,
+  applyDosing,
   buildDraftQuantity,
   formatQuantityText,
   formatRegimenLines,
@@ -176,23 +176,13 @@ export async function createOrUpdateTreatment(
     // Omission means unchanged; null/empty text explicitly clears only the
     // exposed text, retaining structured dosage and coded reason information.
     if (input.regimen !== undefined || input.dosageInstructions !== undefined) {
-      let dosages = existing?.dosageInstruction || [];
-      // The regimen replaces structured doses; entries it does not show are
-      // kept first, so the text below lands on the text-only entry.
-      if (input.regimen !== undefined)
-        dosages = applyRegimen(
-          dosages,
-          hasRegimen(input.regimen) ? input.regimen : null
-        );
-      if (input.dosageInstructions !== undefined) {
-        const first = { ...dosages[0] };
-        if (trimmedInstructions) first.text = trimmedInstructions;
-        else delete first.text;
-        dosages = [
-          ...(Object.keys(first).length ? [first] : []),
-          ...dosages.slice(1),
-        ];
-      }
+      const dosages = applyDosing(
+        existing?.dosageInstruction || [],
+        input.regimen,
+        input.dosageInstructions === undefined
+          ? undefined
+          : (trimmedInstructions ?? null)
+      );
       medicationRequest.dosageInstruction = dosages.length
         ? dosages
         : undefined;

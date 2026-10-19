@@ -236,7 +236,9 @@ export function isRegimenDosage(dosage: Dosage): boolean {
 }
 
 /** The request's structured doses grouped into phases by `Dosage.sequence`. */
-export function getRegimenDraft(request: MedicationRequest): RegimenDraft {
+export function getRegimenDraft(
+  request: Pick<MedicationRequest, 'dosageInstruction'>
+): RegimenDraft {
   const phases = new Map<string, DoseDraft[]>();
   (request.dosageInstruction || []).forEach((dosage, index) => {
     if (!isRegimenDosage(dosage)) return;
@@ -576,6 +578,30 @@ export function applyRegimen(
   return [...kept, ...structured];
 }
 
+/**
+ * Dosage entries after editing dosing: the regimen replaces structured doses
+ * (entries it does not show are kept first, so the text lands on the
+ * text-only entry) and the text replaces the first entry's text. `undefined`
+ * keeps either as it is; `null` or empty text removes it.
+ */
+export function applyDosing(
+  dosages: Dosage[],
+  regimen: RegimenDraft | null | undefined,
+  instructions: string | null | undefined
+): Dosage[] {
+  let next = dosages;
+  if (regimen !== undefined)
+    next = applyRegimen(next, hasRegimen(regimen) ? regimen : null);
+  if (instructions !== undefined) {
+    const first = { ...next[0] };
+    const text = instructions?.trim();
+    if (text) first.text = text;
+    else delete first.text;
+    next = [...(Object.keys(first).length ? [first] : []), ...next.slice(1)];
+  }
+  return next;
+}
+
 function formatQuantity(quantity: Quantity, value = quantity.value): string {
   const known = AMOUNT_UNITS.find((unit) => unit.code === quantity.code);
   const unit = known
@@ -653,7 +679,9 @@ export function formatDose(dosage: Dosage): string {
 }
 
 /** The structured regimen as lines, prefixed by phase when there are several. */
-export function formatRegimenLines(request: MedicationRequest): string[] {
+export function formatRegimenLines(
+  request: Pick<MedicationRequest, 'dosageInstruction'>
+): string[] {
   const draft = getRegimenDraft(request);
   const dosages = request.dosageInstruction || [];
   return draft.phases.flatMap((phase, index) =>
@@ -662,6 +690,17 @@ export function formatRegimenLines(request: MedicationRequest): string[] {
       return draft.phases.length > 1 ? `Phase ${index + 1}: ${text}` : text;
     })
   );
+}
+
+/**
+ * Dosing in words: the text instructions, then the regimen's lines. Records
+ * may carry both (e.g. imported).
+ */
+export function formatDosingLines(dosages: Dosage[] = []): string[] {
+  return [
+    dosages[0]?.text,
+    ...formatRegimenLines({ dosageInstruction: dosages }),
+  ].filter((line): line is string => Boolean(line));
 }
 
 /** The local day (YYYY-MM-DD) a course of `value` units starting on `start` ends. */
