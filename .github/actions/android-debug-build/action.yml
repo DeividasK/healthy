@@ -12,13 +12,15 @@ runs:
     # Saves ~/.gradle (dependencies and the build cache) only on main;
     # branches restore main's latest state read-only.
     - uses: gradle/actions/setup-gradle@v5
+      with:
+        cache-read-only: false
 
     - name: Cache Native Compilation
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: android-debug
         max-size: 1G
-        save: ${{ github.ref == 'refs/heads/main' }}
+        save: true
 
     - name: Generate Native Project
       shell: bash
