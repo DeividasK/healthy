@@ -15,6 +15,8 @@ interface ResourceSectionProps {
   /** Accessible name of the heading button, e.g. "Open journal". */
   pressLabel?: string;
   pressTestID?: string;
+  /** Control at the end of a plain heading, e.g. a filter button. */
+  action?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -27,6 +29,7 @@ export function ResourceSection({
   onPress,
   pressLabel,
   pressTestID,
+  action,
   children,
 }: ResourceSectionProps) {
   // Sections with no related resources are left out entirely.
@@ -63,7 +66,10 @@ export function ResourceSection({
           </View>
         </TouchableOpacity>
       ) : (
-        <View style={styles.heading}>{heading}</View>
+        <View style={styles.heading}>
+          {heading}
+          {action && <View style={styles.headingAction}>{action}</View>}
+        </View>
       )}
       {children}
     </View>
@@ -252,6 +258,9 @@ const styles = StyleSheet.create({
   headingChevron: {
     marginLeft: 'auto',
     marginRight: 0,
+  },
+  headingAction: {
+    marginLeft: 'auto',
   },
   title: {
     fontSize: 18,

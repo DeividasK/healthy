@@ -5,7 +5,14 @@ import type {
   MedicationRequest,
   ServiceRequest,
 } from 'fhir/r5';
-import { buildConditionTimeline, getStatusTone } from './conditionTimeline';
+import {
+  NO_TIMELINE_FILTERS,
+  buildConditionTimeline,
+  buildTimelineItems,
+  filterTimelineItems,
+  getStatusTone,
+  hasTimelineFilters,
+} from './conditionTimeline';
 
 const subject = { reference: 'Patient/p1' };
 
@@ -129,4 +136,65 @@ test('maps each type’s FHIR statuses to tones', () => {
   expect(getStatusTone('labResult', 'entered-in-error')).toBe('faded');
   expect(getStatusTone('treatment', 'unknown')).toBe('done');
   expect(getStatusTone('labResult', undefined)).toBe('done');
+});
+
+test('filters steps by status tone, type and time period', () => {
+  const items = buildTimelineItems({
+    consultations: [
+      consultation('review', '2026-11-03T09:30:00', 'planned'),
+      consultation('gp', '2026-04-19T14:15:00'),
+      consultation('undated'),
+    ],
+    serviceRequests: [request('physio', '2026-09-12')],
+    treatments: [treatment('paracetamol', '2025-10-18', 'on-hold')],
+    labResults: [labResult('cbc', '2026-10-19T08:15:00')],
+  });
+  const filter = (filters: Partial<typeof NO_TIMELINE_FILTERS>) =>
+    filterTimelineItems(
+      items,
+      { ...NO_TIMELINE_FILTERS, ...filters },
+      '2026-10-19'
+    ).map((item) => item.resource.id);
+
+  expect(filter({})).toEqual([
+    'review',
+    'cbc',
+    'physio',
+    'gp',
+    'paracetamol',
+    'undated',
+  ]);
+  expect(filter({ tones: ['planned', 'active'] })).toEqual([
+    'review',
+    'physio',
+  ]);
+  expect(filter({ types: ['consultation', 'labResult'] })).toEqual([
+    'review',
+    'cbc',
+    'gp',
+    'undated',
+  ]);
+  // Periods include today and their first day, and leave out undated steps
+  expect(filter({ period: 'upcoming' })).toEqual(['review']);
+  expect(filter({ period: 'past3' })).toEqual(['cbc', 'physio']);
+  expect(filter({ period: 'past6' })).toEqual(['cbc', 'physio', 'gp']);
+  expect(filter({ period: 'past12' })).toEqual(['cbc', 'physio', 'gp']);
+  // Filters combine
+  expect(
+    filter({ types: ['consultation'], tones: ['done'], period: 'past12' })
+  ).toEqual(['gp']);
+  expect(filter({ tones: ['paused'], types: ['labResult'] })).toEqual([]);
+});
+
+test('knows when any filter is on', () => {
+  expect(hasTimelineFilters(NO_TIMELINE_FILTERS)).toBe(false);
+  expect(hasTimelineFilters({ ...NO_TIMELINE_FILTERS, tones: ['done'] })).toBe(
+    true
+  );
+  expect(
+    hasTimelineFilters({ ...NO_TIMELINE_FILTERS, types: ['treatment'] })
+  ).toBe(true);
+  expect(hasTimelineFilters({ ...NO_TIMELINE_FILTERS, period: 'past3' })).toBe(
+    true
+  );
 });

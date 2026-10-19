@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { focusWhenReady } from '@/src/utils/focus';
 import {
-  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Platform,
-  Pressable,
 } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
+import { CenteredModal, ModalActions, ModalButton } from './CenteredModal';
 
 export interface DeleteConfirmationModalProps {
   visible: boolean;
@@ -34,7 +33,6 @@ export interface DeleteConfirmationModalProps {
 }
 
 interface DeleteConfirmationModalContentProps {
-  title: string;
   message: string;
   confirmLabel?: string;
   cancelLabel: string;
@@ -45,13 +43,11 @@ interface DeleteConfirmationModalContentProps {
   cloudDeleteLabel?: string;
   onConfirm: (options?: { deleteFromCloud?: boolean }) => void | Promise<void>;
   onCancel: () => void;
-  testID: string;
   children?: React.ReactNode;
   confirmTone: 'destructive' | 'primary';
 }
 
 function DeleteConfirmationModalContent({
-  title,
   message,
   confirmLabel = 'Delete',
   cancelLabel,
@@ -62,7 +58,6 @@ function DeleteConfirmationModalContent({
   cloudDeleteLabel = 'Delete from Google Drive',
   onConfirm,
   onCancel,
-  testID,
   children,
   confirmTone,
 }: DeleteConfirmationModalContentProps) {
@@ -96,76 +91,49 @@ function DeleteConfirmationModalContent({
   const isDeleteDisabled = countdown > 0;
 
   return (
-    <Pressable style={styles.backdrop} onPress={onCancel}>
-      <Pressable
-        style={styles.card}
-        testID={`${testID}-card`}
-        onPress={(e) => e.stopPropagation?.()}
-      >
-        <Text style={styles.title}>{title}</Text>
-        {Boolean(message) && <Text style={styles.message}>{message}</Text>}
-        {children}
+    <>
+      {Boolean(message) && <Text style={styles.message}>{message}</Text>}
+      {children}
 
-        {showCloudDeleteOption && (
-          <TouchableOpacity
-            testID="delete-from-cloud-checkbox"
-            style={styles.checkboxRow}
-            onPress={() => setDeleteFromCloud((prev) => !prev)}
-            activeOpacity={0.7}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: deleteFromCloud }}
-            aria-checked={deleteFromCloud}
+      {showCloudDeleteOption && (
+        <TouchableOpacity
+          testID="delete-from-cloud-checkbox"
+          style={styles.checkboxRow}
+          onPress={() => setDeleteFromCloud((prev) => !prev)}
+          activeOpacity={0.7}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: deleteFromCloud }}
+          aria-checked={deleteFromCloud}
+        >
+          <View
+            style={[styles.checkbox, deleteFromCloud && styles.checkboxChecked]}
           >
-            <View
-              style={[
-                styles.checkbox,
-                deleteFromCloud && styles.checkboxChecked,
-              ]}
-            >
-              {deleteFromCloud && (
-                <Check size={14} color="#FFFFFF" strokeWidth={3} />
-              )}
-            </View>
-            <Text style={styles.checkboxLabel}>{cloudDeleteLabel}</Text>
-          </TouchableOpacity>
-        )}
+            {deleteFromCloud && (
+              <Check size={14} color="#FFFFFF" strokeWidth={3} />
+            )}
+          </View>
+          <Text style={styles.checkboxLabel}>{cloudDeleteLabel}</Text>
+        </TouchableOpacity>
+      )}
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            ref={cancelRef}
-            testID="delete-modal-cancel-button"
-            accessibilityRole="button"
-            style={styles.cancelButton}
-            onPress={onCancel}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.cancelButtonText}>{cancelLabel}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            testID="delete-modal-confirm-button"
-            accessibilityRole="button"
-            style={[
-              styles.deleteButton,
-              confirmTone === 'primary' && styles.primaryButton,
-              isDeleteDisabled && styles.deleteButtonDisabled,
-            ]}
-            disabled={isDeleteDisabled}
-            onPress={() => onConfirm({ deleteFromCloud })}
-            activeOpacity={0.8}
-          >
-            <Text
-              style={[
-                styles.deleteButtonText,
-                confirmTone === 'primary' && styles.primaryButtonText,
-              ]}
-            >
-              {countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Pressable>
-    </Pressable>
+      <ModalActions>
+        <ModalButton
+          ref={cancelRef}
+          testID="delete-modal-cancel-button"
+          label={cancelLabel}
+          onPress={onCancel}
+        />
+        <ModalButton
+          testID="delete-modal-confirm-button"
+          tone={confirmTone}
+          label={
+            countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel
+          }
+          disabled={isDeleteDisabled}
+          onPress={() => onConfirm({ deleteFromCloud })}
+        />
+      </ModalActions>
+    </>
   );
 }
 
@@ -186,18 +154,14 @@ export function DeleteConfirmationModal({
   children,
   confirmTone = 'destructive',
 }: DeleteConfirmationModalProps) {
-  if (!visible) return null;
-
   return (
-    <Modal
-      testID={testID}
-      transparent
-      animationType="fade"
+    <CenteredModal
       visible={visible}
-      onRequestClose={onCancel}
+      title={title}
+      onClose={onCancel}
+      testID={testID}
     >
       <DeleteConfirmationModalContent
-        title={title}
         message={message}
         confirmLabel={confirmLabel}
         cancelLabel={cancelLabel}
@@ -208,50 +172,15 @@ export function DeleteConfirmationModal({
         cloudDeleteLabel={cloudDeleteLabel}
         onConfirm={onConfirm}
         onCancel={onCancel}
-        testID={testID}
         confirmTone={confirmTone}
       >
         {children}
       </DeleteConfirmationModalContent>
-    </Modal>
+    </CenteredModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: COLORS.light.modalBackdrop,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: COLORS.light.card,
-    borderRadius: 16,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: COLORS.light.cardBorder,
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebModalCard,
-      },
-      default: {
-        shadowColor: COLORS.light.shadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 6,
-      },
-    }),
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginBottom: 10,
-  },
   message: {
     fontSize: 14,
     color: COLORS.light.textSecondary,
@@ -282,48 +211,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.light.foreground,
     fontWeight: '500',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  cancelButton: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    backgroundColor: COLORS.light.pillBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  deleteButton: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 9999,
-    backgroundColor: COLORS.light.destructive,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 100,
-  },
-  primaryButton: {
-    backgroundColor: COLORS.light.primary,
-  },
-  primaryButtonText: {
-    color: COLORS.light.primaryForeground,
-  },
-  deleteButtonDisabled: {
-    opacity: 0.45,
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.light.destructiveForeground,
   },
 });
