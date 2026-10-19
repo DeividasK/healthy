@@ -22,8 +22,5 @@ test.describe('View Lab Result - Visual Regression', () => {
     await page.goto(`/lab-result/${report.id}`);
     await page.getByTestId('lab-result-title').waitFor();
     await takeSnapshot(page, 'Lab Result View - Details', testInfo);
-
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await takeSnapshot(page, 'Lab Result View - Wide layout', testInfo);
   });
 });
