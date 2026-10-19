@@ -116,6 +116,22 @@ test.describe('View Condition View - Visual Regression', () => {
       'Condition View - Details with Consultations',
       testInfo
     );
+    await page.getByTestId('condition-timeline-filter-button').click();
+    await page.getByTestId('condition-timeline-filter-tone-planned').click();
+    await page.getByTestId('condition-timeline-filter-tone-active').click();
+    await takeSnapshot(page, 'Condition View - Timeline filters', testInfo);
+    await page.getByTestId('condition-timeline-filters-done').click();
+    await page
+      .getByTestId('condition-timeline-filters-card')
+      .waitFor({ state: 'detached' });
+    await takeSnapshot(page, 'Condition View - Filtered timeline', testInfo);
+    await page.getByTestId('condition-timeline-filter-button').click();
+    await page.getByTestId('condition-timeline-filters-reset').click();
+    await page.getByTestId('condition-timeline-filters-done').click();
+    await page
+      .getByTestId('condition-timeline-filters-card')
+      .waitFor({ state: 'detached' });
+
     await page.getByTestId('condition-add-button').click();
     await page.getByTestId('condition-add-menu').waitFor();
     await takeSnapshot(page, 'Condition View - Add menu', testInfo);
