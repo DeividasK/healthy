@@ -258,7 +258,7 @@ export function LabsSummary({
               />
             ))}
           </Svg>
-          <View pointerEvents="none" style={styles.total}>
+          <View style={styles.total}>
             <Text style={styles.totalText} testID="labs-summary-total">
               {biomarkers.length}
             </Text>
@@ -374,6 +374,7 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    pointerEvents: 'none',
   },
   totalText: {
     fontSize: 32,

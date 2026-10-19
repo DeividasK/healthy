@@ -268,7 +268,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     ).toBeNull();
   });
 
-  test('silently refreshes an expired Google token and keeps syncing', async ({
+  test('an expired Google token pauses background sync until the user syncs', async ({
     page,
   }) => {
     await seedTestPatient(page);
@@ -287,12 +287,22 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       );
     }, CONFIG_KEY);
     store.acceptedToken = 'fresh-gis-token';
+    const savedConfig = () =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key)!),
+        CONFIG_KEY
+      );
     await page.goto('/profile');
+    // Renewing on web needs Google's popup, which browsers block without a
+    // click, so the background sync on start leaves the token alone.
+    await expect(page.getByTestId('sync-now-button')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect((await savedConfig()).accessToken).toBe('stale-token');
+
+    // Syncing by hand renews the token and catches up.
+    await page.getByTestId('sync-now-button').click();
     await expect(page.getByTestId('up-to-date-button')).toBeVisible();
-    const saved = await page.evaluate(
-      (key) => JSON.parse(localStorage.getItem(key)!),
-      CONFIG_KEY
-    );
+    const saved = await savedConfig();
     expect(saved.accessToken).toBe('fresh-gis-token');
     expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
   });
