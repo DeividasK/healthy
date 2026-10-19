@@ -3,12 +3,14 @@ import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppLogo } from './AppLogo';
+import { OfflineHeaderIndicator, useIsOffline } from './OfflineHeaderIndicator';
 import { SyncHeaderIndicator } from './SyncHeaderIndicator';
 import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton';
 import { COLORS } from '@/src/theme/colors';
 
 export function AppHeader() {
   const router = useRouter();
+  const isOffline = useIsOffline();
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -29,7 +31,7 @@ export function AppHeader() {
           </TouchableOpacity>
         </View>
         <View style={styles.profile}>
-          <SyncHeaderIndicator />
+          {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
           <View style={styles.button}>
             <ProfileHeaderButton />
           </View>
