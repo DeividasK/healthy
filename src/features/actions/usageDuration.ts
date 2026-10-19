@@ -1,4 +1,4 @@
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import { formatDisplayDate, formatLocalDate } from '@/src/utils/dateUtils';
 
 const DAY_MS = 86_400_000;
 
@@ -44,3 +44,11 @@ export function formatUsageDuration(
     .map(([value, unit]) => `${value} ${unit}${value === 1 ? '' : 's'}`)
     .join(', ');
 }
+
+/** e.g. "Oct 13, 2026 – Oct 19, 2026", "Oct 20, 2026" or "Since Oct 25, 2026". */
+export const formatUsagePeriod = (start: string, end?: string) =>
+  !end
+    ? `Since ${formatDisplayDate(start)}`
+    : end === start
+      ? formatDisplayDate(start)
+      : `${formatDisplayDate(start)} – ${formatDisplayDate(end)}`;

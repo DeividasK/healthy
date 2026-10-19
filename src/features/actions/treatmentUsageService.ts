@@ -8,11 +8,13 @@ import {
   insertMedicationStatementRecord,
 } from './medicationStatementsRepository';
 import {
+  editUsageStatement,
   getLatestRegimen,
   getUsagePeriods,
   planUsageChange,
   planUsageRemoval,
   type UsageAction,
+  type UsageEdit,
   type UsageChangePlan,
   type UsagePeriod,
 } from './treatmentUsage';
@@ -91,6 +93,32 @@ export async function removeTreatmentUsage(
       await getTreatmentUsage(patientId, treatmentId),
       statementId
     ),
+    patientId
+  );
+}
+
+/** Edits one period's state, notes and regimen; its dates stay. */
+export async function editTreatmentUsage(
+  treatmentId: string,
+  statementId: string,
+  patientId: string,
+  edit: UsageEdit
+): Promise<void> {
+  const period = (await getTreatmentUsage(patientId, treatmentId)).find(
+    (candidate) => candidate.statement.id === statementId
+  );
+  if (!period) throw new Error('This period no longer exists');
+  const statement = editUsageStatement(period.statement, edit);
+  await applyPlan(
+    {
+      save: [
+        {
+          ...statement,
+          meta: { ...statement.meta, lastUpdated: new Date().toISOString() },
+        },
+      ],
+      remove: [],
+    },
     patientId
   );
 }

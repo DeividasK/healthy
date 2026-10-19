@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { Dosage, MedicationRequest, MedicationStatement } from 'fhir/r5';
 import {
   buildUsageStatement,
+  editUsageStatement,
   getCurrentUsage,
   getFirstTakingDay,
   getLatestRegimen,
@@ -289,4 +290,58 @@ test('removing a period between two regimens keeps both', () => {
     'taking 1 capsule daily',
     'taking 2 capsules daily',
   ]);
+});
+
+test('editing a period changes its state, notes and regimen but not its dates', () => {
+  const [statement] = run([['start', '2026-10-01', ONE]]);
+  const withReason = {
+    ...statement,
+    adherence: { ...statement.adherence!, reason: { text: 'Imported' } },
+  };
+  const paused = editUsageStatement(withReason, {
+    state: 'on-hold',
+    notes: ' Waiting for a refill ',
+    dosage: ONE,
+  });
+  expect(paused.effectivePeriod).toEqual(statement.effectivePeriod);
+  expect(paused.adherence).toEqual({
+    code: {
+      coding: [
+        {
+          system:
+            'http://hl7.org/fhir/CodeSystem/medication-statement-adherence',
+          code: 'on-hold',
+          display: 'On Hold',
+        },
+      ],
+    },
+    reason: { text: 'Imported' },
+  });
+  expect(paused.note).toEqual([{ text: 'Waiting for a refill' }]);
+  // Only periods of taking it keep a regimen.
+  expect(paused.dosage).toBeUndefined();
+  const taking = editUsageStatement(paused, {
+    state: 'taking',
+    notes: '',
+    dosage: TWO,
+  });
+  expect(taking.dosage).toEqual(TWO);
+  expect(taking.note).toBeUndefined();
+  // An unchanged or imported state keeps its stored coding.
+  const imported = {
+    ...statement,
+    adherence: {
+      code: {
+        coding: [{ code: 'taking-as-directed', display: 'As directed' }],
+      },
+    },
+  };
+  expect(
+    editUsageStatement(imported, { state: 'taking', notes: '', dosage: [] })
+      .adherence
+  ).toEqual(imported.adherence);
+  expect(
+    editUsageStatement(imported, { state: 'taking', notes: '', dosage: [] })
+      .dosage
+  ).toBeUndefined();
 });

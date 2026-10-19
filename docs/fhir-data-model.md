@@ -283,7 +283,7 @@ A treatment's `MedicationRequest.status` is the state of the order. Whether the
 patient actually takes it is reported with FHIR R5 `MedicationStatement`, one
 per period of use, recorded from the treatment page's main button (play to
 start or resume taking; "Change usage" while taking, choosing on hold,
-stopped or a new regimen) and edited by removing periods:
+stopped or a new regimen) and edited or removed from each period's row:
 
 - `derivedFrom`: the treatment's `MedicationRequest`; `medication` is copied
   from it and `subject` is the patient. `status` is `recorded`.
@@ -296,9 +296,16 @@ stopped or a new regimen) and edited by removing periods:
   on day D ends the current period on D − 1 and starts the next on D; a change
   on the current period's first day replaces it. Dates cannot be in the future
   or before the current period, so periods never overlap.
-- Removing a period deletes it; the period before it then runs up to the next
-  one (or stays open when the removed one was current), and neighbours in the
-  same state with the same regimen merge.
+- Editing a period (the pencil on its row) changes its state, the regimen
+  followed while taking it and its notes. A changed state replaces the
+  adherence code and keeps `adherence.reason`; other elements are kept.
+- A period's dates are intentionally not editable. They decide which days the
+  journal asks about and which regimen past answers are compared with, so
+  moving them would silently change past logs. Changes start from a date with
+  the main button; a mistaken period is removed and recorded again.
+- Removing a period (from its edit form) deletes it; the period before it
+  then runs up to the next one (or stays open when the removed one was
+  current), and neighbours in the same state with the same regimen merge.
 - `dosage`: on periods of taking it, the regimen followed (see Regimen
   changes).
 
@@ -317,9 +324,10 @@ how the medication is or was taken and illustrates with a dose that changes
 over time; the page shows the current period's as "Current Regimen", and the
 Usage list shows each period's once the regimen has changed.
 
-- Starting copies the prescribed dosage into the form, resuming the regimen
-  last followed; either can be edited or left out (a period without `dosage`
-  follows the prescription).
+- Starting or resuming asks for the regimen, required and pre-filled from the
+  prescription (starting) or the regimen last followed (resuming); without
+  either, e.g. for a supplement, it is entered there. A period without
+  `dosage` (from before v17 or another device) follows the prescription.
 - A new regimen (while taking it) ends the current period the day before its
   date and starts a taking period with the new `dosage`; on the current
   period's first day it replaces that period, which corrects it. The

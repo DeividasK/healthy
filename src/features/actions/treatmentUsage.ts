@@ -271,6 +271,50 @@ export function planUsageChange(
   return plan;
 }
 
+/** Changes to one period of use; its dates are not edited. */
+export interface UsageEdit {
+  /** `other` only for an imported state left as it is. */
+  state: UsageState;
+  /** Replaces the notes; empty removes them. */
+  notes: string;
+  /** The regimen followed, kept only while taking it; empty removes it. */
+  dosage: Dosage[];
+}
+
+/**
+ * A period with its state, notes and regimen edited. A changed state
+ * replaces the adherence code (keeping the reason); an unchanged one keeps
+ * the stored coding, including imported codes. Other elements are kept.
+ */
+export function editUsageStatement(
+  statement: MedicationStatement,
+  edit: UsageEdit
+): MedicationStatement {
+  const { note: _note, dosage: _dosage, ...rest } = statement;
+  const notes = edit.notes.trim();
+  const { state } = edit;
+  return {
+    ...rest,
+    adherence:
+      state === 'other' || state === getUsageState(getAdherenceCode(statement))
+        ? statement.adherence
+        : {
+            ...statement.adherence,
+            code: {
+              coding: [
+                {
+                  system: ADHERENCE_SYSTEM,
+                  code: state,
+                  display: STATE_DISPLAY[state],
+                },
+              ],
+            },
+          },
+    ...(notes && { note: [{ ...statement.note?.[0], text: notes }] }),
+    ...(state === 'taking' && edit.dosage.length && { dosage: edit.dosage }),
+  };
+}
+
 /**
  * Removes one period. The period before it then runs up to the next one, or
  * stays open when the removed one was current; neighbours in the same state

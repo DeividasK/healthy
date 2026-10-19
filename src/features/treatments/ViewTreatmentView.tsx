@@ -222,7 +222,6 @@ function TreatmentForPatient({
             deleteTestID="delete-treatment-button"
           />
         }
-        modal={usage.modals}
       >
         <View style={styles.details}>
           {Boolean(reasonText) && (
@@ -285,7 +284,7 @@ function TreatmentForPatient({
 
         <TreatmentUsageSection
           periods={usage.periods}
-          onRemove={usage.requestRemove}
+          onEdit={usage.editPeriod}
         />
 
         <TreatmentLogHistory
