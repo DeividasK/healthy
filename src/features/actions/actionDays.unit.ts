@@ -9,6 +9,7 @@ import {
   buildActionDay,
   daysEndingOn,
   formatDayLabel,
+  getJournalDays,
   getStripEnd,
   isDayComplete,
 } from './actionDays';
@@ -63,6 +64,38 @@ test('the strip centres the selected day until it reaches today', () => {
   expect(getStripEnd('2026-10-13', today)).toBe('2026-10-16');
   expect(getStripEnd('2026-10-12', today)).toBe('2026-10-15');
   expect(daysEndingOn(getStripEnd('2026-09-29', today))[3]).toBe('2026-09-29');
+});
+
+test('the journal loads the neighbouring days before the rest of its strips', () => {
+  const today = '2026-10-16';
+  const recent = getJournalDays('2026-10-10', today);
+  expect(recent.nearby).toEqual([
+    '2026-10-08',
+    '2026-10-09',
+    '2026-10-10',
+    '2026-10-11',
+    '2026-10-12',
+  ]);
+  // The rest of the last 21 days, never a loaded day twice.
+  expect(recent.strip).toHaveLength(21 - 5);
+  expect(recent.strip).not.toContain('2026-10-10');
+  expect(recent.strip).toContain(today);
+  expect(recent.strip).toContain('2026-09-26');
+
+  // No days after today.
+  expect(getJournalDays(today, today).nearby).toEqual([
+    '2026-10-14',
+    '2026-10-15',
+    '2026-10-16',
+  ]);
+
+  // An older day also loads its own strip, as well as the recent one.
+  const older = getJournalDays('2026-08-01', today);
+  expect(older.nearby[0]).toBe('2026-07-30');
+  expect(older.strip).toContain('2026-07-22');
+  expect(older.strip).toContain('2026-08-11');
+  expect(older.strip).toContain(today);
+  expect(older.strip).toHaveLength(2 * 21 - 5);
 });
 
 /** A "taking" usage period for a treatment, from `start` to `end`. */

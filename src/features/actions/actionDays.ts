@@ -306,6 +306,32 @@ export function getStripAnchor(selected: string, today: string): string {
   return end > today ? today : end;
 }
 
+/** Days on each side of the selected one that the journal loads first. */
+export const NEARBY_DAYS = 2;
+
+/**
+ * The days the journal keeps loaded for `selected`, none after today:
+ * `nearby` is the selected day with 2 days each side (the day before is also
+ * where copied answers come from), so stepping to them shows at once; `strip`
+ * is the rest of the strips showing today and the selection, for their marks.
+ */
+export function getJournalDays(
+  selected: string,
+  today: string
+): { nearby: string[]; strip: string[] } {
+  const nearby = daysEndingOn(
+    addDays(selected, NEARBY_DAYS),
+    2 * NEARBY_DAYS + 1
+  ).filter((date) => date <= today);
+  const strip = [
+    ...new Set([
+      ...daysEndingOn(today, STRIP_DAYS),
+      ...daysEndingOn(getStripAnchor(selected, today), STRIP_DAYS),
+    ]),
+  ].filter((date) => !nearby.includes(date));
+  return { nearby, strip };
+}
+
 /**
  * One treatment's day in its logging history: `taken` when every dose due
  * was taken, `not-taken` once all are answered and any was not, `missing`
