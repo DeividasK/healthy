@@ -41,7 +41,7 @@
       "@react-native-community/datetimepicker",
       "expo-sharing",
       "@react-native-google-signin/google-signin",
-      "./plugins/withGradleMemory"
+      "./plugins/withGradleProperties"
     ],
     "experiments": {
       "typedRoutes": true
