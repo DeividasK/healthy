@@ -40,6 +40,8 @@ const CLINICAL_TABLES = [
   'medication_administrations',
   'medication_statements',
   'organizations',
+  'request_orchestrations',
+  'profile_settings',
 ];
 
 /** Every canonical row on a device, for comparing two devices. */
@@ -52,7 +54,9 @@ const snapshot = (page: Page) =>
         result[table] = await b.querySql(
           table === 'consultation_conditions'
             ? `SELECT * FROM ${table} ORDER BY consultation_id, condition_id`
-            : `SELECT id, fhir_json FROM ${table} ORDER BY id`
+            : table === 'profile_settings'
+              ? `SELECT id, settings_json FROM ${table} ORDER BY id`
+              : `SELECT id, fhir_json FROM ${table} ORDER BY id`
         );
       return result;
     },
@@ -92,6 +96,24 @@ async function seedLinkedRecord(page: Page) {
         biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
       },
     ],
+  });
+  // A treatment bundle and the profile's settings replicate too.
+  await bridge(page, async (b) => {
+    await b.seedBundle({
+      id: 'morning',
+      title: 'Morning',
+      times: [{ kind: 'when', code: 'MORN' }],
+      memberIds: ['inhaler'],
+    });
+    await b.saveProfileSettings({
+      timesOfDay: {
+        MORN: '07:00',
+        NOON: '12:00',
+        AFT: '15:00',
+        EVE: '18:00',
+        HS: '22:00',
+      },
+    });
   });
 }
 
@@ -331,6 +353,9 @@ test.describe('Sync between devices', () => {
   }) => {
     await seedTestPatient(page);
     await bridge(page, async (b) => {
+      // Let the upload check scheduled by the save above run first, so it
+      // never reads the tables while they are being dropped.
+      await new Promise((resolve) => setTimeout(resolve, 2500));
       const names = await b.querySql(
         "SELECT name, type FROM sqlite_master WHERE name LIKE 'sync_%' AND type IN ('table', 'trigger')"
       );
@@ -367,7 +392,9 @@ test.describe('Sync between devices', () => {
         UNION ALL SELECT 'MedicationStatement', id FROM medication_statements
         UNION ALL SELECT 'ServiceRequest', id FROM service_requests
         UNION ALL SELECT 'Composition', id FROM clinical_documents
-        UNION ALL SELECT 'Organization', id FROM organizations`);
+        UNION ALL SELECT 'Organization', id FROM organizations
+        UNION ALL SELECT 'RequestOrchestration', id FROM request_orchestrations
+        UNION ALL SELECT 'ProfileSettings', id FROM profile_settings`);
       const versions = await b.querySql(
         'SELECT resource_type AS type, resource_id AS id, deleted FROM sync_row_versions'
       );
@@ -387,7 +414,12 @@ test.describe('Sync between devices', () => {
         .filter((v: any) => v.deleted)
         .map((v: any) => `${v.type}/${v.id}`)
         .sort()
-    ).toEqual(['Condition/eczema', 'MedicationRequest/inhaler']);
+    ).toEqual([
+      'Condition/eczema',
+      'MedicationRequest/inhaler',
+      // Its only treatment deleted, the bundle goes with it.
+      'RequestOrchestration/morning',
+    ]);
     // The cascade rewrote the visit's reason, and that rewrite is what syncs.
     const visit = state.changes.find((c: any) => c.id === 'visit');
     expect(visit.payload).not.toContain('Condition/eczema');

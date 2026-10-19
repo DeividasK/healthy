@@ -14,7 +14,9 @@ export type DatabaseTable =
   | 'organizations'
   | 'service_requests'
   | 'medication_administrations'
-  | 'medication_statements';
+  | 'medication_statements'
+  | 'request_orchestrations'
+  | 'profile_settings';
 
 type Listener = (tables: DatabaseTable[]) => void;
 

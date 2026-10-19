@@ -4,6 +4,7 @@ import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import { removeEntryFromAllDocuments } from '@/src/features/consultations/consultationDocumentEntries';
+import { removeTreatmentFromBundles } from '@/src/features/bundles/bundlesRepository';
 
 export const VALID_MEDICATION_REQUEST_STATUSES: MedicationRequest['status'][] =
   [
@@ -332,6 +333,7 @@ export async function deleteMedicationRequestRecord(
     // logs (MedicationAdministrations) and usage periods (MedicationStatements)
     // go with it by cascade.
     await removeEntryFromAllDocuments(db, `MedicationRequest/${id}`);
+    await removeTreatmentFromBundles(db, id, existing.patient_id);
 
     didDelete = true;
   };
@@ -346,6 +348,7 @@ export async function deleteMedicationRequestRecord(
         'medication_administrations',
         'medication_statements',
         'clinical_documents',
+        'request_orchestrations',
       ]);
     }
   }

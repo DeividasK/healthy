@@ -380,7 +380,7 @@ test('v17 records the regimen on taking periods and the dosage on free-text answ
       };
     });
   const result = await readMigration();
-  expect(result.version[0].user_version).toBe(17);
+  expect(result.version[0].user_version).toBeGreaterThanOrEqual(17);
   for (const id of ['text', 'structured'])
     expect(result.periods[id].dosage).toEqual(
       result.requests[id].dosageInstruction

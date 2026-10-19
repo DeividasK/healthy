@@ -1,8 +1,15 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Alert, Platform } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FolderPlus, Pencil, Stethoscope } from 'lucide-react-native';
-import type { MedicationRequest, Encounter, Condition } from 'fhir/r5';
+import { FolderPlus, Group, Pencil, Stethoscope } from 'lucide-react-native';
+import type {
+  MedicationRequest,
+  Encounter,
+  Condition,
+  RequestOrchestration,
+} from 'fhir/r5';
+import { BundleRelatedRow } from '@/src/features/bundles/BundleRelatedRow';
+import { getBundlesWithTreatment } from '@/src/features/bundles/bundleService';
 import { getTreatmentMeta } from './TreatmentRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -61,6 +68,7 @@ function TreatmentForPatient({
   const [linkedConsultations, setLinkedConsultations] = useState<Encounter[]>(
     []
   );
+  const [bundles, setBundles] = useState<RequestOrchestration[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -131,8 +139,13 @@ function TreatmentForPatient({
         if (cons) loadedOthers.push(cons);
       }
 
+      const treatmentBundles = await getBundlesWithTreatment(
+        id,
+        activePatientId
+      );
       if (sequence !== loadSequence.current) return;
       setLinkedConsultations(loadedOthers);
+      setBundles(treatmentBundles);
     } catch (err) {
       if (sequence !== loadSequence.current) return;
       console.error('Failed to load treatment view data:', err);
@@ -149,6 +162,7 @@ function TreatmentForPatient({
       'consultations',
       'clinical_documents',
       'conditions',
+      'request_orchestrations',
     ],
     loadData
   );
@@ -292,6 +306,22 @@ function TreatmentForPatient({
           patientId={activePatientId}
           isActive={treatment.status === 'active'}
         />
+
+        <ResourceSection
+          icon={Group}
+          title="Bundles"
+          count={bundles.length}
+          testID="treatment-bundles-section"
+        >
+          {bundles.map((bundle) => (
+            <BundleRelatedRow
+              key={bundle.id}
+              bundle={bundle}
+              testID={`treatment-bundle-${bundle.id}`}
+              onPress={() => router.push(`/bundle/${bundle.id}`)}
+            />
+          ))}
+        </ResourceSection>
 
         {originConsultation && (
           <ResourceSection
