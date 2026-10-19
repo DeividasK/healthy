@@ -42,15 +42,7 @@ jobs:
         with:
           cache: true
           save-cache: false
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v5
-      - name: Generate Native Project
-        run: pnpm expo prebuild --platform android --no-install
-      - name: Build Debug APK
-        run: ./android/gradlew -p android assembleDebug -PreactNativeArchitectures=x86_64
+      - uses: ./.github/actions/android-debug-build
 
   build:
     name: Production Web Build
