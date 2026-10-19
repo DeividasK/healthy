@@ -6,6 +6,7 @@ import {
   seedTestConsultation,
   seedTestTreatment,
   seedTestServiceRequest,
+  seedTestReport,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Condition View - Visual Regression', () => {
@@ -23,7 +24,7 @@ test.describe('View Condition View - Visual Regression', () => {
       },
       status: 'active',
       notes: 'Persistent ache after running on tarmac.',
-      onsetDate: '2026-10-02',
+      onsetDate: '2026-09-02',
     });
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-follow-up',
@@ -55,11 +56,55 @@ test.describe('View Condition View - Visual Regression', () => {
       reasonConditionIds: [cond.id],
       requesterName: 'Dr. Sarah Connor',
     });
+    const mri = await seedTestServiceRequest(page, {
+      id: 'mri-cond-view-visual',
+      title: 'MRI left knee',
+      category: '363679005',
+      intent: 'order',
+      status: 'completed',
+      authoredOn: '2026-10-04',
+      reasonConditionIds: [cond.id],
+      requesterName: 'Dr. Sarah Connor',
+    });
+    await seedTestReport(page, {
+      id: 'report-cond-view-visual',
+      date: '2026-10-05',
+      time: '08:15',
+      serviceProviderName: 'City Lab',
+      serviceRequestIds: [mri.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+    });
+    await seedTestConsultation(page, {
+      id: 'cons-cond-view-visual-planned',
+      conditionIds: [cond.id],
+      title: 'MRI review',
+      doctorName: 'Dr. Sarah Connor',
+      date: '2026-11-03',
+      status: 'planned',
+    });
     await seedTestServiceRequest(page, {
       id: 'planned-cond-view-visual',
       title: 'Physiotherapy referral',
       category: '3457005',
-      authoredOn: '2026-10-04',
+      intent: 'order',
+      status: 'active',
+      authoredOn: '2026-09-12',
+      reasonConditionIds: [cond.id],
+    });
+    await seedTestTreatment(page, {
+      id: 'treat-cond-view-visual-paused',
+      title: 'Paracetamol 500mg',
+      status: 'on-hold',
+      authoredOn: '2026-09-02',
+      reasonConditionIds: [cond.id],
+    });
+    await seedTestServiceRequest(page, {
+      id: 'revoked-cond-view-visual',
+      title: 'X-ray left knee',
+      category: '363679005',
+      intent: 'order',
+      status: 'revoked',
+      authoredOn: '2026-09-02',
       reasonConditionIds: [cond.id],
     });
 

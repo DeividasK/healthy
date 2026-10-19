@@ -262,8 +262,10 @@ export function setupTestBridge() {
       id?: string;
       patientId?: string;
       date?: string;
+      time?: string;
       notes?: string;
       serviceProviderName?: string;
+      serviceRequestIds?: string[];
       biomarkers: {
         name: string;
         value: number | string;
@@ -323,8 +325,10 @@ export function setupTestBridge() {
         reportId: input.id,
         patientId,
         date: input.date || new Date().toISOString().split('T')[0],
+        time: input.time,
         notes: input.notes,
         serviceProviderName: input.serviceProviderName,
+        serviceRequestIds: input.serviceRequestIds,
         items,
       });
     },

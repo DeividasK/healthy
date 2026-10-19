@@ -271,22 +271,26 @@ test.describe('Edit Condition Flow', () => {
     );
     await expect(
       view
-        .getByTestId('condition-consultations-section')
+        .getByTestId('condition-timeline')
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
     await page.reload();
     await expect(
       view
-        .getByTestId('condition-consultations-section')
+        .getByTestId('condition-timeline')
         .getByText('Linked Consultation', { exact: true })
     ).toBeVisible();
 
     const consultationRow = view.getByTestId(
-      /^condition-consultation-item-.*-row$/
+      /^condition-timeline-item-consultation-.*-row$/
     );
-    expect((await consultationRow.boundingBox())!.width).toBeCloseTo(
-      viewportWidth
-    );
+    // The row reaches the screen edge, after its timeline node at the margin
+    const rowBox = (await consultationRow.boundingBox())!;
+    expect(rowBox.x + rowBox.width).toBeCloseTo(viewportWidth);
+    const nodeBox = (await view
+      .getByTestId(/^condition-timeline-item-consultation-.*-tone-done$/)
+      .boundingBox())!;
+    expect(nodeBox.x).toBeCloseTo(20);
     // The whole row opens the consultation
     await consultationRow.getByText('Linked Consultation').click();
     const consultationView = page.getByTestId('consultation-view');

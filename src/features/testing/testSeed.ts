@@ -27,8 +27,12 @@ export interface SeedReportOptions {
   id?: string;
   patientId?: string;
   date?: string;
+  /** e.g. "08:15". */
+  time?: string;
   notes?: string;
   serviceProviderName?: string;
+  /** ServiceRequests the report is based on. */
+  serviceRequestIds?: string[];
   biomarkers: {
     name: string;
     value: number | string;

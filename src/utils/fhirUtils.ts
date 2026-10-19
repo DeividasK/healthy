@@ -382,11 +382,16 @@ export function getServiceRequestReason(
   return request.reason?.[0]?.concept?.text || null;
 }
 
-/** IDs of the ServiceRequests an Encounter is based on. */
-export function getConsultationBasedOnIds(encounter: Encounter): string[] {
+/** A resource that can be based on requests, e.g. an Encounter or DiagnosticReport. */
+type BasedOnResource = { basedOn?: Reference[] };
+
+/** IDs of the ServiceRequests a resource is based on. */
+export function getBasedOnServiceRequestIds(
+  resource: BasedOnResource
+): string[] {
   return [
     ...new Set(
-      (encounter.basedOn || []).flatMap((reference) =>
+      (resource.basedOn || []).flatMap((reference) =>
         reference.reference?.startsWith('ServiceRequest/')
           ? [reference.reference.slice(15)]
           : []
@@ -396,16 +401,16 @@ export function getConsultationBasedOnIds(encounter: Encounter): string[] {
 }
 
 /**
- * Sets the ServiceRequests an Encounter is based on. References to other
+ * Sets the ServiceRequests a resource is based on. References to other
  * request types and metadata on retained references are preserved.
  */
-export function withConsultationBasedOn(
-  encounter: Encounter,
+export function withBasedOnServiceRequests<T extends BasedOnResource>(
+  resource: T,
   serviceRequestIds: string[]
-): Encounter {
+): T {
   const selected = new Set(serviceRequestIds);
   const retained = new Set<string>();
-  const basedOn = (encounter.basedOn || []).filter((reference) => {
+  const basedOn = (resource.basedOn || []).filter((reference) => {
     if (!reference.reference?.startsWith('ServiceRequest/')) return true;
     const id = reference.reference.slice(15);
     if (!selected.has(id) || retained.has(id)) return false;
@@ -418,7 +423,20 @@ export function withConsultationBasedOn(
         reference: `ServiceRequest/${id}`,
         type: 'ServiceRequest',
       });
-  const updated: Encounter = { ...encounter, basedOn };
+  const updated: T = { ...resource, basedOn };
   if (!basedOn.length) delete updated.basedOn;
   return updated;
+}
+
+/** IDs of the ServiceRequests an Encounter is based on. */
+export function getConsultationBasedOnIds(encounter: Encounter): string[] {
+  return getBasedOnServiceRequestIds(encounter);
+}
+
+/** Sets the ServiceRequests an Encounter is based on. */
+export function withConsultationBasedOn(
+  encounter: Encounter,
+  serviceRequestIds: string[]
+): Encounter {
+  return withBasedOnServiceRequests(encounter, serviceRequestIds);
 }

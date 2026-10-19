@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestConsultation,
   seedTestServiceRequest,
+  seedTestReport,
   getTestClinicalDocument,
   findServiceRequestSection,
   evaluateBridge as bridge,
@@ -84,6 +85,10 @@ test.describe('View Service Request', () => {
       title: 'Echo appointment',
       basedOnServiceRequestIds: [request.id],
     });
+    const { report } = await seedTestReport(page, {
+      serviceRequestIds: [request.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+    });
 
     await page.goto(`/service-request/${request.id}`);
     await page.clock.install();
@@ -106,6 +111,15 @@ test.describe('View Service Request', () => {
     );
     expect(stored.basedOn).toBeUndefined();
     expect(stored.meta.lastUpdated).toBeTruthy();
+    const [row] = await bridge(
+      page,
+      (b, id) =>
+        b.querySql('SELECT fhir_json FROM diagnostic_reports WHERE id = ?;', [
+          id,
+        ]),
+      report.id
+    );
+    expect(JSON.parse(row.fhir_json).basedOn).toBeUndefined();
   });
 
   test('is not shown to another profile', async ({ page }) => {

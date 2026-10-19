@@ -3,6 +3,9 @@ import {
   expect,
   seedTestPatient,
   seedTestCondition,
+  seedTestConsultation,
+  seedTestReport,
+  seedTestServiceRequest,
   seedTestTreatment,
 } from '@/src/features/testing/testStorage';
 
@@ -11,49 +14,126 @@ test.describe('View Condition', () => {
     await seedTestPatient(page);
   });
 
-  test('lists treatments associated with the condition and opens them', async ({
+  test('shows related steps as a timeline grouped by month and opens each', async ({
     page,
   }) => {
-    const condition = await seedTestCondition(page, { title: 'Migraine' });
+    const condition = await seedTestCondition(page, { title: 'Knee pain' });
     const other = await seedTestCondition(page, { title: 'Back pain' });
     await page.goto(`/condition/${condition.id}`);
     await page.getByTestId('condition-title').waitFor();
-    await expect(page.getByTestId('condition-treatments-section')).toHaveCount(
-      0
-    );
-    await expect(
-      page.getByTestId('condition-consultations-section')
-    ).toHaveCount(0);
+    // Nothing related yet: no empty timeline
+    await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
 
-    const associated = await seedTestTreatment(page, {
-      title: 'Sumatriptan 50mg',
-      status: 'active',
-      authoredOn: '2026-10-01',
-      reasonConditionIds: [condition.id],
-      requesterName: 'Dr. Julian Bashir',
+    const visit = await seedTestConsultation(page, {
+      title: 'Orthopaedic review',
+      conditionIds: [condition.id],
+      date: '2026-10-04',
+      status: 'completed',
     });
-    await seedTestTreatment(page, {
+    const review = await seedTestConsultation(page, {
+      title: 'MRI review',
+      conditionIds: [condition.id],
+      date: '2026-11-03',
+      status: 'planned',
+    });
+    const mri = await seedTestServiceRequest(page, {
+      title: 'Knee MRI',
+      authoredOn: '2026-10-04',
+      status: 'active',
+      reasonConditionIds: [condition.id],
+    });
+    const xray = await seedTestServiceRequest(page, {
+      title: 'Knee X-ray',
+      authoredOn: '2026-09-12',
+      status: 'revoked',
+      reasonConditionIds: [condition.id],
+    });
+    const ibuprofen = await seedTestTreatment(page, {
       title: 'Ibuprofen 400mg',
+      authoredOn: '2026-10-04',
+      status: 'on-hold',
+      reasonConditionIds: [condition.id],
+    });
+    const report = await seedTestReport(page, {
+      date: '2026-10-04',
+      serviceProviderName: 'City Lab',
+      serviceRequestIds: [mri.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+    });
+    // Steps for other conditions stay off this timeline
+    await seedTestTreatment(page, {
+      title: 'Naproxen',
       reasonConditionIds: [other.id],
     });
-    await seedTestTreatment(page, { title: 'Vitamin D' });
+    const unrelated = await seedTestServiceRequest(page, {
+      title: 'Spine MRI',
+      reasonConditionIds: [other.id],
+    });
+    await seedTestReport(page, {
+      date: '2026-10-05',
+      serviceRequestIds: [unrelated.id],
+      biomarkers: [{ name: 'Hemoglobin', value: 13.9, unit: 'g/dL' }],
+    });
 
-    // Saved treatments appear without leaving the screen
-    const section = page.getByTestId('condition-treatments-section');
-    const item = page.getByTestId(`condition-treatment-item-${associated.id}`);
-    const row = page.getByTestId(
-      `condition-treatment-item-${associated.id}-row`
+    // Saved steps appear without leaving the screen, newest first by month;
+    // on one day, outcomes sit above the visit that produced them.
+    const timeline = page.getByTestId('condition-timeline');
+    await expect(timeline.getByTestId('condition-timeline-count')).toHaveText(
+      '6'
     );
-    await expect(row).toContainText('Sumatriptan 50mg');
-    await expect(row).toContainText('Dr. Julian Bashir');
-    await expect(row).toContainText('Active');
-    await expect(section.getByText('Ibuprofen 400mg')).toHaveCount(0);
-    await expect(section.getByText('Vitamin D')).toHaveCount(0);
+    await expect(timeline.getByRole('heading')).toHaveText([
+      'Timeline',
+      'November 2026',
+      'October 2026',
+      'September 2026',
+    ]);
+    const rows = timeline.getByTestId(/^condition-timeline-item-.*-row$/);
+    await expect(rows).toHaveText([
+      /MRI review/,
+      /Complete blood count/,
+      /Ibuprofen 400mg/,
+      /Knee MRI/,
+      /Orthopaedic review/,
+      /Knee X-ray/,
+    ]);
+    await expect(timeline.getByText('Naproxen')).toHaveCount(0);
+    await expect(timeline.getByText('Spine MRI')).toHaveCount(0);
 
-    await item.click();
-    await expect(page.getByTestId('treatment-title')).toHaveText(
-      'Sumatriptan 50mg'
-    );
+    // Each step shows its status tone
+    for (const [type, id, tone] of [
+      ['consultation', review.id, 'planned'],
+      ['lab-result', report.report.id, 'done'],
+      ['treatment', ibuprofen.id, 'paused'],
+      ['service-request', mri.id, 'active'],
+      ['consultation', visit.id, 'done'],
+      ['service-request', xray.id, 'faded'],
+    ])
+      await expect(
+        page.getByTestId(`condition-timeline-item-${type}-${id}-tone-${tone}`)
+      ).toBeVisible();
+    await expect(
+      page.getByTestId(
+        `condition-timeline-item-lab-result-${report.report.id}-row`
+      )
+    ).toContainText('City Lab');
+
+    // Every row opens its step
+    for (const [type, id, titleTestID, title] of [
+      ['consultation', visit.id, 'consultation-title', 'Orthopaedic review'],
+      ['service-request', mri.id, 'service-request-title', 'Knee MRI'],
+      ['treatment', ibuprofen.id, 'treatment-title', 'Ibuprofen 400mg'],
+      [
+        'lab-result',
+        report.report.id,
+        'lab-result-title',
+        'Complete blood count (hemogram) panel - Blood by Automated count',
+      ],
+    ]) {
+      await page.getByTestId(`condition-timeline-item-${type}-${id}`).click();
+      await expect(page.getByTestId(titleTestID)).toHaveText(title);
+      await page.goBack();
+      await expect(page.getByTestId('condition-title')).toHaveText('Knee pain');
+    }
   });
 });
 

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { CodeableConcept, Condition } from 'fhir/r5';
-import { Stethoscope } from 'lucide-react-native';
+import { FlaskConical, Stethoscope } from 'lucide-react-native';
 import {
   ServiceRequestForm,
   type ServiceRequestFormValues,
@@ -36,7 +36,15 @@ import {
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
-import type { LinkFieldConfig } from '@/src/components/useLinkFields';
+import {
+  diffLinkIds,
+  type LinkFieldConfig,
+} from '@/src/components/useLinkFields';
+import {
+  getLabResultLinkOptions,
+  getLabResultsByServiceRequestId,
+  setLabResultServiceRequestLink,
+} from '@/src/features/lab-results/diagnosticReportService';
 
 export function EditServiceRequestView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -80,12 +88,16 @@ function EditServiceRequestForPatient({
           knownSpecialists,
           consultationOptions,
           roles,
+          labResultOptions,
+          linkedLabResults,
         ] = await Promise.all([
           getServiceRequestById(id, activePatientId),
           getAllConditions(activePatientId),
           getDistinctDoctorNames(activePatientId),
           getConsultationLinkOptions(activePatientId),
           getServiceRequestConsultationRoles(id, activePatientId),
+          getLabResultLinkOptions(activePatientId),
+          getLabResultsByServiceRequestId(id, activePatientId),
         ]);
         if (!isMounted) return;
         if (!request) {
@@ -108,7 +120,15 @@ function EditServiceRequestForPatient({
               single: 'origin',
             },
           },
+          {
+            type: 'lab-result',
+            label: 'Lab results',
+            icon: FlaskConical,
+            options: labResultOptions,
+            initialIds: linkedLabResults.map((report) => report.id!),
+          },
         ]);
+
         setNotFound(false);
         setInitialCategory(request.category?.[0]);
         setInitialValues({
@@ -192,6 +212,19 @@ function EditServiceRequestForPatient({
         ServiceRequestConsultationRole
       >
     );
+    const labResults = diffLinkIds(
+      linkFields.find((field) => field.type === 'lab-result')?.initialIds || [],
+      values.links?.['lab-result']?.ids || []
+    );
+    for (const reportId of labResults.added)
+      await setLabResultServiceRequestLink(reportId, id, activePatientId, true);
+    for (const reportId of labResults.removed)
+      await setLabResultServiceRequestLink(
+        reportId,
+        id,
+        activePatientId,
+        false
+      );
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();

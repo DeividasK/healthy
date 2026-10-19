@@ -240,7 +240,7 @@ test.describe('Add Service Request Flow', () => {
     await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
     await expect(
       page
-        .getByTestId('condition-service-request-section')
+        .getByTestId('condition-timeline')
         .getByText('Ambulatory blood pressure monitoring')
     ).toBeVisible();
   });

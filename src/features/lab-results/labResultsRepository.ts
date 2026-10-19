@@ -5,6 +5,28 @@ import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { assertCBCObservation } from './biomarkerMeasurements';
 import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
+import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
+
+/**
+ * A referenced ServiceRequest must belong to the same patient. One not stored
+ * yet is tolerated, so restores and sync can apply in any order.
+ */
+async function assertServiceRequestReferences(
+  report: DiagnosticReport,
+  patientId: string
+) {
+  const db = await getDb();
+  for (const requestId of getBasedOnServiceRequestIds(report)) {
+    const request = await db.getFirstAsync<{ patient_id: string }>(
+      'SELECT patient_id FROM service_requests WHERE id = ?;',
+      [requestId]
+    );
+    if (request && request.patient_id !== patientId)
+      throw new Error(
+        'DiagnosticReport basedOn must reference a service request for the same patient'
+      );
+  }
+}
 
 /**
  * Persists a FHIR DiagnosticReport and its Observations in SQLite.
@@ -61,6 +83,7 @@ export async function insertDiagnosticReportRecord(
       (report.performer || []).map((performer) => performer.reference),
       patientId
     );
+    await assertServiceRequestReferences(report, patientId);
 
     await db.runAsync(
       `INSERT INTO diagnostic_reports (id, patient_id, effective_date, status, notes, fhir_json, created_at, updated_at)
@@ -185,6 +208,82 @@ export async function fetchAllDiagnosticReportRecords(
   }
 
   return records;
+}
+
+/**
+ * Replaces a stored DiagnosticReport's JSON, leaving its Observations as they
+ * are. Run inside the caller's transaction.
+ */
+export async function updateDiagnosticReportJson(
+  report: DiagnosticReport,
+  patientId: string
+): Promise<void> {
+  await assertServiceRequestReferences(report, patientId);
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE diagnostic_reports SET fhir_json = ?, updated_at = ?
+     WHERE id = ? AND patient_id = ?;`,
+    [
+      JSON.stringify(report),
+      report.meta?.lastUpdated || new Date().toISOString(),
+      report.id!,
+      patientId,
+    ]
+  );
+}
+
+function parseReport(json: string, updatedAt: string): DiagnosticReport {
+  const report: DiagnosticReport = JSON.parse(json);
+  if (!report.meta?.lastUpdated && updatedAt)
+    report.meta = { ...report.meta, lastUpdated: updatedAt };
+  return report;
+}
+
+/** The patient's DiagnosticReports based on the ServiceRequest, newest first. */
+export async function fetchDiagnosticReportsByServiceRequestId(
+  requestId: string,
+  patientId: string
+): Promise<DiagnosticReport[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
+    `SELECT fhir_json, updated_at FROM diagnostic_reports
+     WHERE patient_id = ?
+     AND EXISTS (
+       SELECT 1 FROM json_each(fhir_json, '$.basedOn')
+       WHERE json_extract(value, '$.reference') = ?
+     )
+     ORDER BY effective_date DESC, created_at DESC, id DESC;`,
+    [patientId, `ServiceRequest/${requestId}`]
+  );
+  return rows.map((r) => parseReport(r.fhir_json, r.updated_at));
+}
+
+/**
+ * The patient's DiagnosticReports based on a ServiceRequest whose `reason`
+ * references the Condition, newest first.
+ */
+export async function fetchDiagnosticReportsByConditionId(
+  conditionId: string,
+  patientId: string
+): Promise<DiagnosticReport[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
+    `SELECT fhir_json, updated_at FROM diagnostic_reports
+     WHERE patient_id = ?
+     AND EXISTS (
+       SELECT 1 FROM json_each(diagnostic_reports.fhir_json, '$.basedOn') AS based_on
+       JOIN service_requests
+         ON json_extract(based_on.value, '$.reference') = 'ServiceRequest/' || service_requests.id
+       WHERE service_requests.patient_id = diagnostic_reports.patient_id
+       AND EXISTS (
+         SELECT 1 FROM json_each(service_requests.fhir_json, '$.reason') AS reason
+         WHERE json_extract(reason.value, '$.reference.reference') = ?
+       )
+     )
+     ORDER BY effective_date DESC, created_at DESC, id DESC;`,
+    [patientId, `Condition/${conditionId}`]
+  );
+  return rows.map((r) => parseReport(r.fhir_json, r.updated_at));
 }
 
 /**

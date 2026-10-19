@@ -194,7 +194,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     });
 
     await page
-      .getByTestId(`condition-consultation-item-${consultation.id}`)
+      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
       .click();
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Dock navigation'

@@ -1,4 +1,4 @@
-import type { Encounter, ServiceRequest } from 'fhir/r5';
+import type { DiagnosticReport, Encounter, ServiceRequest } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
@@ -6,6 +6,8 @@ import {
   getServiceRequestTitle,
   withConsultationBasedOn,
   getConsultationBasedOnIds,
+  getBasedOnServiceRequestIds,
+  withBasedOnServiceRequests,
 } from '@/src/utils/fhirUtils';
 import { removeEntryFromAllDocuments } from '@/src/features/consultations/consultationDocumentEntries';
 
@@ -261,7 +263,8 @@ export async function fetchAllServiceRequestRecords(
 
 /**
  * Deletes a ServiceRequest and, in the same transaction, removes its
- * Composition entries and `Encounter.basedOn` references.
+ * Composition entries and `Encounter.basedOn` and `DiagnosticReport.basedOn`
+ * references.
  */
 export async function deleteServiceRequestRecord(
   id: string,
@@ -309,6 +312,26 @@ export async function deleteServiceRequestRecord(
       );
     }
 
+    const reports = await db.getAllAsync<{ id: string; fhir_json: string }>(
+      `SELECT id, fhir_json FROM diagnostic_reports
+       WHERE patient_id = ? AND fhir_json LIKE ?;`,
+      [existing.patient_id, `%${reference}%`]
+    );
+    for (const row of reports) {
+      const report: DiagnosticReport = JSON.parse(row.fhir_json);
+      const ids = getBasedOnServiceRequestIds(report);
+      if (!ids.includes(id)) continue;
+      const cleaned = withBasedOnServiceRequests(
+        report,
+        ids.filter((other) => other !== id)
+      );
+      cleaned.meta = { ...cleaned.meta, lastUpdated: now };
+      await db.runAsync(
+        'UPDATE diagnostic_reports SET fhir_json = ?, updated_at = ? WHERE id = ?;',
+        [JSON.stringify(cleaned), now, row.id]
+      );
+    }
+
     didDelete = true;
   };
 
@@ -321,6 +344,7 @@ export async function deleteServiceRequestRecord(
         'service_requests',
         'clinical_documents',
         'consultations',
+        'diagnostic_reports',
       ]);
     }
   }

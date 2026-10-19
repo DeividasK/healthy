@@ -84,9 +84,7 @@ test.describe('Add Consultation Flow', () => {
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
-        const consultationsSection = page.getByTestId(
-          'condition-consultations-section'
-        );
+        const consultationsSection = page.getByTestId('condition-timeline');
         await expect(consultationsSection).toBeVisible();
         await expect(
           consultationsSection.getByText('General Cardiology Review')
@@ -101,7 +99,7 @@ test.describe('Add Consultation Flow', () => {
         ).toBeVisible();
 
         const consultationRow = page.getByTestId(
-          /^condition-consultation-item-(?!.*-row$)/
+          /^condition-timeline-item-consultation-(?!.*-(row|tone-\w+)$)/
         );
         await expect(consultationRow).toBeVisible();
         await consultationRow.click();
@@ -191,9 +189,7 @@ test.describe('Add Consultation Flow', () => {
         );
 
         // Consultations and floating + are in Condition View
-        await expect(
-          page.getByTestId('condition-consultations-section')
-        ).toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
         await expect(page.getByTestId('condition-add-button')).toBeVisible();
 
         // Click edit condition button
@@ -203,9 +199,7 @@ test.describe('Add Consultation Flow', () => {
         );
 
         // Consultations and floating + are NOT in Condition Edit
-        await expect(
-          page.getByTestId('condition-consultations-section')
-        ).not.toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).not.toBeVisible();
         await expect(
           page.getByTestId('condition-add-button')
         ).not.toBeVisible();
@@ -223,9 +217,7 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByTestId('condition-title')).toHaveText(
           'Updated Knee Osteoarthritis'
         );
-        await expect(
-          page.getByTestId('condition-consultations-section')
-        ).toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
       });
     }
   );
@@ -392,9 +384,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Verify consultation details render on Condition View', async () => {
-        const consultationsSection = page.getByTestId(
-          'condition-consultations-section'
-        );
+        const consultationsSection = page.getByTestId('condition-timeline');
         await expect(consultationsSection).toBeVisible();
         await expect(
           consultationsSection.getByText('Future Cardiology Assessment')
