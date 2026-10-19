@@ -3,6 +3,13 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Copy, Pill } from 'lucide-react-native';
+import Animated, {
+  ReduceMotion,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+} from 'react-native-reanimated';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
@@ -29,6 +36,23 @@ import {
 } from './actionDays';
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A later day's rows come in from the right, an earlier day's from the left.
+const ROWS_SLIDE_MS = 300;
+const rowsSlide = {
+  laterIn: SlideInRight.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  laterOut: SlideOutLeft.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  earlierIn: SlideInLeft.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+  earlierOut: SlideOutRight.duration(ROWS_SLIDE_MS).reduceMotion(
+    ReduceMotion.System
+  ),
+};
 
 /** Logs, day by day, whether each treatment was taken. */
 export function ActionsView() {
@@ -188,6 +212,23 @@ function ActionsForPatient({
     ],
     loadData
   );
+
+  // The day whose rows are shown, which follows the selected one a commit
+  // later: the outgoing rows first learn which way to slide out, and stop
+  // taking answers, which would otherwise be saved for the new day.
+  const [shown, setShown] = useState<{
+    date: string;
+    isLater: boolean | null;
+  }>({ date: selected, isLater: null });
+  const isLeaving = selected !== shown.date;
+  useEffect(() => {
+    if (!isLeaving) return;
+    // A separate commit, so the outgoing rows slide out with it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShown({ date: selected, isLater: selected > shown.date });
+  }, [isLeaving, selected, shown.date]);
+  const isLeavingForLater = isLeaving ? selected > shown.date : shown.isLater;
+  const shownDay = daysByDate[shown.date];
 
   const day = daysByDate[selected];
   const isLoading =
@@ -357,20 +398,44 @@ function ActionsForPatient({
               title="Treatments"
               testID="actions-treatments-section"
             >
-              {day?.items.map((item) => (
-                <TreatmentLogRow
-                  key={item.key}
-                  item={item}
-                  disabled={savingKeys.includes(item.key)}
-                  onAnswer={(answer) => void handleAnswer(item, answer)}
-                  onOpen={() =>
-                    router.push({
-                      pathname: '/treatment/[id]',
-                      params: { id: item.treatment.id || '' },
-                    })
+              {!!shownDay?.items.length && (
+                <Animated.View
+                  key={shown.date}
+                  entering={
+                    shown.isLater === null
+                      ? undefined
+                      : shown.isLater
+                        ? rowsSlide.laterIn
+                        : rowsSlide.earlierIn
                   }
-                />
-              ))}
+                  exiting={
+                    isLeavingForLater === false
+                      ? rowsSlide.earlierOut
+                      : rowsSlide.laterOut
+                  }
+                  pointerEvents={isLeaving ? 'none' : 'auto'}
+                  aria-hidden={isLeaving}
+                  importantForAccessibility={
+                    isLeaving ? 'no-hide-descendants' : 'auto'
+                  }
+                >
+                  {shownDay.items.map((item) => (
+                    <TreatmentLogRow
+                      key={item.key}
+                      item={item}
+                      isLeaving={isLeaving}
+                      disabled={isLeaving || savingKeys.includes(item.key)}
+                      onAnswer={(answer) => void handleAnswer(item, answer)}
+                      onOpen={() =>
+                        router.push({
+                          pathname: '/treatment/[id]',
+                          params: { id: item.treatment.id || '' },
+                        })
+                      }
+                    />
+                  ))}
+                </Animated.View>
+              )}
             </ResourceSection>
           </>
         )}

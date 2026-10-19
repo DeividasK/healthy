@@ -13,11 +13,14 @@ import type { ActionItem, TreatmentLogAnswer } from './actionDays';
 export function TreatmentLogRow({
   item,
   disabled = false,
+  isLeaving = false,
   onAnswer,
   onOpen,
 }: {
   item: ActionItem;
   disabled?: boolean;
+  /** Sliding out for another day's rows: a copy without test IDs. */
+  isLeaving?: boolean;
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
   /** Opens the treatment's page. */
   onOpen: () => void;
@@ -33,7 +36,7 @@ export function TreatmentLogRow({
     const selected = item.answer === value;
     return (
       <TouchableOpacity
-        testID={`treatment-log-${value}-${item.rowId}`}
+        testID={isLeaving ? undefined : `treatment-log-${value}-${item.rowId}`}
         accessibilityRole="checkbox"
         accessibilityLabel={`Mark ${name} ${label}`}
         aria-checked={selected}
@@ -55,7 +58,7 @@ export function TreatmentLogRow({
   };
   return (
     <ResourceRow
-      testID={`treatment-log-row-${item.rowId}`}
+      testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
       title={title}
       meta={item.dose ? [{ icon: Tablets, text: item.dose.text }] : []}
       accessibilityLabel={`View treatment: ${title}`}
