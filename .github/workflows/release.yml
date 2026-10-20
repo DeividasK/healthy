@@ -1,55 +1,56 @@
 name: Release
 
-# Pushing to `release` ships the version in app.json: a GitHub Release with its
-# release notes (.changes/<version>.md), and the web app on GitHub Pages. EAS builds and submits
-# Android from the same push (.eas/workflows/android-release.yml).
+# Publish a stable GitHub Release to ship its tagged commit. The internal
+# release branch advances to that commit to trigger the existing EAS pipeline.
 on:
-  push:
-    branches: [release]
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
-  github-release:
-    name: GitHub Release
+  verify-release:
+    name: Verify & Dispatch Release
+    if: ${{ !github.event.release.prerelease }}
     permissions:
       contents: write
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
           persist-credentials: false
 
-      # Ships only a prepared version (pnpm release:prepare): its release
-      # notes exist and no fragments are left unreleased.
-      - name: Verify Release Notes
+      - name: Verify Release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           version=$(node -p "require('./app.json').expo.version")
+          test "$RELEASE_TAG" = "v$version" || { echo "::error::Release tag must match app.json version v$version."; exit 1; }
+          test "$(node -p "require('./package.json').version")" = "$version" || { echo "::error::App and package versions differ."; exit 1; }
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::Release commit must already be on main."; exit 1; }
+          git merge-base --is-ancestor origin/release HEAD || { echo "::error::Release must fast-forward the previous release."; exit 1; }
           if ls .changes/unreleased/*.yaml > /dev/null 2>&1; then
             echo "::error::Unreleased fragments in .changes/unreleased. Run 'pnpm release:prepare' on main first."
             exit 1
           fi
           test -f ".changes/$version.md" || { echo "::error::No release notes for $version in .changes/"; exit 1; }
-          echo "VERSION=$version" >> "$GITHUB_ENV"
 
-      # A push that keeps the version (e.g. a merge back from main without a
-      # prepared release) leaves the existing release alone.
-      - name: Create Release
+      # EAS listens for this branch's push webhook. GitHub Pages is deployed
+      # below from the same tag; a branch push no longer starts this workflow.
+      - name: Start Android Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "v$VERSION" > /dev/null 2>&1; then
-            echo "v$VERSION is already released."
-            exit 0
-          fi
-          tail -n +2 ".changes/$VERSION.md" > release-notes.md
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file release-notes.md
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/release" \
+            -f sha="$(git rev-parse HEAD)" -F force=false
 
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
-    needs: [github-release]
+    needs: [verify-release]
     permissions:
       contents: read
       pages: write
@@ -62,6 +63,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.release.tag_name }}
           persist-credentials: false
       - uses: pnpm/setup@v3
         with:
