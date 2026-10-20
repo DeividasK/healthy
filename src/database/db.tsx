@@ -181,7 +181,9 @@ export function resetDatabaseInstance(): void {
  */
 export async function clearAllDatabaseTables(): Promise<void> {
   const db = await getDb();
-  await db.execAsync(`
+  // A transaction waits for any in progress, so no write lands half-cleared.
+  await db.withTransactionAsync(() =>
+    db.execAsync(`
     DELETE FROM observations;
     DELETE FROM diagnostic_reports;
     DELETE FROM clinical_documents;
@@ -207,7 +209,8 @@ export async function clearAllDatabaseTables(): Promise<void> {
     UPDATE sync_device SET device_id = lower(hex(randomblob(8))),
       hlc_last = NULL, last_seq = 0, snapshot_seq = 0, space_id = NULL,
       provider_cursor = NULL;
-  `);
+  `)
+  );
   notifyDatabaseChanged([
     'observations',
     'diagnostic_reports',

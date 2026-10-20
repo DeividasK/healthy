@@ -99,11 +99,12 @@ test.describe('Add Treatment Flow', () => {
     expect(stored.text.div).toContain('Amoxicillin 500mg Capsule');
   });
 
-  test('creates a treatment from a consultation and keeps it when the consultation is deleted', async ({
+  test('creates a treatment from a consultation, then edits and deletes it', async ({
     page,
   }) => {
     const migraine = await seedTestCondition(page, { title: 'Migraine' });
     const headache = await seedTestCondition(page, { title: 'Headache' });
+    const nausea = await seedTestCondition(page, { title: 'Nausea' });
     const consultation = await seedTestConsultation(page, {
       title: 'Neurology Consultation',
       doctorName: 'Dr. Julian Bashir',
@@ -175,24 +176,83 @@ test.describe('Add Treatment Flow', () => {
       { reference: `MedicationRequest/${created.id}` },
     ]);
 
-    // Deleting the consultation keeps the treatment and clears its origin
-    await page.clock.install();
-    await page.getByTestId('delete-consultation-button').click();
-    await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
-    await page.clock.runFor(5000);
-    await page.getByTestId('delete-modal-confirm-button').click();
-    await expect(page).toHaveURL(/.*(\/|#|\/\?.*)$/);
-    await expect(page.getByText('Sumatriptan 50mg')).toBeVisible();
+    // Deleting the consultation instead is covered by record-integrity.
+    expect(created.text.div).toContain('Sumatriptan 50mg');
 
-    const retained = await page.evaluate(async () => {
-      return await (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
-        'SELECT * FROM medication_requests WHERE display_label = ?;',
-        ['Sumatriptan 50mg']
+    await test.step('Edit its name, status, reason and associated conditions', async () => {
+      await openRoute(page, `/treatment/${created.id}`);
+      await page.getByTestId('edit-treatment-button').click();
+      await expect(page).toHaveURL(new RegExp(`treatment/${created.id}/edit$`));
+      await expect(
+        page.getByTestId(`treatment-selected-condition-${migraine.id}`)
+      ).toBeVisible();
+      await page.getByTestId('treatment-title-input').fill('Rizatriptan 10mg');
+      await page
+        .getByTestId('treatment-status-select')
+        .selectOption('completed');
+      await page.getByTestId('add-option-button').click();
+      await page.getByTestId('menu-add-treatment-reason').click();
+      await page.getByTestId('treatment-reason-input').fill('Acute attacks');
+      await page.getByTestId('treatment-condition-search-input').click();
+      await page
+        .getByTestId(`treatment-condition-autocomplete-item-${nausea.id}`)
+        .click();
+      await checkA11y(page, { include: '[data-testid="treatment-form"]' });
+      await page.getByTestId('save-treatment-button').click();
+
+      await expect(page.getByTestId('treatment-title')).toHaveText(
+        'Rizatriptan 10mg'
       );
+      // The meta line shows the status first; the origin row may repeat it.
+      await expect(
+        page.getByTestId('treatment-view').getByText('Completed').first()
+      ).toBeVisible();
+      const section = page.getByTestId('treatment-reason-conditions-section');
+      for (const title of ['Migraine', 'Headache', 'Nausea'])
+        await expect(section).toContainText(title);
+      // The narrative is regenerated from the edited treatment.
+      const edited = await getTestTreatment(page, created.id);
+      expect(edited.status).toBe('completed');
+      expect(edited.text.div).toContain('Rizatriptan 10mg');
+      expect(edited.text.div).not.toContain('Sumatriptan');
+      // The wording lives on the first reason, beside its condition.
+      expect(edited.reason[0].concept).toEqual({ text: 'Acute attacks' });
+      expect(
+        edited.reason.map((reason: any) => reason.reference?.reference)
+      ).toEqual([
+        `Condition/${migraine.id}`,
+        `Condition/${headache.id}`,
+        `Condition/${nausea.id}`,
+      ]);
+
+      // Removing one condition keeps the others
+      await page.getByTestId('edit-treatment-button').click();
+      await page.getByTestId('treatment-remove-condition-button').click();
+      await page.getByTestId('save-treatment-button').click();
+      await expect(section).not.toContainText('Migraine');
+      await expect(section).toContainText('Nausea');
+
+      // Removing the field clears only the links; the wording stays
+      await page.getByTestId('edit-treatment-button').click();
+      await page.getByTestId('remove-treatment-reasonCondition-button').click();
+      await page.getByTestId('save-treatment-button').click();
+      await expect(section).toHaveCount(0);
+      const cleared = await getTestTreatment(page, created.id);
+      expect(cleared.reason).toEqual([{ concept: { text: 'Acute attacks' } }]);
     });
-    expect(retained.length).toBe(1);
-    expect(retained[0].consultation_id).toBeNull();
-    expect(JSON.parse(retained[0].fhir_json).encounter).toBeUndefined();
+
+    await test.step('Delete it and drop its now-empty document section', async () => {
+      await page.clock.install();
+      await page.getByTestId('delete-treatment-button').click();
+      await page.clock.runFor(5000);
+      await page.getByTestId('delete-modal-confirm-button').click();
+      await expect(page).not.toHaveURL(/\/treatment\//);
+      await expect(page.getByText('Rizatriptan 10mg')).toHaveCount(0);
+      // The document remains, but an empty section would violate R5 cmp-1
+      const docAfter = await getTestClinicalDocument(page, consultation.id);
+      expect(docAfter).toBeDefined();
+      expect(findTreatmentsSection(docAfter)).toBeUndefined();
+    });
   });
 
   test('records an optional requester on a standalone treatment', async ({

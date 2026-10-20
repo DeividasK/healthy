@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { verifyDiagnosisMigration } from '@/src/features/consultations/multipleDiagnosesMigrationFixture';
 import {
   fetchConsultationById,
@@ -130,27 +131,96 @@ async function resolvePatientId(
   return undefined;
 }
 
+let resetKey = 0;
+let freshAfterReset = false;
+const resetListeners = new Set<() => void>();
+const subscribeToReset = (listener: () => void) => {
+  resetListeners.add(listener);
+  return () => {
+    resetListeners.delete(listener);
+  };
+};
+
+/** Changes when a test resets the app, so its state mounts from scratch. */
+export function useTestResetKey(): number {
+  const getKey = () => resetKey;
+  return useSyncExternalStore(subscribeToReset, getKey, getKey);
+}
+
 export function setupTestBridge(
   navigation?: ReturnType<typeof useNavigationContainerRef>
 ) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   if (process.env.NODE_ENV === 'production' && !__DEV__) return;
 
+  const schemaSignature = async () => {
+    const db = await getDb();
+    const schema = await db.getAllAsync(
+      'SELECT type, name, sql FROM sqlite_master ORDER BY type, name'
+    );
+    return JSON.stringify(schema);
+  };
+  const bootSchema = schemaSignature();
+
+  /**
+   * Opens a route without reloading the app, with the stack a deep link
+   * builds: Home, then the route. Resetting first unmounts other screens
+   * at once instead of animating them out.
+   */
+  const navigate = (href: string) => {
+    freshAfterReset = false;
+    navigation?.resetRoot({
+      index: 0,
+      routes: [
+        { name: '__root', state: { index: 0, routes: [{ name: 'index' }] } },
+      ],
+    });
+    if (href !== '/') router.push(href as Href);
+  };
+
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
+    navigate,
     /**
-     * Opens a route without reloading the app, with the stack a deep link
-     * builds: Home, then the route. Resetting first unmounts other screens
-     * at once instead of animating them out.
+     * Returns the app to the state a freshly loaded page starts in, without
+     * reloading: empty database and storage, every provider and screen
+     * mounted anew, on the new-profile screen. Skipping the reload saves the
+     * bundle parse and database open that dominate a test's CPU time.
      */
-    navigate: (href: string) => {
-      navigation?.resetRoot({
-        index: 0,
-        routes: [
-          { name: '__root', state: { index: 0, routes: [{ name: 'index' }] } },
-        ],
-      });
-      if (href !== '/') router.push(href as Href);
+    resetForTest: async () => {
+      // Clearing rows cannot undo schema changes or the sync vault's
+      // IndexedDB keys; the test runner reloads instead.
+      if ((await schemaSignature()) !== (await bootSchema))
+        throw new Error('The database schema changed since the app loaded');
+      if ((await indexedDB.databases()).length > 0)
+        throw new Error('IndexedDB holds data a reset cannot clear');
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      // Tests inject failures with temporary triggers; a reload drops them.
+      const db = await getDb();
+      const temporary = await db.getAllAsync<{ type: string; name: string }>(
+        "SELECT type, name FROM sqlite_temp_master WHERE type IN ('trigger', 'view', 'table') ORDER BY type = 'table'"
+      );
+      for (const { type, name } of temporary)
+        await db.execAsync(`DROP ${type} IF EXISTS temp."${name}";`);
+      await clearAllDatabaseTables();
+      // Errors a test expected would otherwise stay in the dev error toast.
+      if (process.env.NODE_ENV === 'development')
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only module, left out of production bundles
+        require('@expo/log-box/src/LogBox').default.clearAllLogs();
+      localStorage.clear();
+      sessionStorage.clear();
+      // A freshly loaded page treats its last input as a pointer.
+      document.dispatchEvent(new PointerEvent('pointerdown'));
+      resetKey += 1;
+      resetListeners.forEach((listener) => listener());
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+      navigate('/profile/new');
+      freshAfterReset = true;
     },
+    /** Whether the app is still where `resetForTest` left it. */
+    isFreshAfterReset: () =>
+      freshAfterReset && window.location.pathname === '/profile/new',
     verifyDiagnosisMigration,
     getCondition: fetchConditionById,
     saveCondition: insertConditionRecord,

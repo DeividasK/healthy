@@ -8,67 +8,12 @@ import {
   getTestTreatment,
   getTestClinicalDocument,
   findTreatmentsSection,
-  checkA11y,
   openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
-  });
-
-  test('shows a consultation from its condition and deletes it back to the condition', async ({
-    page,
-  }) => {
-    const condition = await seedTestCondition(page, {
-      title: 'Migraine Study',
-    });
-    const consultation = await seedTestConsultation(page, {
-      id: 'consultation-view-delete',
-      conditionIds: [condition.id],
-      title: 'Annual Physical Exam',
-      doctorName: 'Dr. Beverly Crusher',
-      serviceType: 'Primary care',
-      date: '2026-10-02',
-      notes: 'Follow-up next year.',
-      status: 'completed',
-    });
-    await page.getByTestId(`condition-open-${condition.id}`).click();
-    await page
-      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
-      .click();
-    await expect(page).toHaveURL(
-      new RegExp(`.*consultation\\/${consultation.id}$`)
-    );
-    await expect(page.getByTestId('consultation-title')).toHaveText(
-      'Annual Physical Exam'
-    );
-    const view = page.getByTestId('consultation-view');
-    await expect(view.getByText('Dr. Beverly Crusher')).toBeVisible();
-    await expect(view.getByText('Primary care')).toBeVisible();
-    await expect(view.getByText('Follow-up next year.')).toBeVisible();
-    await checkA11y(page, { include: '[data-testid="consultation-view"]' });
-
-    await page.clock.install();
-    await page.getByTestId('delete-consultation-button').click();
-    await expect(page.getByText('Delete Consultation')).toBeVisible();
-    await page.clock.runFor(5000);
-    await page.getByTestId('delete-modal-confirm-button').click();
-    // Deleting returns to the condition, whose timeline is now empty.
-    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
-    await expect(page.getByTestId('condition-title')).toHaveText(
-      'Migraine Study'
-    );
-    await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
-
-    const deletions = await page.evaluate(async () => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      await bridge.flushLocalChanges();
-      return await bridge.querySql(
-        "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
-      );
-    });
-    expect(deletions).toEqual([{ resource_id: consultation.id }]);
   });
 
   test('keeps consultation details available when the linked condition fails to load', async ({

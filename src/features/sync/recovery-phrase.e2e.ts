@@ -15,6 +15,9 @@ import {
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 
+// Devices, reloads and the sync vault need pages of their own.
+test.use({ freshApp: true });
+
 const CONFIG_KEY = '@healthy_device_google_sync_config';
 // A valid 24-word phrase that belongs to no vault in these tests.
 const OTHER_PHRASE = `${'abandon '.repeat(23)}art`;
@@ -62,7 +65,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const names = [...store.files.values()].map((file) => file.name);
     expect(names).toContain('vault.json');
     expect(names.some((name) => name.startsWith('chunk_'))).toBe(true);
-    expect(driveContents(store)).not.toContain('Doe');
+    // Quotes never occur in encrypted (base64url) text, so a match is plaintext.
+    expect(driveContents(store)).not.toContain('"family":"Doe"');
 
     await page.getByTestId('show-recovery-phrase-button').click();
     expect(await readPhrase(page)).toBe(phrase);
@@ -339,12 +343,17 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       userEmail: 'bob@gmail.com',
     });
     store.acceptedToken = 'revoked-everywhere';
+    const requestsBefore = store.requests.length;
     // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');
     await expect(page.getByTestId('sync-now-button')).toBeVisible();
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'bob@gmail.com'
     );
+    // The sync that runs on start is refused first.
+    await expect
+      .poll(() => store.requests.length)
+      .toBeGreaterThan(requestsBefore);
 
     // Once Google refuses a token, automatic syncs stop asking for one.
     const driveRequests: string[] = [];

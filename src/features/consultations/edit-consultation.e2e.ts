@@ -2,7 +2,6 @@ import {
   test,
   expect,
   seedTestPatient,
-  seedTestCondition,
   seedTestConsultation,
   seedTestServiceRequest,
   getTestServiceRequest,
@@ -14,77 +13,6 @@ test.describe('Edit Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
-
-  test(
-    'should allow editing an existing Consultation from Condition view',
-    { tag: ['@smoke'] },
-    async ({ page }) => {
-      let conditionId = '';
-      let consultationId = '';
-
-      await test.step('Seed condition with consultation', async () => {
-        const cond = await seedTestCondition(page, {
-          title: 'Hypertension Monitoring',
-        });
-        conditionId = cond.id;
-
-        const cons = await seedTestConsultation(page, {
-          conditionIds: [conditionId],
-          title: 'Initial Checkup',
-          doctorName: 'Dr. Watson',
-          date: '2026-10-01',
-          notes: 'Preliminary assessment.',
-        });
-        consultationId = cons.id;
-      });
-
-      await test.step('Open the consultation view from Condition and edit it', async () => {
-        await page.getByTestId(`condition-open-${conditionId}`).click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-
-        await page
-          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
-          .click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/${consultationId}$`)
-        );
-        await page.getByTestId('consultation-diagnosis-condition').click();
-        await expect(
-          page.locator('[data-testid="condition-title"]:visible')
-        ).toHaveText('Hypertension Monitoring');
-        await page.getByTestId('back-button').click();
-        await page.getByTestId('edit-consultation-button').click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/${consultationId}\\/edit`)
-        );
-        await expect(page.getByText('Edit Consultation')).toBeVisible();
-
-        const titleInput = page.getByTestId('consultation-title-input');
-        await expect(titleInput).toHaveValue('Initial Checkup');
-
-        const doctorInput = page.getByTestId('consultation-doctor-input');
-        await expect(doctorInput).toHaveValue('Dr. Watson');
-
-        await titleInput.fill('Follow-up Examination');
-        await doctorInput.fill('Dr. John Watson');
-        await page.getByTestId('save-button').click();
-      });
-
-      await test.step('Verify the consultation view reflects the update', async () => {
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/${consultationId}$`)
-        );
-        await expect(page.getByTestId('consultation-title')).toHaveText(
-          'Follow-up Examination'
-        );
-        await expect(
-          page.getByTestId('consultation-view').getByText('Dr. John Watson')
-        ).toBeVisible();
-      });
-    }
-  );
 
   test('edits and removes the service provider', async ({ page }) => {
     const consultation = await seedTestConsultation(page, {

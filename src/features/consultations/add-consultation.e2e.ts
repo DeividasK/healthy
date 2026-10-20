@@ -6,6 +6,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   checkA11y,
+  evaluateBridge,
   openRoute,
   reopenRoute,
 } from '@/src/features/testing/testStorage';
@@ -16,10 +17,11 @@ test.describe('Add Consultation Flow', () => {
   });
 
   test(
-    'creates a consultation from its condition with every optional field and lists it everywhere',
+    'creates a consultation from its condition with every optional field, then views, edits and deletes it',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       let conditionId: string;
+      let consultationId = '';
 
       await test.step('Seed a condition and navigate to it from Home', async () => {
         const cond = await seedTestCondition(page, {
@@ -119,6 +121,7 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByTestId('consultation-title')).toHaveText(
           'General Cardiology Review'
         );
+        consultationId = new URL(page.url()).pathname.split('/').pop()!;
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
@@ -128,6 +131,76 @@ test.describe('Add Consultation Flow', () => {
         // Home lists recent consultations, including linked ones.
         await expect(page.getByText('General Cardiology Review')).toBeVisible();
         await expect(page.getByText('Dr. Marcus Welby')).toBeVisible();
+      });
+
+      await test.step('View its details and open the condition it was for', async () => {
+        await openRoute(page, `/condition/${conditionId}`);
+        await page
+          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
+          .click();
+        const view = page.getByTestId('consultation-view');
+        await expect(view.getByText('Dr. Marcus Welby')).toBeVisible();
+        await expect(
+          view.getByText('Cardiology', { exact: true })
+        ).toBeVisible();
+        await expect(
+          view.getByText('Follow-up in 6 months. Blood pressure stable.')
+        ).toBeVisible();
+        await checkA11y(page, { include: '[data-testid="consultation-view"]' });
+        await page
+          .getByTestId('consultation-reasons')
+          .getByText('Cardiology Overview')
+          .click();
+        await expect(
+          page.locator('[data-testid="condition-title"]:visible')
+        ).toHaveText('Cardiology Overview');
+        await page.getByTestId('back-button').click();
+      });
+
+      await test.step('Edit it from its view', async () => {
+        await page.getByTestId('edit-consultation-button').click();
+        await expect(page).toHaveURL(
+          new RegExp(`consultation/${consultationId}/edit$`)
+        );
+        await expect(page.getByText('Edit Consultation')).toBeVisible();
+        const titleInput = page.getByTestId('consultation-title-input');
+        await expect(titleInput).toHaveValue('General Cardiology Review');
+        const doctorInput = page.getByTestId('consultation-doctor-input');
+        await expect(doctorInput).toHaveValue('Dr. Marcus Welby');
+        await titleInput.fill('Follow-up Examination');
+        await doctorInput.fill('Dr. John Watson');
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(
+          new RegExp(`consultation/${consultationId}$`)
+        );
+        await expect(page.getByTestId('consultation-title')).toHaveText(
+          'Follow-up Examination'
+        );
+        await expect(
+          page.getByTestId('consultation-view').getByText('Dr. John Watson')
+        ).toBeVisible();
+      });
+
+      await test.step('Delete it back to its condition and record the deletion for sync', async () => {
+        await page.clock.install();
+        await page.getByTestId('delete-consultation-button').click();
+        await expect(page.getByText('Delete Consultation')).toBeVisible();
+        await page.clock.runFor(5000);
+        await page.getByTestId('delete-modal-confirm-button').click();
+        await expect(page).toHaveURL(
+          new RegExp(`.*condition\\/${conditionId}$`)
+        );
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          'Cardiology Overview'
+        );
+        await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
+        const deletions = await evaluateBridge(page, async (b) => {
+          await b.flushLocalChanges();
+          return await b.querySql(
+            "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
+          );
+        });
+        expect(deletions).toEqual([{ resource_id: consultationId }]);
       });
     }
   );

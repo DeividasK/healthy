@@ -210,12 +210,18 @@ export async function reopenRoute(page: Page): Promise<void> {
   await openRoute(page, url.pathname + url.search);
 }
 
+/** Whether the shared app is still where its reset left it (see `page`). */
+const isFreshApp = (page: Page): Promise<boolean> =>
+  page.evaluate(
+    () => !!(window as any).__HEALTHY_TEST_BRIDGE__?.isFreshAfterReset()
+  );
+
 /** Seeds a Patient through the real service; a fresh page starts on Home. */
 export async function seedTestPatient(
   page: Page,
   options?: SeedPatientOptions
 ): Promise<any> {
-  const freshPage = page.url() === 'about:blank';
+  const freshPage = page.url() === 'about:blank' || (await isFreshApp(page));
   await bootstrapApp(page);
   const patient = await test.step('Seed patient', () =>
     page.evaluate(async (opts) => {

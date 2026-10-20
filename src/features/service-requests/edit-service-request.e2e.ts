@@ -282,9 +282,10 @@ test.describe('Edit Service Request', () => {
     await page.getByTestId(`service-request-lab-result-${report.id}`).click();
     await expect(page.getByTestId('lab-result-title')).toBeVisible();
     await page.getByTestId(`lab-result-service-request-${request.id}`).click();
-    await expect(page.getByTestId('service-request-title')).toHaveText(
-      'Blood count'
-    );
+    // The request opens again on top of itself; the one below is hidden.
+    await expect(
+      page.getByTestId('service-request-title').filter({ visible: true })
+    ).toHaveText('Blood count');
 
     // The request's condition shows the result on its timeline
     await openRoute(page, `/condition/${condition.id}`);

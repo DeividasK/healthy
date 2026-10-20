@@ -2,6 +2,7 @@ import {
   test as baseTest,
   expect,
   type Browser,
+  type BrowserContext,
   type Page,
   type TestInfo,
 } from '@playwright/test';
@@ -20,10 +21,138 @@ export interface ConsoleMonitor {
   getWarnings: () => string[];
 }
 
-export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
-  page: async ({ page }, providePage) => {
-    await mockGoogleIdentityServices(page);
+/** A booted app a worker reuses across tests (see the `page` fixture). */
+interface SharedApp {
+  context?: BrowserContext;
+  page?: Page;
+  /** The context options it was created with. */
+  options?: string;
+}
+
+/** Listeners a test may add that must not reach the next test. */
+const TEST_EVENTS = [
+  'console',
+  'pageerror',
+  'dialog',
+  'download',
+  'filechooser',
+  'popup',
+  'request',
+  'response',
+] as const;
+
+export const test = baseTest.extend<
+  { consoleMonitor: ConsoleMonitor; freshApp: boolean },
+  { sharedApp: SharedApp }
+>({
+  /**
+   * Gives the test a page of its own instead of the worker's shared app:
+   * for tests about loading, other tabs or devices, or browser state a
+   * reset cannot clear. A test can also opt out with the `@fresh-app` tag.
+   */
+  freshApp: [false, { option: true }],
+  sharedApp: [
+    // eslint-disable-next-line no-empty-pattern -- Playwright reads fixture dependencies from the pattern
+    async ({}, use) => {
+      const shared: SharedApp = {};
+      await use(shared);
+      await shared.context?.close();
+    },
+    { scope: 'worker' },
+  ],
+  /**
+   * Booting the app (bundle parse, SQLite and migrations) costs more CPU
+   * than most tests, so a worker boots it once and resets it in place before
+   * each test: empty database and storage, providers and screens remounted,
+   * on the new-profile screen a fresh page also opens on. A failed test, a
+   * reload, a fake clock or other tabs discard the shared app.
+   */
+  page: async (
+    {
+      browser,
+      freshApp,
+      sharedApp,
+      viewport,
+      reducedMotion,
+      isMobile,
+      hasTouch,
+      colorScheme,
+    },
+    providePage,
+    testInfo
+  ) => {
+    if (freshApp || testInfo.tags.includes('@fresh-app')) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await mockGoogleIdentityServices(page);
+      await providePage(page);
+      await context.close();
+      return;
+    }
+    const options = JSON.stringify({
+      viewport,
+      reducedMotion,
+      isMobile,
+      hasTouch,
+      colorScheme,
+    });
+    const discard = async () => {
+      await sharedApp.context?.close();
+      sharedApp.context = sharedApp.page = undefined;
+    };
+    if (sharedApp.options !== options) await discard();
+    if (sharedApp.page && sharedApp.page.url() !== 'about:blank') {
+      const page = sharedApp.page;
+      const reset = await test
+        .step('Reset app', async () => {
+          if (viewport && !isEqualSize(page.viewportSize(), viewport))
+            await page.setViewportSize(viewport);
+          await page.mouse.move(0, 0);
+          await page.evaluate(() =>
+            (window as any).__HEALTHY_TEST_BRIDGE__.resetForTest()
+          );
+          await page.waitForURL('**/profile/new');
+        })
+        .then(
+          () => true,
+          () => false
+        );
+      if (!reset) await discard();
+    }
+    if (!sharedApp.page) {
+      sharedApp.context = await browser.newContext();
+      sharedApp.page = await sharedApp.context.newPage();
+      sharedApp.options = options;
+      await mockGoogleIdentityServices(sharedApp.page);
+    }
+    const page = sharedApp.page;
+    // A test that loads the page again leaves another document in its
+    // history, which a later back navigation would reload into.
+    let loads = page.url() === 'about:blank' ? -1 : 0;
+    const countLoad = () => loads++;
+    page.on('domcontentloaded', countLoad);
     await providePage(page);
+    page.off('domcontentloaded', countLoad);
+    for (const event of TEST_EVENTS) page.removeAllListeners(event);
+    const usedClock = await page
+      .evaluate(() => '__pwClock' in globalThis)
+      .catch(() => true);
+    if (
+      testInfo.status !== testInfo.expectedStatus ||
+      loads > 0 ||
+      page.isClosed() ||
+      sharedApp.context!.pages().length !== 1 ||
+      usedClock
+    ) {
+      await discard();
+    } else {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await sharedApp.context!.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+  },
+  // The page's own context, shared or not.
+  context: async ({ page }, provideContext) => {
+    await provideContext(page.context());
   },
   consoleMonitor: [
     async ({ page }, use) => {
@@ -34,6 +163,11 @@ export const test = baseTest.extend<{ consoleMonitor: ConsoleMonitor }>({
     { auto: true },
   ],
 });
+
+const isEqualSize = (
+  a: { width: number; height: number } | null,
+  b: { width: number; height: number }
+) => a?.width === b.width && a?.height === b.height;
 
 /**
  * Opens another browser context: a separate device with its own SQLite

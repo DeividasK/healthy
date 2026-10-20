@@ -2,11 +2,8 @@ import {
   test,
   expect,
   seedTestPatient,
-  seedTestConsultation,
   seedTestTreatment,
   getTestTreatment,
-  getTestClinicalDocument,
-  findTreatmentsSection,
   checkA11y,
   getBrowserLocalDate,
   openRoute,
@@ -53,36 +50,6 @@ test.describe('View Treatment Flow', () => {
     await checkA11y(page, { include: '[data-testid="treatment-view"]' });
     const stored = await getTestTreatment(page, treatment.id);
     expect(stored.dosageInstruction?.[0]?.text).toBe(longInstructions);
-  });
-
-  test('deletes a treatment and removes its now-empty document section', async ({
-    page,
-  }) => {
-    const consultation = await seedTestConsultation(page, {
-      title: 'Endocrinology Review',
-    });
-    const treatment = await seedTestTreatment(page, {
-      title: 'Metformin 500mg',
-      consultationId: consultation.id,
-      dosageInstructions: 'Take 1 tablet twice daily with meals.',
-    });
-    const docBefore = await getTestClinicalDocument(page, consultation.id);
-    expect(findTreatmentsSection(docBefore).entry).toContainEqual({
-      reference: `MedicationRequest/${treatment.id}`,
-    });
-
-    await page.clock.install();
-    await openRoute(page, `/treatment/${treatment.id}`);
-    await page.getByTestId('delete-treatment-button').click();
-    await page.clock.runFor(5000);
-    await page.getByTestId('delete-modal-confirm-button').click();
-    await expect(page).toHaveURL(/.*(\/|#|\/\?.*)$/);
-    await expect(page.getByText('Metformin 500mg')).not.toBeVisible();
-
-    // The document remains, but an empty section would violate R5 cmp-1
-    const docAfter = await getTestClinicalDocument(page, consultation.id);
-    expect(docAfter).toBeDefined();
-    expect(findTreatmentsSection(docAfter)).toBeUndefined();
   });
 });
 

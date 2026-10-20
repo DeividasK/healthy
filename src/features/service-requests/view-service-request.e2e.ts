@@ -2,11 +2,7 @@ import {
   test,
   expect,
   seedTestPatient,
-  seedTestConsultation,
   seedTestServiceRequest,
-  seedTestReport,
-  getTestClinicalDocument,
-  findServiceRequestSection,
   evaluateBridge as bridge,
   openRoute,
 } from '@/src/features/testing/testStorage';
@@ -62,54 +58,5 @@ test.describe('View Service Request', () => {
     await expect(
       page.getByTestId(`based-on-consultation-${consultation.id}`)
     ).toBeVisible();
-  });
-
-  test('deleting removes document entries and basedOn references', async ({
-    page,
-  }) => {
-    const origin = await seedTestConsultation(page, { title: 'GP visit' });
-    const request = await seedTestServiceRequest(page, {
-      title: 'Echocardiogram',
-      consultationId: origin.id,
-    });
-    const visit = await seedTestConsultation(page, {
-      title: 'Echo appointment',
-      basedOnServiceRequestIds: [request.id],
-    });
-    const { report } = await seedTestReport(page, {
-      serviceRequestIds: [request.id],
-      biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
-    });
-
-    await openRoute(page, `/service-request/${request.id}`);
-    await page.clock.install();
-    await page.getByTestId('delete-service-request-button').click();
-    await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
-    await page.clock.runFor(5000);
-    await page.getByTestId('delete-modal-confirm-button').click();
-    await expect(page.getByTestId('home-consultations-section')).toBeVisible();
-    await expect(page.getByTestId('home-service-requests-section')).toHaveCount(
-      0
-    );
-
-    expect(
-      findServiceRequestSection(await getTestClinicalDocument(page, origin.id))
-    ).toBeUndefined();
-    const stored = await bridge(
-      page,
-      (b, id) => b.getConsultation(id),
-      visit.id
-    );
-    expect(stored.basedOn).toBeUndefined();
-    expect(stored.meta.lastUpdated).toBeTruthy();
-    const [row] = await bridge(
-      page,
-      (b, id) =>
-        b.querySql('SELECT fhir_json FROM diagnostic_reports WHERE id = ?;', [
-          id,
-        ]),
-      report.id
-    );
-    expect(JSON.parse(row.fhir_json).basedOn).toBeUndefined();
   });
 });

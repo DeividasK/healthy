@@ -4,6 +4,7 @@ import {
   expect,
   seedTestPatient,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -12,7 +13,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   });
 
   test(
-    'should allow user to add CBC lab results and view them on home',
+    'adds CBC lab results, then views, edits and deletes them',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       await test.step('Open Add Lab Results screen from floating button and audit a11y', async () => {
@@ -151,6 +152,117 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         ).toBe('10*9/L');
 
         await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
+      });
+
+      let reportId = '';
+      const results = page.getByTestId('lab-result-results-section');
+      await test.step('View its details from the Home card', async () => {
+        await page.getByTestId(/^view-report-button-/).click();
+        await expect(page).toHaveURL(/lab-result\/[^/]+$/);
+        reportId = new URL(page.url()).pathname.split('/').pop()!;
+        await expect(page.getByTestId('lab-result-title')).toHaveText(
+          'Complete blood count (hemogram) panel - Blood by Automated count'
+        );
+        await expect(page.getByTestId('lab-result-date')).toContainText(
+          'Sep 20, 2026'
+        );
+        await expect(page.getByTestId('lab-result-status')).toHaveText('Final');
+        await expect(page.getByTestId('lab-result-notes')).toHaveText(
+          'Fasting routine checkup'
+        );
+        // A report without a provider shows no provider section.
+        await expect(
+          page.getByTestId('lab-result-service-provider')
+        ).toHaveCount(0);
+        await expect(
+          page.getByTestId('lab-result-results-section-count')
+        ).toHaveText('2');
+        await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
+          '14.5'
+        );
+        await expect(results.getByTestId('biomarker-row-6690-2')).toContainText(
+          '6.8'
+        );
+        await results.getByTestId('biomarker-row-718-7').click();
+        await expect(page).toHaveURL(/biomarker\/718-7$/);
+        await page.getByTestId('back-button').click();
+      });
+
+      await test.step('Edit it from its view and return to the update', async () => {
+        await page.getByTestId('edit-lab-result-button').click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
+        await page.getByTestId('marker-value-input-0').fill('11.2');
+        await page.getByTestId('remove-notes-button').click();
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}$`));
+        await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
+          '11.2'
+        );
+        await expect(page.getByTestId('lab-result-notes-section')).toHaveCount(
+          0
+        );
+      });
+
+      await test.step('Edit it from its Home card: values, tests and notes', async () => {
+        await openRoute(page, '/');
+        await expect(page.getByText('CBC Panel')).not.toBeVisible();
+        await page.getByTestId(`edit-report-button-${reportId}`).click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
+        await expect(page.getByText('Edit Lab Results')).toBeVisible();
+        await expect(page.getByTestId('marker-card-0')).toContainText(
+          'Hemoglobin (Hgb)'
+        );
+        await expect(page.getByTestId('marker-value-input-0')).toHaveValue(
+          '11.2'
+        );
+        await expect(page.getByTestId('marker-card-1')).toContainText(
+          'White Blood Cells (WBC)'
+        );
+        await expect(page.getByTestId('marker-value-input-1')).toHaveValue(
+          '6.8'
+        );
+
+        await page.getByTestId('marker-value-input-0').fill('16.2');
+        await page.getByTestId('remove-marker-1').click();
+        await expect(
+          page.getByTestId(/^marker-card-/).getByText('White Blood Cells (WBC)')
+        ).not.toBeVisible();
+        await page.getByTestId('test-search-input').fill('Platelets');
+        await page.getByTestId('autocomplete-item-cbc_platelets').click();
+        await page.getByTestId('marker-value-input-1').fill('250');
+        await page.getByTestId('plus-menu-button').click();
+        await page.getByTestId('menu-add-notes').click();
+        await page.getByTestId('notes-input').fill('Updated checkup note');
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(/.*(\/|#)$/);
+
+        const cards = page
+          .getByTestId('results-scroll-view')
+          .locator('[data-testid^="report-card-"]');
+        await expect(cards.getByText('Hemoglobin (Hgb)')).toBeVisible();
+        await expect(cards.getByText('16.2')).toBeVisible();
+        await expect(cards.getByText('11.2')).not.toBeVisible();
+        await expect(cards.getByText('Platelets (PLT)')).toBeVisible();
+        await expect(cards.getByText('250')).toBeVisible();
+        await expect(
+          cards.getByText('White Blood Cells (WBC)')
+        ).not.toBeVisible();
+        await expect(page.getByText('"Updated checkup note"')).toBeVisible();
+      });
+
+      await test.step('Delete it from the edit island', async () => {
+        await page.getByTestId(`edit-report-button-${reportId}`).click();
+        await page.clock.install();
+        await page.getByTestId('delete-report-button').click();
+        await expect(
+          page.getByTestId('delete-confirmation-modal')
+        ).toBeVisible();
+        await page.clock.runFor(5000);
+        await page.getByTestId('delete-modal-confirm-button').click();
+        await expect(page).toHaveURL(/\/$/);
+        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
+        await openRoute(page, `/lab-result/${reportId}`);
+        await expect(page.getByText('Lab result not found.')).toBeVisible();
       });
     }
   );

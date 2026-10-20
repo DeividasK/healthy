@@ -5,8 +5,9 @@ export default defineConfig<ChromaticConfig>({
   testDir: './src/features',
   globalSetup: './src/features/testing/globalSetup.ts',
   fullyParallel: true,
-  // Three of four cores: measured stable, the dev server takes the rest.
-  workers: '75%',
+  // Locally one worker per core measured fastest: with the app booted once
+  // per worker, tests no longer saturate the CPU while the dev server works.
+  workers: process.env.CI ? '75%' : '100%',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   timeout: 30000,

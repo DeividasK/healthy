@@ -90,7 +90,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     }
   );
 
-  test('opens the profile from the header and edits it', async ({ page }) => {
+  test('opens the profile from the header, edits it, offers adding another and deletes it', async ({
+    page,
+  }) => {
     await page.getByTestId('profile-header-button').click();
     await expect(page).toHaveURL(/.*profile/);
     await expect(page.getByText('Profile', { exact: true })).toBeVisible();
@@ -139,77 +141,76 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
       'Not specified'
     );
-  });
 
-  test('should present 3 creation options on /profile/new (Create, Restore file, Restore GDrive) and navigate properly', async ({
-    page,
-  }) => {
-    await openRoute(page, '/profile/new');
-    await expect(page.getByText('Add Profile')).toBeVisible();
+    await test.step('Offers creating or restoring another profile', async () => {
+      await openRoute(page, '/profile/new');
+      await expect(page.getByText('Add Profile')).toBeVisible();
 
-    // Verify 3 options exist
-    await expect(page.getByTestId('option-create-profile')).toBeVisible();
-    await expect(page.getByTestId('option-restore-file')).toBeVisible();
-    await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
+      // Verify 3 options exist
+      await expect(page.getByTestId('option-create-profile')).toBeVisible();
+      await expect(page.getByTestId('option-restore-file')).toBeVisible();
+      await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
 
-    // "Create" option shows the manual form and doesn't duplicate "New Profile" header
-    await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
-    await expect(page.getByText('New Profile')).not.toBeVisible();
+      // "Create" option shows the manual form and doesn't duplicate "New Profile" header
+      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+      await expect(page.getByText('New Profile')).not.toBeVisible();
 
-    // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
-    await page.getByTestId('option-restore-file').click();
-    await expect(page.getByTestId('select-profile-file-button')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Select profile', exact: true })
-    ).toBeVisible();
+      // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
+      await page.getByTestId('option-restore-file').click();
+      await expect(
+        page.getByTestId('select-profile-file-button')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Select profile', exact: true })
+      ).toBeVisible();
 
-    // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
-    await page.getByTestId('option-restore-gdrive').click();
-    await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Connect Google Drive', exact: true })
-    ).toBeVisible();
+      // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
+      await page.getByTestId('option-restore-gdrive').click();
+      await expect(
+        page.getByTestId('connect-google-drive-button')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Connect Google Drive', exact: true })
+      ).toBeVisible();
 
-    // Click "Create" -> navigates back to /profile/new with manual form
-    await page.getByTestId('option-create-profile').click();
-    await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
-  });
+      // Click "Create" -> navigates back to /profile/new with manual form
+      await page.getByTestId('option-create-profile').click();
+      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+    });
 
-  test('deletes the last profile from its edit form and returns to /profile/new', async ({
-    page,
-  }) => {
-    await page.getByTestId('profile-header-button').click();
+    await test.step('Deletes the last profile from its edit form', async () => {
+      await openRoute(page, '/profile');
+      // Wait for active profile to load and edit button to be enabled
+      await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
+      await page.getByTestId('edit-profile-button').click();
+      await expect(page).toHaveURL(/.*profile\/.*\/edit/);
 
-    // Wait for active profile to load and edit button to be enabled
-    await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
-    await page.getByTestId('edit-profile-button').click();
-    await expect(page).toHaveURL(/.*profile\/.*\/edit/);
+      // Delete button should appear in EditProfileView
+      const deleteBtn = page.getByTestId('delete-profile-button');
+      await expect(deleteBtn).toBeVisible();
+      await page.clock.install();
+      await deleteBtn.click();
 
-    // Delete button should appear in EditProfileView
-    const deleteBtn = page.getByTestId('delete-profile-button');
-    await expect(deleteBtn).toBeVisible();
-    await page.clock.install();
-    await deleteBtn.click();
+      // Confirmation modal should appear with 5s countdown
+      const modal = page.getByTestId('delete-profile-modal');
+      await expect(modal).toBeVisible();
+      await expect(modal.getByText('Delete Profile')).toBeVisible();
 
-    // Confirmation modal should appear with 5s countdown
-    const modal = page.getByTestId('delete-profile-modal');
-    await expect(modal).toBeVisible();
-    await expect(modal.getByText('Delete Profile')).toBeVisible();
+      // Since this is a local profile without Google Drive sync, cloud checkbox should not be visible
+      await expect(
+        modal.getByTestId('delete-from-cloud-checkbox')
+      ).not.toBeVisible();
 
-    // Since this is a local profile without Google Drive sync, cloud checkbox should not be visible
-    await expect(
-      modal.getByTestId('delete-from-cloud-checkbox')
-    ).not.toBeVisible();
+      await page.clock.runFor(5000);
+      await page.getByTestId('delete-modal-confirm-button').click();
 
-    await page.clock.runFor(5000);
-    await page.getByTestId('delete-modal-confirm-button').click();
+      // Since this was the only profile, should redirect straight to /profile/new!
+      await expect(page).toHaveURL(/.*profile\/new/);
+      await expect(page.getByTestId('option-create-profile')).toBeVisible();
 
-    // Since this was the only profile, should redirect straight to /profile/new!
-    await expect(page).toHaveURL(/.*profile\/new/);
-    await expect(page.getByTestId('option-create-profile')).toBeVisible();
-
-    // When 0 profiles exist, back button is hidden
-    await expect(page.getByTestId('back-button')).not.toBeVisible();
+      // When 0 profiles exist, back button is hidden
+      await expect(page.getByTestId('back-button')).not.toBeVisible();
+    });
   });
 });
 

@@ -9,6 +9,9 @@ import {
   reopenRoute,
 } from '@/src/features/testing/testStorage';
 
+// Legacy schemas and reloads need a page of their own.
+test.use({ freshApp: true });
+
 for (const scenario of [
   'legacy-v10',
   'legacy-v11',
