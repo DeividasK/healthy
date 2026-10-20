@@ -1,14 +1,12 @@
-import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import '../../../global.css';
 
 import { AppChrome } from '@/src/components/AppChrome';
-import { COLORS } from '@/src/theme/colors';
 import { NAV_THEME } from '@/src/theme';
 import { ActivePatientProvider } from '@/src/features/profile/ActivePatientContext';
 import { SyncProvider } from '@/src/context/SyncContext';
@@ -17,12 +15,14 @@ import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedR
 import { setupTestBridge } from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// Keep the splash screen up until the app chrome has rendered, then fade out
+// to it: screens show their own loading states while their data arrives.
 SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ fade: true });
 
 function AppReadyHandler() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hide();
     setupTestBridge();
     registerPwa();
   }, []);
@@ -31,30 +31,6 @@ function AppReadyHandler() {
 }
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../../../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  if (!loaded) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: COLORS.light.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
-  }
-
   return (
     <DatabaseProvider>
       <AppReadyHandler />

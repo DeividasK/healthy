@@ -1,12 +1,10 @@
-import React, { Suspense, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
+import React, { useEffect, useState } from 'react';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
 import { DATABASE_MIGRATIONS } from './migrations';
 import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
-import { COLORS } from '@/src/theme/colors';
 
 export * from './migrations';
 
@@ -23,7 +21,6 @@ export function getNativeDb(): SQLiteDatabase | null {
 
 /**
  * Applies PRAGMAs and migrations to a database instance.
- * Used by expo-sqlite's SQLiteProvider onInit callback.
  */
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -76,28 +73,14 @@ export interface DatabaseProviderProps {
   children: React.ReactNode;
 }
 
-function DatabaseLoading() {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.light.background,
-      }}
-    >
-      <ActivityIndicator size="large" color={COLORS.light.primary} />
-    </View>
-  );
-}
-
 /**
- * Configured SQLiteProvider for the Healthy application.
- * Manages the SQLite database connection, PRAGMA setup, and schema migrations.
+ * Opens and migrates the database while the app renders. Screens read through
+ * `getDb()`, which waits for it, and show their own loading states meanwhile.
  * On web, only one tab opens the database; others wait until it closes.
  */
 export function DatabaseProvider({ children }: DatabaseProviderProps) {
   const [owned, setOwned] = useState<boolean | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let active = true;
@@ -107,13 +90,19 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     whenDatabaseTabOwned().then(() => {
       if (active) setOwned(true);
     });
+    initializeDatabase().catch((err) => {
+      if (active) setError(err);
+    });
     return () => {
       active = false;
     };
   }, []);
 
-  if (owned === null) return <DatabaseLoading />;
-  if (!owned) {
+  // Surfaces a failed open or migration through the router's error boundary.
+  if (error) throw error;
+  // The app renders before ownership is known: until this tab owns the
+  // database, everything it reads waits.
+  if (owned === false) {
     return (
       <DatabaseInUseView
         onRetry={async () => {
@@ -123,17 +112,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     );
   }
 
-  return (
-    <Suspense fallback={<DatabaseLoading />}>
-      <SQLiteProvider
-        databaseName={DB_NAME}
-        onInit={migrateDatabase}
-        useSuspense
-      >
-        {children}
-      </SQLiteProvider>
-    </Suspense>
-  );
+  return <>{children}</>;
 }
 
 /**

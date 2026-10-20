@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ClipboardList } from 'lucide-react-native';
 import type { LinkFieldConfig } from '@/src/components/useLinkFields';
 import { getServiceRequestLinkOptions } from '@/src/features/service-requests/serviceRequestService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
-import { COLORS } from '@/src/theme/colors';
 import { LabResultForm } from './LabResultForm';
 import { getReportById } from './diagnosticReportService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditLabResultView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,11 +47,7 @@ export function EditLabResultView() {
   }, [id, activePatientId, isLoading]);
 
   if (!linkFields) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
   return (
     <LabResultForm
@@ -63,12 +58,3 @@ export function EditLabResultView() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.background,
-  },
-});

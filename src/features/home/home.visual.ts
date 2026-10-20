@@ -175,3 +175,26 @@ test.describe('Home View - Visual Regression', () => {
     await takeSnapshot(page, 'Home View - Expanded sections', testInfo);
   });
 });
+
+test('Home and resource views - Loading placeholders', async ({
+  page,
+}, testInfo) => {
+  // Holds the SQLite worker so the database stays closed while capturing.
+  await page.route(/expo-sqlite\/web\/worker|wa-sqlite\.wasm/, () => {});
+
+  await page.goto('/');
+  await page
+    .getByTestId('home-skeleton')
+    .getByTestId('skeleton-row')
+    .first()
+    .waitFor();
+  await takeSnapshot(page, 'Home View - Loading', testInfo);
+
+  await page.goto('/condition/loading-visual');
+  await page
+    .getByTestId('resource-skeleton')
+    .getByTestId('skeleton-row')
+    .first()
+    .waitFor();
+  await takeSnapshot(page, 'Resource View - Loading', testInfo);
+});

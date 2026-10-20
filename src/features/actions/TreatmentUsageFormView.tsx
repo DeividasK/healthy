@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,6 +45,7 @@ import {
   removeTreatmentUsage,
 } from './treatmentUsageService';
 import { formatUsagePeriod } from './usageDuration';
+import { LoadingView } from '@/src/components/LoadingView';
 
 /** A change while taking it: on hold, stopped for good, or a new regimen. */
 type ChangeKind = 'pause' | 'stop' | 'change';
@@ -130,11 +130,7 @@ export function TreatmentUsageFormView() {
     );
   }
   if (!loaded) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
   return period ? (
     <UsagePeriodForm

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,6 +22,7 @@ import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { GoogleSyncCard } from './GoogleSyncCard';
 import { PatientIdText } from './PatientIdText';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function ProfileView() {
   const router = useRouter();
@@ -70,9 +70,7 @@ export function ProfileView() {
     return (
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <View style={styles.container}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.light.primary} />
-          </View>
+          <LoadingView />
         </View>
       </SafeAreaView>
     );
@@ -211,11 +209,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scroll: {
     flex: 1,

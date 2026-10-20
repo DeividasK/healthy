@@ -1,7 +1,7 @@
 import { getConditionCategoryLabel } from './conditionCategories';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ConditionForm, ConditionFormValues } from './ConditionForm';
 import {
@@ -35,6 +35,7 @@ import {
   getServiceRequestLinkOptions,
   setServiceRequestConditionLink,
 } from '@/src/features/service-requests/serviceRequestService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -169,11 +170,7 @@ export function EditConditionView() {
   }, [id, activePatientId, isPatientLoading]);
 
   if (isLoading || isPatientLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (notFound || !initialValues) {
@@ -185,11 +182,7 @@ export function EditConditionView() {
   }
 
   if (initialPatientId !== activePatientId) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   const handleSave = async (

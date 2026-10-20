@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  ActivityIndicator,
-  StyleSheet,
-  Platform,
-  Text,
-} from 'react-native';
+import { Platform, Text } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { TreatmentForm, type TreatmentFormValues } from './TreatmentForm';
 import { createOrUpdateTreatment } from './treatmentService';
@@ -22,7 +16,7 @@ import {
 } from '@/src/utils/fhirUtils';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
-import { COLORS } from '@/src/theme/colors';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function AddTreatmentView() {
   const { consultationId, conditionId } = useLocalSearchParams<{
@@ -30,8 +24,7 @@ export function AddTreatmentView() {
     conditionId?: string;
   }>();
   const { activePatientId, isLoading } = useActivePatient();
-  if (isLoading)
-    return <ActivityIndicator accessibilityLabel="Loading patient" />;
+  if (isLoading) return <LoadingView />;
   return (
     <AddTreatmentForPatient
       key={`${activePatientId}:${consultationId || ''}:${conditionId || ''}`}
@@ -110,11 +103,7 @@ function AddTreatmentForPatient({
 
   if (loadState === 'error') return <Text>Failed to load treatment form.</Text>;
   if (loadState === 'loading') {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   const handleSubmit = async (values: TreatmentFormValues) => {
@@ -164,12 +153,3 @@ function AddTreatmentForPatient({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.background,
-  },
-});

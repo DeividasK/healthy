@@ -190,6 +190,41 @@ export async function fetchConsultationIdsReferencingResource(
 }
 
 /**
+ * Counts, for each of the patient's consultations, how many of `references`
+ * its document lists. Reads the patient's documents once.
+ */
+export async function countConsultationsReferencingResources(
+  references: string[],
+  patientId: string
+): Promise<Record<string, number>> {
+  if (references.length === 0) return {};
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    consultation_id: string;
+    fhir_json: string;
+  }>(
+    `SELECT consultation_id, fhir_json FROM clinical_documents
+     WHERE patient_id = ?;`,
+    [patientId]
+  );
+  const wanted = new Set(references);
+  const linked = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.consultation_id) continue;
+    const found = linked.get(row.consultation_id) ?? new Set<string>();
+    for (const reference of getCompositionEntryReferences(
+      JSON.parse(row.fhir_json) as Composition
+    ))
+      if (wanted.has(reference)) found.add(reference);
+    linked.set(row.consultation_id, found);
+  }
+  const counts: Record<string, number> = {};
+  for (const [consultationId, found] of linked)
+    if (found.size > 0) counts[consultationId] = found.size;
+  return counts;
+}
+
+/**
  * Fetches a single Composition document by its ID.
  */
 export async function fetchClinicalDocumentById(

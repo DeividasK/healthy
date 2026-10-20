@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TreatmentForm, type TreatmentFormValues } from './TreatmentForm';
 import {
@@ -42,12 +36,12 @@ import {
   diffLinkIds,
   type LinkFieldConfig,
 } from '@/src/components/useLinkFields';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditTreatmentView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading } = useActivePatient();
-  if (isLoading)
-    return <ActivityIndicator accessibilityLabel="Loading patient" />;
+  if (isLoading) return <LoadingView />;
   return (
     <EditTreatmentForPatient
       key={`${activePatientId}:${id}`}
@@ -162,11 +156,7 @@ function EditTreatmentForPatient({
   }, [id, activePatientId]);
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (notFound || !initialValues) {
@@ -238,12 +228,6 @@ function EditTreatmentForPatient({
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.background,
-  },
   notFoundContainer: {
     flex: 1,
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ProfileForm } from './ProfileForm';
 import {
@@ -12,6 +12,7 @@ import { useActivePatient } from './ActivePatientContext';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditProfileView() {
   const router = useRouter();
@@ -67,11 +68,7 @@ export function EditProfileView() {
   }, [id]);
 
   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (notFound || !initialValues || !id) {
