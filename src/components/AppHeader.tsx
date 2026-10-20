@@ -2,7 +2,7 @@ import React from 'react';
 import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
-import { Settings } from 'lucide-react-native';
+import { Bot, Settings } from 'lucide-react-native';
 import { AppLogo } from './AppLogo';
 import { OfflineHeaderIndicator, useIsOffline } from './OfflineHeaderIndicator';
 import { SyncHeaderIndicator } from './SyncHeaderIndicator';
@@ -10,7 +10,7 @@ import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton'
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 
-/** Profile on the left, the logo (home) centred, sync status and settings on the right. */
+/** Profile on the left, the logo (home) centred, sync status, the assistant and settings on the right. */
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,6 +43,21 @@ export function AppHeader() {
         )}
         <View style={styles.end}>
           {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
+          {activePatient && (
+            <TouchableOpacity
+              testID="assistant-header-button"
+              accessibilityRole="button"
+              accessibilityLabel="Assistant"
+              style={styles.button}
+              activeOpacity={0.7}
+              onPress={() => {
+                Keyboard.dismiss();
+                if (pathname !== '/assistant') router.navigate('/assistant');
+              }}
+            >
+              <Bot size={22} color={COLORS.light.primary} />
+            </TouchableOpacity>
+          )}
           {activePatient && (
             <TouchableOpacity
               testID="settings-header-button"

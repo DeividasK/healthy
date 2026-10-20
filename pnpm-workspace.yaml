@@ -7,6 +7,7 @@ nodeLinker: hoisted
 
 allowBuilds:
   esbuild: true
+  react-native-executorch: true
   unrs-resolver: false
 
 patchedDependencies:

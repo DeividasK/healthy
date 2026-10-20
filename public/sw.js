@@ -39,7 +39,10 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))
+          keys
+            // Other caches, such as the assistant's downloaded model, are not ours.
+            .filter((key) => key.startsWith('healthy-shell-') && key !== CACHE)
+            .map((key) => caches.delete(key))
         )
       )
       .then(() => self.clients.claim())
