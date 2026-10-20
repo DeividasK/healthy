@@ -51,11 +51,13 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   await expect(page.getByTestId(/^treatment-selected-condition-/)).toHaveCount(
     0
   );
-  await addField('usageStart');
-  await expect(page.getByTestId('add-option-button')).toBeDisabled();
-  // A removed start date records no usage
+  // Start taking is shown by default; dismissed, it returns to the menu and
+  // records no usage
   await page.getByTestId('remove-treatment-usageStart-button').click();
   await expect(page.getByTestId('treatment-usageStart-picker')).toHaveCount(0);
+  await addField('usageStart');
+  await expect(page.getByTestId('add-option-button')).toBeDisabled();
+  await page.getByTestId('remove-treatment-usageStart-button').click();
   await page.getByTestId('treatment-title-input').fill('Optional fields');
   await checkA11y(page, { include: '[data-testid="treatment-form"]' });
   await page.getByTestId('save-treatment-button').click();

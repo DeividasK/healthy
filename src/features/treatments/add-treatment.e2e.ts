@@ -550,8 +550,7 @@ test.describe('Treatment form keyboard support', () => {
     );
     await page.goto('/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Vitamin D');
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-treatment-usageStart').click();
+    // Start taking is shown from the start, as today
     const usageStart = page
       .getByTestId('treatment-usageStart-picker')
       .locator('input');

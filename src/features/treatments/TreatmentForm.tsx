@@ -178,8 +178,10 @@ export function TreatmentForm({
         label: 'Start taking',
         icon: Play,
         empty: null as Date | null,
+        // New treatments start being taken today unless dismissed; usage of
+        // a saved treatment is recorded from its page.
+        initial: isEditing ? null : new Date(),
         added: () => new Date(),
-        // Usage of a saved treatment is recorded from its page.
         available: !isEditing,
       },
     },
