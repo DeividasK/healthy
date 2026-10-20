@@ -198,6 +198,8 @@ export function rowToChange(row: {
 export interface ApplyResult {
   applied: number;
   deferred: number;
+  /** Profiles newly held because another device deleted them. */
+  held: number;
   tables: DatabaseTable[];
 }
 
@@ -211,9 +213,15 @@ export interface ApplyResult {
 export async function applyRemoteChanges(
   db: SQLiteDatabase,
   incoming: SyncChange[],
-  options: { alsoPatientId?: string } = {}
+  options: { alsoPatientId?: string; confirmDeletionOf?: string } = {}
 ): Promise<ApplyResult> {
   await flushLocalChanges(db);
+  // A held profile removed from this device needs no decision any more.
+  await db.runAsync(
+    `UPDATE sync_profiles SET deletion_hold_hlc = NULL
+     WHERE deletion_hold_hlc IS NOT NULL
+     AND patient_id NOT IN (SELECT id FROM patients);`
+  );
   const state = await getDeviceState(db);
   const pending = await db.getAllAsync<{ change_json: string }>(
     'SELECT change_json FROM sync_pending_apply;'
@@ -247,7 +255,16 @@ export async function applyRemoteChanges(
       await db.runAsync('DELETE FROM sync_pending_apply WHERE hlc = ?;', [
         change.hlc,
       ]);
+  const { held, added } = await holdRemoteProfileDeletions(
+    db,
+    winners,
+    synced,
+    options.confirmDeletionOf
+  );
   for (const change of winners) {
+    // A held profile's changes wait for the user's decision, which downloads
+    // them again; deferred ones stay queued.
+    if (change.patientId && held.has(change.patientId)) continue;
     // Every profile in the cloud is listed, so it can be chosen for sync.
     if (change.resourceType === 'Patient') await recordCloudProfile(db, change);
     // Profiles this device does not sync are skipped, not stored.
@@ -328,7 +345,60 @@ export async function applyRemoteChanges(
     );
     await updateDeviceState(db, { hlcLast: formatHlc(clock) });
   }
-  return { applied, deferred, tables: [...tables] };
+  return { applied, deferred, held: added, tables: [...tables] };
+}
+
+/**
+ * Puts on hold every profile this device syncs and still has whose deletion
+ * would now be applied from another device, so the user decides first
+ * whether to delete, restore or keep this device's copy. Returns every held
+ * profile, including ones held by earlier syncs.
+ */
+async function holdRemoteProfileDeletions(
+  db: SQLiteDatabase,
+  winners: SyncChange[],
+  synced: Set<string>,
+  confirmDeletionOf: string | undefined
+): Promise<{ held: Set<string>; added: number }> {
+  let added = 0;
+  const held = new Set(
+    (
+      await db.getAllAsync<{ patient_id: string }>(
+        'SELECT patient_id FROM sync_profiles WHERE deletion_hold_hlc IS NOT NULL;'
+      )
+    ).map((row) => row.patient_id)
+  );
+  for (const change of winners) {
+    if (
+      change.resourceType !== 'Patient' ||
+      change.op !== 'delete' ||
+      change.id === confirmDeletionOf ||
+      held.has(change.id) ||
+      !synced.has(change.id)
+    )
+      continue;
+    const current = await db.getFirstAsync<{ hlc: string }>(
+      'SELECT hlc FROM sync_row_versions WHERE resource_type = ? AND resource_id = ?;',
+      [change.resourceType, change.id]
+    );
+    if (current && current.hlc >= change.hlc) continue;
+    if (
+      !(await db.getFirstAsync('SELECT 1 FROM patients WHERE id = ?;', [
+        change.id,
+      ]))
+    )
+      continue;
+    await db.runAsync(
+      `INSERT INTO sync_profiles (patient_id, deletion_hold_hlc) VALUES (?, ?)
+       ON CONFLICT (patient_id) DO UPDATE SET
+         deletion_hold_hlc = excluded.deletion_hold_hlc;`,
+      [change.id, change.hlc]
+    );
+    held.add(change.id);
+    added++;
+  }
+  held.delete(confirmDeletionOf ?? '');
+  return { held, added };
 }
 
 export async function listSyncedPatientIds(

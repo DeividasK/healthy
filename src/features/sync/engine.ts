@@ -107,6 +107,11 @@ function exclusive<T>(operation: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** Changes of profiles this device uploads: synced and not held. */
+const UPLOADED_PATIENTS = `(patient_id IS NULL OR patient_id IN (
+  SELECT patient_id FROM sync_profiles
+  WHERE synced = 1 AND deletion_hold_hlc IS NULL))`;
+
 const chunkName = (deviceId: string, seq: number) =>
   `chunk_${deviceId}_${String(seq).padStart(8, '0')}.bin`;
 const snapshotName = (deviceId: string) => `snapshot_${deviceId}.bin`;
@@ -263,7 +268,8 @@ async function resetSpaceState(
 ): Promise<void> {
   await db.execAsync(`
     DELETE FROM sync_remote_devices;
-    UPDATE sync_profiles SET in_cloud = 0, cloud_deleted = 0;
+    UPDATE sync_profiles SET in_cloud = 0, cloud_deleted = 0,
+      deletion_hold_hlc = NULL;
     DELETE FROM sync_pending_apply;
   `);
   await updateDeviceState(db, {
@@ -327,13 +333,17 @@ async function pushLocalChanges(
   db: SQLiteDatabase
 ): Promise<number> {
   const rows = await db.getAllAsync<Parameters<typeof rowToChange>[0]>(
-    // Only profiles this device syncs are uploaded.
+    // Only profiles this device syncs, and not held ones, are uploaded.
+    // Profile deletions go first, so another device sees one before any of
+    // the profile's other deletions and can ask before applying them.
     `SELECT * FROM sync_changes WHERE chunk_seq IS NULL
-     AND (patient_id IS NULL OR patient_id IN (
-       SELECT patient_id FROM sync_profiles WHERE synced = 1))
-     ORDER BY hlc;`
+     AND ${UPLOADED_PATIENTS}
+     ORDER BY (resource_type = 'Patient' AND op = 'delete') DESC, hlc;`
   );
-  if (!rows.length) return 0;
+  if (!rows.length) {
+    await releaseDeletedProfiles(db);
+    return 0;
+  }
   const batches: (typeof rows)[] = [[]];
   let size = 0;
   for (const row of rows) {
@@ -372,7 +382,28 @@ async function pushLocalChanges(
         );
     });
   }
+  await releaseDeletedProfiles(db);
   return rows.length;
+}
+
+/**
+ * Stops syncing profiles deleted on this device once their deletions are
+ * uploaded. If another device restores one, it is then offered under
+ * "Restore from Google Drive" here instead of coming back on its own.
+ */
+async function releaseDeletedProfiles(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync(
+    `UPDATE sync_profiles SET synced = 0
+     WHERE synced = 1 AND patient_id NOT IN (SELECT id FROM patients)
+     AND NOT EXISTS (
+       SELECT 1 FROM sync_changes WHERE chunk_seq IS NULL
+       AND sync_changes.patient_id = sync_profiles.patient_id)
+     AND NOT EXISTS (
+       SELECT 1 FROM sync_dirty
+       WHERE sync_dirty.patient_id = sync_profiles.patient_id
+       OR (sync_dirty.resource_type = 'Patient'
+         AND sync_dirty.resource_id = sync_profiles.patient_id));`
+  );
 }
 
 /**
@@ -467,7 +498,12 @@ export async function syncOnce(
       isOwnFile
     );
     let downloaded = 0;
-    let result = { applied: 0, deferred: 0, tables: [] as DatabaseTable[] };
+    let result = {
+      applied: 0,
+      deferred: 0,
+      held: 0,
+      tables: [] as DatabaseTable[],
+    };
     const hasPending = Boolean(
       await db.getFirstAsync('SELECT 1 FROM sync_pending_apply LIMIT 1;')
     );
@@ -502,7 +538,11 @@ export async function syncOnce(
         await updateDeviceState(db, { providerCursor: cursor });
       });
     }
-    if (result.tables.length) notifyDatabaseChanged(result.tables);
+    if (result.tables.length || result.held)
+      notifyDatabaseChanged([
+        ...result.tables,
+        ...(result.held ? (['sync_profiles'] as const) : []),
+      ]);
 
     const pushed = await pushLocalChanges(provider, keys, db);
     const after = await getDeviceState(db);
@@ -528,14 +568,12 @@ export function compactNow(
 /** Whether edits to synced profiles are waiting to be uploaded. */
 export async function hasUnsyncedLocalChanges(): Promise<boolean> {
   const db = await getDb();
-  const synced = `(patient_id IS NULL OR patient_id IN (
-    SELECT patient_id FROM sync_profiles WHERE synced = 1))`;
   return Boolean(
     (await db.getFirstAsync(
-      `SELECT 1 FROM sync_dirty WHERE ${synced} LIMIT 1;`
+      `SELECT 1 FROM sync_dirty WHERE ${UPLOADED_PATIENTS} LIMIT 1;`
     )) ||
     (await db.getFirstAsync(
-      `SELECT 1 FROM sync_changes WHERE chunk_seq IS NULL AND ${synced} LIMIT 1;`
+      `SELECT 1 FROM sync_changes WHERE chunk_seq IS NULL AND ${UPLOADED_PATIENTS} LIMIT 1;`
     ))
   );
 }
@@ -619,43 +657,165 @@ export async function startSyncingPatient(
       // The cloud only holds this device's tombstones: re-stamp every record
       // so the new uploads win over them.
       await db.withTransactionAsync(async () => {
-        for (const [type, entry] of Object.entries(RESOURCE_REGISTRY))
-          await db.runAsync(
-            `INSERT OR REPLACE INTO sync_dirty (resource_type, resource_id, patient_id, changed_ms)
-             SELECT ?, id, ?, ? FROM ${entry.table}
-             WHERE ${type === 'Patient' ? 'id' : 'patient_id'} = ?;`,
-            [type, patientId, Date.now(), patientId]
-          );
+        await restampPatient(db, patientId);
         await enable();
       });
       return;
     }
-    const state = await getDeviceState(db);
-    const plan = planDownloads(
-      await provider.listAll(),
-      keys.spaceId,
-      state.deviceId,
-      new Map(),
-      true
-    );
-    const remote = await downloadChanges(provider, keys, plan.downloads);
-    const own = (
-      await db.getAllAsync<Parameters<typeof rowToChange>[0]>(
-        'SELECT * FROM sync_changes WHERE patient_id = ?;',
-        [patientId]
-      )
-    ).map(rowToChange);
+    const changes = await downloadPatientHistory(provider, keys, patientId);
     let tables: DatabaseTable[] = [];
     await db.withTransactionAsync(async () => {
-      const result = await applyRemoteChanges(
-        db,
-        [...remote, ...own].filter((change) => change.patientId === patientId),
-        { alsoPatientId: patientId }
-      );
+      const result = await applyRemoteChanges(db, changes, {
+        alsoPatientId: patientId,
+      });
       tables = result.tables;
       await enable();
     });
-    if (tables.length) notifyDatabaseChanged(tables);
+    // The cloud may hold a deletion of the profile this device has.
+    notifyDatabaseChanged([...tables, 'sync_profiles']);
+  });
+}
+
+/** Every change to a profile from every device, including this one. */
+async function downloadPatientHistory(
+  provider: CloudStorageProvider,
+  keys: VaultKeys,
+  patientId: string
+): Promise<SyncChange[]> {
+  const db = await getDb();
+  const state = await getDeviceState(db);
+  const plan = planDownloads(
+    await provider.listAll(),
+    keys.spaceId,
+    state.deviceId,
+    new Map(),
+    true
+  );
+  const remote = await downloadChanges(provider, keys, plan.downloads);
+  const own = (
+    await db.getAllAsync<Parameters<typeof rowToChange>[0]>(
+      'SELECT * FROM sync_changes WHERE patient_id = ?;',
+      [patientId]
+    )
+  ).map(rowToChange);
+  return [...remote, ...own].filter((change) => change.patientId === patientId);
+}
+
+/**
+ * Marks every local record of a profile as changed now, so its next upload
+ * wins over older deletions in the cloud. Must run inside a transaction.
+ */
+async function restampPatient(
+  db: SQLiteDatabase,
+  patientId: string
+): Promise<void> {
+  for (const [type, entry] of Object.entries(RESOURCE_REGISTRY))
+    await db.runAsync(
+      `INSERT OR REPLACE INTO sync_dirty (resource_type, resource_id, patient_id, changed_ms)
+       SELECT ?, id, ?, ? FROM ${entry.table}
+       WHERE ${type === 'Patient' ? 'id' : 'patient_id'} = ?;`,
+      [type, patientId, Date.now(), patientId]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Profiles deleted from the cloud by another device: held until the user
+// deletes, restores or keeps this device's copy.
+// ---------------------------------------------------------------------------
+
+/** Profiles another device deleted from the cloud, still on this device. */
+export async function listProfileDeletionHolds(): Promise<CloudProfile[]> {
+  const db = await getDb();
+  return (
+    await db.getAllAsync<{ patient_id: string; display_name: string | null }>(
+      `SELECT patient_id, display_name FROM sync_profiles
+       WHERE deletion_hold_hlc IS NOT NULL
+       AND patient_id IN (SELECT id FROM patients)
+       ORDER BY display_name, patient_id;`
+    )
+  ).map((row) => ({
+    patientId: row.patient_id,
+    displayName: row.display_name,
+  }));
+}
+
+/** Clears a profile's hold and the remote changes deferred for it. */
+async function releaseHold(
+  db: SQLiteDatabase,
+  patientId: string
+): Promise<void> {
+  await db.runAsync(
+    'UPDATE sync_profiles SET deletion_hold_hlc = NULL WHERE patient_id = ?;',
+    [patientId]
+  );
+  await db.runAsync(
+    `DELETE FROM sync_pending_apply
+     WHERE json_extract(change_json, '$.patientId') = ?;`,
+    [patientId]
+  );
+}
+
+/** Applies the held deletion: the profile's records leave this device. */
+export async function applyHeldProfileDeletion(
+  provider: CloudStorageProvider,
+  keys: VaultKeys,
+  patientId: string
+): Promise<void> {
+  return exclusive(async () => {
+    const db = await getDb();
+    const changes = await downloadPatientHistory(provider, keys, patientId);
+    let tables: DatabaseTable[] = [];
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        'UPDATE sync_profiles SET deletion_hold_hlc = NULL WHERE patient_id = ?;',
+        [patientId]
+      );
+      tables = (
+        await applyRemoteChanges(db, changes, { confirmDeletionOf: patientId })
+      ).tables;
+    });
+    notifyDatabaseChanged([...tables, 'sync_profiles']);
+  });
+}
+
+/**
+ * Uploads this device's copy of a held profile again. Its records are
+ * re-stamped, so they win over the deletion on every device.
+ */
+export async function restoreHeldProfile(patientId: string): Promise<void> {
+  return exclusive(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      await releaseHold(db, patientId);
+      await restampPatient(db, patientId);
+      await db.runAsync(
+        `UPDATE sync_profiles SET synced = 1, in_cloud = 1, cloud_deleted = 0
+         WHERE patient_id = ?;`,
+        [patientId]
+      );
+    });
+    notifyDatabaseChanged(['sync_profiles']);
+  });
+}
+
+/**
+ * Stops syncing a held profile and keeps it on this device only. Syncing it
+ * again later uploads it anew instead of applying the deletion.
+ */
+export async function keepHeldProfileOnDevice(
+  patientId: string
+): Promise<void> {
+  return exclusive(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      await releaseHold(db, patientId);
+      await db.runAsync(
+        `UPDATE sync_profiles SET synced = 0, in_cloud = 0, cloud_deleted = 1
+         WHERE patient_id = ?;`,
+        [patientId]
+      );
+    });
+    notifyDatabaseChanged(['sync_profiles']);
   });
 }
 

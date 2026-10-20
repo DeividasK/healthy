@@ -14,8 +14,11 @@ import { useDismissKey } from '@/src/utils/dismissKey';
 
 /**
  * A dialog card centred over a dimmed backdrop. Tapping the backdrop, Escape
- * (web) or back (Android) closes it.
+ * (web) or back (Android) closes it. Without `onClose` it cannot be
+ * dismissed: only its own buttons close it.
  */
+const ignoreDismiss = () => {};
+
 export function CenteredModal({
   visible,
   title,
@@ -27,11 +30,13 @@ export function CenteredModal({
   visible: boolean;
   title: string;
   icon?: LucideIcon;
-  onClose: () => void;
+  onClose?: () => void;
   testID: string;
   children?: React.ReactNode;
 }) {
-  useDismissKey(onClose, visible);
+  // Still registered without `onClose`, so Escape or back cannot reach
+  // whatever is underneath.
+  useDismissKey(onClose ?? ignoreDismiss, visible);
   if (!visible) return null;
 
   return (
@@ -40,7 +45,7 @@ export function CenteredModal({
       transparent
       animationType="fade"
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={onClose ?? ignoreDismiss}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
@@ -61,9 +66,22 @@ export function CenteredModal({
   );
 }
 
-/** The buttons at the bottom of a `CenteredModal`, aligned to the end. */
-export function ModalActions({ children }: { children: React.ReactNode }) {
-  return <View style={styles.actionsRow}>{children}</View>;
+/**
+ * The buttons at the bottom of a `CenteredModal`, aligned to the end, or
+ * `stacked` full width for choices with longer labels.
+ */
+export function ModalActions({
+  children,
+  stacked,
+}: {
+  children: React.ReactNode;
+  stacked?: boolean;
+}) {
+  return (
+    <View style={stacked ? styles.actionsColumn : styles.actionsRow}>
+      {children}
+    </View>
+  );
 }
 
 /** A pill button in `ModalActions`. */
@@ -154,6 +172,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
+  },
+  actionsColumn: {
+    alignItems: 'stretch',
+    gap: 10,
   },
   button: {
     paddingHorizontal: 18,

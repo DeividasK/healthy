@@ -25,7 +25,12 @@ import type { CloudStorageProvider } from '@/src/features/sync/providers/types';
 import {
   VaultAlreadyExistsError,
   VaultMissingError,
+  applyHeldProfileDeletion,
   createVault,
+  keepHeldProfileOnDevice,
+  listProfileDeletionHolds,
+  restoreHeldProfile,
+  type CloudProfile,
   deleteCloudData,
   forgetVaultKey,
   hasRemoteVault,
@@ -40,6 +45,9 @@ import {
 } from '@/src/features/sync/engine';
 
 export type SyncState = 'idle' | 'syncing' | 'just_synced' | 'error';
+
+/** What to do with a profile another device deleted from the cloud. */
+export type ProfileDeletionChoice = 'delete' | 'restore' | 'keep-local';
 
 /**
  * `locked`: a Google account is connected but this device has not entered
@@ -68,6 +76,15 @@ interface SyncContextValue {
   syncNow: () => Promise<void>;
   /** Profiles this device syncs; each profile is opted in separately. */
   syncedProfileIds: string[];
+  /**
+   * Profiles another device deleted from the cloud that are still here.
+   * Their sync waits until the user chooses what to do with them.
+   */
+  profileDeletionHolds: CloudProfile[];
+  resolveProfileDeletion: (
+    patientId: string,
+    choice: ProfileDeletionChoice
+  ) => Promise<void>;
   /**
    * Connects Google Drive. A new vault needs its phrase shown, an existing one
    * needs it entered; without `createIfMissing` an empty Drive stays
@@ -152,6 +169,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<GoogleDriveConfig | null>(null);
   const [vaultState, setVaultState] = useState<VaultState>('disconnected');
   const [syncedProfileIds, setSyncedProfileIds] = useState<string[]>([]);
+  const [profileDeletionHolds, setProfileDeletionHolds] = useState<
+    CloudProfile[]
+  >([]);
   const hasSyncedProfiles = syncedProfileIds.length > 0;
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -183,6 +203,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setSyncedProfileIds(await listSyncedProfileIds());
   }, []);
 
+  const refreshProfileDeletionHolds = useCallback(async () => {
+    setProfileDeletionHolds(await listProfileDeletionHolds());
+  }, []);
+
+  // Syncs (also from other tabs) hold and release profiles.
+  useDatabaseSubscription(['sync_profiles'], () => {
+    Promise.all([refreshSyncedProfiles(), refreshProfileDeletionHolds()]).catch(
+      (err) => console.warn('Failed to read synced profiles:', err)
+    );
+  });
+
   const refreshConfig = useCallback(async () => {
     const loaded = await loadGoogleDriveConfig();
     configRef.current = loaded;
@@ -213,6 +244,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           setLastSyncedAt(new Date(loaded.lastSyncTimestamp));
         setIsUpToDate(!(await hasUnsyncedLocalChanges()));
         setSyncedProfileIds(await listSyncedProfileIds());
+        setProfileDeletionHolds(await listProfileDeletionHolds());
       } catch (err) {
         console.warn('Failed to load sync config:', err);
       }
@@ -516,6 +548,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     [disconnect, syncNow, withProvider]
   );
 
+  const resolveProfileDeletion = useCallback(
+    async (patientId: string, choice: ProfileDeletionChoice) => {
+      if (choice === 'delete') {
+        const keys = await loadVaultKeys();
+        if (!keys) throw new Error('Enter your recovery phrase first.');
+        await withProvider((provider) =>
+          applyHeldProfileDeletion(provider, keys, patientId)
+        );
+      } else if (choice === 'restore') await restoreHeldProfile(patientId);
+      else await keepHeldProfileOnDevice(patientId);
+      await refreshProfileDeletionHolds();
+      const remaining = await listSyncedProfileIds();
+      setSyncedProfileIds(remaining);
+      if (choice === 'restore') await syncNow();
+      // As when stopping a profile, the account goes with the last one.
+      else if (choice === 'keep-local' && remaining.length === 0)
+        await disconnect();
+    },
+    [disconnect, refreshProfileDeletionHolds, syncNow, withProvider]
+  );
+
   const clearError = useCallback(() => {
     setSyncError(null);
     setSyncState('idle');
@@ -540,6 +593,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         disconnect,
         syncedProfileIds,
         setProfileSynced,
+        profileDeletionHolds,
+        resolveProfileDeletion,
         clearError,
         refreshConfig,
       }}
