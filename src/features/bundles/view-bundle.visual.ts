@@ -4,7 +4,6 @@ import {
   seedTestBundle,
   seedTestPatient,
   seedTestResources,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Bundle - Visual Regression', () => {
@@ -31,7 +30,7 @@ test.describe('View Bundle - Visual Regression', () => {
       times: ['MORN', '20:00'],
       memberIds: ['visual-bundle-vit-d', 'visual-bundle-omega'],
     });
-    await openRoute(page, `/bundle/${bundle.id}`);
+    await page.goto(`/bundle/${bundle.id}`);
     await page.getByTestId('bundle-treatment-visual-bundle-omega').waitFor();
     await takeSnapshot(page, 'Bundle - View', testInfo);
   });

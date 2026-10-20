@@ -4,7 +4,6 @@ import {
   seedTestPatient,
   seedTestReport,
   seedTestServiceRequest,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Lab Result - Visual Regression', () => {
@@ -29,7 +28,7 @@ test.describe('View Lab Result - Visual Regression', () => {
       ],
     });
 
-    await openRoute(page, `/lab-result/${report.id}`);
+    await page.goto(`/lab-result/${report.id}`);
     await page.getByTestId('lab-result-title').waitFor();
     await takeSnapshot(page, 'Lab Result View - Details', testInfo);
   });

@@ -3,7 +3,6 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestResources,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test('Usage form: start, stop with notes, resume', async ({
@@ -20,7 +19,7 @@ test('Usage form: start, stop with notes, resume', async ({
       },
     ],
   });
-  await openRoute(page, '/treatment/visual-usage');
+  await page.goto('/treatment/visual-usage');
   await page.getByTestId('treatment-usage-start').click();
   await page.getByTestId('save-usage-button').waitFor();
   await takeSnapshot(page, 'Treatment usage - Start taking', testInfo);
@@ -30,7 +29,7 @@ test('Usage form: start, stop with notes, resume', async ({
       { id: 'visual-supplement', title: 'Magnesium', status: 'active' },
     ],
   });
-  await openRoute(page, '/treatment/visual-supplement');
+  await page.goto('/treatment/visual-supplement');
   await page.getByTestId('treatment-usage-start').click();
   await page.getByTestId('treatment-regimen-field').waitFor();
   await takeSnapshot(
@@ -43,7 +42,7 @@ test('Usage form: start, stop with notes, resume', async ({
       { treatmentId: 'visual-usage', action: 'start', date: '2026-10-01' },
     ],
   });
-  await openRoute(page, '/treatment/visual-usage');
+  await page.goto('/treatment/visual-usage');
   await page.getByTestId('treatment-usage-change').click();
   await page.getByTestId('add-option-button').click();
   await page.getByTestId('menu-add-usage-notes').click();
@@ -63,7 +62,7 @@ test('Usage form: start, stop with notes, resume', async ({
       },
     ],
   });
-  await openRoute(page, '/treatment/visual-usage');
+  await page.goto('/treatment/visual-usage');
   await page.getByTestId('treatment-usage-start').click();
   await page.getByTestId('save-usage-button').waitFor();
   await takeSnapshot(page, 'Treatment usage - Resume taking', testInfo);
@@ -118,7 +117,7 @@ test('Usage form: a new regimen and where it shows', async ({
       },
     ],
   });
-  await openRoute(page, '/treatment/visual-regimen');
+  await page.goto('/treatment/visual-regimen');
   await page.getByTestId('treatment-usage-change').click();
   await page.getByTestId('save-usage-button').waitFor();
   await takeSnapshot(page, 'Treatment usage - Change usage', testInfo);
@@ -136,7 +135,7 @@ test('Usage form: a new regimen and where it shows', async ({
     .nth(1)
     .waitFor();
   await takeSnapshot(page, 'Treatment View - New regimen', testInfo);
-  await openRoute(page, '/journal?date=2026-10-06');
+  await page.goto('/journal?date=2026-10-06');
   await page.getByTestId('treatment-log-mismatch-visual-regimen-0').waitFor();
   await takeSnapshot(
     page,
@@ -167,7 +166,7 @@ test('Usage form: edit and remove a period', async ({ page }, testInfo) => {
       { treatmentId: 'visual-edit', action: 'resume', date: '2026-10-07' },
     ],
   });
-  await openRoute(page, '/treatment/visual-edit');
+  await page.goto('/treatment/visual-edit');
   await page.getByRole('button', { name: /^Edit On hold/i }).click();
   await page.getByTestId('treatment-usage-notes-input').waitFor();
   await takeSnapshot(page, 'Treatment usage - Edit period', testInfo);

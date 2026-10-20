@@ -4,7 +4,6 @@ import {
   seedTestBundle,
   seedTestPatient,
   seedTestResources,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 // The visual fixture fixes today at 2026-10-08.
@@ -65,7 +64,7 @@ test.describe('My actions - Visual Regression', () => {
   test('Home and actions view with a partly logged week', async ({
     page,
   }, testInfo) => {
-    await openRoute(page, '/');
+    await page.goto('/');
     await page.getByTestId('home-action-day-2026-10-06-complete').waitFor();
     await takeSnapshot(page, 'My actions - Home week strip', testInfo);
 
@@ -77,7 +76,7 @@ test.describe('My actions - Visual Regression', () => {
 
     // The fixture's frozen clock stops slide animations, so other days
     // open directly.
-    await openRoute(page, '/journal?date=2026-10-05');
+    await page.goto('/journal?date=2026-10-05');
     await page
       .getByTestId('actions-day-label')
       .getByText('Mon, Oct 5')
@@ -86,14 +85,14 @@ test.describe('My actions - Visual Regression', () => {
     await takeSnapshot(page, 'My actions - Past day', testInfo);
 
     // An older day sits in the middle of the strip (Sep 26 – Oct 2).
-    await openRoute(page, '/journal?date=2026-09-29');
+    await page.goto('/journal?date=2026-09-29');
     await page.getByTestId('actions-day-2026-09-26').waitFor();
     await page.getByTestId('treatment-log-row-visual-log-cream').waitFor();
     await takeSnapshot(page, 'My actions - Centred older day', testInfo);
     await page.getByTestId('actions-day-label').click();
     await page.getByTestId('actions-calendar-day-2026-09-29').waitFor();
     await takeSnapshot(page, 'My actions - Month calendar', testInfo);
-    await openRoute(page, '/journal');
+    await page.goto('/journal');
     await page.getByTestId('treatment-log-taken-visual-log-cream').waitFor();
     // Do not capture Expo's development error toast for this injected failure.
     await page.evaluate(() => {

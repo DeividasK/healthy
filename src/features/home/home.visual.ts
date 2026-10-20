@@ -8,7 +8,6 @@ import {
   seedTestConsultation,
   seedTestTreatment,
   seedTestServiceRequest,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Home View - Visual Regression', () => {
@@ -60,7 +59,7 @@ test.describe('Home View - Visual Regression', () => {
       title: 'Combined review',
       conditionIds: ['condition-home-visual', 'second-home-visual'],
     });
-    await openRoute(page, '/');
+    await page.goto('/');
     await page.getByTestId('condition-card-second-home-visual').waitFor();
     await takeSnapshot(
       page,
@@ -85,7 +84,7 @@ test.describe('Home View - Visual Regression', () => {
       notes: 'Routine morning blood test',
     });
 
-    await openRoute(page, '/');
+    await page.goto('/');
     await page
       .getByTestId('results-scroll-view')
       .locator('[data-testid^="report-card-"]')
@@ -123,7 +122,7 @@ test.describe('Home View - Visual Regression', () => {
       date: '2026-09-20',
       biomarkers: [{ name: 'Hemoglobin', value: 8 }],
     });
-    await openRoute(page, '/');
+    await page.goto('/');
     await page.getByTestId('labs-summary-total').waitFor();
 
     await takeSnapshot(

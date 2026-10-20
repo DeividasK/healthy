@@ -4,7 +4,6 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestConsultation,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Consultation View - Visual Regression', () => {
@@ -28,7 +27,7 @@ test.describe('Edit Consultation View - Visual Regression', () => {
       status: 'completed',
     });
 
-    await openRoute(page, `/consultation/${cons.id}/edit`);
+    await page.goto(`/consultation/${cons.id}/edit`);
     await page.getByTestId('consultation-title-input').waitFor();
     await page.getByTestId('diagnosis-1-title-input').waitFor();
     await page.getByTestId('diagnosis-1-add').click();

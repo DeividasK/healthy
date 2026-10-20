@@ -3,7 +3,6 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestReport,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test('Labs Summary page - full and filtered latest results', async ({
@@ -25,7 +24,7 @@ test('Labs Summary page - full and filtered latest results', async ({
       { name: 'Red Blood Cells', value: 4.7 },
     ],
   });
-  await openRoute(page, '/labs-summary');
+  await page.goto('/labs-summary');
   const view = page.getByTestId('labs-summary-view');
   await view.getByTestId('labs-summary-result-718-7').waitFor();
   await takeSnapshot(page, 'Labs Summary - all biomarkers', testInfo);

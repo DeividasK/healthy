@@ -188,7 +188,8 @@ export async function bootstrapApp(page: Page): Promise<void> {
  * Opens a route like `page.goto`, with the same Home-then-route stack, but
  * without reloading the app once it has booted. A reload costs a full bundle
  * parse and database open, so keep `page.goto`/`page.reload` for tests about
- * a fresh boot or persistence.
+ * a fresh boot or persistence. Visual tests load pages instead: their frozen
+ * clock never finishes the animations a navigation starts.
  */
 export async function openRoute(page: Page, path: string): Promise<void> {
   if (page.url() === 'about:blank') {

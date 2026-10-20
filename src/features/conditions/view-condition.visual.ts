@@ -7,7 +7,6 @@ import {
   seedTestTreatment,
   seedTestServiceRequest,
   seedTestReport,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Condition View - Visual Regression', () => {
@@ -109,7 +108,7 @@ test.describe('View Condition View - Visual Regression', () => {
       reasonConditionIds: [cond.id],
     });
 
-    await openRoute(page, `/condition/${cond.id}`);
+    await page.goto(`/condition/${cond.id}`);
     await page.getByTestId('condition-title').waitFor();
 
     await takeSnapshot(

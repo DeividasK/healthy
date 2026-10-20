@@ -3,7 +3,6 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestResources,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Bundle - Visual Regression', () => {
@@ -15,7 +14,7 @@ test.describe('Add Bundle - Visual Regression', () => {
         { id: 'visual-bundle-omega', title: 'Omega-3 1g' },
       ],
     });
-    await openRoute(page, '/bundle/add?treatmentId=visual-bundle-vit-d');
+    await page.goto('/bundle/add?treatmentId=visual-bundle-vit-d');
     await page.getByTestId('bundle-form-title').waitFor();
     await page.getByTestId('bundle-title-input').fill('Before breakfast');
     await page.getByTestId('bundle-treatment-search-input').click();

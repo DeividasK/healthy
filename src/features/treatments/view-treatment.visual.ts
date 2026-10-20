@@ -6,7 +6,6 @@ import {
   seedTestTreatment,
   seedTestConsultation,
   seedTestResources,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Treatment - Visual Regression', () => {
@@ -40,7 +39,7 @@ test.describe('View Treatment - Visual Regression', () => {
       notes: 'Monitored for sun sensitivity.',
     });
 
-    await openRoute(page, `/treatment/${treatment.id}`);
+    await page.goto(`/treatment/${treatment.id}`);
     await page.getByTestId('treatment-title').waitFor();
     await takeSnapshot(page, 'Treatment View - Details', testInfo);
 
@@ -122,7 +121,7 @@ test.describe('View Treatment - Visual Regression', () => {
       dispenseQuantity: { value: '56', unit: '{tablet}' },
     });
 
-    await openRoute(page, `/treatment/${treatment.id}`);
+    await page.goto(`/treatment/${treatment.id}`);
     await page.getByTestId('treatment-dosage').waitFor();
     await takeSnapshot(page, 'Treatment View - Regimen', testInfo);
   });
@@ -145,7 +144,7 @@ test('Taking and paused usage periods', async ({ page }, testInfo) => {
       { treatmentId: 'usage-history', action: 'resume', date: '2026-10-07' },
     ],
   });
-  await openRoute(page, '/treatment/usage-history');
+  await page.goto('/treatment/usage-history');
   await page.getByTestId('treatment-usage-change').waitFor();
   await page.getByTestId('treatment-usage-section').waitFor();
   await takeSnapshot(page, 'Treatment View - Usage periods', testInfo);

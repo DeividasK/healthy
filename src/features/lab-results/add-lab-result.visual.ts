@@ -3,13 +3,12 @@ import {
   takeSnapshot,
   waitForMenuToggle,
   seedTestPatient,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Lab Result View - Visual Regression', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
-    await openRoute(page, '/lab-result/add');
+    await page.goto('/lab-result/add');
   });
 
   test('Add Report View - Initial Clean Form', async ({ page }, testInfo) => {

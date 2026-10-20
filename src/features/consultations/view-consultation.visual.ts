@@ -6,7 +6,6 @@ import {
   seedTestConsultation,
   seedTestTreatment,
   seedTestServiceRequest,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Consultation - Visual Regression', () => {
@@ -57,7 +56,7 @@ test.describe('View Consultation - Visual Regression', () => {
       authoredOn: '2026-10-04',
       consultationId: consultation.id,
     });
-    await openRoute(page, `/consultation/${consultation.id}`);
+    await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-title').waitFor();
     await takeSnapshot(page, 'Consultation View - Details', testInfo);
     await page.setViewportSize({ width: 1280, height: 900 });

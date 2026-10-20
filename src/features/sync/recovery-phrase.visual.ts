@@ -4,7 +4,6 @@ import {
   takeSnapshot,
   waitForSyncIdle,
   seedTestPatient,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
@@ -16,7 +15,7 @@ test('Sync - Recovery Phrase', async ({ page }, testInfo) => {
       (i * 7).toString(16).padStart(2, '0')
     ).join(''),
   });
-  await openRoute(page, '/sync/recovery-phrase');
+  await page.goto('/sync/recovery-phrase');
   await expect(page.getByTestId('recovery-phrase-value')).not.toHaveText('');
 
   await waitForSyncIdle(page);

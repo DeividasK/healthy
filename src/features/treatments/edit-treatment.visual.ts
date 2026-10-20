@@ -4,7 +4,6 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Treatment - Visual Regression', () => {
@@ -24,7 +23,7 @@ test.describe('Edit Treatment - Visual Regression', () => {
       notes: 'No penicillin allergies reported.',
     });
 
-    await openRoute(page, `/treatment/${treatment.id}/edit`);
+    await page.goto(`/treatment/${treatment.id}/edit`);
     await page.getByTestId('treatment-form-title').waitFor();
     await takeSnapshot(page, 'Treatment - Edit Form Populated', testInfo);
   });
@@ -101,7 +100,7 @@ test.describe('Edit Treatment - Visual Regression', () => {
       dispenseQuantity: { value: '56', unit: '{tablet}' },
     });
 
-    await openRoute(page, `/treatment/${treatment.id}/edit`);
+    await page.goto(`/treatment/${treatment.id}/edit`);
     await page.getByTestId('treatment-regimen-field').waitFor();
     await takeSnapshot(page, 'Treatment - Edit Form Regimen', testInfo);
   });

@@ -3,7 +3,6 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestCondition,
-  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Condition View - Visual Regression', () => {
@@ -17,7 +16,7 @@ test.describe('Edit Condition View - Visual Regression', () => {
       onsetDate: '2026-10-02',
     });
 
-    await openRoute(page, `/condition/${cond.id}/edit`);
+    await page.goto(`/condition/${cond.id}/edit`);
     await page.getByTestId('condition-title-input').waitFor();
 
     await takeSnapshot(page, 'Condition View - Edit Existing Mode', testInfo);
