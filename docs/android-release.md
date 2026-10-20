@@ -74,19 +74,22 @@ repository; no GitHub secret is needed.
 
 ## Releasing
 
-- **Every push to `main`** that can change the app builds a `production` AAB
-  on EAS and submits it to the Play **Internal testing** track. Pushes that only
-  touch `docs/`, Markdown, `public/` or `.github/` are skipped.
-- **Manual:** expo.dev → **healthy → Workflows → Run workflow**, or
+Android ships with every release; see [Releasing Healthy](releasing.md).
+
+- **Every push to `release`** builds a `production` AAB on EAS and submits it
+  to the Play **Internal testing** track. Pushes to `main` publish nothing.
+- **Manual:** expo.dev → **healthy → Workflows → Run workflow** on the
+  `release` branch, or
   `pnpm dlx eas-cli workflow:run .eas/workflows/android-release.yml`.
 - **An installable APK, no store involved:**
   `pnpm dlx eas-cli build --platform android --profile preview`.
 
 Follow builds and submissions under **Workflows** on expo.dev.
 
-`eas.json` submits with `releaseStatus: draft`. The first release stays a draft
-until the store listing and declarations above are complete. After that, change
-it to `completed` to roll out automatically.
+`eas.json` submits with `releaseStatus: draft`, so each release needs **Start
+rollout** in Play Console, with its release notes pasted from the GitHub
+Release. The first release stays a draft until the store listing and
+declarations above are complete.
 
 ## Installing on your phone
 

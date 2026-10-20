@@ -80,6 +80,11 @@ Docs: https://docs.expo.dev/eas/index.md
 - **Strict UI Scope**: Never add UI elements (badges, buttons, indicators, icons, labels, tags, etc.) that are not explicitly mentioned in the user request or approved implementation plan. Adhere strictly to the requested UI specifications and do not invent unsolicited visual elements.
 - **Git Staging & File Management**: Never stage (`git add`), unstage (`git restore --staged`, `git reset`), commit (`git commit`), or push (`git push`) any git files or changes in the branch unless explicitly asked by the user. Leave all modified files unstaged for the user to review. Cloud sessions are the exception: follow **Cloud sessions** below.
 
+## Changelog and releases
+
+- **Changelog Fragments**: Every branch that changes what users get adds a changie fragment: `pnpm changie new --interactive=false --kind <Added|Changed|Fixed|Removed|Security> --body "<entry>"`, one per change. Write the entry for the people using the app (what they can now do, what works better), not how it was built: no issue numbers, file names or internal terms. Changes users would not notice (refactors, tests, tooling, dependency bumps) need no fragment; if CI asks for one anyway, add a `Changelog: none` trailer to the commit message. Never edit `CHANGELOG.md` by hand; see `docs/releasing.md`.
+- **Releases**: `main` publishes nothing. Only pushes to `release` publish (GitHub Release, GitHub Pages, Play internal testing). Never push to `release` unless the user asks for a release; follow `docs/releasing.md` (`pnpm release:prepare` on a branch from `main`, which sets the next `YYYY.M.N` date version, then fast-forward `release`).
+
 ## Cloud sessions
 
 A cloud session (Claude Code on the web, the app or a GitHub integration) runs in a disposable container, so unpushed work is lost. When a cloud session works on a GitHub issue:

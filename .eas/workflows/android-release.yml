@@ -1,16 +1,11 @@
 name: Android release
 
-# Every push to main that can change the app builds a production AAB and
-# submits it to Google Play's internal testing track (see eas.json `submit`).
+# Every push to `release` builds a production AAB and submits it to Google
+# Play's internal testing track (see eas.json `submit`). `main` publishes
+# nothing; see docs/releasing.md.
 on:
   push:
-    branches: ['main']
-    paths:
-      - '**'
-      - '!docs/**'
-      - '!**/*.md'
-      - '!public/**'
-      - '!.github/**'
+    branches: ['release']
 
 # Every job runs its own `pnpm install`, and package.json requires exactly this
 # Node version (devEngines). Build jobs also get it from eas.json, but the
@@ -19,23 +14,36 @@ defaults:
   tools:
     node: 22.23.2
 
-# Releases come only from main, also when the workflow is run by hand on
+# Releases come only from `release`, also when the workflow is run by hand on
 # another branch; branches get a debug build check in GitHub CI instead.
 jobs:
+  # Ships only a prepared version (pnpm release:prepare): its release notes
+  # exist and no fragments are left unreleased.
+  verify_release:
+    name: Verify release notes
+    if: ${{ github.ref_name == 'release' }}
+    steps:
+      - uses: eas/checkout
+      - name: Verify release notes
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          if ls .changes/unreleased/*.yaml > /dev/null 2>&1; then
+            echo "Unreleased fragments in .changes/unreleased. Run 'pnpm release:prepare' on main first."
+            exit 1
+          fi
+          test -f ".changes/$version.md" || { echo "No release notes for $version in .changes/"; exit 1; }
   build_android:
     name: Build Android
-    if: ${{ github.ref_name == 'main' }}
+    needs: [verify_release]
     type: build
     params:
       platform: android
       profile: production
   # Uploads as a draft (eas.json `submit.production.android.releaseStatus`), so
-  # each release still needs "Start rollout" in Play Console. Google Play only
-  # accepts drafts until the app has been published once; after that, switch
-  # releaseStatus to "completed" to roll out to internal testers automatically.
+  # each release still needs "Start rollout" in Play Console, where its release
+  # notes are pasted from the GitHub Release.
   submit_android:
     name: Submit to internal testing
-    if: ${{ github.ref_name == 'main' }}
     needs: [build_android]
     type: submit
     params:
