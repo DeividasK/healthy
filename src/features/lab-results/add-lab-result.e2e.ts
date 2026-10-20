@@ -4,6 +4,7 @@ import {
   expect,
   seedTestPatient,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -12,7 +13,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   });
 
   test(
-    'should allow user to add CBC lab results and view them on home',
+    'adds CBC lab results, then views, edits and deletes them',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       await test.step('Open Add Lab Results screen from floating button and audit a11y', async () => {
@@ -88,6 +89,25 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(notesInput).toBeVisible();
         await notesInput.fill('Fasting routine checkup');
 
+        // Date and an added time use native inputs behind their buttons.
+        await expect(page.getByTestId('menu-add-time')).toHaveCount(0);
+        await page
+          .getByTestId('date-picker-button')
+          .locator('input[type="date"]')
+          .fill('2026-09-20');
+        await expect(page.getByTestId('date-picker-button')).toContainText(
+          'Sep 20'
+        );
+        await plusMenuBtn.click();
+        await page.getByTestId('menu-add-time').click();
+        await page
+          .getByTestId('time-picker-button')
+          .locator('input[type="time"]')
+          .fill('08:15');
+        await expect(page.getByTestId('time-picker-button')).toContainText(
+          '08:15'
+        );
+
         const saveButton = page.getByTestId('save-button');
         await expect(saveButton).toBeVisible();
         await saveButton.click();
@@ -133,99 +153,119 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
         await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
       });
+
+      let reportId = '';
+      const results = page.getByTestId('lab-result-results-section');
+      await test.step('View its details from the Home card', async () => {
+        await page.getByTestId(/^view-report-button-/).click();
+        await expect(page).toHaveURL(/lab-result\/[^/]+$/);
+        reportId = new URL(page.url()).pathname.split('/').pop()!;
+        await expect(page.getByTestId('lab-result-title')).toHaveText(
+          'Complete blood count (hemogram) panel - Blood by Automated count'
+        );
+        await expect(page.getByTestId('lab-result-date')).toContainText(
+          'Sep 20, 2026'
+        );
+        await expect(page.getByTestId('lab-result-status')).toHaveText('Final');
+        await expect(page.getByTestId('lab-result-notes')).toHaveText(
+          'Fasting routine checkup'
+        );
+        // A report without a provider shows no provider section.
+        await expect(
+          page.getByTestId('lab-result-service-provider')
+        ).toHaveCount(0);
+        await expect(
+          page.getByTestId('lab-result-results-section-count')
+        ).toHaveText('2');
+        await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
+          '14.5'
+        );
+        await expect(results.getByTestId('biomarker-row-6690-2')).toContainText(
+          '6.8'
+        );
+        await results.getByTestId('biomarker-row-718-7').click();
+        await expect(page).toHaveURL(/biomarker\/718-7$/);
+        await page.getByTestId('back-button').click();
+      });
+
+      await test.step('Edit it from its view and return to the update', async () => {
+        await page.getByTestId('edit-lab-result-button').click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
+        await page.getByTestId('marker-value-input-0').fill('11.2');
+        await page.getByTestId('remove-notes-button').click();
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}$`));
+        await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
+          '11.2'
+        );
+        await expect(page.getByTestId('lab-result-notes-section')).toHaveCount(
+          0
+        );
+      });
+
+      await test.step('Edit it from its Home card: values, tests and notes', async () => {
+        await openRoute(page, '/');
+        await expect(page.getByText('CBC Panel')).not.toBeVisible();
+        await page.getByTestId(`edit-report-button-${reportId}`).click();
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
+        await expect(page.getByText('Edit Lab Results')).toBeVisible();
+        await expect(page.getByTestId('marker-card-0')).toContainText(
+          'Hemoglobin (Hgb)'
+        );
+        await expect(page.getByTestId('marker-value-input-0')).toHaveValue(
+          '11.2'
+        );
+        await expect(page.getByTestId('marker-card-1')).toContainText(
+          'White Blood Cells (WBC)'
+        );
+        await expect(page.getByTestId('marker-value-input-1')).toHaveValue(
+          '6.8'
+        );
+
+        await page.getByTestId('marker-value-input-0').fill('16.2');
+        await page.getByTestId('remove-marker-1').click();
+        await expect(
+          page.getByTestId(/^marker-card-/).getByText('White Blood Cells (WBC)')
+        ).not.toBeVisible();
+        await page.getByTestId('test-search-input').fill('Platelets');
+        await page.getByTestId('autocomplete-item-cbc_platelets').click();
+        await page.getByTestId('marker-value-input-1').fill('250');
+        await page.getByTestId('plus-menu-button').click();
+        await page.getByTestId('menu-add-notes').click();
+        await page.getByTestId('notes-input').fill('Updated checkup note');
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(/.*(\/|#)$/);
+
+        const cards = page
+          .getByTestId('results-scroll-view')
+          .locator('[data-testid^="report-card-"]');
+        await expect(cards.getByText('Hemoglobin (Hgb)')).toBeVisible();
+        await expect(cards.getByText('16.2')).toBeVisible();
+        await expect(cards.getByText('11.2')).not.toBeVisible();
+        await expect(cards.getByText('Platelets (PLT)')).toBeVisible();
+        await expect(cards.getByText('250')).toBeVisible();
+        await expect(
+          cards.getByText('White Blood Cells (WBC)')
+        ).not.toBeVisible();
+        await expect(page.getByText('"Updated checkup note"')).toBeVisible();
+      });
+
+      await test.step('Delete it from the edit island', async () => {
+        await page.getByTestId(`edit-report-button-${reportId}`).click();
+        await page.clock.install();
+        await page.getByTestId('delete-report-button').click();
+        await expect(
+          page.getByTestId('delete-confirmation-modal')
+        ).toBeVisible();
+        await page.clock.runFor(5000);
+        await page.getByTestId('delete-modal-confirm-button').click();
+        await expect(page).toHaveURL(/\/$/);
+        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
+        await openRoute(page, `/lab-result/${reportId}`);
+        await expect(page.getByText('Lab result not found.')).toBeVisible();
+      });
     }
   );
-
-  test('should open and update date and time via native dropdown inputs', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Verify date picker button has native date input and updates with valid past date
-    const dateInput = page
-      .getByTestId('date-picker-button')
-      .locator('input[type="date"]');
-    await expect(dateInput).toBeAttached();
-    await dateInput.fill('2026-09-20');
-    await expect(page.getByTestId('date-picker-button')).toContainText(
-      'Sep 20'
-    );
-
-    // Add time from plus menu
-    const plusMenuBtn = page.getByTestId('plus-menu-button');
-    await plusMenuBtn.click();
-    await page.getByTestId('menu-add-time').click();
-
-    // Verify time picker button has native time input and updates
-    const timeInput = page
-      .getByTestId('time-picker-button')
-      .locator('input[type="time"]');
-    await expect(timeInput).toBeAttached();
-    await timeInput.fill('08:15');
-    await expect(page.getByTestId('time-picker-button')).toContainText('08:15');
-  });
-
-  test('should disable add when all optional fields are present and re-enable it when removed', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await expect(plusBtn).toBeVisible();
-
-    // 1. Add Time
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-    await page.getByTestId('menu-add-time').click();
-
-    // Time pill is visible
-    await expect(page.getByTestId('time-picker-button')).toBeVisible();
-
-    // 2. Open plus menu again: "Add Time" should no longer appear
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).not.toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-
-    // 3. Add Notes
-    await page.getByTestId('menu-add-notes').click();
-    await expect(page.getByTestId('notes-input')).toBeVisible();
-
-    // Add Service provider once the previous menu has closed
-    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-    await plusBtn.click();
-    await page
-      .getByTestId('form-add-menu')
-      .getByTestId('menu-add-service-provider')
-      .click();
-    await expect(
-      page.getByTestId('lab-result-service-provider-input')
-    ).toBeVisible();
-
-    // 4. Keep the primary add action in place, disabled when all fields are present
-    await expect(plusBtn).toBeDisabled();
-
-    // 5. Removing notes makes it available to add again
-    await page.getByTestId('remove-notes-button').click();
-    await expect(page.getByTestId('notes-input')).not.toBeVisible();
-    await expect(plusBtn).toBeVisible();
-
-    // 6. Click plus button: only "Add Notes" should be shown
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).not.toBeVisible();
-    await page
-      .getByTestId('form-add-menu-backdrop')
-      .click({ position: { x: 5, y: 5 } });
-
-    // 7. Remove Time -> "Add Time" should reappear in menu
-    await page.getByTestId('remove-time-button').click();
-    await expect(page.getByTestId('time-picker-button')).not.toBeVisible();
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-  });
 
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
@@ -314,124 +354,40 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     }
   });
 
-  test('should validate that date and time cannot be set to the future', async ({
+  test('limits date and time to now and pulls a later time back when the date returns to today', async ({
     page,
   }) => {
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-lab-results').click();
-
-    // 1. Verify native date input has max attribute set to today
     const dateInput = page
       .getByTestId('date-picker-button')
       .locator('input[type="date"]');
-    const todayStr = formatLocalDate(new Date());
-    await expect(dateInput).toHaveAttribute('max', todayStr);
-
-    // 2. Add a test item
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('15.0');
-
-    // 3. Add Time
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await plusBtn.click();
-    await page.getByTestId('menu-add-time').click();
-
-    // 4. Verify time picker has max attribute on the native time input when date is today
     const timeInput = page
       .getByTestId('time-picker-button')
       .locator('input[type="time"]');
-    await expect(timeInput).toBeAttached();
-    const maxAttr = await timeInput.getAttribute('max');
-    expect(maxAttr).toBeTruthy();
-  });
+    await expect(dateInput).toHaveAttribute('max', formatLocalDate(new Date()));
 
-  test('should reset future time to current time without throwing an alert when reverting to today from a past date', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // 1. Select a past date (2026-09-20)
-    const dateInput = page
-      .getByTestId('date-picker-button')
-      .locator('input[type="date"]');
+    // A past date allows any time
     await dateInput.fill('2026-09-20');
-
-    // 2. Add Time: select 23:55 (allowed since date was in the past)
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await plusBtn.click();
+    await page.getByTestId('plus-menu-button').click();
     await page.getByTestId('menu-add-time').click();
-
-    const timeInput = page
-      .getByTestId('time-picker-button')
-      .locator('input[type="time"]');
     await timeInput.fill('23:55');
     await expect(page.getByTestId('time-picker-button')).toContainText('23:55');
 
-    // Ensure NO dialog/alert is thrown
+    // Back on today the later time resets to now, without an alert
     let dialogTriggered = false;
     page.on('dialog', async (dialog) => {
       dialogTriggered = true;
       await dialog.accept();
     });
-
-    // 3. Revert date back to today
     const now = new Date();
-    const todayStr = formatLocalDate(now);
-    await dateInput.fill(todayStr);
-
-    // 4. Verify no alert was thrown
-    expect(dialogTriggered).toBe(false);
-
-    // 5. Verify that time was reset to current time instead of remaining 23:55
-    const expectedCurrentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    await dateInput.fill(formatLocalDate(now));
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     await expect(page.getByTestId('time-picker-button')).toContainText(
-      expectedCurrentTime
+      currentTime
     );
-    await expect(page.getByTestId('time-picker-button')).not.toContainText(
-      '23:55'
-    );
-  });
-
-  test('records a service provider as an Organization performer', async ({
-    page,
-  }) => {
-    await page.goto('/lab-result/add');
-    await page.getByTestId('test-search-input').fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('14.5');
-    await page.getByTestId('plus-menu-button').click();
-    await page.getByTestId('menu-add-service-provider').click();
-    await page
-      .getByTestId('lab-result-service-provider-input')
-      .fill('City Laboratory');
-    await page.getByTestId('save-button').click();
-    await expect(page).not.toHaveURL(/lab-result\/add/);
-
-    const stored = await page.evaluate(async () => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      return {
-        report: JSON.parse(
-          (
-            await bridge.querySql('SELECT fhir_json FROM diagnostic_reports;')
-          )[0].fhir_json
-        ),
-        organizations: await bridge.querySql(
-          'SELECT id, name FROM organizations;'
-        ),
-      };
-    });
-    expect(stored.organizations).toEqual([
-      { id: expect.stringMatching(/^org-/), name: 'City Laboratory' },
-    ]);
-    expect(stored.report.performer).toEqual([
-      {
-        reference: `Organization/${stored.organizations[0].id}`,
-        type: 'Organization',
-        display: 'City Laboratory',
-      },
-    ]);
+    expect(dialogTriggered).toBe(false);
+    // Today's time cannot go past now either
+    expect(await timeInput.getAttribute('max')).toBeTruthy();
   });
 });

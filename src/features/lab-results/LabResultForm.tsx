@@ -29,6 +29,7 @@ import {
   useLinkFields,
   type LinkFieldConfig,
 } from '@/src/components/useLinkFields';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import {
   getOrganizationNames,
   getServiceProviderName,
@@ -112,13 +113,33 @@ export function LabResultForm({
   // Test Date (defaults to today)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Optional Time & Notes
-  const [testTime, setTestTime] = useState<string | null>(null);
-  const [testNotes, setTestNotes] = useState<string | null>(null);
-  const [showNotesInput, setShowNotesInput] = useState(false);
-  const [serviceProviderName, setServiceProviderName] = useState<string | null>(
-    null
-  );
+  const fields = useOptionalFields({
+    time: {
+      label: 'Time',
+      icon: Clock,
+      empty: null as string | null,
+      added: () => {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        return `${h}:${m}`;
+      },
+    },
+    serviceProvider: {
+      label: 'Service provider',
+      icon: Hospital,
+      testID: 'menu-add-service-provider',
+      empty: null as string | null,
+      added: () => '',
+    },
+    notes: { label: 'Notes', icon: FileText, empty: '' },
+  });
+  const {
+    time: testTime,
+    serviceProvider: serviceProviderName,
+    notes: testNotes,
+  } = fields.values;
+  const loadFields = fields.load;
   // Whether the loaded report showed a provider, so removing it is explicit.
   const [hadServiceProvider, setHadServiceProvider] = useState(false);
   const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
@@ -170,11 +191,11 @@ export function LabResultForm({
             const [datePart, timePart] = eff.split('T');
             const [y, m, d] = datePart.split('-').map(Number);
             setSelectedDate(new Date(y, m - 1, d));
-            setTestTime(timePart.substring(0, 5));
+            loadFields({ time: timePart.substring(0, 5) });
           } else {
             const [y, m, d] = eff.split('-').map(Number);
             setSelectedDate(new Date(y, m - 1, d));
-            setTestTime(null);
+            loadFields({ time: null });
           }
         }
 
@@ -183,13 +204,14 @@ export function LabResultForm({
           activePatientId
         );
         if (!isMounted) return;
-        setServiceProviderName(providerName);
+        loadFields({ serviceProvider: providerName });
         setHadServiceProvider(providerName !== null);
 
         // Notes
         if (record.report.note && record.report.note.length > 0) {
-          setTestNotes(record.report.note.map((n) => n.text).join('\n'));
-          setShowNotesInput(true);
+          loadFields({
+            notes: record.report.note.map((n) => n.text).join('\n'),
+          });
         }
 
         // Map observations to activeItems
@@ -247,7 +269,7 @@ export function LabResultForm({
     return () => {
       isMounted = false;
     };
-  }, [reportId, activePatientId]);
+  }, [reportId, activePatientId, loadFields]);
 
   useEffect(() => {
     let isMounted = true;
@@ -275,14 +297,7 @@ export function LabResultForm({
     );
   }, [searchQuery, activeItems]);
 
-  const hasTime = testTime !== null;
-  const hasNotes = showNotesInput;
-  const hasServiceProvider = serviceProviderName !== null;
-  const showPlusButton =
-    !hasTime ||
-    !hasNotes ||
-    !hasServiceProvider ||
-    links.menuOptions.length > 0;
+  const menuOptions = [...fields.menuOptions, ...links.menuOptions];
 
   const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
@@ -432,7 +447,7 @@ export function LabResultForm({
         if (h > currentH || (h === currentH && m > currentM)) {
           const resetH = currentH.toString().padStart(2, '0');
           const resetM = currentM.toString().padStart(2, '0');
-          setTestTime(`${resetH}:${resetM}`);
+          fields.set('time', `${resetH}:${resetM}`);
         }
       }
     }
@@ -483,17 +498,17 @@ export function LabResultForm({
               />
             </FormField>
 
-            {hasTime && (
+            {testTime !== null && (
               <FormField
                 label="Time"
                 nativeID="lab-result-time"
                 removeTestID="remove-time-button"
                 removeLabel="Remove time"
-                onRemove={() => setTestTime(null)}
+                onRemove={() => fields.remove('time')}
               >
                 <NativeTimePicker
                   value={testTime}
-                  onChange={setTestTime}
+                  onChange={(value) => fields.set('time', value)}
                   maxTime={
                     formatLocalDate(selectedDate) ===
                     formatLocalDate(new Date())
@@ -507,7 +522,7 @@ export function LabResultForm({
               </FormField>
             )}
 
-            {hasServiceProvider && (
+            {serviceProviderName !== null && (
               <AutocompleteTextField
                 label="Service provider"
                 name="serviceProviderName"
@@ -515,23 +530,20 @@ export function LabResultForm({
                 inputID="lab-result-service-provider-input"
                 autocompleteTestID="service-provider-autocomplete"
                 value={serviceProviderName}
-                onChangeText={setServiceProviderName}
+                onChangeText={(value) => fields.set('serviceProvider', value)}
                 suggestions={knownServiceProviders}
                 removeTestID="remove-service-provider-button"
-                onRemove={() => setServiceProviderName(null)}
+                onRemove={() => fields.remove('serviceProvider')}
               />
             )}
 
             {/* Optional Notes Section if added */}
-            {showNotesInput && (
+            {fields.shown.notes && (
               <FormField
                 label="Notes"
                 nativeID="notes-input"
                 removeTestID="remove-notes-button"
-                onRemove={() => {
-                  setShowNotesInput(false);
-                  setTestNotes(null);
-                }}
+                onRemove={() => fields.remove('notes')}
                 inputProps={{
                   testID: 'notes-input',
                   id: 'notes-input',
@@ -542,8 +554,8 @@ export function LabResultForm({
                     'Enter report notes (e.g., fasting, laboratory name)...',
                   multiline: true,
                   numberOfLines: 3,
-                  value: testNotes || '',
-                  onChangeText: setTestNotes,
+                  value: testNotes,
+                  onChangeText: (value) => fields.set('notes', value),
                 }}
               />
             )}
@@ -688,7 +700,7 @@ export function LabResultForm({
           <FormActionDock
             onAdd={() => setShowPlusMenu((visible) => !visible)}
             addExpanded={showPlusMenu}
-            addDisabled={!showPlusButton}
+            addDisabled={menuOptions.length === 0}
             addTestID="plus-menu-button"
             onSave={handleSave}
             isSaving={isSaving}
@@ -716,67 +728,7 @@ export function LabResultForm({
             testID="form-add-menu"
             visible={showPlusMenu}
             onClose={() => setShowPlusMenu(false)}
-            options={[
-              ...(!hasTime
-                ? [
-                    {
-                      id: 'add-time',
-                      label: 'Time',
-                      icon: (
-                        <Clock
-                          color={COLORS.light.primary}
-                          size={20}
-                          style={{ marginRight: 12 }}
-                        />
-                      ),
-                      testID: 'menu-add-time',
-                      onPress: () => {
-                        const now = new Date();
-                        const h = now.getHours().toString().padStart(2, '0');
-                        const m = now.getMinutes().toString().padStart(2, '0');
-                        setTestTime(`${h}:${m}`);
-                      },
-                    },
-                  ]
-                : []),
-              ...(!hasServiceProvider
-                ? [
-                    {
-                      id: 'add-service-provider',
-                      label: 'Service provider',
-                      icon: (
-                        <Hospital
-                          color={COLORS.light.primary}
-                          size={20}
-                          style={{ marginRight: 12 }}
-                        />
-                      ),
-                      testID: 'menu-add-service-provider',
-                      onPress: () => setServiceProviderName(''),
-                    },
-                  ]
-                : []),
-              ...(!hasNotes
-                ? [
-                    {
-                      id: 'add-notes',
-                      label: 'Notes',
-                      icon: (
-                        <FileText
-                          color={COLORS.light.primary}
-                          size={20}
-                          style={{ marginRight: 12 }}
-                        />
-                      ),
-                      testID: 'menu-add-notes',
-                      onPress: () => {
-                        setShowNotesInput(true);
-                      },
-                    },
-                  ]
-                : []),
-              ...links.menuOptions,
-            ]}
+            options={menuOptions}
           />
         </View>
       </SafeAreaView>

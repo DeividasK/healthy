@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { verifyDiagnosisMigration } from '@/src/features/consultations/multipleDiagnosesMigrationFixture';
 import {
   fetchConsultationById,
@@ -65,6 +66,7 @@ import {
   stopSyncingPatient,
   syncOnce,
   unlockVault,
+  whenSyncIdle,
 } from '@/src/features/sync/engine';
 import {
   loadGoogleDriveConfig,
@@ -90,6 +92,7 @@ import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleD
 import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
+import { router, type Href, type useNavigationContainerRef } from 'expo-router';
 import {
   createOrUpdatePatient,
   deletePatient,
@@ -129,11 +132,113 @@ async function resolvePatientId(
   return undefined;
 }
 
-export function setupTestBridge() {
+/** The app tree's key; null while a reset has it unmounted. */
+let resetKey: number | null = 0;
+let freshAfterReset = false;
+const resetListeners = new Set<() => void>();
+const subscribeToReset = (listener: () => void) => {
+  resetListeners.add(listener);
+  return () => {
+    resetListeners.delete(listener);
+  };
+};
+
+/**
+ * Changes when a test resets the app, so its state mounts from scratch;
+ * null while the reset clears storage with the app unmounted.
+ */
+export function useTestResetKey(): number | null {
+  const getKey = () => resetKey;
+  return useSyncExternalStore(subscribeToReset, getKey, getKey);
+}
+
+export function setupTestBridge(
+  navigation?: ReturnType<typeof useNavigationContainerRef>
+) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   if (process.env.NODE_ENV === 'production' && !__DEV__) return;
 
+  const schemaSignature = async () => {
+    const db = await getDb();
+    const schema = await db.getAllAsync(
+      'SELECT type, name, sql FROM sqlite_master ORDER BY type, name'
+    );
+    return JSON.stringify(schema);
+  };
+  const bootSchema = schemaSignature();
+
+  /**
+   * Opens a route without reloading the app, with the stack a deep link
+   * builds: Home, then the route. Resetting first unmounts other screens
+   * at once instead of animating them out.
+   */
+  const navigate = (href: string) => {
+    freshAfterReset = false;
+    navigation?.resetRoot({
+      index: 0,
+      routes: [
+        { name: '__root', state: { index: 0, routes: [{ name: 'index' }] } },
+      ],
+    });
+    if (href !== '/') router.push(href as Href);
+  };
+
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
+    navigate,
+    /**
+     * Returns the app to the state a freshly loaded page starts in, without
+     * reloading: empty database and storage, every provider and screen
+     * mounted anew, on the new-profile screen. Skipping the reload saves the
+     * bundle parse and database open that dominate a test's CPU time.
+     */
+    resetForTest: async () => {
+      // Clearing rows cannot undo schema changes; the runner reloads instead.
+      if ((await schemaSignature()) !== (await bootSchema))
+        throw new Error('The database schema changed since the app loaded');
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      const setResetKey = async (key: number | null) => {
+        resetKey = key;
+        resetListeners.forEach((listener) => listener());
+        await new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        );
+      };
+      // Unmounted, the app's timers and listeners stop; sync work already
+      // started finishes before anything is cleared.
+      const nextKey = (resetKey ?? 0) + 1;
+      await setResetKey(null);
+      await whenSyncIdle();
+      // Tests inject failures with temporary triggers; a reload drops them.
+      const db = await getDb();
+      const temporary = await db.getAllAsync<{ type: string; name: string }>(
+        "SELECT type, name FROM sqlite_temp_master WHERE type IN ('trigger', 'view', 'table') ORDER BY type = 'table'"
+      );
+      for (const { type, name } of temporary)
+        await db.execAsync(`DROP ${type} IF EXISTS temp."${name}";`);
+      await clearAllDatabaseTables();
+      // Errors a test expected would otherwise stay in the dev error toast.
+      if (process.env.NODE_ENV === 'development')
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only module, left out of production bundles
+        require('@expo/log-box/src/LogBox').default.clearAllLogs();
+      localStorage.clear();
+      sessionStorage.clear();
+      // The sync vault's key; it opens the database only per operation.
+      for (const { name } of await indexedDB.databases())
+        if (name)
+          await new Promise((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = resolve;
+            request.onerror = () => reject(request.error);
+          });
+      // A freshly loaded page treats its last input as a pointer.
+      document.dispatchEvent(new PointerEvent('pointerdown'));
+      await setResetKey(nextKey);
+      navigate('/profile/new');
+      freshAfterReset = true;
+    },
+    /** Whether the app is still where `resetForTest` left it. */
+    isFreshAfterReset: () =>
+      freshAfterReset && window.location.pathname === '/profile/new',
     verifyDiagnosisMigration,
     getCondition: fetchConditionById,
     saveCondition: insertConditionRecord,

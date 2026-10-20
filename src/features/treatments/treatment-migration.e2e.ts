@@ -5,7 +5,12 @@ import {
   seedTestPatient,
   seedTestResources,
   seedTestTreatment,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
+
+// Legacy schemas and reloads need a page of their own.
+test.use({ freshApp: true });
 
 for (const scenario of [
   'legacy-v10',
@@ -24,7 +29,7 @@ for (const scenario of [
       id: 'undated-treatment',
       title: 'Undated treatment',
     });
-    await page.goto('/profile');
+    await openRoute(page, '/profile');
     await expect(page.getByTestId('edit-profile-button').first()).toBeVisible();
     const before = await page.evaluate(async (scenario) => {
       const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
@@ -66,6 +71,7 @@ for (const scenario of [
       return rows;
     }, scenario);
 
+    // A full load runs the repair.
     await page.goto('/');
     await expect(
       page.getByTestId('treatment-card-existing-treatment')
@@ -141,6 +147,7 @@ for (const scenario of [
       );
       expect(restored.medicationRequests).toBe(1);
     }
+    // Restarting must not repeat or undo the repair.
     await page.reload();
     if (scenario === 'legacy-v10') {
       await expect(
@@ -155,22 +162,22 @@ for (const scenario of [
     );
     expect(repeated[0].user_version).toBeGreaterThanOrEqual(12);
 
-    await page.goto('/treatment/add');
+    // Inserts and updates work on the repaired table.
+    await openRoute(page, '/treatment/add');
     await page
       .getByTestId('treatment-title-input')
       .fill('Treatment after repair');
     await page.getByTestId('save-treatment-button').click();
     await expect(page).not.toHaveURL(/treatment\/add/);
-    await page.goto('/');
+    await openRoute(page, '/');
     await expect(
       page.getByText('Treatment after repair', { exact: true })
     ).toBeVisible();
-    await page.getByTestId('treatment-open-existing-treatment').click();
-    await page.goto('/treatment/existing-treatment/edit');
+    await openRoute(page, '/treatment/existing-treatment/edit');
     await page.getByTestId('treatment-title-input').fill('Edited after repair');
     await page.getByTestId('save-treatment-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);
-    await page.reload();
+    await reopenRoute(page);
     await expect(
       page.getByText('Edited after repair', { exact: true }).first()
     ).toBeVisible();

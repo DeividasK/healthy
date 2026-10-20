@@ -4,6 +4,9 @@ import {
   createPatientViaUI,
 } from '@/src/features/testing/testStorage';
 
+// Loading the app is what these tests are about.
+test.use({ freshApp: true });
+
 test.describe('Installable web app', () => {
   test('links a manifest with home-screen icons', async ({ page, request }) => {
     await createPatientViaUI(page);

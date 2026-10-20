@@ -24,6 +24,23 @@ Follow these rules when designing, updating, and executing test suites:
 - **When to Run**: Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
 - **Targeted Test Execution (`--only-changed`)**: When re-running tests during development or iterating on fixes, utilize `pnpm exec playwright test --only-changed` (or `pnpm exec playwright test --only-changed=main`) to selectively execute only the tests affected by the changed files instead of the entire test suite. Specific test file paths can also be supplied directly (e.g. `pnpm playwright test src/features/<feature>/<name>.e2e.ts`).
 
+## Keeping the E2E Suite Fast
+
+The suite is CPU-bound and its tests pack evenly across workers, so its run time is roughly the CPU every test costs divided by the cores. Booting the app (parsing the dev bundle, starting SQLite, running migrations) costs about 3.5 CPU-seconds, more than most tests themselves, so the suite avoids booting.
+
+- **Shared app**: each worker boots the app once. Before every test, the `page` fixture resets it in place (`resetForTest` in `src/features/testing/testBridge.ts`): it unmounts the app, clears the database, storage and sync vault, drops temporary triggers and remounts on `/profile/new`, as a fresh page would. Write tests that start from that state.
+- **Seed, don't click, unless the UI is under test**: use `seedTestPatient`, `seedTestResources` and the other seed helpers. `seedTestPatient` on a fresh or reset app goes straight to Home.
+- **Navigate in-app**: open screens with `openRoute(page, path)` and `reopenRoute(page)`, not `page.goto`/`page.reload`. A test that loads the page again discards the shared app, and the next test pays for a boot. Reload only when loading or restarting is the behaviour under test (migrations, persistence, sync on start), and say so in a comment.
+- **Opt out only when needed**: `test.use({ freshApp: true })` or the `@fresh-app` tag give a page of its own. Use them only for tests about loading the app, other tabs, or legacy database schemas.
+- **Fake clock**: the shared app already runs on Playwright's fake clock, with time flowing normally. `page.clock.install()`, `runFor` and `fastForward` (e.g. to skip a delete countdown) cost nothing. `setFixedTime`, `pauseAt` and `setSystemTime` discard the shared app; prefer them in visual tests.
+- **Injected failures**: temporary triggers (`CREATE TEMP TRIGGER`) are dropped by the reset. Changing the schema discards the shared app.
+- **Second devices**: `openSecondDevice` reuses a spare app per worker. Open its first screen with `openRoute` or `bootstrapApp`, not `goto`, and always `close()` it.
+- **One journey per feature lifecycle**: extend the feature's add journey (add, view, edit, delete) with a `test.step` per stage instead of adding a test that seeds the same record again. Keep separate tests for distinct scenarios: keyboard, motion, failure rollback, FHIR preservation, links.
+- **Test shared components once**: behaviour owned by a shared component or hook (`useOptionalFields`, `LinkedResourcesField`, the delete countdown) has one deep test. Form tests only check what the form maps to FHIR.
+- **Wait for state, never for time**: wait for the element or value the next step depends on, e.g. a saved title, an "Up to date" label, or a mock having received the start-up request. No sleeps or timeout waits.
+- **Load-sensitive patterns**: under full parallel load, screens briefly overlap during transitions (scope locators with `.filter({ visible: true })`), start-up work lands late (wait for it before counting requests), and short strings match random ciphertext (check for structured plaintext such as `'"family":"Doe"'`).
+- **Measure before optimizing**: run `PLAYWRIGHT_JSON_OUTPUT_NAME=<file> pnpm test:e2e --reporter=json,dot` and sum test durations; the `Bootstrap app and SQLite` and `Reset app` steps show where boots and resets happen. Local runs use one worker per core; CI keeps 75%.
+
 ## Visual Tests (`pnpm test:visual`)
 
 - **Mandatory for New Views**: You **MUST** write visual tests for new views.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, type SetStateAction } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock } from 'lucide-react-native';
@@ -21,6 +21,7 @@ import { NativeSelect } from '@/src/components/NativeSelect';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { useHasChanges } from '@/src/components/useHasChanges';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { COLORS } from '@/src/theme/colors';
 import {
   OFFERED_WHEN,
@@ -66,10 +67,19 @@ export function BundleForm({
 }) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [memberIds, setMemberIds] = useState(initialValues?.memberIds || []);
-  const [times, setTimes] = useState<TimeDraft[]>(
-    (initialValues?.times || []).map(toDraft)
-  );
-  const [showTimes, setShowTimes] = useState(times.length > 0);
+  const fields = useOptionalFields({
+    times: {
+      label: 'Times',
+      icon: Clock,
+      testID: 'menu-add-bundle-times',
+      empty: [] as TimeDraft[],
+      initial: (initialValues?.times || []).map(toDraft),
+      added: () => [newTime()],
+    },
+  });
+  const { times } = fields.values;
+  const setTimes = (next: SetStateAction<TimeDraft[]>) =>
+    fields.set('times', next);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [timeOptions, setTimeOptions] = useState<AddOptionItem[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,26 +87,7 @@ export function BundleForm({
   const hasChanges = useHasChanges({ title, memberIds, times });
   const { reveal, scrollViewProps } = useFieldReveal();
 
-  const options: AddOptionItem[] = showTimes
-    ? []
-    : [
-        {
-          id: 'times',
-          label: 'Times',
-          testID: 'menu-add-bundle-times',
-          icon: (
-            <Clock
-              size={20}
-              color={COLORS.light.primary}
-              style={{ marginRight: 12 }}
-            />
-          ),
-          onPress: () => {
-            setTimes([newTime()]);
-            setShowTimes(true);
-          },
-        },
-      ];
+  const options = fields.menuOptions;
 
   const setTime = (index: number, next: TimeDraft) =>
     setTimes((current) =>
@@ -105,7 +96,7 @@ export function BundleForm({
 
   const handleSubmit = async () => {
     const trimmed = title.trim();
-    const bundleTimes = showTimes ? times.map(fromDraft) : [];
+    const bundleTimes = times.map(fromDraft);
     const keys = bundleTimes.map(getBundleTimeKey);
     const error = !trimmed
       ? 'Bundle name is required'
@@ -175,14 +166,11 @@ export function BundleForm({
             idPrefix="bundle-"
             testID="bundle-treatments-field"
           />
-          {showTimes && (
+          {fields.shown.times && (
             <FormField
               label="Times"
               nativeID="bundle-time-1-select"
-              onRemove={() => {
-                setShowTimes(false);
-                setTimes([]);
-              }}
+              onRemove={() => fields.remove('times')}
               removeTestID="remove-bundle-times-button"
               testID="bundle-times-field"
             >

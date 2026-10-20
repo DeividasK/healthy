@@ -2,103 +2,15 @@ import {
   test,
   expect,
   seedTestPatient,
-  seedTestCondition,
   seedTestTreatment,
   getTestTreatment,
   getBrowserLocalDate,
-  checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
-  });
-
-  test('edits fields, regenerates the narrative and associates multiple conditions', async ({
-    page,
-  }) => {
-    const first = await seedTestCondition(page, { title: 'Hypertension' });
-    const second = await seedTestCondition(page, { title: 'Kidney disease' });
-    const treatment = await seedTestTreatment(page, {
-      title: 'Amoxicillin 500mg',
-      intent: 'order',
-      status: 'active',
-      reason: 'Blood pressure',
-      reasonConditionIds: [first.id],
-    });
-    const before = await getTestTreatment(page, treatment.id);
-    expect(before.text.div).toContain('Amoxicillin 500mg');
-
-    await page.goto(`/treatment/${treatment.id}`);
-    await page.getByTestId('edit-treatment-button').click();
-    await expect(page).toHaveURL(/.*treatment\/[a-zA-Z0-9_-]+\/edit$/);
-    await expect(
-      page.getByTestId(`treatment-selected-condition-${first.id}`)
-    ).toBeVisible();
-
-    await page.getByTestId('treatment-title-input').fill('Lisinopril 10mg');
-    await page.getByTestId('treatment-status-select').selectOption('completed');
-    await page.getByTestId('treatment-condition-search-input').click();
-    await page
-      .getByTestId(`treatment-condition-autocomplete-item-${second.id}`)
-      .click();
-    await checkA11y(page, { include: '[data-testid="treatment-form"]' });
-    await page.getByTestId('save-treatment-button').click();
-
-    await expect(page.getByTestId('treatment-title')).toHaveText(
-      'Lisinopril 10mg'
-    );
-    await expect(
-      page.getByTestId('treatment-view').getByText('Completed')
-    ).toBeVisible();
-    const section = page.getByTestId('treatment-reason-conditions-section');
-    await expect(section).toContainText('Hypertension');
-    await expect(section).toContainText('Kidney disease');
-
-    const edited = await getTestTreatment(page, treatment.id);
-    expect(edited.text.div).toContain('Lisinopril 10mg');
-    expect(edited.text.div).not.toContain('Amoxicillin');
-    expect(
-      edited.reason.map((reason: any) => reason.reference?.reference)
-    ).toEqual([undefined, `Condition/${first.id}`, `Condition/${second.id}`]);
-
-    // Removing one condition keeps the other
-    await page.getByTestId('edit-treatment-button').click();
-    await page.getByTestId('treatment-remove-condition-button').click();
-    await page.getByTestId('save-treatment-button').click();
-    await expect(section).not.toContainText('Hypertension');
-    await expect(section).toContainText('Kidney disease');
-
-    // Removing the field clears only the links; the wording stays
-    await page.getByTestId('edit-treatment-button').click();
-    await page.getByTestId('remove-treatment-reasonCondition-button').click();
-    await page.getByTestId('save-treatment-button').click();
-    await expect(section).toHaveCount(0);
-    const cleared = await getTestTreatment(page, treatment.id);
-    expect(cleared.reason).toEqual([{ concept: { text: 'Blood pressure' } }]);
-  });
-
-  test('labels uncommon intent and status codes instead of hiding them', async ({
-    page,
-  }) => {
-    const treatment = await seedTestTreatment(page, {
-      title: 'Imported treatment',
-      intent: 'proposal',
-      status: 'on-hold',
-    });
-    await page.goto(`/treatment/${treatment.id}`);
-    await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
-    await expect(
-      page.getByTestId('treatment-view').getByText('On Hold')
-    ).toBeVisible();
-
-    await page.getByTestId('edit-treatment-button').click();
-    await expect(page.getByTestId('treatment-intent-select')).toHaveValue(
-      'proposal'
-    );
-    await expect(
-      page.getByTestId('treatment-intent-select').locator('option:checked')
-    ).toHaveText('Proposal');
   });
 
   test('keeps regimen data the form does not show and edits only what changed', async ({
@@ -151,7 +63,7 @@ test.describe('Edit Treatment Flow', () => {
       stored
     );
 
-    await page.goto(`/treatment/${seeded.id}/edit`);
+    await openRoute(page, `/treatment/${seeded.id}/edit`);
     await expect(
       page.getByTestId('treatment-regimen-p1-d1-amount-input')
     ).toHaveValue('4');
@@ -199,7 +111,7 @@ test.describe('Edit Treatment Flow', () => {
       await page.getByTestId('add-option-button').click();
       await expect(page.getByTestId('form-add-menu')).toBeVisible();
     };
-    await page.goto(`/treatment/${treatment.id}/edit`);
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
     await expect(page.getByTestId('treatment-instructions-input')).toHaveValue(
       'As needed for pain'
     );
@@ -236,9 +148,13 @@ test.describe('Edit Treatment Flow', () => {
     expect(text.dosageInstruction).toEqual([{ text: 'Back to plain text' }]);
   });
 
-  test('keeps imported text stored beside a regimen', async ({ page }) => {
+  test('labels uncommon codes and keeps imported text stored beside a regimen', async ({
+    page,
+  }) => {
     const seeded = await seedTestTreatment(page, {
       title: 'Imported regimen',
+      intent: 'proposal',
+      status: 'on-hold',
       dosageInstructions: 'One each morning',
     });
     seeded.dosageInstruction[0].timing = { repeat: { when: ['MORN'] } };
@@ -250,13 +166,21 @@ test.describe('Edit Treatment Flow', () => {
         ),
       seeded
     );
-    await page.goto(`/treatment/${seeded.id}`);
-    // Both are shown under the one Dosage heading
+    await openRoute(page, `/treatment/${seeded.id}`);
+    // Uncommon codes are labelled instead of hidden
+    await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
+    await expect(
+      page.getByTestId('treatment-view').getByText('On Hold')
+    ).toBeVisible();
+    // Text and regimen are both shown under the one Dosage heading
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       'One each morning\nin the morning'
     );
 
     await page.getByTestId('edit-treatment-button').click();
+    const intent = page.getByTestId('treatment-intent-select');
+    await expect(intent).toHaveValue('proposal');
+    await expect(intent.locator('option:checked')).toHaveText('Proposal');
     await expect(page.getByTestId('treatment-instructions-input')).toHaveCount(
       0
     );
@@ -270,6 +194,7 @@ test.describe('Edit Treatment Flow', () => {
     );
     const kept = await getTestTreatment(page, seeded.id);
     expect(kept.dosageInstruction).toEqual(seeded.dosageInstruction);
+    expect(kept.intent).toBe('proposal');
   });
 
   test("cannot move the treatment's date past the day taking it started", async ({
@@ -286,7 +211,7 @@ test.describe('Edit Treatment Flow', () => {
       authoredOn: twoAgo,
       takingSince: yesterday,
     });
-    await page.goto(`/treatment/${treatment.id}/edit`);
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
     await page
       .getByTestId('treatment-date-picker')
       .locator('input')

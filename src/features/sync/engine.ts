@@ -109,6 +109,11 @@ function exclusive<T>(operation: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** Resolves once sync operations already started have finished. */
+export function whenSyncIdle(): Promise<void> {
+  return exclusive(async () => undefined);
+}
+
 /** Changes of profiles this device uploads: synced and not held. */
 const UPLOADED_PATIENTS = `(patient_id IS NULL OR patient_id IN (
   SELECT patient_id FROM sync_profiles
