@@ -113,7 +113,8 @@ test.describe('Add Treatment Flow', () => {
       reasonConditionIds: [headache.id],
     });
 
-    await openRoute(page, `/consultation/${consultation.id}`);
+    // A full load: browser back below needs the history it builds.
+    await page.goto(`/consultation/${consultation.id}`);
     await page.getByTestId('consultation-add-treatment').click();
     await page.getByTestId('option-create-new-treatment').click();
     await expect(page).toHaveURL(

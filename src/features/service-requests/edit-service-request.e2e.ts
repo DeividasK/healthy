@@ -230,12 +230,10 @@ test.describe('Edit Service Request', () => {
       .getByTestId('remove-service-request-reasonCondition-button')
       .click();
     await page.getByTestId('save-service-request-button').click();
-    await expect(
-      page.getByTestId('service-request-reason-conditions-section')
-    ).toHaveCount(0);
-    expect(
-      (await getTestServiceRequest(page, request.id)).reason
-    ).toBeUndefined();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    await expect
+      .poll(async () => (await getTestServiceRequest(page, request.id)).reason)
+      .toBeUndefined();
   });
 
   test('links lab results and lists them on the request, the result and the condition', async ({
