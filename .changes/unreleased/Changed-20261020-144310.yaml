@@ -1,0 +1,3 @@
+kind: Changed
+body: Taking a treatment can no longer start before the treatment's date, and a treatment's date can't be moved past the day you started taking it.
+time: 2026-10-20T14:43:10.634342309Z

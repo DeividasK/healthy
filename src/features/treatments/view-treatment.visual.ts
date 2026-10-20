@@ -130,7 +130,14 @@ test.describe('View Treatment - Visual Regression', () => {
 test('Taking and paused usage periods', async ({ page }, testInfo) => {
   await seedTestPatient(page);
   await seedTestResources(page, {
-    treatments: [{ id: 'usage-history', title: 'Vitamin D', status: 'active' }],
+    treatments: [
+      {
+        id: 'usage-history',
+        title: 'Vitamin D',
+        status: 'active',
+        authoredOn: '2025-07-25',
+      },
+    ],
     treatmentUsage: [
       { treatmentId: 'usage-history', action: 'start', date: '2025-07-25' },
       { treatmentId: 'usage-history', action: 'stop', date: '2026-09-01' },

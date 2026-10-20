@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestTreatment,
   getTestTreatment,
+  getBrowserLocalDate,
   openRoute,
 } from '@/src/features/testing/testStorage';
 
@@ -194,5 +195,33 @@ test.describe('Edit Treatment Flow', () => {
     const kept = await getTestTreatment(page, seeded.id);
     expect(kept.dosageInstruction).toEqual(seeded.dosageInstruction);
     expect(kept.intent).toBe('proposal');
+  });
+
+  test("cannot move the treatment's date past the day taking it started", async ({
+    page,
+    consoleMonitor,
+  }) => {
+    // The form logs the refused save before showing it.
+    consoleMonitor.ignore('Failed to save treatment:');
+    const [twoAgo, yesterday, today] = await Promise.all(
+      [-2, -1, 0].map((offset) => getBrowserLocalDate(page, offset))
+    );
+    const treatment = await seedTestTreatment(page, {
+      title: 'Vitamin D',
+      authoredOn: twoAgo,
+      takingSince: yesterday,
+    });
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
+    await page
+      .getByTestId('treatment-date-picker')
+      .locator('input')
+      .fill(today);
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-form-error')).toHaveText(
+      `The date cannot be after usage started, ${yesterday}`
+    );
+    expect((await getTestTreatment(page, treatment.id)).authoredOn).toBe(
+      twoAgo
+    );
   });
 });
