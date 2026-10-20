@@ -67,6 +67,8 @@ const CLINICAL_TABLES: DatabaseTable[] = [
   'medication_administrations',
   'medication_statements',
   'organizations',
+  'request_orchestrations',
+  'profile_settings',
 ];
 
 interface VaultFile {

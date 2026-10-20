@@ -92,6 +92,28 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       ],
     });
     const usage = await getTestTreatmentUsage(page, original.id);
+    // Its bundle and the profile's settings travel with the profile.
+    const { bundle, settings } = await page.evaluate(async () => {
+      const b = (window as any).__HEALTHY_TEST_BRIDGE__;
+      await b.saveProfileSettings({
+        timesOfDay: {
+          MORN: '06:45',
+          NOON: '12:00',
+          AFT: '15:00',
+          EVE: '18:00',
+          HS: '22:30',
+        },
+      });
+      return {
+        bundle: await b.seedBundle({
+          id: 'backed-up-bundle',
+          title: 'Evening',
+          times: [{ kind: 'when', code: 'EVE' }],
+          memberIds: ['backed-up-treatment'],
+        }),
+        settings: await b.getProfileSettings(),
+      };
+    });
     let archive: number[] = [];
     if (transport === 'ZIP') {
       const download = page.waitForEvent('download');
@@ -119,6 +141,8 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
           document: await b.getClinicalDocumentByConsultationId(
             'treatment-backup-visit'
           ),
+          bundle: await b.getBundle('backed-up-bundle'),
+          settings: await b.getProfileSettings(),
         };
       },
       { transport, archive }
@@ -133,6 +157,9 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       request: { reference: 'MedicationRequest/backed-up-treatment' },
     });
     expect(restored.clearedLog).toBeNull();
+    expect(restored.bundle).toEqual(bundle);
+    expect(restored.settings).toEqual(settings);
+    expect(restored.settings.timesOfDay).toMatchObject({ MORN: '06:45' });
     expect(restored.document.section[0].entry).toContainEqual({
       reference: 'MedicationRequest/backed-up-treatment',
     });

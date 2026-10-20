@@ -88,4 +88,5 @@ export {
   seedTestTreatment,
   getTestTreatment,
   seedTestServiceRequest,
+  seedTestBundle,
 } from './testStorage';
