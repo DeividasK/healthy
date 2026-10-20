@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -540,46 +546,50 @@ function ActionsForPatient({
         ) : hasLoadError ? (
           <Text style={styles.errorText}>Failed to load treatments.</Text>
         ) : (
-          groups.length > 0 && (
-            <Animated.View
-              key={shown.date}
-              entering={
-                shown.isLater === null
-                  ? undefined
-                  : shown.isLater
-                    ? rowsSlide.laterIn
-                    : rowsSlide.earlierIn
-              }
-              exiting={
-                isLeavingForLater === false
-                  ? rowsSlide.earlierOut
-                  : rowsSlide.laterOut
-              }
-              pointerEvents={isLeaving ? 'none' : 'auto'}
-              aria-hidden={isLeaving}
-              importantForAccessibility={
-                isLeaving ? 'no-hide-descendants' : 'auto'
-              }
-            >
-              {groups.map((group) => {
-                const sectionTestID = isGrouped
-                  ? `actions-group-${group.id}`
-                  : 'actions-treatments-section';
-                return (
-                  <ResourceSection
-                    key={group.id}
-                    icon={isGrouped ? Clock : Pill}
-                    title={isGrouped ? group.label : 'Treatments'}
-                    testID={isLeaving ? undefined : sectionTestID}
-                  >
-                    {group.rows.map((row, index) =>
-                      renderRow(row, group, index)
-                    )}
-                  </ResourceSection>
-                );
-              })}
-            </Animated.View>
-          )
+          // A plain parent: when a day still loading replaces the rows, they
+          // leave without sliding out (and without their test IDs twice).
+          <View>
+            {groups.length > 0 && (
+              <Animated.View
+                key={shown.date}
+                entering={
+                  shown.isLater === null
+                    ? undefined
+                    : shown.isLater
+                      ? rowsSlide.laterIn
+                      : rowsSlide.earlierIn
+                }
+                exiting={
+                  isLeavingForLater === false
+                    ? rowsSlide.earlierOut
+                    : rowsSlide.laterOut
+                }
+                pointerEvents={isLeaving ? 'none' : 'auto'}
+                aria-hidden={isLeaving}
+                importantForAccessibility={
+                  isLeaving ? 'no-hide-descendants' : 'auto'
+                }
+              >
+                {groups.map((group) => {
+                  const sectionTestID = isGrouped
+                    ? `actions-group-${group.id}`
+                    : 'actions-treatments-section';
+                  return (
+                    <ResourceSection
+                      key={group.id}
+                      icon={isGrouped ? Clock : Pill}
+                      title={isGrouped ? group.label : 'Treatments'}
+                      testID={isLeaving ? undefined : sectionTestID}
+                    >
+                      {group.rows.map((row, index) =>
+                        renderRow(row, group, index)
+                      )}
+                    </ResourceSection>
+                  );
+                })}
+              </Animated.View>
+            )}
+          </View>
         )}
       </ScrollView>
       {isCalendarOpen && (
