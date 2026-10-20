@@ -3,16 +3,18 @@ import { Tablets, TriangleAlert } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
-import { AnswerButtons } from './AnswerButtons';
+import { AnswerButtons, ReorderButtons } from './AnswerButtons';
 
 /**
  * A treatment, or one scheduled dose of it, with "not taken" (×) and "taken"
- * (✓) buttons. Pressing the selected button again clears the answer.
+ * (✓) buttons. Pressing the selected button again clears the answer. While
+ * the journal is reordered, move buttons take their place.
  */
 export function TreatmentLogRow({
   item,
   disabled = false,
   isLeaving = false,
+  reorder,
   onAnswer,
   onOpen,
 }: {
@@ -20,6 +22,8 @@ export function TreatmentLogRow({
   disabled?: boolean;
   /** Sliding out for another day's rows: a copy without test IDs. */
   isLeaving?: boolean;
+  /** Set while the journal is reordered. */
+  reorder?: ReorderHandlers;
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
   /** Opens the treatment's page. */
   onOpen: () => void;
@@ -51,18 +55,32 @@ export function TreatmentLogRow({
       accessibilityLabel={`View treatment: ${title}`}
       onPress={onOpen}
       accessory={
-        <AnswerButtons
-          answer={item.answer}
-          name={name}
-          disabled={disabled}
-          testIDPrefix={
-            isLeaving
-              ? undefined
-              : { prefix: 'treatment-log', rowId: item.rowId }
-          }
-          onAnswer={onAnswer}
-        />
+        reorder ? (
+          <ReorderButtons
+            name={name}
+            testIDSuffix={isLeaving ? undefined : item.rowId}
+            {...reorder}
+          />
+        ) : (
+          <AnswerButtons
+            answer={item.answer}
+            name={name}
+            disabled={disabled}
+            testIDPrefix={
+              isLeaving
+                ? undefined
+                : { prefix: 'treatment-log', rowId: item.rowId }
+            }
+            onAnswer={onAnswer}
+          />
+        )
       }
     />
   );
+}
+
+/** Moves a journal row; a missing handler disables that direction. */
+export interface ReorderHandlers {
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }

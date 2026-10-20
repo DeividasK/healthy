@@ -5,8 +5,37 @@ import {
   seedTestPatient,
   seedTestResources,
 } from '@/src/features/testing/visualTest';
+import type { RegimenDraft } from '@/src/features/treatments/regimen';
 
 // The visual fixture fixes today at 2026-10-08.
+
+/** A once-daily regimen of one tablet at a part of the day. */
+const onceDailyAt = (when: string): RegimenDraft => ({
+  phases: [
+    {
+      doses: [
+        {
+          amount: '1',
+          amountMax: '',
+          unit: '{tablet}',
+          route: '',
+          site: '',
+          patientInstruction: '',
+          timing: {
+            frequency: '1',
+            frequencyMax: '',
+            period: '1',
+            periodUnit: 'd',
+            when,
+            boundsValue: '',
+            boundsUnit: 'd',
+          },
+        },
+      ],
+    },
+  ],
+});
+
 const treatments = [
   {
     id: 'visual-log-vitamin-d',
@@ -126,5 +155,48 @@ test.describe('My actions - Visual Regression', () => {
     // Answers are mixed today, so the bundle opens on its treatments.
     await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
     await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
+  });
+
+  test('Treatments grouped by time of day, then reordered', async ({
+    page,
+  }, testInfo) => {
+    await seedTestResources(page, {
+      treatments: [
+        {
+          id: 'visual-log-magnesium',
+          title: 'Magnesium 250mg',
+          status: 'active',
+          authoredOn: '2026-09-20',
+          takingSince: '2026-09-20',
+          regimen: onceDailyAt('EVE'),
+        },
+        {
+          id: 'visual-log-omega',
+          title: 'Omega-3',
+          status: 'active',
+          authoredOn: '2026-09-20',
+          takingSince: '2026-09-20',
+          regimen: onceDailyAt('MORN'),
+        },
+        {
+          id: 'visual-log-probiotic',
+          title: 'Probiotic',
+          status: 'active',
+          authoredOn: '2026-09-20',
+          takingSince: '2026-09-20',
+          regimen: onceDailyAt('MORN'),
+        },
+      ],
+    });
+    await page.goto('/journal');
+    await page.getByTestId('actions-group-MORN').waitFor();
+    await page
+      .getByTestId('treatment-log-row-visual-log-magnesium-0')
+      .waitFor();
+    await takeSnapshot(page, 'My actions - Grouped by time of day', testInfo);
+
+    await page.getByTestId('actions-reorder-button').click();
+    await page.getByTestId('journal-move-up-visual-log-probiotic-0').waitFor();
+    await takeSnapshot(page, 'My actions - Reordering', testInfo);
   });
 });

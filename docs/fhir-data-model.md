@@ -421,7 +421,20 @@ are stored as JSON in `profile_settings` (one row per profile, id
 records, right after its `Patient`. Today they hold the clock time each part
 of the day stands for (`timesOfDay`: Morning 08:00, Noon 12:00, Afternoon
 15:00, Evening 18:00 and Bedtime 22:00 by default), edited on the Settings
-page. Keys a device does not know are kept on save. ZIP archives carry them
+page, and the journal's order (`journalOrder`). Keys a device does not know
+are kept on save.
+
+The journal groups each day's rows (doses, treatments and bundle times) by
+part of the day: a `when` code is its part, an exact `timeOfDay` joins the
+part whose clock time is nearest (ties go to the earlier part), and rows at
+several parts, at other times (e.g. with meals) or without a time come last,
+under "Any time". Parts follow their clock times. A day with only "Any time"
+rows keeps a single list. Users reorder rows within each part; `journalOrder`
+holds, per part (or `any`), resource keys (`MedicationRequest/<id>`,
+`RequestOrchestration/<id>`) first to last. Rows of one resource move
+together, resources not shown that day keep their place, and unlisted ones
+follow in the default order (by clock time, then as the day lists them).
+Nothing clinical changes: no migration. ZIP archives carry them
 as `records/profile_settings_<patient id>.json` envelopes
 (`{ settings, patientId }`), restored right after patients; archives without
 them still restore, and those profiles start with the defaults.
