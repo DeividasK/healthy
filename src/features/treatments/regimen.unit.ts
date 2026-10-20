@@ -228,10 +228,14 @@ test('requires amount and times, and rejects invalid ranges', () => {
     validateRegimen({
       phases: [
         { doses: [{ ...base, amount: '1', timing }] },
-        { doses: [base] },
+        { doses: [{ ...base, amount: '' }] },
       ],
     })
   ).toBe('Phase 2: Enter a min amount');
+  // A new dose starts as 1 tablet once a day, valid as it is.
+  expect(validateRegimen({ phases: [{ doses: [base] }] })).toBeNull();
+  const [prefilled] = applyRegimen([], { phases: [{ doses: [base] }] });
+  expect(formatDose(prefilled)).toBe('1 tablet, once a day');
   expect(validateRegimen(splitThenMaintenance)).toBeNull();
 });
 

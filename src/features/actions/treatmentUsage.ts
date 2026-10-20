@@ -224,7 +224,8 @@ function withEnd(
  * Plans a change of usage on `date`: the open period ends the day before and
  * a new one starts on `date`. A change on the open period's first day
  * replaces it, so no period is empty. Returns an error message instead when
- * the date is in the future or before the current period.
+ * the date is before the treatment's date or the current period, or in the
+ * future for anything but starting to take it.
  */
 export function planUsageChange(
   periods: UsagePeriod[],
@@ -239,7 +240,8 @@ export function planUsageChange(
   /** The regimen followed from `date` when taking it. */
   dosage?: Dosage[]
 ): UsageChangePlan | { error: string } {
-  if (date > today) return { error: 'The date cannot be in the future' };
+  if (date > today && action !== 'start')
+    return { error: 'The date cannot be in the future' };
   const last = periods[periods.length - 1];
   const open = getOpenPeriod(periods);
   if (action === 'change' && open?.state !== 'taking')
@@ -247,6 +249,11 @@ export function planUsageChange(
   const earliest = open ? open.start : last?.end ? addDays(last.end, 1) : null;
   if (earliest && date < earliest)
     return { error: `The date cannot be before ${earliest}` };
+  const entered = treatment.authoredOn?.slice(0, 10);
+  if (entered && date < entered)
+    return {
+      error: `The date cannot be before the treatment's date, ${entered}`,
+    };
   const plan: UsageChangePlan = { save: [], remove: [] };
   if (open?.statement.id) {
     if (date === open.start) {

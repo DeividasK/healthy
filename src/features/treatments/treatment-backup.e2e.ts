@@ -25,6 +25,7 @@ for (const transport of ['ZIP', 'encrypted Drive'] as const) {
       id: 'backed-up-treatment',
       title: 'Treatment to back up',
       consultationId: consultation.id,
+      authoredOn: '2026-10-01',
       dosageInstructions: 'First line\nSecond line',
       reason: 'Original indication',
       notes: 'Original annotation',

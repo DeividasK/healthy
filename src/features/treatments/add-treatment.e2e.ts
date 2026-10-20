@@ -7,6 +7,8 @@ import {
   getTestTreatment,
   findTreatmentsSection,
   getTestClinicalDocument,
+  getTestTreatmentUsage,
+  getBrowserLocalDate,
   checkA11y,
 } from '@/src/features/testing/testStorage';
 
@@ -337,10 +339,17 @@ test.describe('Treatment form keyboard support', () => {
       await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
     };
     await addField('regimen');
-    // The added regimen's first field takes focus
+    // The added regimen's first field takes focus, prefilled as 1 tablet
+    // once a day
     await expect(
       page.getByTestId('treatment-regimen-p1-d1-amount-input')
     ).toBeFocused();
+    await expect(
+      page.getByTestId('treatment-regimen-p1-d1-amount-input')
+    ).toHaveValue('1');
+    await expect(
+      page.getByTestId('treatment-regimen-p1-d1-frequency-input')
+    ).toHaveValue('1');
     // Text instructions and a regimen are alternatives
     await openMenu();
     await expect(
@@ -398,10 +407,11 @@ test.describe('Treatment form keyboard support', () => {
     await page
       .locator('#treatment-regimen-p1-d2-timeOfDay-input')
       .fill('20:30');
-    // Another dose starts empty and takes focus
+    // Another dose starts as 1 tablet once a day and takes focus
     await addFrom('p1', 'dose');
     await expect(dose(1, 3, 'amount-input')).toBeFocused();
-    await expect(dose(1, 3, 'amount-input')).toHaveValue('');
+    await expect(dose(1, 3, 'amount-input')).toHaveValue('1');
+    await expect(dose(1, 3, 'frequency-input')).toHaveValue('1');
     await dose(1, 3, 'remove').click();
 
     await addFrom('p1', 'phase');
@@ -475,5 +485,40 @@ test.describe('Treatment form keyboard support', () => {
     await expect(page.getByTestId('treatment-dispense-quantity')).toHaveText(
       '30 tablets'
     );
+  });
+
+  test('starts taking a new treatment from a chosen day, not before its date', async ({
+    page,
+  }) => {
+    const [lastWeek, today, nextWeek] = await Promise.all(
+      [-7, 0, 7].map((offset) => getBrowserLocalDate(page, offset))
+    );
+    await page.goto('/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Vitamin D');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-treatment-usageStart').click();
+    const usageStart = page
+      .getByTestId('treatment-usageStart-picker')
+      .locator('input');
+    await expect(usageStart).toHaveValue(today);
+    await checkA11y(page, { include: '[data-testid="treatment-form"]' });
+
+    // Taking it cannot start before the treatment's date
+    await usageStart.fill(lastWeek);
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-form-error')).toHaveText(
+      "Start taking cannot be before the treatment's date"
+    );
+
+    // It can start on a day still to come
+    await usageStart.fill(nextWeek);
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page).toHaveURL(/\/treatment\/[^/]+$/);
+    await expect(page.getByTestId('treatment-usage-section')).toBeVisible();
+    const id = new URL(page.url()).pathname.split('/').pop()!;
+    const statements = await getTestTreatmentUsage(page, id);
+    expect(statements).toHaveLength(1);
+    expect(statements[0].effectivePeriod).toEqual({ start: nextWeek });
+    expect(statements[0].adherence.code.coding[0].code).toBe('taking');
   });
 });

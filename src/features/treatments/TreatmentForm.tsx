@@ -14,6 +14,7 @@ import {
   FolderPlus,
   MessageSquareText,
   Package,
+  Play,
   Repeat,
   Tablets,
   User,
@@ -72,6 +73,8 @@ export interface TreatmentFormValues {
   notes?: string | null;
   /** Selected links to other resources, keyed by resource type. */
   links?: Record<string, LinkSelection>;
+  /** New treatments only: the day taking it starts, if chosen. */
+  usageStart?: Date;
 }
 
 export interface TreatmentFormProps {
@@ -126,6 +129,7 @@ export function TreatmentForm({
   const [requesterName, setRequesterName] = useState(
     initialValues?.requesterName || ''
   );
+  const [usageStart, setUsageStart] = useState(() => new Date());
   const [visibleFields, setVisibleFields] = useState({
     requester: Boolean(initialValues?.requesterName),
     instructions: Boolean(initialValues?.dosageInstructions) && !initialRegimen,
@@ -134,6 +138,7 @@ export function TreatmentForm({
     reason: Boolean(initialValues?.reason),
     reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
     notes: Boolean(initialValues?.notes),
+    usageStart: false,
   });
   const hasChanges = useHasChanges({
     title,
@@ -147,6 +152,7 @@ export function TreatmentForm({
     reasonConditionIds,
     notes,
     requesterName,
+    usageStart: visibleFields.usageStart ? formatLocalDate(usageStart) : null,
     links: links.values,
   });
 
@@ -171,6 +177,7 @@ export function TreatmentForm({
       icon: FolderPlus,
     },
     { id: 'notes' as const, label: 'Notes', icon: FileText },
+    { id: 'usageStart' as const, label: 'Start taking', icon: Play },
   ];
   const conditionOptions = conditions.flatMap((condition) =>
     condition.id
@@ -186,7 +193,9 @@ export function TreatmentForm({
           (id !== 'reasonCondition' || conditionOptions.length > 0) &&
           // Dosing is either text instructions or a regimen, never both.
           (id !== 'instructions' || !visibleFields.regimen) &&
-          (id !== 'regimen' || !visibleFields.instructions)
+          (id !== 'regimen' || !visibleFields.instructions) &&
+          // Usage of a saved treatment is recorded from its page.
+          (id !== 'usageStart' || !isEditing)
       )
       .map(({ id, label, icon: Icon }) => ({
         id,
@@ -202,6 +211,7 @@ export function TreatmentForm({
         onPress: () => {
           if (id === 'regimen' && !hasRegimen(regimen))
             setRegimen({ phases: [{ doses: [createDoseDraft()] }] });
+          if (id === 'usageStart') setUsageStart(new Date());
           setVisibleFields((fields) => ({ ...fields, [id]: true }));
         },
       })),
@@ -215,7 +225,7 @@ export function TreatmentForm({
     else if (id === 'reason') setReason('');
     else if (id === 'reasonCondition') setReasonConditionIds([]);
     else if (id === 'requester') setRequesterName('');
-    else setNotes('');
+    else if (id === 'notes') setNotes('');
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -229,7 +239,10 @@ export function TreatmentForm({
     const fieldError =
       (visibleFields.regimen && validateRegimen(regimen)) ||
       (visibleFields.dispenseQuantity &&
-        validateQuantity(dispenseQuantity, 'Quantity to dispense'));
+        validateQuantity(dispenseQuantity, 'Quantity to dispense')) ||
+      (visibleFields.usageStart &&
+        formatLocalDate(usageStart) < formatLocalDate(authoredDate) &&
+        "Start taking cannot be before the treatment's date");
     if (fieldError) {
       setErrorMessage(fieldError);
       return;
@@ -277,6 +290,7 @@ export function TreatmentForm({
           : [],
         notes: visibleFields.notes ? notes.trim() || null : null,
         links: links.values,
+        usageStart: visibleFields.usageStart ? usageStart : undefined,
       });
     } catch (err: any) {
       console.error('Failed to save treatment:', err);
@@ -430,6 +444,28 @@ export function TreatmentForm({
                     onUnitChange={(unit) =>
                       setDispenseQuantity((current) => ({ ...current, unit }))
                     }
+                  />
+                </FormField>
+              );
+            }
+            if (id === 'usageStart') {
+              return (
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  nativeID="treatment-usageStart-input"
+                >
+                  <NativeDatePicker
+                    value={usageStart}
+                    onChange={(date) => {
+                      if (date) setUsageStart(date);
+                    }}
+                    testID="treatment-usageStart-picker"
+                    id="treatment-usageStart-input"
+                    name="usageStart"
+                    variant="input"
+                    // Taking it can be planned to start on a later day.
+                    allowFuture
                   />
                 </FormField>
               );
