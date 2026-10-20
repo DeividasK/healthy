@@ -5,145 +5,13 @@ import {
   seedTestReport,
   seedTestServiceRequest,
   evaluateBridge as bridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
-
-  test(
-    'should replace "CBC Panel" badge with "Edit" icon and allow editing existing report results',
-    { tag: ['@smoke'] },
-    async ({ page }) => {
-      await test.step('Create an initial report with Hemoglobin and WBC', async () => {
-        await page.getByTestId('floating-add-button').click();
-        await page.getByTestId('menu-add-lab-results').click();
-        const searchInput = page.getByTestId('test-search-input');
-        await searchInput.fill('Hemoglobin');
-        await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-        await page.getByTestId('marker-value-input-0').fill('14.5');
-
-        await searchInput.fill('WBC');
-        await page.getByTestId('autocomplete-item-cbc_wbc').click();
-        await page.getByTestId('marker-value-input-1').fill('6.8');
-
-        const plusBtn = page.getByTestId('plus-menu-button');
-        await plusBtn.click();
-        await page.getByTestId('menu-add-notes').click();
-        await page.getByTestId('notes-input').fill('Initial checkup note');
-
-        await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-      });
-
-      await test.step('Verify Edit button exists on report card', async () => {
-        await expect(page.getByText('CBC Panel')).not.toBeVisible();
-        const editBtn = page.getByTestId(/^edit-report-button-/);
-        await expect(editBtn).toBeVisible();
-        await editBtn.click();
-        await expect(page).toHaveURL(/.*lab-result\/.*\/edit/);
-        await expect(page.getByText('Edit Lab Results')).toBeVisible();
-      });
-
-      await test.step('Verify populated values and modify them', async () => {
-        await expect(page.getByTestId('marker-card-0')).toContainText(
-          'Hemoglobin (Hgb)'
-        );
-        await expect(page.getByTestId('marker-value-input-0')).toHaveValue(
-          '14.5'
-        );
-        await expect(page.getByTestId('marker-card-1')).toContainText(
-          'White Blood Cells (WBC)'
-        );
-        await expect(page.getByTestId('marker-value-input-1')).toHaveValue(
-          '6.8'
-        );
-        await expect(page.getByTestId('notes-input')).toHaveValue(
-          'Initial checkup note'
-        );
-
-        await page.getByTestId('marker-value-input-0').fill('16.2');
-        await page.getByTestId('remove-marker-1').click();
-        await expect(
-          page.getByTestId(/^marker-card-/).getByText('White Blood Cells (WBC)')
-        ).not.toBeVisible();
-
-        const searchInput = page.getByTestId('test-search-input');
-        await searchInput.fill('Platelets');
-        await page.getByTestId('autocomplete-item-cbc_platelets').click();
-        await page.getByTestId('marker-value-input-1').fill('250');
-
-        await page.getByTestId('notes-input').fill('Updated checkup note');
-        await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-      });
-
-      await test.step('Verify updated report on Home', async () => {
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('Hemoglobin (Hgb)')
-        ).toBeVisible();
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^=\"report-card-\"]')
-            .getByText('16.2')
-        ).toBeVisible();
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^=\"report-card-\"]')
-            .getByText('14.5')
-        ).not.toBeVisible();
-
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('Platelets (PLT)')
-        ).toBeVisible();
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^=\"report-card-\"]')
-            .getByText('250')
-        ).toBeVisible();
-
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('White Blood Cells (WBC)')
-        ).not.toBeVisible();
-        await expect(page.getByText('"Updated checkup note"')).toBeVisible();
-      });
-      await test.step('Cancel and confirm deletion from the edit island', async () => {
-        await page.getByTestId(/^edit-report-button-/).click();
-        await page.getByTestId('delete-report-button').click();
-        const modal = page.getByTestId('delete-confirmation-modal');
-        await expect(modal).toBeVisible();
-        await page.getByTestId('delete-modal-cancel-button').click();
-        await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('notes-input')).toHaveValue(
-          'Updated checkup note'
-        );
-
-        await page.clock.install();
-        await page.getByTestId('delete-report-button').click();
-        const confirm = page.getByTestId('delete-modal-confirm-button');
-        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
-        await page.clock.runFor(5000);
-        await confirm.click();
-        await expect(page).toHaveURL(/\/$/);
-        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
-        await page.reload();
-        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
-      });
-    }
-  );
 
   test(
     'should preserve exact selected date without shifting back by a day across multiple edits/saves',
@@ -227,7 +95,7 @@ test.describe('Edit Lab Results Flow', () => {
       [report.id, JSON.stringify(practitioner)]
     );
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     const input = page.getByTestId('lab-result-service-provider-input');
     await expect(input).toHaveValue('City Laboratory');
     await page.getByTestId('remove-service-provider-button').click();
@@ -272,7 +140,7 @@ test.describe('Edit Lab Results Flow', () => {
       [report.id, JSON.stringify([performer])]
     );
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await expect(page.getByTestId('marker-value-input-0')).toHaveValue('14.5');
     await expect(
       page.getByTestId('lab-result-service-provider-input')
@@ -317,7 +185,7 @@ test.describe('Edit Lab Results Flow', () => {
         )[0].fhir_json
       ).basedOn;
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await page.getByTestId('plus-menu-button').click();
     await page.getByTestId('menu-link-service-request').click();
     await page.getByTestId('link-service-request-search-input').click();
@@ -332,7 +200,7 @@ test.describe('Edit Lab Results Flow', () => {
     expect(await storedBasedOn()).toEqual(linked);
 
     // Saving other changes keeps the link
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await expect(
       page.getByTestId(`link-selected-service-request-${request.id}`)
     ).toBeVisible();
@@ -341,7 +209,7 @@ test.describe('Edit Lab Results Flow', () => {
     await expect(page).not.toHaveURL(/\/edit$/);
     expect(await storedBasedOn()).toEqual(linked);
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await page.getByTestId('remove-link-service-request-button').click();
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);

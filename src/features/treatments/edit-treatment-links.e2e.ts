@@ -8,6 +8,8 @@ import {
   getTestTreatment,
   getTestClinicalDocument,
   findTreatmentsSection,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Treatment links', () => {
@@ -27,7 +29,7 @@ test.describe('Edit Treatment links', () => {
       consultationId: origin.id,
     });
 
-    await page.goto(`/treatment/${treatment.id}/edit`);
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
     await expect(
       page.getByTestId(`link-selected-consultation-${origin.id}`)
     ).toBeVisible();
@@ -77,12 +79,12 @@ test.describe('Edit Treatment add menu', () => {
       notes: 'With food',
       dispenseQuantity: { value: '30', unit: '{tablet}' },
     });
-    await page.goto(`/treatment/${treatment.id}/edit`);
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
     // No consultations or conditions exist, so nothing can be linked.
     await expect(page.getByTestId('add-option-button')).toBeDisabled();
 
     await seedTestConsultation(page, { title: 'Check-up' });
-    await page.reload();
+    await reopenRoute(page);
     await expect(page.getByTestId('add-option-button')).toBeEnabled();
     await page.getByTestId('add-option-button').click();
     await expect(page.getByTestId('menu-link-consultation')).toBeVisible();
@@ -107,7 +109,7 @@ test('hides the link search once every consultation and condition is linked', as
     consultationId: consultation.id,
     reasonConditionIds: [condition.id],
   });
-  await page.goto(`/treatment/${treatment.id}/edit`);
+  await openRoute(page, `/treatment/${treatment.id}/edit`);
   await expect(
     page.getByTestId(`link-selected-consultation-${consultation.id}`)
   ).toBeVisible();

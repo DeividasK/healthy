@@ -36,6 +36,7 @@ import {
   type LinkFieldConfig,
   type LinkSelection,
 } from '@/src/components/useLinkFields';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { goBackOr } from '@/src/utils/navigation';
@@ -156,21 +157,13 @@ export function ConditionForm({
   const links = useLinkFields(linkFields);
 
   const [title, setTitle] = useState(initialValues?.title || '');
-
   const initialStatus =
     CONDITION_STATUS_OPTIONS.find(
       (s) => s.id === (initialValues?.clinicalStatus || initialValues?.statusId)
     ) || CONDITION_STATUS_OPTIONS[0];
   const initialVerification =
     initialValues?.verificationStatus ?? (isEdit ? '' : 'unconfirmed');
-  const [verificationStatus, setVerificationStatus] =
-    useState(initialVerification);
   const initialCategory = initialValues?.category ?? (isEdit ? '' : 'Ongoing');
-  const [category, setCategory] = useState(initialCategory);
-  const [showVerification, setShowVerification] = useState(
-    Boolean(initialVerification)
-  );
-  const [showCategory, setShowCategory] = useState(Boolean(initialCategory));
 
   const [selectedStatus, setSelectedStatus] =
     useState<ConditionStatusOption>(initialStatus);
@@ -178,28 +171,57 @@ export function ConditionForm({
     initialValues?.onsetDate || new Date()
   );
 
-  // Optional fields state
-  const [severity, setSeverity] = useState<string | undefined>(
-    initialValues?.severity
-  );
-  const [showSeverity, setShowSeverity] = useState(
-    Boolean(initialValues?.severity)
-  );
-
-  const [bodySite, setBodySite] = useState(initialValues?.bodySite || '');
-  const [showBodySite, setShowBodySite] = useState(
-    Boolean(initialValues?.bodySite)
-  );
-
-  const [abatementDate, setAbatementDate] = useState<Date | undefined>(
-    initialValues?.abatementDate
-  );
-  const [showAbatementDate, setShowAbatementDate] = useState(
-    Boolean(initialValues?.abatementDate)
-  );
-
-  const [notes, setNotes] = useState(initialValues?.notes || '');
-  const [showNotes, setShowNotes] = useState(Boolean(initialValues?.notes));
+  const fields = useOptionalFields({
+    verificationStatus: {
+      label: 'Verification Status',
+      icon: BadgeCheck,
+      testID: 'menu-add-verification',
+      empty: '',
+      initial: initialVerification,
+    },
+    category: {
+      label: 'Category',
+      icon: Tag,
+      empty: '',
+      initial: initialCategory,
+    },
+    severity: {
+      label: 'Severity',
+      icon: Activity,
+      empty: undefined as string | undefined,
+      initial: initialValues?.severity,
+      added: (severity) => severity || 'mild',
+    },
+    bodySite: {
+      label: 'Body Site',
+      icon: MapPin,
+      testID: 'menu-add-body-site',
+      empty: '',
+      initial: initialValues?.bodySite,
+    },
+    abatementDate: {
+      label: 'Resolution Date',
+      icon: Calendar,
+      testID: 'menu-add-abatement-date',
+      empty: undefined as Date | undefined,
+      initial: initialValues?.abatementDate,
+      added: (date) => date || new Date(),
+    },
+    notes: {
+      label: 'Notes',
+      icon: FileText,
+      empty: '',
+      initial: initialValues?.notes,
+    },
+  });
+  const {
+    verificationStatus,
+    category,
+    severity,
+    bodySite,
+    abatementDate,
+    notes,
+  } = fields.values;
   const hasChanges = useHasChanges({
     title,
     verificationStatus,
@@ -226,22 +248,21 @@ export function ConditionForm({
     try {
       setIsSaving(true);
       const formattedOnsetDate = formatLocalDate(onsetDate);
-      const formattedAbatementDate =
-        showAbatementDate && abatementDate
-          ? formatLocalDate(abatementDate)
-          : undefined;
+      const formattedAbatementDate = abatementDate
+        ? formatLocalDate(abatementDate)
+        : undefined;
 
       const values: ConditionInput = {
         id: initialValues?.id,
         title: trimmedTitle,
         clinicalStatus: selectedStatus.clinicalStatus,
-        verificationStatus: showVerification ? verificationStatus : '',
-        category: showCategory ? category : '',
+        verificationStatus,
+        category,
         onsetDate: formattedOnsetDate,
-        severity: showSeverity ? severity : undefined,
-        bodySite: showBodySite && bodySite.trim() ? bodySite.trim() : undefined,
+        severity,
+        bodySite: bodySite.trim() || undefined,
         abatementDate: formattedAbatementDate,
-        notes: showNotes && notes.trim() ? notes.trim() : undefined,
+        notes: notes.trim() || undefined,
       };
       if (isEdit) {
         const baseline: Partial<ConditionInput> = {
@@ -281,103 +302,7 @@ export function ConditionForm({
     }
   };
 
-  // Build list of options available in the '+' menu
-  const plusMenuOptions = [];
-  if (!showVerification)
-    plusMenuOptions.push({
-      id: 'add-verification',
-      label: 'Verification Status',
-      icon: (
-        <BadgeCheck
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-verification',
-      onPress: () => setShowVerification(true),
-    });
-  if (!showCategory)
-    plusMenuOptions.push({
-      id: 'add-category',
-      label: 'Category',
-      icon: (
-        <Tag
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-category',
-      onPress: () => setShowCategory(true),
-    });
-  if (!showSeverity) {
-    plusMenuOptions.push({
-      id: 'add-severity',
-      label: 'Severity',
-      icon: (
-        <Activity
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-severity',
-      onPress: () => {
-        setShowSeverity(true);
-        if (!severity) setSeverity('mild');
-      },
-    });
-  }
-  if (!showBodySite) {
-    plusMenuOptions.push({
-      id: 'add-body-site',
-      label: 'Body Site',
-      icon: (
-        <MapPin
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-body-site',
-      onPress: () => setShowBodySite(true),
-    });
-  }
-  if (!showAbatementDate) {
-    plusMenuOptions.push({
-      id: 'add-abatement-date',
-      label: 'Resolution Date',
-      icon: (
-        <Calendar
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-abatement-date',
-      onPress: () => {
-        setShowAbatementDate(true);
-        if (!abatementDate) setAbatementDate(new Date());
-      },
-    });
-  }
-  if (!showNotes) {
-    plusMenuOptions.push({
-      id: 'add-notes',
-      label: 'Notes',
-      icon: (
-        <FileText
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-notes',
-      onPress: () => setShowNotes(true),
-    });
-  }
-  plusMenuOptions.push(...links.menuOptions);
+  const plusMenuOptions = [...fields.menuOptions, ...links.menuOptions];
 
   const { reveal, scrollViewProps } = useFieldReveal();
 
@@ -448,16 +373,13 @@ export function ConditionForm({
               />
             </FormField>
 
-            {showVerification && (
+            {fields.shown.verificationStatus && (
               <FormField
                 label="Verification status"
                 nativeID="verification-picker-button"
                 removeTestID="remove-verification-button"
                 removeLabel="Remove verification status"
-                onRemove={() => {
-                  setShowVerification(false);
-                  setVerificationStatus('');
-                }}
+                onRemove={() => fields.remove('verificationStatus')}
               >
                 <NativeSelect
                   testID="verification-picker-button"
@@ -465,20 +387,17 @@ export function ConditionForm({
                   label="Verification status"
                   value={verificationStatus}
                   options={VERIFICATION_OPTIONS}
-                  onChange={setVerificationStatus}
+                  onChange={(value) => fields.set('verificationStatus', value)}
                 />
               </FormField>
             )}
-            {showCategory && (
+            {fields.shown.category && (
               <FormField
                 label="Category"
                 nativeID="condition-category-input"
                 removeTestID="remove-category-button"
                 removeLabel="Remove category"
-                onRemove={() => {
-                  setShowCategory(false);
-                  setCategory('');
-                }}
+                onRemove={() => fields.remove('category')}
               >
                 <NativeSelect
                   testID="condition-category-input"
@@ -498,20 +417,17 @@ export function ConditionForm({
                       ? [{ id: category, label: category }]
                       : []),
                   ]}
-                  onChange={setCategory}
+                  onChange={(value) => fields.set('category', value)}
                 />
               </FormField>
             )}
 
             {/* Severity Section if toggled */}
-            {showSeverity && (
+            {fields.shown.severity && (
               <FormField
                 label="Severity"
                 removeTestID="remove-severity-button"
-                onRemove={() => {
-                  setShowSeverity(false);
-                  setSeverity(undefined);
-                }}
+                onRemove={() => fields.remove('severity')}
               >
                 <View style={styles.severityRow}>
                   {SEVERITY_OPTIONS.map((opt) => (
@@ -522,7 +438,7 @@ export function ConditionForm({
                         styles.severityPill,
                         severity === opt.value && styles.severityPillSelected,
                       ]}
-                      onPress={() => setSeverity(opt.value)}
+                      onPress={() => fields.set('severity', opt.value)}
                       activeOpacity={0.8}
                     >
                       <View
@@ -547,15 +463,12 @@ export function ConditionForm({
             )}
 
             {/* Body Site Section if toggled */}
-            {showBodySite && (
+            {fields.shown.bodySite && (
               <FormField
                 label="Body Site"
                 nativeID="condition-body-site-input"
                 removeTestID="remove-body-site-button"
-                onRemove={() => {
-                  setShowBodySite(false);
-                  setBodySite('');
-                }}
+                onRemove={() => fields.remove('bodySite')}
                 inputProps={{
                   testID: 'condition-body-site-input',
                   id: 'condition-body-site-input',
@@ -564,25 +477,24 @@ export function ConditionForm({
                   accessibilityLabel: 'Body Site',
                   placeholder: 'e.g. Left knee, Lower back',
                   value: bodySite,
-                  onChangeText: setBodySite,
+                  onChangeText: (value) => fields.set('bodySite', value),
                 }}
               />
             )}
 
             {/* Resolution Date Section if toggled */}
-            {showAbatementDate && (
+            {fields.shown.abatementDate && (
               <FormField
                 label="Resolution Date"
                 removeTestID="remove-abatement-date-button"
-                onRemove={() => {
-                  setShowAbatementDate(false);
-                  setAbatementDate(undefined);
-                }}
+                onRemove={() => fields.remove('abatementDate')}
               >
                 <View style={styles.datePickerContainer}>
                   <NativeDatePicker
                     value={abatementDate || new Date()}
-                    onChange={(date) => setAbatementDate(date || undefined)}
+                    onChange={(date) =>
+                      fields.set('abatementDate', date || undefined)
+                    }
                     testID="abatement-date-picker-button"
                   />
                 </View>
@@ -590,15 +502,12 @@ export function ConditionForm({
             )}
 
             {/* Notes Textarea if toggled */}
-            {showNotes && (
+            {fields.shown.notes && (
               <FormField
                 label="Notes"
                 nativeID="condition-notes-input"
                 removeTestID="remove-notes-button"
-                onRemove={() => {
-                  setShowNotes(false);
-                  setNotes('');
-                }}
+                onRemove={() => fields.remove('notes')}
                 inputProps={{
                   testID: 'condition-notes-input',
                   id: 'condition-notes-input',
@@ -609,7 +518,7 @@ export function ConditionForm({
                   multiline: true,
                   numberOfLines: 4,
                   value: notes,
-                  onChangeText: setNotes,
+                  onChangeText: (value) => fields.set('notes', value),
                 }}
               />
             )}

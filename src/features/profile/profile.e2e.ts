@@ -2,45 +2,18 @@ import {
   test,
   expect,
   seedTestPatient,
+  seedTestReport,
+  seedEveryResource,
   createConditionViaUI,
   checkA11y,
-  evaluateBridge,
+  openRoute,
+  evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
-
-  test(
-    'should display profile button in header and allow navigating to profile',
-    { tag: ['@smoke'] },
-    async ({ page }) => {
-      await test.step('Click profile button in header', async () => {
-        const profileBtn = page.getByTestId('profile-header-button');
-        await expect(profileBtn).toBeVisible();
-        await profileBtn.click();
-      });
-
-      await test.step('Verify navigation to profile view, display name, and audit a11y', async () => {
-        await expect(page).toHaveURL(/.*profile/);
-        await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-        await expect(page.getByTestId('active-profile-card')).toBeVisible();
-        await expect(page.getByTestId('profile-display-name')).toHaveText(
-          'John Doe'
-        );
-        // The patient ID tells apart profiles with the same name.
-        const [{ id }] = await evaluateBridge(page, (b) =>
-          b.querySql('SELECT id FROM patients')
-        );
-        await expect(page.getByTestId('profile-id-value')).toHaveText(id);
-        await expect(page.getByTestId(`profile-item-id-${id}`)).toHaveText(id);
-        // Muted #717973 text (4.48:1) and the Google sign-in button still
-        // fall just short of 4.5:1.
-        await checkA11y(page, { disableRules: ['color-contrast'] });
-      });
-    }
-  );
 
   test(
     'should allow creating a new profile and switching active patient with record isolation',
@@ -117,8 +90,25 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     }
   );
 
-  test('should allow editing an existing profile', async ({ page }) => {
+  test('opens the profile from the header, edits it, offers adding another and deletes it', async ({
+    page,
+  }) => {
     await page.getByTestId('profile-header-button').click();
+    await expect(page).toHaveURL(/.*profile/);
+    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('active-profile-card')).toBeVisible();
+    await expect(page.getByTestId('profile-display-name')).toHaveText(
+      'John Doe'
+    );
+    // The patient ID tells apart profiles with the same name.
+    const [{ id }] = await bridge(page, (b) =>
+      b.querySql('SELECT id FROM patients')
+    );
+    await expect(page.getByTestId('profile-id-value')).toHaveText(id);
+    await expect(page.getByTestId(`profile-item-id-${id}`)).toHaveText(id);
+    // Muted #717973 text (4.48:1) and the Google sign-in button still
+    // fall just short of 4.5:1.
+    await checkA11y(page, { disableRules: ['color-contrast'] });
 
     // Wait for active profile to load and edit button to be enabled
     await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
@@ -151,83 +141,149 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
       'Not specified'
     );
+
+    await test.step('Offers creating or restoring another profile', async () => {
+      await openRoute(page, '/profile/new');
+      await expect(page.getByText('Add Profile')).toBeVisible();
+
+      // Verify 3 options exist
+      await expect(page.getByTestId('option-create-profile')).toBeVisible();
+      await expect(page.getByTestId('option-restore-file')).toBeVisible();
+      await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
+
+      // "Create" option shows the manual form and doesn't duplicate "New Profile" header
+      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+      await expect(page.getByText('New Profile')).not.toBeVisible();
+
+      // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
+      await page.getByTestId('option-restore-file').click();
+      await expect(
+        page.getByTestId('select-profile-file-button')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Select profile', exact: true })
+      ).toBeVisible();
+
+      // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
+      await page.getByTestId('option-restore-gdrive').click();
+      await expect(
+        page.getByTestId('connect-google-drive-button')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Connect Google Drive', exact: true })
+      ).toBeVisible();
+
+      // Click "Create" -> navigates back to /profile/new with manual form
+      await page.getByTestId('option-create-profile').click();
+      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+    });
+
+    await test.step('Deletes the last profile from its edit form', async () => {
+      await openRoute(page, '/profile');
+      // Wait for active profile to load and edit button to be enabled
+      await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
+      await page.getByTestId('edit-profile-button').click();
+      await expect(page).toHaveURL(/.*profile\/.*\/edit/);
+
+      // Delete button should appear in EditProfileView
+      const deleteBtn = page.getByTestId('delete-profile-button');
+      await expect(deleteBtn).toBeVisible();
+      await page.clock.install();
+      await deleteBtn.click();
+
+      // Confirmation modal should appear with 5s countdown
+      const modal = page.getByTestId('delete-profile-modal');
+      await expect(modal).toBeVisible();
+      await expect(modal.getByText('Delete Profile')).toBeVisible();
+
+      // Since this is a local profile without Google Drive sync, cloud checkbox should not be visible
+      await expect(
+        modal.getByTestId('delete-from-cloud-checkbox')
+      ).not.toBeVisible();
+
+      await page.clock.runFor(5000);
+      await page.getByTestId('delete-modal-confirm-button').click();
+
+      // Since this was the only profile, should redirect straight to /profile/new!
+      await expect(page).toHaveURL(/.*profile\/new/);
+      await expect(page.getByTestId('option-create-profile')).toBeVisible();
+
+      // When 0 profiles exist, back button is hidden
+      await expect(page.getByTestId('back-button')).not.toBeVisible();
+    });
   });
+});
 
-  test('should present 3 creation options on /profile/new (Create, Restore file, Restore GDrive) and navigate properly', async ({
-    page,
-  }) => {
-    await page.goto('/profile/new');
-    await expect(page.getByText('Add Profile')).toBeVisible();
-
-    // Verify 3 options exist
-    await expect(page.getByTestId('option-create-profile')).toBeVisible();
-    await expect(page.getByTestId('option-restore-file')).toBeVisible();
-    await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
-
-    // "Create" option shows the manual form and doesn't duplicate "New Profile" header
-    await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
-    await expect(page.getByText('New Profile')).not.toBeVisible();
-
-    // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
-    await page.getByTestId('option-restore-file').click();
-    await expect(page.getByTestId('select-profile-file-button')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Select profile', exact: true })
-    ).toBeVisible();
-
-    // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
-    await page.getByTestId('option-restore-gdrive').click();
-    await expect(page.getByTestId('connect-google-drive-button')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Connect Google Drive', exact: true })
-    ).toBeVisible();
-
-    // Click "Create" -> navigates back to /profile/new with manual form
-    await page.getByTestId('option-create-profile').click();
-    await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+test('keeps every record to its own profile on every screen', async ({
+  page,
+}) => {
+  await seedEveryResource(page);
+  await seedTestReport(page, {
+    patientId: 'shared-patient',
+    biomarkers: [{ name: 'Red Blood Cells', value: 4.5 }],
   });
-
-  test('should allow deleting a profile from EditProfileView with 5s countdown and redirect to /profile/new when last profile deleted', async ({
-    page,
-  }) => {
-    await page.getByTestId('profile-header-button').click();
-
-    // Wait for active profile to load and edit button to be enabled
-    await expect(page.getByTestId('edit-profile-button')).toBeEnabled();
-    await page.getByTestId('edit-profile-button').click();
-    await expect(page).toHaveURL(/.*profile\/.*\/edit/);
-
-    // Delete button should appear in EditProfileView
-    const deleteBtn = page.getByTestId('delete-profile-button');
-    await expect(deleteBtn).toBeVisible();
-    await page.clock.install();
-    await deleteBtn.click();
-
-    // Confirmation modal should appear with 5s countdown
-    const modal = page.getByTestId('delete-profile-modal');
-    await expect(modal).toBeVisible();
-    await expect(modal.getByText('Delete Profile')).toBeVisible();
-
-    // Since this is a local profile without Google Drive sync, cloud checkbox should not be visible
-    await expect(
-      modal.getByTestId('delete-from-cloud-checkbox')
-    ).not.toBeVisible();
-
-    const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
-    await expect(confirmBtn).toContainText('Delete (');
-
-    // Fast-forward countdown by 5 seconds
-    await page.clock.runFor(5000);
-    await expect(confirmBtn).toHaveText('Delete');
-    await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
-    await confirmBtn.click();
-
-    // Since this was the only profile, should redirect straight to /profile/new!
-    await expect(page).toHaveURL(/.*profile\/new/);
-    await expect(page.getByTestId('option-create-profile')).toBeVisible();
-
-    // When 0 profiles exist, back button is hidden
-    await expect(page.getByTestId('back-button')).not.toBeVisible();
+  await seedTestPatient(page, { id: 'other-patient', givenName: 'Bob' });
+  await seedTestReport(page, {
+    biomarkers: [{ name: 'Red Blood Cells', value: 6.1 }],
   });
+  const switchTo = (id: string) =>
+    bridge(page, (b, id) => b.setActivePatient(id), id);
+
+  // Home lists only the active profile's records.
+  await openRoute(page, '/');
+  await expect(page.getByTestId('biomarker-row-789-8')).toContainText('6.1');
+  for (const title of [
+    'Private asthma diagnosis',
+    'Respiratory review',
+    'Treatment to back up',
+    'Request to back up',
+  ])
+    await expect(page.getByText(title)).toHaveCount(0);
+
+  // Another profile's records are not found by direct entry either.
+  for (const [path, message] of [
+    ['/condition/asthma', 'Condition not found.'],
+    ['/consultation/visit', 'Consultation not found.'],
+    ['/treatment/inhaler', 'Treatment not found.'],
+    ['/service-request/referral', 'Service request not found.'],
+    ['/lab-result/cbc', 'Lab result not found.'],
+  ]) {
+    await openRoute(page, path);
+    await expect(page.getByText(message)).toBeVisible();
+  }
+
+  // Biomarker history and the labs summary follow profile changes live.
+  await openRoute(page, '/biomarker/789-8');
+  const latest = page.getByTestId('biomarker-latest-value');
+  const history = page.getByTestId('biomarker-history-list');
+  await expect(latest).toHaveText('6.1');
+  await expect(history.getByText('4.5', { exact: true })).toHaveCount(0);
+  await switchTo('shared-patient');
+  await expect(latest).toHaveText('4.5');
+  await expect(history.getByText('6.1', { exact: true })).toHaveCount(0);
+
+  await openRoute(page, '/labs-summary');
+  const summary = page.getByTestId('labs-summary-view');
+  await expect(summary.getByTestId('labs-summary-total')).toHaveText('2');
+  await expect(summary.getByTestId('labs-summary-result-789-8')).toContainText(
+    '4.5'
+  );
+  await switchTo('other-patient');
+  await expect(summary.getByTestId('labs-summary-total')).toHaveText('1');
+  await expect(summary.getByTestId('labs-summary-result-789-8')).toContainText(
+    '6.1'
+  );
+  await expect(summary.getByTestId('labs-summary-result-718-7')).toHaveCount(0);
+
+  // An open edit form unmounts, dropping its draft, and reloads on return.
+  await switchTo('shared-patient');
+  await openRoute(page, '/treatment/inhaler/edit');
+  const title = page.getByTestId('treatment-title-input');
+  await expect(title).toHaveValue('Treatment to back up');
+  await title.fill('Unsaved private draft');
+  await switchTo('other-patient');
+  await expect(page.getByTestId('edit-treatment-not-found')).toBeVisible();
+  await expect(title).toHaveCount(0);
+  await switchTo('shared-patient');
+  await expect(title).toHaveValue('Treatment to back up');
 });

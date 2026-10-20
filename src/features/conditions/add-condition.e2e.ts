@@ -2,7 +2,11 @@ import {
   test,
   expect,
   seedTestPatient,
+  seedTestConsultation,
   checkA11y,
+  evaluateBridge,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
@@ -13,7 +17,7 @@ test.describe('Add Condition Flow', () => {
   test('field labels are labels for their controls and mark required ones', async ({
     page,
   }) => {
-    await page.goto('/condition/add');
+    await openRoute(page, '/condition/add');
     // A required text input and a required native select
     for (const id of ['condition-title-input', 'status-picker-select']) {
       await expect(page.locator(`label[for="${id}"]`)).toHaveText(/ \*$/);
@@ -34,9 +38,9 @@ test.describe('Add Condition Flow', () => {
   });
 
   test(
-    'should allow creating a Condition with status, title, and optional fields via plus modal',
+    'adds a condition with optional fields, then views, edits and deletes it',
     { tag: ['@smoke', '@critical'] },
-    async ({ page }) => {
+    async ({ page, consoleMonitor }) => {
       await test.step('Navigate to Add Condition screen and audit a11y', async () => {
         await page.getByTestId('floating-add-button').click();
         await page.getByTestId('menu-add-condition').click();
@@ -114,6 +118,101 @@ test.describe('Add Condition Flow', () => {
           0
         );
       });
+
+      let conditionId = '';
+      await test.step('View it with its timeline, then edit it', async () => {
+        await page.getByRole('button', { name: /^View condition:/ }).click();
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          'Left Knee Pain'
+        );
+        conditionId = new URL(page.url()).pathname.split('/').pop()!;
+        await seedTestConsultation(page, {
+          conditionIds: [conditionId],
+          title: 'Knee Arthroscopy Review',
+        });
+        await reopenRoute(page);
+        // The timeline and its + belong to the view, not the edit form.
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
+        await expect(page.getByTestId('condition-add-button')).toBeVisible();
+        await page.getByTestId('edit-condition-button').click();
+        await expect(page).toHaveURL(/.*condition\/.*\/edit/);
+        await expect(page.getByText('Edit Condition')).toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).not.toBeVisible();
+        await expect(
+          page.getByTestId('condition-add-button')
+        ).not.toBeVisible();
+        // Edit forms do not delete; the view page's island does.
+        await expect(page.getByTestId('delete-condition-button')).toHaveCount(
+          0
+        );
+
+        const titleInput = page.getByTestId('condition-title-input');
+        await expect(titleInput).toHaveValue('Left Knee Pain');
+        await titleInput.fill('Updated Condition');
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(new RegExp(`condition/${conditionId}$`));
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          'Updated Condition'
+        );
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
+      });
+
+      await test.step('Delete it after a countdown, explaining a failure and allowing retry', async () => {
+        const deleteButton = page.getByTestId('delete-condition-button');
+        const modal = page.getByTestId('delete-confirmation-modal');
+        await deleteButton.click();
+        await expect(modal).toBeVisible();
+        await page.getByTestId('delete-modal-cancel-button').click();
+        await expect(modal).not.toBeVisible();
+        await expect(page.getByTestId('condition-title')).toHaveText(
+          'Updated Condition'
+        );
+
+        await evaluateBridge(
+          page,
+          (b, id) =>
+            b.executeSql(
+              `CREATE TEMP TRIGGER fail_condition_delete BEFORE DELETE ON conditions
+               WHEN OLD.id = '${id}'
+               BEGIN SELECT RAISE(ABORT, 'Simulated deletion failure'); END;`
+            ),
+          conditionId
+        );
+        consoleMonitor.ignore('Failed to delete resource:');
+        await page.clock.install();
+        await deleteButton.click();
+        const confirm = page.getByTestId('delete-modal-confirm-button');
+        // Confirming unlocks only after a 5 second countdown.
+        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+        await expect(confirm).toContainText('Delete (');
+        await page.clock.runFor(5000);
+        await expect(confirm).toHaveText('Delete');
+        await expect(confirm).toBeEnabled();
+        const dialogPromise = page.waitForEvent('dialog');
+        const clickPromise = confirm.click();
+        const dialog = await dialogPromise;
+        expect(dialog.type()).toBe('alert');
+        expect(dialog.message()).toBe(
+          'Error\nFailed to delete. Please try again.'
+        );
+        await dialog.accept();
+        await clickPromise;
+        await expect(modal).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`condition/${conditionId}$`));
+
+        await evaluateBridge(page, (b) =>
+          b.executeSql('DROP TRIGGER fail_condition_delete;')
+        );
+        await confirm.click();
+        await expect(page).toHaveURL(/\/$/);
+        // The condition is gone for good; its consultation stays.
+        const conditionRows = page.getByTestId(/^condition-card-/);
+        await expect(page.getByText('Knee Arthroscopy Review')).toBeVisible();
+        await expect(conditionRows).toHaveCount(0);
+        await page.reload();
+        await expect(page.getByText('Knee Arthroscopy Review')).toBeVisible();
+        await expect(conditionRows).toHaveCount(0);
+      });
     }
   );
 });
@@ -171,6 +270,8 @@ test.describe('New condition form keyboard support', () => {
 });
 
 test.describe('Condition form island', () => {
+  // Checks the + rotating into a close icon, so it runs with full motion.
+  test.use({ reducedMotion: 'no-preference' });
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
@@ -178,7 +279,7 @@ test.describe('Condition form island', () => {
   test('centers the add menu on its + and turns the + into a close icon', async ({
     page,
   }) => {
-    await page.goto('/condition/add');
+    await openRoute(page, '/condition/add');
     const add = page.getByTestId('add-option-button');
     await add.click();
     const menu = page.getByTestId('form-add-menu');

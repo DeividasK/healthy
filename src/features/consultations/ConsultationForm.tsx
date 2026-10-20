@@ -50,6 +50,7 @@ import {
   type LinkFieldConfig,
   type LinkSelection,
 } from '@/src/components/useLinkFields';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
@@ -213,43 +214,71 @@ export function ConsultationForm({
     });
 
   const [date, setDate] = useState<Date>(initialValues?.date || new Date());
-  const [time, setTime] = useState<string | null>(initialValues?.time ?? null);
-
-  // Optional fields visibility and values
-  const [showDoctor, setShowDoctor] = useState<boolean>(
-    Boolean(initialValues?.doctorName)
-  );
-  const [doctorName, setDoctorName] = useState(initialValues?.doctorName || '');
-
-  const [showServiceProvider, setShowServiceProvider] = useState<boolean>(
-    Boolean(initialValues?.serviceProviderName)
-  );
-  const [serviceProviderName, setServiceProviderName] = useState(
-    initialValues?.serviceProviderName || ''
-  );
-
-  const [showServiceType, setShowServiceType] = useState<boolean>(
-    Boolean(initialValues?.serviceType)
-  );
-  const [serviceType, setServiceType] = useState(
-    initialValues?.serviceType || ''
-  );
-
-  const [showNotes, setShowNotes] = useState<boolean>(
-    Boolean(initialValues?.notes)
-  );
-  const [notes, setNotes] = useState(initialValues?.notes || '');
-
-  const [selectedConditionIds, setSelectedConditionIds] = useState<string[]>(
-    initialValues?.reasonConditionIds ?? initialConditionIds ?? []
-  );
-  const [showCondition, setShowCondition] = useState(
-    Boolean((initialValues?.reasonConditionIds ?? initialConditionIds)?.length)
-  );
-
   const [availableConditions, setAvailableConditions] = useState<Condition[]>(
     []
   );
+  const conditionOptions = availableConditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
+  );
+  const fields = useOptionalFields({
+    time: {
+      label: 'Time',
+      icon: Clock,
+      empty: null as string | null,
+      initial: initialValues?.time ?? null,
+      added: () => {
+        const now = new Date();
+        const hh = now.getHours().toString().padStart(2, '0');
+        const mm = now.getMinutes().toString().padStart(2, '0');
+        return `${hh}:${mm}`;
+      },
+    },
+    conditions: {
+      label: 'Reasons for Visit',
+      icon: FolderPlus,
+      testID: 'menu-add-condition',
+      empty: [] as string[],
+      initial: initialValues?.reasonConditionIds ?? initialConditionIds,
+      available: conditionOptions.length > 0,
+    },
+    doctor: {
+      label: 'Specialist',
+      icon: User,
+      empty: '',
+      initial: initialValues?.doctorName,
+    },
+    serviceProvider: {
+      label: 'Service provider',
+      icon: Hospital,
+      testID: 'menu-add-service-provider',
+      empty: '',
+      initial: initialValues?.serviceProviderName,
+    },
+    serviceType: {
+      label: 'Service Type',
+      icon: Activity,
+      testID: 'menu-add-service-type',
+      empty: '',
+      initial: initialValues?.serviceType,
+    },
+    notes: {
+      label: 'Notes',
+      icon: FileText,
+      empty: '',
+      initial: initialValues?.notes,
+    },
+  });
+  const {
+    time,
+    conditions: selectedConditionIds,
+    doctor: doctorName,
+    serviceProvider: serviceProviderName,
+    serviceType,
+    notes,
+  } = fields.values;
+
   const [knownDoctors, setKnownDoctors] = useState<string[]>([]);
   const [knownServiceProviders, setKnownServiceProviders] = useState<string[]>(
     []
@@ -407,12 +436,6 @@ export function ConsultationForm({
     [knownServiceTypes]
   );
 
-  const conditionOptions = availableConditions.flatMap((condition) =>
-    condition.id
-      ? [{ id: condition.id, label: getConditionTitle(condition) }]
-      : []
-  );
-
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
@@ -445,22 +468,18 @@ export function ConsultationForm({
           title: trimmedTitle,
           status: selectedStatus.status,
           date: fullDate,
-          doctorName:
-            showDoctor && doctorName.trim() ? doctorName.trim() : undefined,
+          doctorName: doctorName.trim() || undefined,
           // Removing a provider the consultation had clears it; otherwise an
           // unshown provider (e.g. a reference with no name) is kept.
-          serviceProviderName: showServiceProvider
+          serviceProviderName: fields.shown.serviceProvider
             ? serviceProviderName.trim() || null
             : initialValues?.serviceProviderName
               ? null
               : undefined,
-          serviceType:
-            showServiceType && serviceType.trim()
-              ? serviceType.trim()
-              : undefined,
+          serviceType: serviceType.trim() || undefined,
           reasonConditionIds: selectedConditionIds.filter(Boolean),
           diagnoses,
-          notes: showNotes && notes.trim() ? notes.trim() : undefined,
+          notes: notes.trim() || undefined,
         },
         links.values
       );
@@ -471,9 +490,7 @@ export function ConsultationForm({
 
       goBackOr(
         router,
-        showCondition && selectedConditionIds[0]
-          ? `/condition/${selectedConditionIds[0]}`
-          : '/'
+        selectedConditionIds[0] ? `/condition/${selectedConditionIds[0]}` : '/'
       );
     } catch (err) {
       console.error('Failed to save consultation:', err);
@@ -500,103 +517,11 @@ export function ConsultationForm({
         setDiagnoses((current) => [...current, { title: '', terminology: {} }]),
     },
   ];
-  if (time === null) {
-    plusMenuOptions.push({
-      id: 'add-time',
-      label: 'Time',
-      icon: (
-        <Clock
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-time',
-      onPress: () => {
-        const now = new Date();
-        const hh = now.getHours().toString().padStart(2, '0');
-        const mm = now.getMinutes().toString().padStart(2, '0');
-        setTime(`${hh}:${mm}`);
-      },
-    });
-  }
-  if (!showCondition && conditionOptions.length > 0) {
-    plusMenuOptions.push({
-      id: 'add-reason',
-      label: 'Reasons for Visit',
-      icon: (
-        <FolderPlus
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-condition',
-      onPress: () => setShowCondition(true),
-    });
-  }
-  if (!showDoctor) {
-    plusMenuOptions.push({
-      id: 'add-doctor',
-      label: 'Specialist',
-      icon: (
-        <User
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-doctor',
-      onPress: () => setShowDoctor(true),
-    });
-  }
-  if (!showServiceProvider) {
-    plusMenuOptions.push({
-      id: 'add-service-provider',
-      label: 'Service provider',
-      icon: (
-        <Hospital
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-service-provider',
-      onPress: () => setShowServiceProvider(true),
-    });
-  }
-  if (!showServiceType) {
-    plusMenuOptions.push({
-      id: 'add-service-type',
-      label: 'Service Type',
-      icon: (
-        <Activity
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-service-type',
-      onPress: () => setShowServiceType(true),
-    });
-  }
-  if (!showNotes) {
-    plusMenuOptions.push({
-      id: 'add-notes',
-      label: 'Notes',
-      icon: (
-        <FileText
-          color={COLORS.light.primary}
-          size={20}
-          style={{ marginRight: 12 }}
-        />
-      ),
-      testID: 'menu-add-notes',
-      onPress: () => setShowNotes(true),
-    });
-  }
-
-  const menuOptions = [...plusMenuOptions, ...links.menuOptions];
+  const menuOptions = [
+    ...plusMenuOptions,
+    ...fields.menuOptions,
+    ...links.menuOptions,
+  ];
 
   const { reveal, scrollViewProps } = useFieldReveal();
 
@@ -668,11 +593,11 @@ export function ConsultationForm({
                 nativeID="consultation-time"
                 removeTestID="remove-time-button"
                 removeLabel="Remove time"
-                onRemove={() => setTime(null)}
+                onRemove={() => fields.remove('time')}
               >
                 <NativeTimePicker
                   value={time}
-                  onChange={setTime}
+                  onChange={(value) => fields.set('time', value)}
                   testID="time-picker-button"
                   id="consultation-time"
                   name="time"
@@ -680,19 +605,16 @@ export function ConsultationForm({
               </FormField>
             )}
 
-            {showCondition && (
+            {fields.shown.conditions && (
               <LinkedResourcesField
                 label="Reasons for visit"
                 searchLabel="Select reasons for visit"
                 options={conditionOptions}
                 selectedIds={selectedConditionIds}
-                onChange={setSelectedConditionIds}
+                onChange={(ids) => fields.set('conditions', ids)}
                 testID="consultation-conditions-section"
                 removeTestID="remove-conditions-section-button"
-                onRemove={() => {
-                  setShowCondition(false);
-                  setSelectedConditionIds([]);
-                }}
+                onRemove={() => fields.remove('conditions')}
               />
             )}
 
@@ -866,7 +788,7 @@ export function ConsultationForm({
             )}
 
             {/* Service Type / Specialty Section (Optional) */}
-            {showServiceType && (
+            {fields.shown.serviceType && (
               <AutocompleteTextField
                 label="Specialty / Service Type"
                 name="serviceType"
@@ -875,18 +797,15 @@ export function ConsultationForm({
                 inputID="consultation-service-type-input"
                 autocompleteTestID="service-type-autocomplete"
                 value={serviceType}
-                onChangeText={setServiceType}
+                onChangeText={(value) => fields.set('serviceType', value)}
                 suggestions={serviceTypeSuggestions}
                 removeTestID="remove-service-type-button"
                 removeLabel="Remove service type"
-                onRemove={() => {
-                  setShowServiceType(false);
-                  setServiceType('');
-                }}
+                onRemove={() => fields.remove('serviceType')}
               />
             )}
 
-            {showDoctor && (
+            {fields.shown.doctor && (
               <AutocompleteTextField
                 label="Specialist"
                 name="specialistName"
@@ -894,17 +813,14 @@ export function ConsultationForm({
                 inputID="consultation-doctor-input"
                 autocompleteTestID="doctor-autocomplete"
                 value={doctorName}
-                onChangeText={setDoctorName}
+                onChangeText={(value) => fields.set('doctor', value)}
                 suggestions={knownDoctors}
                 removeTestID="remove-doctor-button"
-                onRemove={() => {
-                  setShowDoctor(false);
-                  setDoctorName('');
-                }}
+                onRemove={() => fields.remove('doctor')}
               />
             )}
 
-            {showServiceProvider && (
+            {fields.shown.serviceProvider && (
               <AutocompleteTextField
                 label="Service provider"
                 name="serviceProviderName"
@@ -912,26 +828,20 @@ export function ConsultationForm({
                 inputID="consultation-service-provider-input"
                 autocompleteTestID="service-provider-autocomplete"
                 value={serviceProviderName}
-                onChangeText={setServiceProviderName}
+                onChangeText={(value) => fields.set('serviceProvider', value)}
                 suggestions={knownServiceProviders}
                 removeTestID="remove-service-provider-button"
-                onRemove={() => {
-                  setShowServiceProvider(false);
-                  setServiceProviderName('');
-                }}
+                onRemove={() => fields.remove('serviceProvider')}
               />
             )}
 
             {/* Consultation Notes Textarea (Optional) */}
-            {showNotes && (
+            {fields.shown.notes && (
               <FormField
                 label="Notes"
                 nativeID="consultation-notes-input"
                 removeTestID="remove-notes-button"
-                onRemove={() => {
-                  setShowNotes(false);
-                  setNotes('');
-                }}
+                onRemove={() => fields.remove('notes')}
                 inputProps={{
                   testID: 'consultation-notes-input',
                   id: 'consultation-notes-input',
@@ -943,7 +853,7 @@ export function ConsultationForm({
                   multiline: true,
                   numberOfLines: 5,
                   value: notes,
-                  onChangeText: setNotes,
+                  onChangeText: (value) => fields.set('notes', value),
                 }}
               />
             )}

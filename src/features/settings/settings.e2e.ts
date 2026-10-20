@@ -4,6 +4,7 @@ import {
   checkA11y,
   evaluateBridge as bridge,
   seedTestPatient,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Settings', () => {
@@ -12,7 +13,7 @@ test.describe('Settings', () => {
   });
 
   test('sets the clock time of each part of the day', async ({ page }) => {
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId('settings-header-button').click();
     await expect(page).toHaveURL(/\/settings$/);
     await expect(page.getByTestId('settings-title')).toHaveText('Settings');

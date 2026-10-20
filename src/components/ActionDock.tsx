@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -92,7 +92,9 @@ export function ActionDock({
     enabled && primaryAction && !primaryAction.disabled
       ? primaryAction.onPress
       : null;
-  useEffect(() => {
+  // A layout effect, so a shortcut pressed right after typing never runs the
+  // previous render's action.
+  useLayoutEffect(() => {
     primaryPressRef.current = primaryPress;
   }, [primaryPress]);
 

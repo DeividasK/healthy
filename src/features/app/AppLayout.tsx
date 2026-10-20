@@ -14,23 +14,29 @@ import { ActivePatientProvider } from '@/src/features/profile/ActivePatientConte
 import { SyncProvider } from '@/src/context/SyncContext';
 import { DatabaseProvider } from '@/src/database/db';
 import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
-import { setupTestBridge } from '@/src/features/testing/testBridge';
+import {
+  setupTestBridge,
+  useTestResetKey,
+} from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 function AppReadyHandler() {
+  const navigation = useNavigationContainerRef();
   useEffect(() => {
     SplashScreen.hideAsync();
-    setupTestBridge();
+    setupTestBridge(navigation);
     registerPwa();
-  }, []);
+  }, [navigation]);
 
   return null;
 }
 
 export default function RootLayout() {
+  // Tests reset the app in place; production never changes it.
+  const resetKey = useTestResetKey();
   const [loaded, error] = useFonts({
     SpaceMono: require('../../../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -58,11 +64,13 @@ export default function RootLayout() {
   return (
     <DatabaseProvider>
       <AppReadyHandler />
-      <SyncProvider>
-        <ActivePatientProvider>
-          <RootLayoutNav />
-        </ActivePatientProvider>
-      </SyncProvider>
+      {resetKey !== null && (
+        <SyncProvider key={resetKey}>
+          <ActivePatientProvider>
+            <RootLayoutNav />
+          </ActivePatientProvider>
+        </SyncProvider>
+      )}
     </DatabaseProvider>
   );
 }

@@ -6,6 +6,7 @@ import {
   seedTestConsultation,
   seedTestTreatment,
   getTestTreatment,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 const getConsultation = (page: any, id: string) =>
@@ -33,7 +34,7 @@ test.describe('Edit Condition links', () => {
       reason: 'Attacks',
     });
 
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await page.getByTestId('edit-condition-button').click();
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-consultation').click();
