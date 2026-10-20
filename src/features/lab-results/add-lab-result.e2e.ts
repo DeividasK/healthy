@@ -155,67 +155,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     }
   );
 
-  test('should disable add when all optional fields are present and re-enable it when removed', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await expect(plusBtn).toBeVisible();
-
-    // 1. Add Time
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-    await page.getByTestId('menu-add-time').click();
-
-    // Time pill is visible
-    await expect(page.getByTestId('time-picker-button')).toBeVisible();
-
-    // 2. Open plus menu again: "Add Time" should no longer appear
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).not.toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-
-    // 3. Add Notes
-    await page.getByTestId('menu-add-notes').click();
-    await expect(page.getByTestId('notes-input')).toBeVisible();
-
-    // Add Service provider once the previous menu has closed
-    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-    await plusBtn.click();
-    await page
-      .getByTestId('form-add-menu')
-      .getByTestId('menu-add-service-provider')
-      .click();
-    await expect(
-      page.getByTestId('lab-result-service-provider-input')
-    ).toBeVisible();
-
-    // 4. Keep the primary add action in place, disabled when all fields are present
-    await expect(plusBtn).toBeDisabled();
-
-    // 5. Removing notes makes it available to add again
-    await page.getByTestId('remove-notes-button').click();
-    await expect(page.getByTestId('notes-input')).not.toBeVisible();
-    await expect(plusBtn).toBeVisible();
-
-    // 6. Click plus button: only "Add Notes" should be shown
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).not.toBeVisible();
-    await page
-      .getByTestId('form-add-menu-backdrop')
-      .click({ position: { x: 5, y: 5 } });
-
-    // 7. Remove Time -> "Add Time" should reappear in menu
-    await page.getByTestId('remove-time-button').click();
-    await expect(page.getByTestId('time-picker-button')).not.toBeVisible();
-    await plusBtn.click();
-    await expect(page.getByTestId('menu-add-time')).toBeVisible();
-    await expect(page.getByTestId('menu-add-notes')).toBeVisible();
-  });
-
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {

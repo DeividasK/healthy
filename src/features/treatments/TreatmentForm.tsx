@@ -30,6 +30,7 @@ import {
   type LinkFieldConfig,
   type LinkSelection,
 } from '@/src/components/useLinkFields';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -106,35 +107,83 @@ export function TreatmentForm({
   const [authoredDate, setAuthoredDate] = useState<Date>(
     initialValues?.authoredDate || new Date()
   );
-  const [dosageInstructions, setDosageInstructions] = useState(
-    initialValues?.dosageInstructions || ''
-  );
-  const [regimen, setRegimen] = useState<RegimenDraft>(
-    initialValues?.regimen || { phases: [] }
-  );
-  const [dispenseQuantity, setDispenseQuantity] = useState<QuantityDraft>(
-    initialValues?.dispenseQuantity || getQuantityDraft()
-  );
   // Records carrying both (e.g. imported) open on the regimen and keep their
   // text untouched unless the user replaces the regimen with text.
   const initialRegimen = hasRegimen(initialValues?.regimen);
-  const [reason, setReason] = useState(initialValues?.reason || '');
-  const [reasonConditionIds, setReasonConditionIds] = useState(
-    initialValues?.reasonConditionIds || []
+  const conditionOptions = conditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
   );
-  const [notes, setNotes] = useState(initialValues?.notes || '');
-  const [requesterName, setRequesterName] = useState(
-    initialValues?.requesterName || ''
+  const fields = useOptionalFields(
+    {
+      requester: {
+        label: 'Requester (Specialist)',
+        icon: User,
+        empty: '',
+        initial: initialValues?.requesterName || '',
+      },
+      instructions: {
+        label: 'Dosage',
+        icon: Tablets,
+        empty: '',
+        initial: initialValues?.dosageInstructions || '',
+        shown: Boolean(initialValues?.dosageInstructions) && !initialRegimen,
+        // Dosing is either text instructions or a regimen, never both.
+        excludes: ['regimen'],
+      },
+      regimen: {
+        label: 'Regimen',
+        icon: Repeat,
+        empty: { phases: [] } as RegimenDraft,
+        initial: initialValues?.regimen || undefined,
+        shown: initialRegimen,
+        added: (regimen) =>
+          hasRegimen(regimen)
+            ? regimen
+            : { phases: [{ doses: [createDoseDraft()] }] },
+        excludes: ['instructions'],
+      },
+      dispenseQuantity: {
+        label: 'Quantity to Dispense',
+        icon: Package,
+        empty: getQuantityDraft(),
+        initial: initialValues?.dispenseQuantity || undefined,
+        shown: Boolean(initialValues?.dispenseQuantity?.value),
+      },
+      reason: {
+        label: 'Reason',
+        icon: MessageSquareText,
+        empty: '',
+        initial: initialValues?.reason || '',
+      },
+      reasonCondition: {
+        label: 'Associated Conditions',
+        icon: FolderPlus,
+        empty: [] as string[],
+        initial: initialValues?.reasonConditionIds,
+        // Linking needs at least one existing condition.
+        available: conditionOptions.length > 0,
+      },
+      notes: {
+        label: 'Notes',
+        icon: FileText,
+        empty: '',
+        initial: initialValues?.notes || '',
+      },
+    },
+    { testIDPrefix: 'menu-add-treatment-' }
   );
-  const [visibleFields, setVisibleFields] = useState({
-    requester: Boolean(initialValues?.requesterName),
-    instructions: Boolean(initialValues?.dosageInstructions) && !initialRegimen,
-    regimen: initialRegimen,
-    dispenseQuantity: Boolean(initialValues?.dispenseQuantity?.value),
-    reason: Boolean(initialValues?.reason),
-    reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
-    notes: Boolean(initialValues?.notes),
-  });
+  const {
+    requester: requesterName,
+    instructions: dosageInstructions,
+    regimen,
+    dispenseQuantity,
+    reason,
+    reasonCondition: reasonConditionIds,
+    notes,
+  } = fields.values;
+  const visibleFields = fields.shown;
   const hasChanges = useHasChanges({
     title,
     intent,
@@ -155,68 +204,7 @@ export function TreatmentForm({
   const [regimenOptions, setRegimenOptions] = useState<AddOptionItem[] | null>(
     null
   );
-  const optionalFields = [
-    { id: 'requester' as const, label: 'Requester (Specialist)', icon: User },
-    { id: 'instructions' as const, label: 'Dosage', icon: Tablets },
-    { id: 'regimen' as const, label: 'Regimen', icon: Repeat },
-    {
-      id: 'dispenseQuantity' as const,
-      label: 'Quantity to Dispense',
-      icon: Package,
-    },
-    { id: 'reason' as const, label: 'Reason', icon: MessageSquareText },
-    {
-      id: 'reasonCondition' as const,
-      label: 'Associated Conditions',
-      icon: FolderPlus,
-    },
-    { id: 'notes' as const, label: 'Notes', icon: FileText },
-  ];
-  const conditionOptions = conditions.flatMap((condition) =>
-    condition.id
-      ? [{ id: condition.id, label: getConditionTitle(condition) }]
-      : []
-  );
-  const options = [
-    ...optionalFields
-      .filter(
-        ({ id }) =>
-          !visibleFields[id] &&
-          // Linking needs at least one existing condition.
-          (id !== 'reasonCondition' || conditionOptions.length > 0) &&
-          // Dosing is either text instructions or a regimen, never both.
-          (id !== 'instructions' || !visibleFields.regimen) &&
-          (id !== 'regimen' || !visibleFields.instructions)
-      )
-      .map(({ id, label, icon: Icon }) => ({
-        id,
-        label,
-        testID: `menu-add-treatment-${id}`,
-        icon: (
-          <Icon
-            size={20}
-            color={COLORS.light.primary}
-            style={{ marginRight: 12 }}
-          />
-        ),
-        onPress: () => {
-          if (id === 'regimen' && !hasRegimen(regimen))
-            setRegimen({ phases: [{ doses: [createDoseDraft()] }] });
-          setVisibleFields((fields) => ({ ...fields, [id]: true }));
-        },
-      })),
-    ...links.menuOptions,
-  ];
-  const removeField = (id: keyof typeof visibleFields) => {
-    setVisibleFields((fields) => ({ ...fields, [id]: false }));
-    if (id === 'instructions') setDosageInstructions('');
-    else if (id === 'regimen') setRegimen({ phases: [] });
-    else if (id === 'dispenseQuantity') setDispenseQuantity(getQuantityDraft());
-    else if (id === 'reason') setReason('');
-    else if (id === 'reasonCondition') setReasonConditionIds([]);
-    else if (id === 'requester') setRequesterName('');
-    else setNotes('');
-  };
+  const options = [...fields.menuOptions, ...links.menuOptions];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -361,11 +349,12 @@ export function TreatmentForm({
               variant="input"
             />
           </FormField>
-          {optionalFields.map(({ id, label }) => {
+          {fields.order.map((id) => {
             if (!visibleFields[id]) return null;
+            const label = fields.labels[id];
             const fieldProps = {
               label,
-              onRemove: () => removeField(id),
+              onRemove: () => fields.remove(id),
               removeTestID: `remove-treatment-${id}-button`,
             };
             if (id === 'requester') {
@@ -377,7 +366,7 @@ export function TreatmentForm({
                   name="requesterName"
                   placeholder="e.g. Dr. Sarah Adams"
                   value={requesterName}
-                  onChangeText={setRequesterName}
+                  onChangeText={(value) => fields.set('requester', value)}
                   suggestions={specialistSuggestions}
                   onRemove={fieldProps.onRemove}
                   removeTestID={fieldProps.removeTestID}
@@ -390,9 +379,11 @@ export function TreatmentForm({
                   key={id}
                   kind={id}
                   instructions={dosageInstructions}
-                  onInstructionsChange={setDosageInstructions}
+                  onInstructionsChange={(value) =>
+                    fields.set('instructions', value)
+                  }
                   regimen={regimen}
-                  onRegimenChange={setRegimen}
+                  onRegimenChange={(value) => fields.set('regimen', value)}
                   onRemove={fieldProps.onRemove}
                   onShowOptions={setRegimenOptions}
                   idPrefix="treatment"
@@ -415,7 +406,7 @@ export function TreatmentForm({
                         placeholder="e.g. 30"
                         value={dispenseQuantity.value}
                         onChangeText={(value) =>
-                          setDispenseQuantity((current) => ({
+                          fields.set('dispenseQuantity', (current) => ({
                             ...current,
                             value,
                           }))
@@ -428,7 +419,10 @@ export function TreatmentForm({
                     unit={dispenseQuantity.unit}
                     options={getAmountUnitOptions(dispenseQuantity.unit)}
                     onUnitChange={(unit) =>
-                      setDispenseQuantity((current) => ({ ...current, unit }))
+                      fields.set('dispenseQuantity', (current) => ({
+                        ...current,
+                        unit,
+                      }))
                     }
                   />
                 </FormField>
@@ -442,7 +436,7 @@ export function TreatmentForm({
                   searchLabel={`Select ${label.toLowerCase()}`}
                   options={conditionOptions}
                   selectedIds={reasonConditionIds}
-                  onChange={setReasonConditionIds}
+                  onChange={(ids) => fields.set('reasonCondition', ids)}
                   onRemove={fieldProps.onRemove}
                   removeTestID={fieldProps.removeTestID}
                   testID="treatment-reason-conditions-field"
@@ -450,8 +444,7 @@ export function TreatmentForm({
                 />
               );
             }
-            const [value, onChangeText] =
-              id === 'reason' ? [reason, setReason] : [notes, setNotes];
+            const textField = id === 'reason' ? 'reason' : 'notes';
             return (
               <FormField
                 key={id}
@@ -463,8 +456,8 @@ export function TreatmentForm({
                   name: id,
                   testID: `treatment-${id}-input`,
                   accessibilityLabel: label,
-                  value,
-                  onChangeText,
+                  value: fields.values[textField],
+                  onChangeText: (value) => fields.set(textField, value),
                   multiline: id !== 'reason',
                   numberOfLines: id === 'notes' ? 3 : 1,
                 }}

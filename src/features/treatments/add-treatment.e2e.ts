@@ -227,19 +227,12 @@ test.describe('Add Treatment Flow', () => {
     );
     const [row] = await page.evaluate(() =>
       (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
-        "SELECT id, fhir_json FROM medication_requests WHERE display_label = 'Ibuprofen 400mg'"
+        "SELECT fhir_json FROM medication_requests WHERE display_label = 'Ibuprofen 400mg'"
       )
     );
     expect(JSON.parse(row.fhir_json).requester).toEqual({
       display: 'Dr. New Specialist',
     });
-
-    // Removing the field clears the requester
-    await page.getByTestId('edit-treatment-button').click();
-    await page.getByTestId('remove-treatment-requester-button').click();
-    await page.getByTestId('save-treatment-button').click();
-    await expect(page.getByTestId('treatment-requester')).toHaveCount(0);
-    expect((await getTestTreatment(page, row.id)).requester).toBeUndefined();
   });
 });
 
@@ -316,6 +309,8 @@ test.describe('Treatment form keyboard support', () => {
 
     await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Keyboard saved');
+    // The shared dock switches to the form once the form has focus.
+    await expect(page.getByTestId('save-treatment-button')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.getByTestId('treatment-title')).toHaveText(
       'Keyboard saved'

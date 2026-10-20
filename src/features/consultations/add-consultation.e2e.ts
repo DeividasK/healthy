@@ -46,26 +46,10 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByText('New Consultation')).toBeVisible();
       });
 
-      await test.step('Remove the condition and the section, then re-add it', async () => {
-        const conditionPill = page.getByTestId(
-          `selected-condition-${conditionId}`
-        );
-        await expect(conditionPill).toContainText('Cardiology Overview');
-        await page.getByTestId('remove-condition-button').click();
-        await expect(conditionPill).not.toBeVisible();
-        await expect(page.getByTestId('condition-search-input')).toBeVisible();
-        await page.getByTestId('remove-conditions-section-button').click();
+      await test.step('The condition is preselected as the reason for visit', async () => {
         await expect(
-          page.getByTestId('consultation-conditions-section')
-        ).not.toBeVisible();
-
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-condition').click();
-        await page.getByTestId('condition-search-input').click();
-        await page
-          .getByTestId(`condition-autocomplete-item-${conditionId}`)
-          .click();
-        await expect(conditionPill).toBeVisible();
+          page.getByTestId(`selected-condition-${conditionId}`)
+        ).toContainText('Cardiology Overview');
       });
 
       await test.step('Fill a future date, time, service type, doctor and notes', async () => {

@@ -16,6 +16,8 @@ test.beforeEach(async ({ page }) => {
   await seedTestPatient(page, { id: 'integrity-patient' });
 });
 
+// Every form builds its optional fields with useOptionalFields; this covers
+// the shared add, remove and clear behaviour on the form with the most fields.
 test('optional fields can be added, removed, re-added, and cleared after reload', async ({
   page,
 }) => {
@@ -31,15 +33,13 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
     // Wait for the closing menu to leave so its items are not matched twice.
     await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
   };
+  // A removed field is cleared, so re-adding it starts empty.
+  await addField('notes');
+  await page.getByTestId('treatment-notes-input').fill('Discarded notes');
+  await page.getByTestId('remove-treatment-notes-button').click();
+  await expect(page.getByTestId('treatment-notes-input')).toHaveCount(0);
   const textFields = ['instructions', 'reason', 'notes', 'requester'];
   for (const field of textFields) {
-    await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
-    await addField(field);
-    await page
-      .getByTestId(`treatment-${field}-input`)
-      .fill(`Original ${field}`);
-    await page.getByTestId(`remove-treatment-${field}-button`).click();
-    await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
     await addField(field);
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveValue('');
     await page.getByTestId(`treatment-${field}-input`).fill(`Saved ${field}`);

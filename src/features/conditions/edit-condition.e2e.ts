@@ -379,22 +379,12 @@ test('edits verification independently and roundtrips source and standard catego
   await expect(
     page.getByTestId('action-dock-primary-slot').getByTestId('save-button')
   ).toBeVisible();
-  await page.getByTestId('remove-verification-button').click();
-  await page.getByTestId('remove-category-button').click();
-  await expect(page.getByTestId('verification-picker-button')).toHaveCount(0);
-  await expect(page.getByTestId('condition-category-input')).toHaveCount(0);
   await page.getByTestId('add-option-button').click();
   await expect(page.getByTestId('action-dock-background')).toHaveCSS(
     'background-color',
     'rgb(255, 255, 255)'
   );
-  await page.getByTestId('menu-add-verification').click();
-  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
   await page.getByTestId('add-option-button').click();
-  await page.getByTestId('menu-add-category').click();
-  await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-  await expect(page.getByTestId('verification-picker-button')).toBeVisible();
-  await expect(page.getByTestId('condition-category-input')).toHaveValue('');
   await page.getByTestId('remove-verification-button').click();
   await page.getByTestId('remove-category-button').click();
   await page.getByTestId('save-button').click();

@@ -188,9 +188,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(toggle).toHaveCount(0);
 });
 
-test('validates dates, removes optional notes and confirms removing a period', async ({
-  page,
-}) => {
+test('validates dates and confirms removing a period', async ({ page }) => {
   const yesterday = await getBrowserLocalDate(page, -1);
   await seedTestResources(page, {
     treatmentUsage: [{ treatmentId, action: 'start', date: yesterday }],
@@ -205,16 +203,8 @@ test('validates dates, removes optional notes and confirms removing a period', a
     `The date cannot be before ${yesterday}`
   );
   expect(await getTestTreatmentUsage(page, treatmentId)).toHaveLength(1);
-  await page.getByTestId('add-option-button').click();
-  await page.getByTestId('menu-add-usage-notes').click();
-  await page
-    .getByTestId('treatment-usage-notes-input')
-    .fill('Discard this note');
-  await page.getByTestId('remove-usage-notes-button').click();
-  await expect(page.getByTestId('treatment-usage-notes-input')).toHaveCount(0);
   await saveChange(page, await getBrowserLocalDate(page));
   const statements = await getTestTreatmentUsage(page, treatmentId);
-  expect(statements[1].note).toBeUndefined();
   await editPeriod(page, statements[1].id);
   await page.getByTestId('treatment-usage-remove-button').click();
   await page.getByTestId('delete-modal-cancel-button').click();

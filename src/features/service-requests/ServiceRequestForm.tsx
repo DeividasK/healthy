@@ -29,6 +29,7 @@ import {
   type LinkFieldConfig,
   type LinkSelection,
 } from '@/src/components/useLinkFields';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -96,28 +97,63 @@ export function ServiceRequestForm({
   const [authoredDate, setAuthoredDate] = useState<Date>(
     initialValues?.authoredDate || new Date()
   );
-  const [plannedDate, setPlannedDate] = useState<Date | null>(
-    initialValues?.plannedDate || null
+  const conditionOptions = conditions.flatMap((condition) =>
+    condition.id
+      ? [{ id: condition.id, label: getConditionTitle(condition) }]
+      : []
   );
-  const [instructions, setInstructions] = useState(
-    initialValues?.instructions || ''
+  const fields = useOptionalFields(
+    {
+      plannedDate: {
+        label: 'Planned Date',
+        icon: CalendarClock,
+        empty: null as Date | null,
+        initial: initialValues?.plannedDate || null,
+      },
+      requester: {
+        label: 'Requester (Specialist)',
+        icon: User,
+        empty: '',
+        initial: initialValues?.requesterName || '',
+      },
+      instructions: {
+        label: 'Instructions',
+        icon: ScrollText,
+        empty: '',
+        initial: initialValues?.instructions || '',
+      },
+      reason: {
+        label: 'Reason',
+        icon: MessageSquareText,
+        empty: '',
+        initial: initialValues?.reason || '',
+      },
+      reasonCondition: {
+        label: 'Associated Conditions',
+        icon: FolderPlus,
+        empty: [] as string[],
+        initial: initialValues?.reasonConditionIds,
+        // Linking needs at least one existing condition.
+        available: conditionOptions.length > 0,
+      },
+      notes: {
+        label: 'Notes',
+        icon: FileText,
+        empty: '',
+        initial: initialValues?.notes || '',
+      },
+    },
+    { testIDPrefix: 'menu-add-service-request-' }
   );
-  const [reason, setReason] = useState(initialValues?.reason || '');
-  const [reasonConditionIds, setReasonConditionIds] = useState(
-    initialValues?.reasonConditionIds || []
-  );
-  const [notes, setNotes] = useState(initialValues?.notes || '');
-  const [requesterName, setRequesterName] = useState(
-    initialValues?.requesterName || ''
-  );
-  const [visibleFields, setVisibleFields] = useState({
-    plannedDate: Boolean(initialValues?.plannedDate),
-    requester: Boolean(initialValues?.requesterName),
-    instructions: Boolean(initialValues?.instructions),
-    reason: Boolean(initialValues?.reason),
-    reasonCondition: Boolean(initialValues?.reasonConditionIds?.length),
-    notes: Boolean(initialValues?.notes),
-  });
+  const {
+    plannedDate,
+    requester: requesterName,
+    instructions,
+    reason,
+    reasonCondition: reasonConditionIds,
+    notes,
+  } = fields.values;
+  const visibleFields = fields.shown;
   const hasChanges = useHasChanges({
     title,
     category,
@@ -134,56 +170,7 @@ export function ServiceRequestForm({
   });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const optionalFields = [
-    { id: 'plannedDate' as const, label: 'Planned Date', icon: CalendarClock },
-    { id: 'requester' as const, label: 'Requester (Specialist)', icon: User },
-    { id: 'instructions' as const, label: 'Instructions', icon: ScrollText },
-    { id: 'reason' as const, label: 'Reason', icon: MessageSquareText },
-    {
-      id: 'reasonCondition' as const,
-      label: 'Associated Conditions',
-      icon: FolderPlus,
-    },
-    { id: 'notes' as const, label: 'Notes', icon: FileText },
-  ];
-  const conditionOptions = conditions.flatMap((condition) =>
-    condition.id
-      ? [{ id: condition.id, label: getConditionTitle(condition) }]
-      : []
-  );
-  const options = [
-    ...optionalFields
-      .filter(
-        ({ id }) =>
-          !visibleFields[id] &&
-          // Linking needs at least one existing condition.
-          (id !== 'reasonCondition' || conditionOptions.length > 0)
-      )
-      .map(({ id, label, icon: Icon }) => ({
-        id,
-        label,
-        testID: `menu-add-service-request-${id}`,
-        icon: (
-          <Icon
-            size={20}
-            color={COLORS.light.primary}
-            style={{ marginRight: 12 }}
-          />
-        ),
-        onPress: () =>
-          setVisibleFields((fields) => ({ ...fields, [id]: true })),
-      })),
-    ...links.menuOptions,
-  ];
-  const removeField = (id: keyof typeof visibleFields) => {
-    setVisibleFields((fields) => ({ ...fields, [id]: false }));
-    if (id === 'plannedDate') setPlannedDate(null);
-    else if (id === 'instructions') setInstructions('');
-    else if (id === 'reason') setReason('');
-    else if (id === 'reasonCondition') setReasonConditionIds([]);
-    else if (id === 'requester') setRequesterName('');
-    else setNotes('');
-  };
+  const options = [...fields.menuOptions, ...links.menuOptions];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -338,11 +325,12 @@ export function ServiceRequestForm({
               variant="input"
             />
           </FormField>
-          {optionalFields.map(({ id, label }) => {
+          {fields.order.map((id) => {
             if (!visibleFields[id]) return null;
+            const label = fields.labels[id];
             const fieldProps = {
               label,
-              onRemove: () => removeField(id),
+              onRemove: () => fields.remove(id),
               removeTestID: `remove-service-request-${id}-button`,
             };
             if (id === 'plannedDate') {
@@ -354,7 +342,7 @@ export function ServiceRequestForm({
                 >
                   <NativeDatePicker
                     value={plannedDate}
-                    onChange={setPlannedDate}
+                    onChange={(date) => fields.set('plannedDate', date)}
                     testID="service-request-planned-date-picker"
                     id="service-request-planned-date-input"
                     name="plannedDate"
@@ -373,7 +361,7 @@ export function ServiceRequestForm({
                   name="requesterName"
                   placeholder="e.g. Dr. Sarah Adams"
                   value={requesterName}
-                  onChangeText={setRequesterName}
+                  onChangeText={(value) => fields.set('requester', value)}
                   suggestions={specialistSuggestions}
                   onRemove={fieldProps.onRemove}
                   removeTestID={fieldProps.removeTestID}
@@ -388,7 +376,7 @@ export function ServiceRequestForm({
                   searchLabel={`Select ${label.toLowerCase()}`}
                   options={conditionOptions}
                   selectedIds={reasonConditionIds}
-                  onChange={setReasonConditionIds}
+                  onChange={(ids) => fields.set('reasonCondition', ids)}
                   onRemove={fieldProps.onRemove}
                   removeTestID={fieldProps.removeTestID}
                   testID="service-request-reason-conditions-field"
@@ -396,12 +384,8 @@ export function ServiceRequestForm({
                 />
               );
             }
-            const [value, onChangeText] =
-              id === 'instructions'
-                ? [instructions, setInstructions]
-                : id === 'reason'
-                  ? [reason, setReason]
-                  : [notes, setNotes];
+            const textField =
+              id === 'instructions' || id === 'reason' ? id : 'notes';
             return (
               <FormField
                 key={id}
@@ -413,8 +397,8 @@ export function ServiceRequestForm({
                   name: id,
                   testID: `service-request-${id}-input`,
                   accessibilityLabel: label,
-                  value,
-                  onChangeText,
+                  value: fields.values[textField],
+                  onChangeText: (value) => fields.set(textField, value),
                   multiline: id !== 'reason',
                   numberOfLines:
                     id === 'instructions' ? 4 : id === 'notes' ? 3 : 1,
