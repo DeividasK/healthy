@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAssistantRuntime } from './assistantEngine';
 import { loadChosenModel, saveChosenModel } from './assistantModels';
-import type { AssistantModelId, AssistantSession } from './assistantTypes';
+import type {
+  AssistantModelId,
+  AssistantProgress,
+  AssistantSession,
+} from './assistantTypes';
 import { buildHealthContext, buildSystemPrompt } from './healthContext';
 
 export type AssistantStatus =
@@ -12,6 +16,8 @@ export interface AssistantMessage {
   role: 'user' | 'assistant';
   text: string;
 }
+
+const PREPARING: AssistantProgress = { phase: 'preparing' };
 
 const LOAD_ERROR =
   "Couldn't load the model. Check your connection and try again.";
@@ -28,7 +34,7 @@ export function useAssistant(patientId: string) {
   const [modelId, setModelId] = useState(runtime.models[0].id);
   const modelIdRef = useRef(modelId);
   const [status, setStatus] = useState<AssistantStatus>('checking');
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<AssistantProgress>(PREPARING);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -59,7 +65,7 @@ export function useAssistant(patientId: string) {
     const controller = new AbortController();
     controllerRef.current = controller;
     setStatus('loading');
-    setProgress(0);
+    setProgress(PREPARING);
     setError(null);
     setMessages([]);
     setIsGenerating(false);
@@ -68,8 +74,8 @@ export function useAssistant(patientId: string) {
       const session = await runtime.load({
         modelId: modelIdRef.current,
         systemPrompt: buildSystemPrompt(healthContext, new Date()),
-        onProgress: (fraction) => {
-          if (!controller.signal.aborted) setProgress(fraction);
+        onProgress: (update) => {
+          if (!controller.signal.aborted) setProgress(update);
         },
         signal: controller.signal,
       });

@@ -13,7 +13,11 @@ type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
 /** Qwen3 through WebLLM, on the GPU via WebGPU. */
 export const assistantRuntime: AssistantRuntime = {
-  models: assistantModels({ 'qwen3-1.7b': '1 GB', 'qwen3-4b': '2.3 GB' }),
+  // Every file in each model's Hugging Face repository.
+  models: assistantModels({
+    'qwen3-1.7b': 984_156_278,
+    'qwen3-4b': 2_279_167_154,
+  }),
   async isSupported() {
     const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
     if (!gpu) return false;
@@ -30,7 +34,15 @@ export const assistantRuntime: AssistantRuntime = {
   async load({ modelId, systemPrompt, onProgress, signal }) {
     const { CreateMLCEngine } = await loadWebLlm();
     const engine = await CreateMLCEngine(MODEL_IDS[modelId], {
-      initProgressCallback: ({ progress }) => onProgress(progress),
+      // Weights are fetched first ("Fetching param cache…"), then loaded
+      // onto the GPU from the cache.
+      initProgressCallback: ({ progress, text }) =>
+        onProgress({
+          phase: text.startsWith('Fetching param cache')
+            ? 'downloading'
+            : 'preparing',
+          fraction: progress,
+        }),
     });
     if (signal.aborted) {
       await engine.unload();

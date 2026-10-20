@@ -5,7 +5,7 @@ export interface AssistantMockOptions {
   supported?: boolean;
   /** Models already stored on the device. */
   downloaded?: ('qwen3-1.7b' | 'qwen3-4b')[];
-  /** Keeps the model loading at 42%, for the loading state. */
+  /** Keeps the download at 42%, for the loading state. */
   holdLoad?: boolean;
 }
 
@@ -28,12 +28,12 @@ export async function mockAssistant(
           {
             id: 'qwen3-1.7b',
             label: 'Qwen3 1.7B (faster)',
-            downloadSize: '1 GB',
+            downloadBytes: 1_000_000_000,
           },
           {
             id: 'qwen3-4b',
             label: 'Qwen3 4B (better answers)',
-            downloadSize: '2.3 GB',
+            downloadBytes: 2_300_000_000,
           },
         ],
         isSupported: async () => supported,
@@ -46,13 +46,16 @@ export async function mockAssistant(
         }: {
           modelId: string;
           systemPrompt: string;
-          onProgress: (fraction: number) => void;
+          onProgress: (progress: {
+            phase: 'downloading' | 'preparing';
+            fraction?: number;
+          }) => void;
         }) => {
           testWindow.__assistantModel = modelId;
           testWindow.__assistantSystemPrompt = systemPrompt;
-          onProgress(0.42);
+          onProgress({ phase: 'downloading', fraction: 0.42 });
           if (holdLoad) await new Promise(() => {});
-          onProgress(1);
+          onProgress({ phase: 'preparing' });
           return {
             send: async (message: string, onToken: (token: string) => void) => {
               // Qwen3 can open with an empty reasoning block, which is hidden.

@@ -19,7 +19,7 @@ test.describe('Assistant - Visual Regression', () => {
     await seedTestPatient(page);
     await page.goto('/assistant');
     await page.getByTestId('assistant-download-button').click();
-    await page.getByText('Loading the model… 42%').waitFor();
+    await page.getByText('420 MB of 1.0 GB · 42%').waitFor();
     await takeSnapshot(page, 'Assistant - Loading', testInfo);
   });
 

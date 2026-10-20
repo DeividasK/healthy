@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clip, fitSections, stripThinking } from './assistantText';
+import { clip, fitSections, formatBytes, stripThinking } from './assistantText';
 
 test('hides reasoning blocks, including one still streaming', () => {
   expect(stripThinking('<think>\n\n</think>\n\nHello')).toBe('Hello');
@@ -24,4 +24,9 @@ test('keeps the first lines of each section within the budget', () => {
   expect(text).toBe(
     'Conditions:\n- Asthma\n- Eczema\n\nTreatments:\n- Salbutamol\n\n(1 more record left out to keep this short.)'
   );
+});
+
+test('formats download sizes', () => {
+  expect(formatBytes(420_000_000)).toBe('420 MB');
+  expect(formatBytes(2_279_167_154)).toBe('2.3 GB');
 });

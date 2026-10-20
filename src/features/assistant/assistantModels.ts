@@ -5,18 +5,18 @@ const MODEL_KEY = 'assistant.model';
 
 /** Qwen3 in two sizes; both runtimes export the same models. */
 export function assistantModels(
-  downloadSizes: Record<AssistantModelId, string>
+  downloadBytes: Record<AssistantModelId, number>
 ): AssistantModelOption[] {
   return [
     {
       id: 'qwen3-1.7b',
       label: 'Qwen3 1.7B (faster)',
-      downloadSize: downloadSizes['qwen3-1.7b'],
+      downloadBytes: downloadBytes['qwen3-1.7b'],
     },
     {
       id: 'qwen3-4b',
       label: 'Qwen3 4B (better answers)',
-      downloadSize: downloadSizes['qwen3-4b'],
+      downloadBytes: downloadBytes['qwen3-4b'],
     },
   ];
 }

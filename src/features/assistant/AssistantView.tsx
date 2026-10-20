@@ -25,8 +25,8 @@ import {
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
-import { stripThinking } from './assistantText';
-import type { AssistantModelId } from './assistantTypes';
+import { formatBytes, stripThinking } from './assistantText';
+import type { AssistantModelId, AssistantProgress } from './assistantTypes';
 import { useAssistant, type AssistantMessage } from './useAssistant';
 
 /** Chat with an on-device AI model about the active profile's records. */
@@ -62,7 +62,8 @@ function AssistantChat({ patientId }: { patientId: string }) {
   } = useAssistant(patientId);
   const model = models.find((option) => option.id === modelId) ?? models[0];
   // Keeps "1.3 GB" on one line.
-  const downloadSize = model.downloadSize.replace(' ', '\u00a0');
+  const sizeText = (bytes: number) => formatBytes(bytes).replace(' ', '\u00a0');
+  const downloadSize = sizeText(model.downloadBytes);
   const canChooseModel = status !== 'checking' && status !== 'unsupported';
 
   const handleSend = () => {
@@ -156,7 +157,7 @@ function AssistantChat({ patientId }: { patientId: string }) {
               value={modelId}
               options={models.map((option) => ({
                 id: option.id,
-                label: `${option.label} · ${option.downloadSize}`,
+                label: `${option.label} · ${formatBytes(option.downloadBytes)}`,
               }))}
               onChange={(id) => selectModel(id as AssistantModelId)}
               disabled={status === 'loading' || isGenerating}
@@ -186,17 +187,11 @@ function AssistantChat({ patientId }: { patientId: string }) {
           </View>
         )}
         {status === 'loading' && (
-          <View
-            style={styles.progress}
-            testID="assistant-loading"
-            accessibilityRole="progressbar"
-            accessibilityValue={{ min: 0, max: 100, now: progress * 100 }}
-          >
-            <ActivityIndicator color={COLORS.light.primary} />
-            <Text style={styles.body}>
-              Loading the model… {Math.round(progress * 100)}%
-            </Text>
-          </View>
+          <LoadingProgress
+            progress={progress}
+            downloadBytes={model.downloadBytes}
+            sizeText={sizeText}
+          />
         )}
         {status === 'ready' && messages.length === 0 && (
           <Text style={styles.caution} testID="assistant-empty">
@@ -226,6 +221,53 @@ function AssistantChat({ patientId }: { patientId: string }) {
         </View>
       )}
       <ResourceActionDock actions={actions} />
+    </View>
+  );
+}
+
+/** A bar with the amount downloaded, then preparing the model to run. */
+function LoadingProgress({
+  progress: { phase, fraction },
+  downloadBytes,
+  sizeText,
+}: {
+  progress: AssistantProgress;
+  downloadBytes: number;
+  sizeText: (bytes: number) => string;
+}) {
+  const isDownloading = phase === 'downloading';
+  const percent =
+    fraction === undefined ? undefined : Math.round(fraction * 100);
+  const title = isDownloading
+    ? 'Downloading the model'
+    : 'Preparing the model…';
+  return (
+    <View style={styles.progress} testID="assistant-loading">
+      <View style={styles.progressHeading}>
+        {percent === undefined && (
+          <ActivityIndicator color={COLORS.light.primary} />
+        )}
+        <Text style={styles.body}>{title}</Text>
+      </View>
+      {percent !== undefined && (
+        <>
+          <View
+            style={styles.progressTrack}
+            role="progressbar"
+            aria-label={title}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+          >
+            <View style={[styles.progressFill, { width: `${percent}%` }]} />
+          </View>
+          <Text style={styles.caution} testID="assistant-progress-text">
+            {isDownloading
+              ? `${sizeText((fraction ?? 0) * downloadBytes)} of ${sizeText(downloadBytes)} · ${percent}%`
+              : `${percent}%`}
+          </Text>
+        </>
+      )}
     </View>
   );
 }
@@ -282,9 +324,22 @@ const styles = StyleSheet.create({
   },
   progress: {
     marginTop: 24,
+    gap: 8,
+  },
+  progressHeading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: COLORS.light.pillBackground,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: COLORS.light.primary,
   },
   message: {
     alignSelf: 'flex-start',

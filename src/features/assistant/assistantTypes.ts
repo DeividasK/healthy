@@ -5,8 +5,15 @@ export interface AssistantModelOption {
   id: AssistantModelId;
   /** e.g. "Qwen3 1.7B (faster)". */
   label: string;
-  /** Approximate size of the download on this platform, e.g. "1.3 GB". */
-  downloadSize: string;
+  /** Size of the download on this platform, in bytes. */
+  downloadBytes: number;
+}
+
+/** How far loading has got: downloading the files, then preparing the model to run. */
+export interface AssistantProgress {
+  phase: 'downloading' | 'preparing';
+  /** From 0 to 1 within the phase, when known. */
+  fraction?: number;
 }
 
 /** A loaded model holding one conversation, primed with the health records. */
@@ -22,8 +29,7 @@ export interface AssistantSession {
 export interface AssistantLoadOptions {
   modelId: AssistantModelId;
   systemPrompt: string;
-  /** Download and load progress from 0 to 1. */
-  onProgress: (fraction: number) => void;
+  onProgress: (progress: AssistantProgress) => void;
   signal: AbortSignal;
 }
 

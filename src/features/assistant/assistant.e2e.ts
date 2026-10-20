@@ -32,7 +32,7 @@ test.describe('Assistant', () => {
     await page.getByTestId('assistant-header-button').click();
     await expect(page).toHaveURL(/\/assistant$/);
     await expect(page.getByTestId('assistant-intro')).toContainText(
-      'about 1 GB'
+      'about 1.0 GB'
     );
     await checkA11y(page);
 
@@ -99,6 +99,22 @@ test.describe('Assistant', () => {
     // The choice is remembered.
     await page.reload();
     await expect(page.getByTestId('assistant-model')).toHaveValue('qwen3-4b');
+  });
+
+  test('shows how much of the model has downloaded', async ({ page }) => {
+    await mockAssistant(page, { holdLoad: true });
+    await seedTestPatient(page);
+    await page.goto('/assistant');
+    await page.getByTestId('assistant-download-button').click();
+    await expect(page.getByTestId('assistant-progress-text')).toHaveText(
+      '420 MB of 1.0 GB · 42%'
+    );
+    const bar = page.getByRole('progressbar', {
+      name: 'Downloading the model',
+    });
+    await expect(bar).toHaveAttribute('aria-valuenow', '42');
+    // The model can't change mid-download.
+    await expect(page.getByTestId('assistant-model')).toBeDisabled();
   });
 
   test('explains when the browser cannot run the model', async ({ page }) => {

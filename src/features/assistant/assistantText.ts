@@ -48,3 +48,10 @@ export function fitSections(
     );
   return parts.join('\n\n');
 }
+
+/** A download size such as "350 MB" or "2.3 GB" (decimal units, as stores show them). */
+export function formatBytes(bytes: number): string {
+  return bytes >= 1e9
+    ? `${(bytes / 1e9).toFixed(1)} GB`
+    : `${Math.round(bytes / 1e6)} MB`;
+}

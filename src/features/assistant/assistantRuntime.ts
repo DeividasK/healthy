@@ -22,18 +22,27 @@ setTelemetryEnabled(false);
 
 /** Qwen3 through React Native ExecuTorch. */
 export const assistantRuntime: AssistantRuntime = {
+  // The .pte export plus the shared 11 MB tokenizer.
   models: assistantModels(
     Platform.OS === 'ios'
-      ? { 'qwen3-1.7b': '1.5 GB', 'qwen3-4b': '2.9 GB' }
-      : { 'qwen3-1.7b': '1.3 GB', 'qwen3-4b': '2.7 GB' }
+      ? { 'qwen3-1.7b': 1_548_250_280, 'qwen3-4b': 2_926_889_768 }
+      : { 'qwen3-1.7b': 1_315_169_576, 'qwen3-4b': 2_693_078_056 }
   ),
   isSupported: async () => true,
   // The model cache and this flag are both app data, so they are cleared together.
   isDownloaded: async (modelId) =>
     (await AsyncStorage.getItem(downloadedKey(modelId))) === 'true',
   async load({ modelId, systemPrompt, onProgress, signal }) {
-    const resolved = await download(MODELS[modelId], { onProgress, signal });
+    // A stored model resolves from the cache, with nothing to show.
+    const isDownloaded = await assistantRuntime.isDownloaded(modelId);
+    const resolved = await download(MODELS[modelId], {
+      onProgress: isDownloaded
+        ? undefined
+        : (fraction) => onProgress({ phase: 'downloading', fraction }),
+      signal,
+    });
     await AsyncStorage.setItem(downloadedKey(modelId), 'true');
+    onProgress({ phase: 'preparing' });
     const session = await createLLMChatSession(resolved, {
       initialMessages: [{ role: 'system', content: systemPrompt }],
       // Qwen3's recommended sampling without thinking.
