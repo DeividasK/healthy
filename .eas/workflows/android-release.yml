@@ -17,15 +17,21 @@ defaults:
 # Releases come only from `release`, also when the workflow is run by hand on
 # another branch; branches get a debug build check in GitHub CI instead.
 jobs:
-  # A release ships only a prepared version: its CHANGELOG.md section exists
-  # and no fragments are left unreleased.
+  # Ships only a prepared version (pnpm release:prepare): its release notes
+  # exist and no fragments are left unreleased.
   verify_release:
     name: Verify release notes
     if: ${{ github.ref_name == 'release' }}
     steps:
       - uses: eas/checkout
       - name: Verify release notes
-        run: node scripts/changelog.ts verify
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          if ls .changes/unreleased/*.yaml > /dev/null 2>&1; then
+            echo "Unreleased fragments in .changes/unreleased. Run 'pnpm release:prepare' on main first."
+            exit 1
+          fi
+          test -f ".changes/$version.md" || { echo "No release notes for $version in .changes/"; exit 1; }
   build_android:
     name: Build Android
     needs: [verify_release]

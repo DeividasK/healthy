@@ -1,7 +1,7 @@
 name: Release
 
 # Pushing to `release` ships the version in app.json: a GitHub Release with its
-# CHANGELOG.md section, and the web app on GitHub Pages. EAS builds and submits
+# release notes (.changes/<version>.md), and the web app on GitHub Pages. EAS builds and submits
 # Android from the same push (.eas/workflows/android-release.yml).
 on:
   push:
@@ -21,13 +21,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/setup@v3
-        with:
-          cache: true
-          save-cache: false
 
+      # Ships only a prepared version (pnpm release:prepare): its release
+      # notes exist and no fragments are left unreleased.
       - name: Verify Release Notes
-        run: pnpm release:verify
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          if ls .changes/unreleased/*.yaml > /dev/null 2>&1; then
+            echo "::error::Unreleased fragments in .changes/unreleased. Run 'pnpm release:prepare' on main first."
+            exit 1
+          fi
+          test -f ".changes/$version.md" || { echo "::error::No release notes for $version in .changes/"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       # A push that keeps the version (e.g. a merge back from main without a
       # prepared release) leaves the existing release alone.
@@ -35,13 +40,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="v$(node -p "require('./app.json').expo.version")"
-          if gh release view "$version" > /dev/null 2>&1; then
-            echo "$version is already released."
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "v$VERSION is already released."
             exit 0
           fi
-          pnpm --silent release:notes > release-notes.md
-          gh release create "$version" --target "$GITHUB_SHA" --title "$version" --notes-file release-notes.md
+          tail -n +2 ".changes/$VERSION.md" > release-notes.md
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file release-notes.md
 
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages

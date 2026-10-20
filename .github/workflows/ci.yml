@@ -32,8 +32,26 @@ jobs:
         run: pnpm dlx expo-doctor
       - name: Pure Function Tests
         run: pnpm test:unit
+      # A branch that changes what users get adds a changie fragment
+      # (pnpm changelog:new), unless a commit says "Changelog: none".
+      # Tests and docs don't count. See docs/releasing.md.
       - name: Changelog Fragment Check
-        run: pnpm changelog:check
+        if: ${{ github.ref_name != 'release' }}
+        run: |
+          base=$(git merge-base origin/main HEAD)
+          if git diff --quiet "$base" HEAD -- app src assets public plugins patches \
+            app.json app.config.js global.css tailwind.config.js \
+            ':(exclude,glob)**/*.e2e.ts' ':(exclude,glob)**/*.visual.ts' \
+            ':(exclude,glob)**/*.unit.ts' ':(exclude)src/features/testing'; then
+            exit 0
+          fi
+          if git diff --name-only --diff-filter=AM "$base" HEAD -- '.changes/unreleased/*.yaml' | grep -q . ||
+            ! git diff --quiet "$base" HEAD -- CHANGELOG.md ||
+            git log --format=%B "$base..HEAD" | grep -qiE '^Changelog: *none *$'; then
+            exit 0
+          fi
+          echo "::error::This branch changes the app without a changelog fragment. Run 'pnpm changelog:new', or add a 'Changelog: none' trailer to a commit when users would not notice the change."
+          exit 1
 
   android:
     name: Android Debug Build

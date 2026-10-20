@@ -1,5 +1,5 @@
 # Changelog
 
-What changed in each release of Healthy, newest first. Sections are compiled
-from the fragments in [`.changes/`](.changes/README.md) when a release is
-prepared; see [Releasing Healthy](docs/releasing.md).
+What changed in each release of Healthy, newest first, compiled from the
+fragments in `.changes/unreleased/` by changie; see
+[Releasing Healthy](docs/releasing.md).

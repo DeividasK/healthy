@@ -82,8 +82,8 @@ Docs: https://docs.expo.dev/eas/index.md
 
 ## Changelog and releases
 
-- **Changelog Fragments**: Every branch that changes what users get adds a fragment in `.changes/` named after the branch (format in `.changes/README.md`): front matter `type: added | changed | fixed | removed | security`, then the entry, or one entry per `- ` line. Write it for the people using the app (what they can now do, what works better), not how it was built: no issue numbers, file names or internal terms. Changes users would not notice (refactors, tests, tooling, dependency bumps) need no fragment; if `pnpm changelog:check` asks for one anyway, add a `Changelog: none` trailer to the commit message. Never edit `CHANGELOG.md` by hand outside preparing a release.
-- **Releases**: `main` publishes nothing. Only pushes to `release` publish (GitHub Release, GitHub Pages, Play internal testing). Never push to `release` unless the user asks for a release; follow `docs/releasing.md` (`pnpm release:prepare <bump>` on a branch from `main`, then fast-forward `release`).
+- **Changelog Fragments**: Every branch that changes what users get adds a changie fragment: `pnpm changie new --interactive=false --kind <Added|Changed|Fixed|Removed|Security> --body "<entry>"`, one per change. Write the entry for the people using the app (what they can now do, what works better), not how it was built: no issue numbers, file names or internal terms. Changes users would not notice (refactors, tests, tooling, dependency bumps) need no fragment; if CI asks for one anyway, add a `Changelog: none` trailer to the commit message. Never edit `CHANGELOG.md` by hand; see `docs/releasing.md`.
+- **Releases**: `main` publishes nothing. Only pushes to `release` publish (GitHub Release, GitHub Pages, Play internal testing). Never push to `release` unless the user asks for a release; follow `docs/releasing.md` (`pnpm release:prepare` on a branch from `main`, which sets the next `YYYY.M.N` date version, then fast-forward `release`).
 
 ## Cloud sessions
 
