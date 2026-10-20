@@ -64,11 +64,13 @@ export default function RootLayout() {
   return (
     <DatabaseProvider>
       <AppReadyHandler />
-      <SyncProvider key={resetKey}>
-        <ActivePatientProvider>
-          <RootLayoutNav />
-        </ActivePatientProvider>
-      </SyncProvider>
+      {resetKey !== null && (
+        <SyncProvider key={resetKey}>
+          <ActivePatientProvider>
+            <RootLayoutNav />
+          </ActivePatientProvider>
+        </SyncProvider>
+      )}
     </DatabaseProvider>
   );
 }

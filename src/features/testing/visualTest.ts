@@ -54,10 +54,21 @@ export async function takeSnapshot(
   // A resting pointer leaves hover styles on whatever is now under it.
   await page.mouse.move(0, 0);
   if (!keepFocus) {
-    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
-    await expect(page.locator(':focus')).toHaveCount(0);
+    // Dialogs move focus in once they are ready, which under load can come
+    // after a first blur; blur until nothing takes focus back.
+    const blurAll = () =>
+      expect
+        .poll(() =>
+          page.evaluate(() => {
+            (document.activeElement as HTMLElement | null)?.blur();
+            return document.querySelector(':focus') === null;
+          })
+        )
+        .toBe(true);
+    await blurAll();
     // Blur handlers close suggestion lists after a short delay (useDismissOnBlur).
     await page.waitForTimeout(200);
+    await blurAll();
   }
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;

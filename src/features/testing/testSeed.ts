@@ -224,20 +224,23 @@ export async function seedTestPatient(
   const freshPage = page.url() === 'about:blank' || (await isFreshApp(page));
   await bootstrapApp(page);
   const patient = await test.step('Seed patient', () =>
-    page.evaluate(async (opts) => {
-      return await (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-        id: opts?.id,
-        givenName: opts?.givenName || 'John',
-        familyName: opts?.familyName || 'Doe',
-        gender: opts?.gender,
-        birthDate: opts?.birthDate,
-      });
-    }, options));
-  if (freshPage) {
-    await page.getByTestId('cancel-button').waitFor();
-    await page.getByTestId('app-home-button').click();
-    await page.getByTestId('floating-add-button').waitFor();
-  }
+    page.evaluate(
+      async ({ opts, home }) => {
+        const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+        const seeded = await bridge.seedPatient({
+          id: opts?.id,
+          givenName: opts?.givenName || 'John',
+          familyName: opts?.familyName || 'Doe',
+          gender: opts?.gender,
+          birthDate: opts?.birthDate,
+        });
+        // A fresh page then opens on Home, as after creating a profile.
+        if (home) bridge.navigate('/');
+        return seeded;
+      },
+      { opts: options, home: freshPage }
+    ));
+  if (freshPage) await page.getByTestId('floating-add-button').waitFor();
   return patient;
 }
 

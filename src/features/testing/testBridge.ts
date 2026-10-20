@@ -66,6 +66,7 @@ import {
   stopSyncingPatient,
   syncOnce,
   unlockVault,
+  whenSyncIdle,
 } from '@/src/features/sync/engine';
 import {
   loadGoogleDriveConfig,
@@ -131,7 +132,8 @@ async function resolvePatientId(
   return undefined;
 }
 
-let resetKey = 0;
+/** The app tree's key; null while a reset has it unmounted. */
+let resetKey: number | null = 0;
 let freshAfterReset = false;
 const resetListeners = new Set<() => void>();
 const subscribeToReset = (listener: () => void) => {
@@ -141,8 +143,11 @@ const subscribeToReset = (listener: () => void) => {
   };
 };
 
-/** Changes when a test resets the app, so its state mounts from scratch. */
-export function useTestResetKey(): number {
+/**
+ * Changes when a test resets the app, so its state mounts from scratch;
+ * null while the reset clears storage with the app unmounted.
+ */
+export function useTestResetKey(): number | null {
   const getKey = () => resetKey;
   return useSyncExternalStore(subscribeToReset, getKey, getKey);
 }
@@ -187,13 +192,22 @@ export function setupTestBridge(
      * bundle parse and database open that dominate a test's CPU time.
      */
     resetForTest: async () => {
-      // Clearing rows cannot undo schema changes or the sync vault's
-      // IndexedDB keys; the test runner reloads instead.
+      // Clearing rows cannot undo schema changes; the runner reloads instead.
       if ((await schemaSignature()) !== (await bootSchema))
         throw new Error('The database schema changed since the app loaded');
-      if ((await indexedDB.databases()).length > 0)
-        throw new Error('IndexedDB holds data a reset cannot clear');
       (document.activeElement as HTMLElement | null)?.blur?.();
+      const setResetKey = async (key: number | null) => {
+        resetKey = key;
+        resetListeners.forEach((listener) => listener());
+        await new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        );
+      };
+      // Unmounted, the app's timers and listeners stop; sync work already
+      // started finishes before anything is cleared.
+      const nextKey = (resetKey ?? 0) + 1;
+      await setResetKey(null);
+      await whenSyncIdle();
       // Tests inject failures with temporary triggers; a reload drops them.
       const db = await getDb();
       const temporary = await db.getAllAsync<{ type: string; name: string }>(
@@ -208,13 +222,17 @@ export function setupTestBridge(
         require('@expo/log-box/src/LogBox').default.clearAllLogs();
       localStorage.clear();
       sessionStorage.clear();
+      // The sync vault's key; it opens the database only per operation.
+      for (const { name } of await indexedDB.databases())
+        if (name)
+          await new Promise((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = resolve;
+            request.onerror = () => reject(request.error);
+          });
       // A freshly loaded page treats its last input as a pointer.
       document.dispatchEvent(new PointerEvent('pointerdown'));
-      resetKey += 1;
-      resetListeners.forEach((listener) => listener());
-      await new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve))
-      );
+      await setResetKey(nextKey);
       navigate('/profile/new');
       freshAfterReset = true;
     },

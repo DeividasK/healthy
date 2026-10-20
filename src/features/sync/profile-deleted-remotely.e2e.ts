@@ -12,9 +12,6 @@ import {
 } from '@/src/features/testing/testStorage';
 import type { Browser, Page, TestInfo } from '@playwright/test';
 
-// Devices, reloads and the sync vault need pages of their own.
-test.use({ freshApp: true });
-
 const CONFIG_KEY = '@healthy_device_google_sync_config';
 const ALICE = { patientId: 'shared-patient', displayName: 'Alice Doe' };
 

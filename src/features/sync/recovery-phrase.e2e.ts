@@ -15,9 +15,6 @@ import {
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 
-// Devices, reloads and the sync vault need pages of their own.
-test.use({ freshApp: true });
-
 const CONFIG_KEY = '@healthy_device_google_sync_config';
 // A valid 24-word phrase that belongs to no vault in these tests.
 const OTHER_PHRASE = `${'abandon '.repeat(23)}art`;
@@ -135,7 +132,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const { page: device, close } = await openSecondDevice(browser, testInfo);
     await mockGoogleDrive(device, store);
     await mockGoogleAuthRoutes(device);
-    await device.goto('/profile/restore-from-google-drive');
+    await openRoute(device, '/profile/restore-from-google-drive');
     await device.getByTestId('connect-google-drive-button').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
 
@@ -207,7 +204,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await mockGoogleDrive(device, store);
     await mockGoogleAuthRoutes(device);
     await seedTestPatient(device, { id: 'bob', givenName: 'Bob' });
-    await device.goto('/profile');
+    await openRoute(device, '/profile');
     await device.getByTestId('google-signin-button').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
     await device.clock.install();
@@ -252,7 +249,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await mockGoogleDrive(device, store);
     await mockGoogleAuthRoutes(device);
     await seedTestPatient(device);
-    await device.goto('/profile');
+    await openRoute(device, '/profile');
     await device.getByTestId('google-signin-button').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
     await device.getByTestId('back-button').click();

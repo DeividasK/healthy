@@ -17,9 +17,6 @@ import {
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
-// Devices, reloads and the sync vault need pages of their own.
-test.use({ freshApp: true });
-
 const snapshot = snapshotClinicalTables;
 
 /** Seeds one patient with a few linked resources. */
