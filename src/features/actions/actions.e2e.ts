@@ -6,6 +6,7 @@ import {
   getTestTreatmentLog,
   seedTestPatient,
   seedTestResources,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('My actions: treatment logging', () => {
@@ -37,7 +38,7 @@ test.describe('My actions: treatment logging', () => {
         },
       ],
     });
-    await page.goto('/');
+    await openRoute(page, '/');
 
     // The last 7 days, today last, are the first section on the homepage.
     const section = page.getByTestId('home-actions-section');
@@ -160,7 +161,7 @@ test.describe('My actions: treatment logging', () => {
         },
       ],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
 
     const morning = page.getByTestId('treatment-log-row-log-regimen-0');
     const evening = page.getByTestId('treatment-log-row-log-regimen-1');
@@ -220,7 +221,7 @@ test.describe('My actions: treatment logging', () => {
         { treatmentId: 'copy-b', date: yesterday, answer: 'not-taken' },
       ],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
     const copy = page.getByTestId('actions-copy-previous-day');
     await expect(copy).toHaveAttribute('aria-checked', 'false');
 
@@ -276,7 +277,7 @@ test.describe('My actions: treatment logging', () => {
         },
       ],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
     await expect(page.getByTestId(`actions-day-${today}`)).toBeInViewport();
     await expect(page.getByTestId(`actions-day-${weekStart}`)).toBeInViewport();
 
@@ -294,7 +295,7 @@ test.describe('My actions: treatment logging', () => {
     await expect(page.getByTestId('actions-day-label')).toHaveText('Today');
 
     // Stepping back past a week's first day turns to the week before.
-    await page.goto(`/journal?date=${weekStart}`);
+    await openRoute(page, `/journal?date=${weekStart}`);
     await expect(page.getByTestId(`actions-day-${weekStart}`)).toBeInViewport();
     await page.getByTestId('actions-previous-day').click();
     await expect(page).toHaveURL(new RegExp(`date=${lastWeekEnd}`));
@@ -375,7 +376,7 @@ test.describe('My actions: treatment logging', () => {
     await seedTestResources(page, {
       treatments: [{ id: 'log-stopped', title: 'Stopped', status: 'stopped' }],
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId('home-treatments-section').waitFor();
     // Nothing to log: no My actions section.
     await expect(page.getByTestId('home-actions-section')).toHaveCount(0);
@@ -402,7 +403,7 @@ test.describe('My actions: treatment logging', () => {
       )
     ).toBeVisible();
 
-    await page.goto(`/journal?date=${yesterday}`);
+    await openRoute(page, `/journal?date=${yesterday}`);
     // Yesterday lists the answered stopped treatment, not one started today.
     await expect(
       page.getByTestId(`treatment-log-row-log-stopped-${yesterday}`)
@@ -416,7 +417,7 @@ test.describe('My actions: treatment logging', () => {
     ).toHaveCount(0);
 
     // Future days cannot be logged.
-    await page.goto('/journal?date=2999-01-01');
+    await openRoute(page, '/journal?date=2999-01-01');
     await expect(page.getByTestId('actions-day-label')).toHaveText('Today');
 
     await page.evaluate(() =>
@@ -450,7 +451,7 @@ for (const mode of ['answer', 'copy'] as const) {
           ? [{ treatmentId: 'save-failure', date: yesterday, answer: 'taken' }]
           : [],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
     const taken = page.getByTestId('treatment-log-taken-save-failure');
     await expect(taken).toBeVisible();
     await page.evaluate(() =>

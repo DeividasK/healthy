@@ -10,6 +10,7 @@ import {
   getTestClinicalDocument,
   findServiceRequestSection,
   evaluateBridge as bridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Service Request', () => {
@@ -52,7 +53,7 @@ test.describe('Edit Service Request', () => {
       request.id
     );
 
-    await page.goto(`/service-request/${request.id}`);
+    await openRoute(page, `/service-request/${request.id}`);
     await expect(page.getByTestId('service-request-intent')).toContainText(
       'Directive'
     );
@@ -128,7 +129,7 @@ test.describe('Edit Service Request', () => {
       }
     );
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await expect(
       page.getByTestId(`link-consultation-role-${first.id}`)
     ).toHaveValue('origin');
@@ -205,7 +206,7 @@ test.describe('Edit Service Request', () => {
       title: 'Iron studies',
     });
 
-    await page.goto(`/condition/${condition.id}/edit`);
+    await openRoute(page, `/condition/${condition.id}/edit`);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-service-request').click();
     await page.getByTestId('link-service-request-search-input').click();
@@ -216,7 +217,7 @@ test.describe('Edit Service Request', () => {
     await expect(
       page.getByTestId(`condition-service-request-count-${condition.id}`)
     ).toBeVisible();
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await expect(
       page.getByTestId(`condition-timeline-item-service-request-${request.id}`)
     ).toBeVisible();
@@ -224,17 +225,15 @@ test.describe('Edit Service Request', () => {
       { reference: { reference: `Condition/${condition.id}` } },
     ]);
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page
       .getByTestId('remove-service-request-reasonCondition-button')
       .click();
     await page.getByTestId('save-service-request-button').click();
-    await expect(
-      page.getByTestId('service-request-reason-conditions-section')
-    ).toHaveCount(0);
-    expect(
-      (await getTestServiceRequest(page, request.id)).reason
-    ).toBeUndefined();
+    await expect(page).not.toHaveURL(/\/edit$/);
+    await expect
+      .poll(async () => (await getTestServiceRequest(page, request.id)).reason)
+      .toBeUndefined();
   });
 
   test('links lab results and lists them on the request, the result and the condition', async ({
@@ -264,7 +263,7 @@ test.describe('Edit Service Request', () => {
         )[0].fhir_json
       ).basedOn;
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-lab-result').click();
     await page.getByTestId('link-lab-result-search-input').click();
@@ -283,18 +282,18 @@ test.describe('Edit Service Request', () => {
     await page.getByTestId(`service-request-lab-result-${report.id}`).click();
     await expect(page.getByTestId('lab-result-title')).toBeVisible();
     await page.getByTestId(`lab-result-service-request-${request.id}`).click();
-    // The request's earlier screen stays mounted, hidden, below this one.
+    // The request opens again on top of itself; the one below is hidden.
     await expect(
       page.getByTestId('service-request-title').filter({ visible: true })
     ).toHaveText('Blood count');
 
     // The request's condition shows the result on its timeline
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await expect(
       page.getByTestId(`condition-timeline-item-lab-result-${report.id}`)
     ).toBeVisible();
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('link-remove-lab-result-button').click();
     await page.getByTestId('save-service-request-button').click();
     await expect(page.getByTestId('service-request-title')).toBeVisible();

@@ -69,7 +69,10 @@ import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModa
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
-import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import {
+  subscribeToDatabaseChanges,
+  useDatabaseSubscription,
+} from '@/src/database/dbEvents';
 import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import { LabsSummary, latestBiomarkers } from './LabsSummary';
 import { BiomarkerResultRow } from './BiomarkerResultRow';
@@ -125,6 +128,10 @@ const EMPTY_HOME_DATA: HomeData = {
  * to Home or switching back to a profile shows it at once while it refreshes.
  */
 const homeDataCache = new Map<string, HomeData>();
+// Profiles created, deleted, restored or reset make every entry suspect.
+subscribeToDatabaseChanges((tables) => {
+  if (tables.includes('patients')) homeDataCache.clear();
+});
 
 /** Counts the given resources' links per consultation; a failure only loses the counts. */
 const countConsultationLinks = (

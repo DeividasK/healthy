@@ -66,6 +66,17 @@ export function notifyDatabaseChanged(tables: DatabaseTable[]): void {
 }
 
 /**
+ * Calls `listener` with the changed tables on every change, outside React.
+ * Returns a function that unsubscribes.
+ */
+export function subscribeToDatabaseChanges(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
  * Subscribes to database changes for one or more tables.
  * Triggers the provided callback whenever any of the specified tables are modified locally,
  * via background sync, or on another browser tab.

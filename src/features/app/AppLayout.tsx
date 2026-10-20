@@ -1,7 +1,7 @@
 import { Stack, ThemeProvider, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import '../../../global.css';
@@ -16,7 +16,10 @@ import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { SyncProvider } from '@/src/context/SyncContext';
 import { DatabaseProvider, preloadDatabase } from '@/src/database/db';
 import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
-import { setupTestBridge } from '@/src/features/testing/testBridge';
+import {
+  setupTestBridge,
+  useTestResetKey,
+} from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
 // Keep the splash screen up until the app chrome has rendered, then fade out
@@ -26,24 +29,29 @@ SplashScreen.setOptions({ fade: true });
 preloadDatabase();
 
 function AppReadyHandler() {
+  const navigation = useNavigationContainerRef();
   useEffect(() => {
     SplashScreen.hide();
-    setupTestBridge();
+    setupTestBridge(navigation);
     registerPwa();
-  }, []);
+  }, [navigation]);
 
   return null;
 }
 
 export default function RootLayout() {
+  // Tests reset the app in place; production never changes it.
+  const resetKey = useTestResetKey();
   return (
     <DatabaseProvider>
       <AppReadyHandler />
-      <SyncProvider>
-        <ActivePatientProvider>
-          <RootLayoutNav />
-        </ActivePatientProvider>
-      </SyncProvider>
+      {resetKey !== null && (
+        <SyncProvider key={resetKey}>
+          <ActivePatientProvider>
+            <RootLayoutNav />
+          </ActivePatientProvider>
+        </SyncProvider>
+      )}
     </DatabaseProvider>
   );
 }
@@ -65,25 +73,34 @@ function useBlurOnScreenChange() {
   }, [navigation]);
 }
 
+/**
+ * Mounts a screen once the database is open and the active profile is known,
+ * so nothing can be read or saved without it. The header shows meanwhile,
+ * and the navigator stays mounted so navigation works throughout.
+ */
+function ScreenWhenProfileReady({ children }: { children: React.ReactNode }) {
+  const { isLoading } = useActivePatient();
+  if (isLoading) return <ResourceSkeleton testID="app-loading-skeleton" />;
+  return <>{children}</>;
+}
+
+const screenLayout = ({ children }: { children: React.ReactNode }) => (
+  <ScreenWhenProfileReady>{children}</ScreenWhenProfileReady>
+);
+
 function RootLayoutNav() {
   useBlurOnScreenChange();
-  // Screens mount once the database is open and the active profile is known,
-  // so nothing can be read or saved without it. The header shows meanwhile.
-  const { isLoading } = useActivePatient();
   return (
     <ThemeProvider value={NAV_THEME.light}>
       <StatusBar style="dark" />
       <AppChrome>
-        {isLoading ? (
-          <ResourceSkeleton testID="app-loading-skeleton" />
-        ) : (
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: Platform.OS === 'web' ? 'none' : 'default',
-            }}
-          />
-        )}
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: Platform.OS === 'web' ? 'none' : 'default',
+          }}
+          screenLayout={screenLayout}
+        />
       </AppChrome>
       <ProfileDeletedRemotelyModal />
     </ThemeProvider>

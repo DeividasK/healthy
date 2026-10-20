@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FileText } from 'lucide-react-native';
 import type { Dosage, MedicationRequest } from 'fhir/r5';
 import type { AddOptionItem } from '@/src/components/AddOptionsModal';
+import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { FormField } from '@/src/components/FormField';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
@@ -62,14 +63,6 @@ const PERIOD_STATES: { id: PeriodState; label: string }[] = [
   { id: 'on-hold', label: 'On hold' },
   { id: 'stopped', label: 'Stopped' },
 ];
-
-const menuIcon = (
-  <FileText
-    size={20}
-    color={COLORS.light.primary}
-    style={{ marginRight: 12 }}
-  />
-);
 
 /** The heading and save label for a change from the current usage. */
 export function getUsageChangeLabel(current: CurrentUsage): string {
@@ -513,29 +506,23 @@ function StatusChoices<T extends string>({
 
 /** Optional notes: shown when present or added from the `+` menu. */
 function useNotes(initial: string) {
-  const [value, setValue] = useState(initial);
-  const [shown, setShown] = useState(Boolean(initial));
+  const fields = useOptionalFields({
+    notes: {
+      label: 'Notes',
+      icon: FileText,
+      testID: 'menu-add-usage-notes',
+      empty: '',
+      initial,
+    },
+  });
   return {
-    value: shown ? value : '',
-    menuOptions: shown
-      ? []
-      : [
-          {
-            id: 'notes',
-            label: 'Notes',
-            testID: 'menu-add-usage-notes',
-            icon: menuIcon,
-            onPress: () => setShown(true),
-          },
-        ],
-    field: shown ? (
+    value: fields.values.notes,
+    menuOptions: fields.menuOptions,
+    field: fields.shown.notes ? (
       <FormField
         label="Notes"
         nativeID="treatment-usage-notes-input"
-        onRemove={() => {
-          setShown(false);
-          setValue('');
-        }}
+        onRemove={() => fields.remove('notes')}
         removeTestID="remove-usage-notes-button"
         inputProps={{
           id: 'treatment-usage-notes-input',
@@ -544,8 +531,8 @@ function useNotes(initial: string) {
           testID: 'treatment-usage-notes-input',
           accessibilityLabel: 'Notes',
           placeholder: 'e.g. Side effects, waiting for a refill',
-          value,
-          onChangeText: setValue,
+          value: fields.values.notes,
+          onChangeText: (value) => fields.set('notes', value),
           multiline: true,
           numberOfLines: 3,
         }}

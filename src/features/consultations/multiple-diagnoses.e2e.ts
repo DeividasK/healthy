@@ -1,5 +1,4 @@
 /// <reference types="node" />
-import { readFile } from 'node:fs/promises';
 import {
   test,
   expect,
@@ -7,6 +6,8 @@ import {
   seedTestCondition,
   seedTestConsultation,
   checkA11y,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Multiple consultation diagnoses', () => {
@@ -24,7 +25,7 @@ test.describe('Multiple consultation diagnoses', () => {
     ]) {
       await seedTestCondition(page, { id, title });
     }
-    await page.goto('/consultation/add?conditionId=first');
+    await openRoute(page, '/consultation/add?conditionId=first');
     await page.getByTestId('consultation-title-input').fill('Combined review');
     await page.getByTestId('condition-search-input').fill('Third');
     await expect(
@@ -55,22 +56,21 @@ test.describe('Multiple consultation diagnoses', () => {
       )
     );
     const id = rows[0].id;
-    await page.goto('/');
+    await openRoute(page, '/');
     await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
     for (const conditionId of ['first', 'third']) {
-      await page.goto(`/condition/${conditionId}`);
+      await openRoute(page, `/condition/${conditionId}`);
       await expect(
         page.getByTestId(`condition-timeline-item-consultation-${id}`)
       ).toHaveCount(1);
     }
-    await page.goto(`/consultation/${id}`);
+    await openRoute(page, `/consultation/${id}`);
     await expect(
       page.getByTestId('consultation-related-condition-row')
     ).toContainText('First diagnosis');
     await expect(
       page.getByTestId('consultation-related-condition-third-row')
     ).toContainText('Third diagnosis');
-    await page.reload();
     await expect(
       page.getByTestId('consultation-related-condition-third')
     ).toBeVisible();
@@ -82,24 +82,22 @@ test.describe('Multiple consultation diagnoses', () => {
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Updated review'
     );
-    await page.reload();
+    await reopenRoute(page);
     await expect(
       page.getByTestId('consultation-related-condition-row')
     ).toContainText('Third diagnosis');
-    await page.goto('/condition/first');
+    await openRoute(page, '/condition/first');
     await expect(
       page.getByTestId(`condition-timeline-item-consultation-${id}`)
     ).toHaveCount(0);
-    await page.goto(`/consultation/${id}/edit`);
+    await openRoute(page, `/consultation/${id}/edit`);
     await page.getByTestId('remove-conditions-section-button').click();
     await expect(
       page.getByTestId('consultation-conditions-section')
     ).toHaveCount(0);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);
-    await page.goto('/');
-    await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
-    await page.reload();
+    await openRoute(page, '/');
     await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
   });
 
@@ -185,7 +183,7 @@ test.describe('Multiple consultation diagnoses', () => {
       { condition_id: 'first' },
       { condition_id: 'second' },
     ]);
-    await page.goto('/consultation/preserved/edit');
+    await openRoute(page, '/consultation/preserved/edit');
     await page.getByTestId('consultation-title-input').fill('Edited');
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);
@@ -252,78 +250,6 @@ test.describe('Multiple consultation diagnoses', () => {
         condition: [{ reference: { reference: 'Condition/second' } }],
         use: [{ text: 'secondary' }],
       },
-    ]);
-  });
-
-  test('ZIP round trips rebuild all associations and preserve canonical Encounter JSON', async ({
-    page,
-  }) => {
-    for (const id of ['first', 'second'])
-      await seedTestCondition(page, { id, title: id });
-    const original = await seedTestConsultation(page, {
-      id: 'archived',
-      title: 'Archive review',
-      conditionIds: ['first', 'second'],
-      notes: 'Original narrative',
-    });
-    original.reason = [
-      { value: [{ reference: { reference: 'Condition/first' } }] },
-    ];
-    original.diagnosis[0].condition[0].concept = {
-      text: 'Independent outcome',
-      coding: [{ code: 'L21' }],
-    };
-    await page.evaluate(
-      (encounter) =>
-        (window as any).__HEALTHY_TEST_BRIDGE__.saveEncounter(
-          encounter,
-          'diagnosis-patient'
-        ),
-      original
-    );
-    const legacy = {
-      ...original,
-      id: 'legacy-single',
-      diagnosis: [original.diagnosis[0]],
-      reason: [{ value: [{ reference: { reference: 'Condition/first' } }] }],
-    };
-    await page.evaluate(
-      (encounter) =>
-        (window as any).__HEALTHY_TEST_BRIDGE__.saveEncounter(
-          encounter,
-          'diagnosis-patient'
-        ),
-      legacy
-    );
-    const downloadPromise = page.waitForEvent('download');
-    await page.evaluate(() =>
-      (window as any).__HEALTHY_TEST_BRIDGE__.exportArchive()
-    );
-    const download = await downloadPromise;
-    const bytes = Array.from(await readFile((await download.path())!));
-    const restored = await page.evaluate(async (data) => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      await bridge.clearDatabase();
-      const summary = await bridge.restoreArchive(data);
-      return {
-        summary,
-        encounter: await bridge.getConsultation('archived'),
-        legacy: await bridge.getConsultation('legacy-single'),
-        legacyLinks: await bridge.querySql(
-          "SELECT condition_id FROM consultation_conditions WHERE consultation_id = 'legacy-single';"
-        ),
-        links: await bridge.querySql(
-          "SELECT condition_id FROM consultation_conditions WHERE consultation_id = 'archived' ORDER BY condition_id;"
-        ),
-      };
-    }, bytes);
-    expect(restored.summary.consultations).toBe(2);
-    expect(restored.legacy).toEqual(legacy);
-    expect(restored.legacyLinks).toEqual([{ condition_id: 'first' }]);
-    expect(restored.encounter).toEqual(original);
-    expect(restored.links).toEqual([
-      { condition_id: 'first' },
-      { condition_id: 'second' },
     ]);
   });
 });

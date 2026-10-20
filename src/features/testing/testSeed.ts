@@ -184,28 +184,63 @@ export async function bootstrapApp(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Opens a route like `page.goto`, with the same Home-then-route stack, but
+ * without reloading the app once it has booted. A reload costs a full bundle
+ * parse and database open, so keep `page.goto`/`page.reload` for tests about
+ * a fresh boot or persistence. Visual tests load pages instead: their frozen
+ * clock never finishes the animations a navigation starts.
+ */
+export async function openRoute(page: Page, path: string): Promise<void> {
+  if (page.url() === 'about:blank') {
+    await page.goto(path);
+    return;
+  }
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  await page.evaluate(
+    (href) => (window as any).__HEALTHY_TEST_BRIDGE__.navigate(href),
+    path
+  );
+  await page.waitForURL((url) => url.pathname + url.search === path);
+}
+
+/** Remounts the current screen so it reads the database again. */
+export async function reopenRoute(page: Page): Promise<void> {
+  const url = new URL(page.url());
+  await openRoute(page, url.pathname + url.search);
+}
+
+/** Whether the shared app is still where its reset left it (see `page`). */
+const isFreshApp = (page: Page): Promise<boolean> =>
+  page.evaluate(
+    () => !!(window as any).__HEALTHY_TEST_BRIDGE__?.isFreshAfterReset()
+  );
+
 /** Seeds a Patient through the real service; a fresh page starts on Home. */
 export async function seedTestPatient(
   page: Page,
   options?: SeedPatientOptions
 ): Promise<any> {
-  const freshPage = page.url() === 'about:blank';
+  const freshPage = page.url() === 'about:blank' || (await isFreshApp(page));
   await bootstrapApp(page);
   const patient = await test.step('Seed patient', () =>
-    page.evaluate(async (opts) => {
-      return await (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-        id: opts?.id,
-        givenName: opts?.givenName || 'John',
-        familyName: opts?.familyName || 'Doe',
-        gender: opts?.gender,
-        birthDate: opts?.birthDate,
-      });
-    }, options));
-  if (freshPage) {
-    await page.getByTestId('cancel-button').waitFor();
-    await page.getByTestId('app-home-button').click();
-    await page.getByTestId('floating-add-button').waitFor();
-  }
+    page.evaluate(
+      async ({ opts, home }) => {
+        const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+        const seeded = await bridge.seedPatient({
+          id: opts?.id,
+          givenName: opts?.givenName || 'John',
+          familyName: opts?.familyName || 'Doe',
+          gender: opts?.gender,
+          birthDate: opts?.birthDate,
+        });
+        // A fresh page then opens on Home, as after creating a profile.
+        if (home) bridge.navigate('/');
+        return seeded;
+      },
+      { opts: options, home: freshPage }
+    ));
+  if (freshPage) await page.getByTestId('floating-add-button').waitFor();
   return patient;
 }
 

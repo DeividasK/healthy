@@ -8,6 +8,7 @@ import {
   seedTestBundle,
   seedTestPatient,
   seedTestResources,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 import type { RegimenDraft } from '@/src/features/treatments/regimen';
 
@@ -62,7 +63,7 @@ test.describe('Treatment bundles', () => {
         { id: 'b-iron', title: 'Iron', status: 'active', takingSince: started },
       ],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
     await expect(page.getByTestId('treatment-log-row-b-iron')).toBeVisible();
     await page.getByTestId('actions-new-bundle-button').click();
     await expect(page).toHaveURL(/\/bundle\/add$/);
@@ -159,7 +160,7 @@ test.describe('Treatment bundles', () => {
       memberIds: ['j-vit-d', 'j-omega'],
     });
     const key = `${bundle.id}:0`;
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
 
     const row = page.getByTestId(`bundle-log-row-${key}`);
     await expect(row).toContainText('Morning supplements');
@@ -235,7 +236,7 @@ test.describe('Treatment bundles', () => {
       times: ['07:30', 'EVE'],
       memberIds: ['t-magnesium', 't-zinc'],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
 
     // Evening doses join the Evening time; morning doses are at 08:00, not
     // 07:30, so they stay their own rows.
@@ -289,7 +290,7 @@ test.describe('Treatment bundles', () => {
       memberIds: ['l-vit-d'],
     });
 
-    await page.goto('/treatment/l-omega/edit');
+    await openRoute(page, '/treatment/l-omega/edit');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-bundle').click();
     await page.getByTestId('link-bundle-search-input').click();

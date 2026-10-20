@@ -1,5 +1,8 @@
 import { test, expect } from '@/src/features/testing/testStorage';
 
+// Loading the app is what these tests are about.
+test.use({ freshApp: true });
+
 test.describe('App startup', () => {
   test('shows the app header while the script loads, then the app takes over in place', async ({
     page,
