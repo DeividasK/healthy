@@ -172,6 +172,8 @@ test.describe('New condition form keyboard support', () => {
 });
 
 test.describe('Condition form island', () => {
+  // Checks the + rotating into a close icon, so it runs with full motion.
+  test.use({ reducedMotion: 'no-preference' });
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });

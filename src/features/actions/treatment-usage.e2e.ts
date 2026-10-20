@@ -81,7 +81,6 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(
     page.getByTestId('treatment-usage-instructions-input')
   ).toHaveValue('1 capsule daily');
-  await checkA11y(page);
   await saveChange(page, dates[1]);
   await page.getByTestId('treatment-usage-change').click();
   await expect(

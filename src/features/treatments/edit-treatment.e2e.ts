@@ -78,29 +78,6 @@ test.describe('Edit Treatment Flow', () => {
     expect(cleared.reason).toEqual([{ concept: { text: 'Blood pressure' } }]);
   });
 
-  test('labels uncommon intent and status codes instead of hiding them', async ({
-    page,
-  }) => {
-    const treatment = await seedTestTreatment(page, {
-      title: 'Imported treatment',
-      intent: 'proposal',
-      status: 'on-hold',
-    });
-    await openRoute(page, `/treatment/${treatment.id}`);
-    await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
-    await expect(
-      page.getByTestId('treatment-view').getByText('On Hold')
-    ).toBeVisible();
-
-    await page.getByTestId('edit-treatment-button').click();
-    await expect(page.getByTestId('treatment-intent-select')).toHaveValue(
-      'proposal'
-    );
-    await expect(
-      page.getByTestId('treatment-intent-select').locator('option:checked')
-    ).toHaveText('Proposal');
-  });
-
   test('keeps regimen data the form does not show and edits only what changed', async ({
     page,
   }) => {
@@ -236,9 +213,13 @@ test.describe('Edit Treatment Flow', () => {
     expect(text.dosageInstruction).toEqual([{ text: 'Back to plain text' }]);
   });
 
-  test('keeps imported text stored beside a regimen', async ({ page }) => {
+  test('labels uncommon codes and keeps imported text stored beside a regimen', async ({
+    page,
+  }) => {
     const seeded = await seedTestTreatment(page, {
       title: 'Imported regimen',
+      intent: 'proposal',
+      status: 'on-hold',
       dosageInstructions: 'One each morning',
     });
     seeded.dosageInstruction[0].timing = { repeat: { when: ['MORN'] } };
@@ -251,12 +232,20 @@ test.describe('Edit Treatment Flow', () => {
       seeded
     );
     await openRoute(page, `/treatment/${seeded.id}`);
-    // Both are shown under the one Dosage heading
+    // Uncommon codes are labelled instead of hidden
+    await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
+    await expect(
+      page.getByTestId('treatment-view').getByText('On Hold')
+    ).toBeVisible();
+    // Text and regimen are both shown under the one Dosage heading
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       'One each morning\nin the morning'
     );
 
     await page.getByTestId('edit-treatment-button').click();
+    const intent = page.getByTestId('treatment-intent-select');
+    await expect(intent).toHaveValue('proposal');
+    await expect(intent.locator('option:checked')).toHaveText('Proposal');
     await expect(page.getByTestId('treatment-instructions-input')).toHaveCount(
       0
     );
@@ -270,5 +259,6 @@ test.describe('Edit Treatment Flow', () => {
     );
     const kept = await getTestTreatment(page, seeded.id);
     expect(kept.dosageInstruction).toEqual(seeded.dosageInstruction);
+    expect(kept.intent).toBe('proposal');
   });
 });

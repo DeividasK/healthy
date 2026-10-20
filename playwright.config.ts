@@ -5,7 +5,8 @@ export default defineConfig<ChromaticConfig>({
   testDir: './src/features',
   globalSetup: './src/features/testing/globalSetup.ts',
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  // Three of four cores: measured stable, the dev server takes the rest.
+  workers: '75%',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   timeout: 30000,
@@ -21,7 +22,7 @@ export default defineConfig<ChromaticConfig>({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], reducedMotion: 'reduce' },
       testMatch: /.*\.e2e\.ts/,
     },
     {

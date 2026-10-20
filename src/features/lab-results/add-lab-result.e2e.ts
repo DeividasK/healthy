@@ -4,7 +4,6 @@ import {
   expect,
   seedTestPatient,
   checkA11y,
-  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -304,124 +303,40 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     }
   });
 
-  test('should validate that date and time cannot be set to the future', async ({
+  test('limits date and time to now and pulls a later time back when the date returns to today', async ({
     page,
   }) => {
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-lab-results').click();
-
-    // 1. Verify native date input has max attribute set to today
     const dateInput = page
       .getByTestId('date-picker-button')
       .locator('input[type="date"]');
-    const todayStr = formatLocalDate(new Date());
-    await expect(dateInput).toHaveAttribute('max', todayStr);
-
-    // 2. Add a test item
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('15.0');
-
-    // 3. Add Time
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await plusBtn.click();
-    await page.getByTestId('menu-add-time').click();
-
-    // 4. Verify time picker has max attribute on the native time input when date is today
     const timeInput = page
       .getByTestId('time-picker-button')
       .locator('input[type="time"]');
-    await expect(timeInput).toBeAttached();
-    const maxAttr = await timeInput.getAttribute('max');
-    expect(maxAttr).toBeTruthy();
-  });
+    await expect(dateInput).toHaveAttribute('max', formatLocalDate(new Date()));
 
-  test('should reset future time to current time without throwing an alert when reverting to today from a past date', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // 1. Select a past date (2026-09-20)
-    const dateInput = page
-      .getByTestId('date-picker-button')
-      .locator('input[type="date"]');
+    // A past date allows any time
     await dateInput.fill('2026-09-20');
-
-    // 2. Add Time: select 23:55 (allowed since date was in the past)
-    const plusBtn = page.getByTestId('plus-menu-button');
-    await plusBtn.click();
+    await page.getByTestId('plus-menu-button').click();
     await page.getByTestId('menu-add-time').click();
-
-    const timeInput = page
-      .getByTestId('time-picker-button')
-      .locator('input[type="time"]');
     await timeInput.fill('23:55');
     await expect(page.getByTestId('time-picker-button')).toContainText('23:55');
 
-    // Ensure NO dialog/alert is thrown
+    // Back on today the later time resets to now, without an alert
     let dialogTriggered = false;
     page.on('dialog', async (dialog) => {
       dialogTriggered = true;
       await dialog.accept();
     });
-
-    // 3. Revert date back to today
     const now = new Date();
-    const todayStr = formatLocalDate(now);
-    await dateInput.fill(todayStr);
-
-    // 4. Verify no alert was thrown
-    expect(dialogTriggered).toBe(false);
-
-    // 5. Verify that time was reset to current time instead of remaining 23:55
-    const expectedCurrentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    await dateInput.fill(formatLocalDate(now));
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     await expect(page.getByTestId('time-picker-button')).toContainText(
-      expectedCurrentTime
+      currentTime
     );
-    await expect(page.getByTestId('time-picker-button')).not.toContainText(
-      '23:55'
-    );
-  });
-
-  test('records a service provider as an Organization performer', async ({
-    page,
-  }) => {
-    await openRoute(page, '/lab-result/add');
-    await page.getByTestId('test-search-input').fill('Hemoglobin');
-    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-    await page.getByTestId('marker-value-input-0').fill('14.5');
-    await page.getByTestId('plus-menu-button').click();
-    await page.getByTestId('menu-add-service-provider').click();
-    await page
-      .getByTestId('lab-result-service-provider-input')
-      .fill('City Laboratory');
-    await page.getByTestId('save-button').click();
-    await expect(page).not.toHaveURL(/lab-result\/add/);
-
-    const stored = await page.evaluate(async () => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      return {
-        report: JSON.parse(
-          (
-            await bridge.querySql('SELECT fhir_json FROM diagnostic_reports;')
-          )[0].fhir_json
-        ),
-        organizations: await bridge.querySql(
-          'SELECT id, name FROM organizations;'
-        ),
-      };
-    });
-    expect(stored.organizations).toEqual([
-      { id: expect.stringMatching(/^org-/), name: 'City Laboratory' },
-    ]);
-    expect(stored.report.performer).toEqual([
-      {
-        reference: `Organization/${stored.organizations[0].id}`,
-        type: 'Organization',
-        display: 'City Laboratory',
-      },
-    ]);
+    expect(dialogTriggered).toBe(false);
+    // Today's time cannot go past now either
+    expect(await timeInput.getAttribute('max')).toBeTruthy();
   });
 });

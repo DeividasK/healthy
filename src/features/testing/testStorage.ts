@@ -50,6 +50,7 @@ export async function openSecondDevice(
     deviceScaleFactor,
     isMobile,
     hasTouch,
+    reducedMotion,
   } = testInfo.project.use;
   const context = await browser.newContext({
     baseURL,
@@ -58,6 +59,7 @@ export async function openSecondDevice(
     deviceScaleFactor,
     isMobile,
     hasTouch,
+    reducedMotion,
   });
   const page = await context.newPage();
   await mockGoogleIdentityServices(page);
@@ -170,6 +172,12 @@ export function setupConsoleMonitor(page: Page): ConsoleMonitor {
     // - When/if it can be removed: Can be removed once upstream Expo Router and React Navigation release updates
     //   that migrate all internal screen wrappers to `style.pointerEvents` (expected in Expo SDK 58+).
     'props.pointerEvents is deprecated. Use style.pointerEvents',
+    // 2. '[Reanimated] Reduced motion setting is enabled on this device.'
+    // - Why: E2E tests run with reduced motion so they do not wait out every
+    //   transition; Reanimated logs this development-only notice once per page.
+    //   Tests about motion opt back into full motion.
+    // - When/if it can be removed: never needed in production builds.
+    '[Reanimated] Reduced motion setting is enabled on this device.',
   ];
 
   page.on('console', (msg) => {

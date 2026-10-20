@@ -94,212 +94,6 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  test('keeps the shared header mounted, logo in the centre, and island transitions continuous', async ({
-    page,
-  }) => {
-    const condition = await seedTestCondition(page, {
-      title: 'Header navigation',
-    });
-    const consultation = await seedTestConsultation(page, {
-      conditionIds: [condition.id],
-      title: 'Dock navigation',
-    });
-    await openRoute(page, '/');
-    const header = page.getByTestId('app-header');
-    const logo = page.getByTestId('app-home-button');
-    await expect(header).toBeVisible();
-    await expect(page.getByTestId('back-button')).toHaveCount(0);
-    const background = page.getByTestId('action-dock-background');
-    const primaryButton = page.getByTestId('floating-add-button');
-    await expect(background).toHaveCSS('opacity', '0');
-    const collapsedSize = (await background.boundingBox())!;
-    const primarySize = (await primaryButton.boundingBox())!;
-    expect(collapsedSize.width).toBeLessThan(primarySize.width);
-    expect(collapsedSize.height).toBeLessThan(primarySize.height);
-    // The logo sits in the middle of the header.
-    const headerBox = (await header.boundingBox())!;
-    const centredX = headerBox.x + (headerBox.width - 44) / 2;
-    await expect
-      .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(centredX);
-    // The profile is at the start of the header and settings at the end.
-    const profileBox = (await page
-      .getByTestId('profile-header-button')
-      .boundingBox())!;
-    const settingsBox = (await page
-      .getByTestId('settings-header-button')
-      .boundingBox())!;
-    expect(profileBox.x).toBeLessThan(centredX);
-    expect(settingsBox.x).toBeGreaterThan(centredX + 44);
-
-    // Sample actual positions across route changes to verify visible motion and persistence.
-    await page.evaluate(() => {
-      const element = document.querySelector(
-        '[data-testid="app-home-button"]'
-      )!;
-      const state = {
-        element,
-        primary: document.querySelector('[data-testid="floating-add-button"]'),
-        positions: [] as number[],
-        heights: [] as number[],
-        frame: 0,
-      };
-      (window as any).__headerMotion = state;
-      const sample = () => {
-        state.positions.push(element.getBoundingClientRect().x);
-        const dock = document.querySelector(
-          '[data-testid="resource-action-dock"]'
-        );
-        const height = dock?.getBoundingClientRect().height;
-        state.heights.push(height ?? 0);
-        state.frame = requestAnimationFrame(sample);
-      };
-      sample();
-    });
-    await page.getByTestId(`condition-open-${condition.id}`).click();
-    await expect(page.getByTestId('back-button')).toBeVisible();
-    await expect(header.getByTestId('back-button')).toHaveCount(0);
-    await expect(
-      page.getByTestId('resource-action-dock').getByTestId('back-button')
-    ).toBeVisible();
-    // View pages delete from their island
-    await expect(page.getByTestId('delete-condition-button')).toBeVisible();
-    await expect
-      .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(centredX);
-    const motion = await page.evaluate(() => {
-      const state = (window as any).__headerMotion;
-      cancelAnimationFrame(state.frame);
-      return {
-        persisted:
-          state.element ===
-          document.querySelector('[data-testid="app-home-button"]'),
-        positions: state.positions as number[],
-        heights: state.heights as number[],
-        primaryPersisted:
-          state.primary ===
-          document.querySelector('[data-testid="condition-add-button"]'),
-      };
-    });
-    expect(motion.persisted).toBe(true);
-    expect(motion.primaryPersisted).toBe(true);
-    expect(motion.positions.every((x) => Math.abs(x - centredX) < 1)).toBe(
-      true
-    );
-    expect(motion.heights.length).toBeGreaterThan(0);
-    expect(
-      motion.heights.every((height) => height === primarySize.height)
-    ).toBe(true);
-    await expect(background).toHaveCSS('opacity', '1');
-    const expandedSize = (await background.boundingBox())!;
-    expect(expandedSize.width).toBeGreaterThan(primarySize.width);
-    expect(expandedSize.height).toBe(primarySize.height);
-    const conditionPrimary = (await page
-      .getByTestId('condition-add-button')
-      .boundingBox())!;
-    expect(conditionPrimary.y).toBe(expandedSize.y);
-
-    await page.evaluate(() => {
-      const primary = document.querySelector(
-        '[data-testid="action-dock-primary-slot"]'
-      )!;
-      const state = {
-        primary,
-        widths: [] as number[],
-        heights: [] as number[],
-        frame: 0,
-      };
-      (window as any).__dockMotion = state;
-      const sample = () => {
-        state.widths.push(primary.getBoundingClientRect().width);
-        state.heights.push(
-          document
-            .querySelector('[data-testid="resource-action-dock"]')
-            ?.getBoundingClientRect().height ?? 0
-        );
-        state.frame = requestAnimationFrame(sample);
-      };
-      sample();
-    });
-
-    await page
-      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
-      .click();
-    await expect(page.getByTestId('consultation-title')).toHaveText(
-      'Dock navigation'
-    );
-    await expect(page.getByTestId('condition-add-button')).toHaveCount(0);
-    // Both screens have a primary add action, so it stays in place unchanged.
-    await expect(page.getByTestId('consultation-add-treatment')).toBeVisible();
-    const dockMotion = await page.evaluate(() => {
-      const state = (window as any).__dockMotion;
-      cancelAnimationFrame(state.frame);
-      return {
-        widths: state.widths as number[],
-        heights: state.heights as number[],
-      };
-    });
-    expect(
-      dockMotion.widths.every((width) => width === primarySize.width)
-    ).toBe(true);
-    expect(
-      dockMotion.heights.every((height) => height === primarySize.height)
-    ).toBe(true);
-    const consultationSize = (await background.boundingBox())!;
-    expect(consultationSize.height).toBe(expandedSize.height);
-    await page.getByTestId('back-button').click();
-
-    await page.getByTestId('edit-condition-button').click();
-    await expect(header).toBeVisible();
-    const dock = page.getByTestId('resource-action-dock');
-    await expect(
-      dock.getByRole('button', { name: 'Save', exact: true })
-    ).toBeVisible();
-    await expect(dock.getByTestId('back-button')).toHaveCount(0);
-    // Edit forms have no delete; the island hugs back, save and + while
-    // save stays at the screen center.
-    await expect(dock.getByTestId('delete-condition-button')).toHaveCount(0);
-    const viewportWidth = page.viewportSize()!.width;
-    await expect
-      .poll(
-        async () => {
-          const close = (await dock
-            .getByTestId('cancel-button')
-            .boundingBox())!;
-          const save = (await dock.getByTestId('save-button').boundingBox())!;
-          const add = (await dock
-            .getByTestId('add-option-button')
-            .boundingBox())!;
-          const island = (await background.boundingBox())!;
-          return (
-            close.x + close.width < save.x &&
-            save.x + save.width < add.x &&
-            Math.abs(save.x + save.width / 2 - viewportWidth / 2) < 1 &&
-            Math.abs(island.x - (close.x - 10)) < 1 &&
-            Math.abs(island.x + island.width - (add.x + add.width + 10)) < 1
-          );
-        },
-        { timeout: 15000 }
-      )
-      .toBe(true);
-    await page.getByTestId('condition-title-input').fill('Unsaved change');
-    await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
-    // Entered data is only discarded after confirming
-    const discard = page.getByTestId('discard-changes-modal');
-    await expect(discard.getByText('Are you sure?')).toBeVisible();
-    await discard.getByRole('button', { name: 'Yes' }).click();
-    await expect(page.getByTestId('condition-title')).toHaveText(
-      'Header navigation'
-    );
-    await page.getByTestId('back-button').click();
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('back-button')).toHaveCount(0);
-    await expect
-      .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(centredX);
-    await expect(dock.getByTestId('floating-add-button')).toBeVisible();
-  });
-
   test(
     'starts empty, toggles the add menu and shows a new condition right away',
     { tag: ['@smoke'] },
@@ -529,5 +323,219 @@ test.describe('Home add menu keyboard navigation', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/treatment\/add$/);
+  });
+});
+
+test.describe('Shared header and island motion', () => {
+  // Samples animation frames, so it runs with full motion.
+  test.use({ reducedMotion: 'no-preference' });
+  test.beforeEach(async ({ page }) => {
+    await seedTestPatient(page);
+  });
+
+  test('keeps the shared header mounted, logo in the centre, and island transitions continuous', async ({
+    page,
+  }) => {
+    const condition = await seedTestCondition(page, {
+      title: 'Header navigation',
+    });
+    const consultation = await seedTestConsultation(page, {
+      conditionIds: [condition.id],
+      title: 'Dock navigation',
+    });
+    await openRoute(page, '/');
+    const header = page.getByTestId('app-header');
+    const logo = page.getByTestId('app-home-button');
+    await expect(header).toBeVisible();
+    await expect(page.getByTestId('back-button')).toHaveCount(0);
+    const background = page.getByTestId('action-dock-background');
+    const primaryButton = page.getByTestId('floating-add-button');
+    await expect(background).toHaveCSS('opacity', '0');
+    const collapsedSize = (await background.boundingBox())!;
+    const primarySize = (await primaryButton.boundingBox())!;
+    expect(collapsedSize.width).toBeLessThan(primarySize.width);
+    expect(collapsedSize.height).toBeLessThan(primarySize.height);
+    // The logo sits in the middle of the header.
+    const headerBox = (await header.boundingBox())!;
+    const centredX = headerBox.x + (headerBox.width - 44) / 2;
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(centredX);
+    // The profile is at the start of the header and settings at the end.
+    const profileBox = (await page
+      .getByTestId('profile-header-button')
+      .boundingBox())!;
+    const settingsBox = (await page
+      .getByTestId('settings-header-button')
+      .boundingBox())!;
+    expect(profileBox.x).toBeLessThan(centredX);
+    expect(settingsBox.x).toBeGreaterThan(centredX + 44);
+
+    // Sample actual positions across route changes to verify visible motion and persistence.
+    await page.evaluate(() => {
+      const element = document.querySelector(
+        '[data-testid="app-home-button"]'
+      )!;
+      const state = {
+        element,
+        primary: document.querySelector('[data-testid="floating-add-button"]'),
+        positions: [] as number[],
+        heights: [] as number[],
+        frame: 0,
+      };
+      (window as any).__headerMotion = state;
+      const sample = () => {
+        state.positions.push(element.getBoundingClientRect().x);
+        const dock = document.querySelector(
+          '[data-testid="resource-action-dock"]'
+        );
+        const height = dock?.getBoundingClientRect().height;
+        state.heights.push(height ?? 0);
+        state.frame = requestAnimationFrame(sample);
+      };
+      sample();
+    });
+    await page.getByTestId(`condition-open-${condition.id}`).click();
+    await expect(page.getByTestId('back-button')).toBeVisible();
+    await expect(header.getByTestId('back-button')).toHaveCount(0);
+    await expect(
+      page.getByTestId('resource-action-dock').getByTestId('back-button')
+    ).toBeVisible();
+    // View pages delete from their island
+    await expect(page.getByTestId('delete-condition-button')).toBeVisible();
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(centredX);
+    const motion = await page.evaluate(() => {
+      const state = (window as any).__headerMotion;
+      cancelAnimationFrame(state.frame);
+      return {
+        persisted:
+          state.element ===
+          document.querySelector('[data-testid="app-home-button"]'),
+        positions: state.positions as number[],
+        heights: state.heights as number[],
+        primaryPersisted:
+          state.primary ===
+          document.querySelector('[data-testid="condition-add-button"]'),
+      };
+    });
+    expect(motion.persisted).toBe(true);
+    expect(motion.primaryPersisted).toBe(true);
+    expect(motion.positions.every((x) => Math.abs(x - centredX) < 1)).toBe(
+      true
+    );
+    expect(motion.heights.length).toBeGreaterThan(0);
+    expect(
+      motion.heights.every((height) => height === primarySize.height)
+    ).toBe(true);
+    await expect(background).toHaveCSS('opacity', '1');
+    const expandedSize = (await background.boundingBox())!;
+    expect(expandedSize.width).toBeGreaterThan(primarySize.width);
+    expect(expandedSize.height).toBe(primarySize.height);
+    const conditionPrimary = (await page
+      .getByTestId('condition-add-button')
+      .boundingBox())!;
+    expect(conditionPrimary.y).toBe(expandedSize.y);
+
+    await page.evaluate(() => {
+      const primary = document.querySelector(
+        '[data-testid="action-dock-primary-slot"]'
+      )!;
+      const state = {
+        primary,
+        widths: [] as number[],
+        heights: [] as number[],
+        frame: 0,
+      };
+      (window as any).__dockMotion = state;
+      const sample = () => {
+        state.widths.push(primary.getBoundingClientRect().width);
+        state.heights.push(
+          document
+            .querySelector('[data-testid="resource-action-dock"]')
+            ?.getBoundingClientRect().height ?? 0
+        );
+        state.frame = requestAnimationFrame(sample);
+      };
+      sample();
+    });
+
+    await page
+      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
+      .click();
+    await expect(page.getByTestId('consultation-title')).toHaveText(
+      'Dock navigation'
+    );
+    await expect(page.getByTestId('condition-add-button')).toHaveCount(0);
+    // Both screens have a primary add action, so it stays in place unchanged.
+    await expect(page.getByTestId('consultation-add-treatment')).toBeVisible();
+    const dockMotion = await page.evaluate(() => {
+      const state = (window as any).__dockMotion;
+      cancelAnimationFrame(state.frame);
+      return {
+        widths: state.widths as number[],
+        heights: state.heights as number[],
+      };
+    });
+    expect(
+      dockMotion.widths.every((width) => width === primarySize.width)
+    ).toBe(true);
+    expect(
+      dockMotion.heights.every((height) => height === primarySize.height)
+    ).toBe(true);
+    const consultationSize = (await background.boundingBox())!;
+    expect(consultationSize.height).toBe(expandedSize.height);
+    await page.getByTestId('back-button').click();
+
+    await page.getByTestId('edit-condition-button').click();
+    await expect(header).toBeVisible();
+    const dock = page.getByTestId('resource-action-dock');
+    await expect(
+      dock.getByRole('button', { name: 'Save', exact: true })
+    ).toBeVisible();
+    await expect(dock.getByTestId('back-button')).toHaveCount(0);
+    // Edit forms have no delete; the island hugs back, save and + while
+    // save stays at the screen center.
+    await expect(dock.getByTestId('delete-condition-button')).toHaveCount(0);
+    const viewportWidth = page.viewportSize()!.width;
+    await expect
+      .poll(
+        async () => {
+          const close = (await dock
+            .getByTestId('cancel-button')
+            .boundingBox())!;
+          const save = (await dock.getByTestId('save-button').boundingBox())!;
+          const add = (await dock
+            .getByTestId('add-option-button')
+            .boundingBox())!;
+          const island = (await background.boundingBox())!;
+          return (
+            close.x + close.width < save.x &&
+            save.x + save.width < add.x &&
+            Math.abs(save.x + save.width / 2 - viewportWidth / 2) < 1 &&
+            Math.abs(island.x - (close.x - 10)) < 1 &&
+            Math.abs(island.x + island.width - (add.x + add.width + 10)) < 1
+          );
+        },
+        { timeout: 15000 }
+      )
+      .toBe(true);
+    await page.getByTestId('condition-title-input').fill('Unsaved change');
+    await dock.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Entered data is only discarded after confirming
+    const discard = page.getByTestId('discard-changes-modal');
+    await expect(discard.getByText('Are you sure?')).toBeVisible();
+    await discard.getByRole('button', { name: 'Yes' }).click();
+    await expect(page.getByTestId('condition-title')).toHaveText(
+      'Header navigation'
+    );
+    await page.getByTestId('back-button').click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('back-button')).toHaveCount(0);
+    await expect
+      .poll(async () => (await logo.boundingBox())?.x)
+      .toBeCloseTo(centredX);
+    await expect(dock.getByTestId('floating-add-button')).toBeVisible();
   });
 });

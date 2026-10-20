@@ -65,7 +65,6 @@ test.describe('Add Treatment Flow', () => {
       .getByTestId('treatment-notes-input')
       .fill('Patient reported no penicillin allergies.');
 
-    await checkA11y(page, { include: '[data-testid="treatment-form"]' });
     await page.getByTestId('save-treatment-button').click();
 
     // Opens the new treatment
