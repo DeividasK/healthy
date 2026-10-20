@@ -7,7 +7,10 @@ import {
   getTestServiceRequest,
   getTestClinicalDocument,
   findServiceRequestSection,
+  seedTestReport,
   checkA11y,
+  evaluateBridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Service Request Flow', () => {
@@ -21,7 +24,7 @@ test.describe('Add Service Request Flow', () => {
     const condition = await seedTestCondition(page, {
       title: 'Gallstones',
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-service-request').click();
     await expect(page).toHaveURL(/.*service-request\/add$/);
@@ -156,7 +159,7 @@ test.describe('Add Service Request Flow', () => {
     expect(results[0].n).toBe(0);
   });
 
-  test('creates a service request from a consultation as its origin', async ({
+  test('creates a service request from a consultation, then deletes it with its references', async ({
     page,
   }) => {
     const consultation = await seedTestConsultation(page, {
@@ -164,7 +167,7 @@ test.describe('Add Service Request Flow', () => {
       doctorName: 'Dr. Julian Bashir',
       date: '2026-03-02',
     });
-    await page.goto(`/consultation/${consultation.id}`);
+    await openRoute(page, `/consultation/${consultation.id}`);
     await page.getByTestId('consultation-add-treatment').click();
     // Menu options name what they add, without verbs.
     await expect(page.getByTestId('option-create-new-treatment')).toHaveText(
@@ -223,13 +226,58 @@ test.describe('Add Service Request Flow', () => {
     expect(section.entry).toEqual([
       { reference: `ServiceRequest/${created.id}` },
     ]);
+
+    await test.step('Deleting it removes its document entry and basedOn references', async () => {
+      const visit = await seedTestConsultation(page, {
+        title: 'Colonoscopy appointment',
+        basedOnServiceRequestIds: [created.id],
+      });
+      const { report } = await seedTestReport(page, {
+        serviceRequestIds: [created.id],
+        biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
+      });
+      await openRoute(page, `/service-request/${created.id}`);
+      await page.clock.install();
+      await page.getByTestId('delete-service-request-button').click();
+      await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
+      await page.clock.runFor(5000);
+      await page.getByTestId('delete-modal-confirm-button').click();
+      await expect(
+        page.getByTestId('home-consultations-section')
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('home-service-requests-section')
+      ).toHaveCount(0);
+
+      expect(
+        findServiceRequestSection(
+          await getTestClinicalDocument(page, consultation.id)
+        )
+      ).toBeUndefined();
+      const stored = await evaluateBridge(
+        page,
+        (b, id) => b.getConsultation(id),
+        visit.id
+      );
+      expect(stored.basedOn).toBeUndefined();
+      expect(stored.meta.lastUpdated).toBeTruthy();
+      const [row] = await evaluateBridge(
+        page,
+        (b, id) =>
+          b.querySql('SELECT fhir_json FROM diagnostic_reports WHERE id = ?;', [
+            id,
+          ]),
+        report.id
+      );
+      expect(JSON.parse(row.fhir_json).basedOn).toBeUndefined();
+    });
   });
 
   test('creates a service request from a condition, associated with it', async ({
     page,
   }) => {
     const condition = await seedTestCondition(page, { title: 'Hypertension' });
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await page.getByTestId('condition-add-button').click();
     await page.getByTestId('menu-add-service-request').click();
     await page

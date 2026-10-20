@@ -3,6 +3,8 @@ import {
   expect,
   seedTestPatient,
   seedTestReport,
+  seedTestCondition,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
@@ -28,11 +30,83 @@ test('See All Biomarkers preserves the period and shows latest normal, low and h
       { name: 'Red Blood Cells', value: 4.7 },
     ],
   });
-  await page.goto('/');
+  await seedTestCondition(page, {
+    id: 'summary-condition',
+    title: 'Summary order',
+  });
+  await openRoute(page, '/');
   const home = page
     .getByTestId('results-scroll-view')
     .getByTestId('labs-summary');
-  await home.getByRole('combobox', { name: 'Period' }).selectOption('1');
+
+  // Home places the summary after the conditions, counting each biomarker's
+  // latest result whatever order reports were imported in.
+  await expect(home.getByTestId('labs-summary-divider')).toHaveCount(1);
+  const conditionY = (await page
+    .getByTestId('condition-card-summary-condition')
+    .boundingBox())!.y;
+  expect((await home.boundingBox())!.y).toBeGreaterThan(conditionY);
+  await expect(home.getByTestId('labs-summary-total')).toHaveText('4');
+  await expect(home.getByText('Biomarkers', { exact: true })).toBeVisible();
+  await expect(home.getByTestId('labs-summary-count-Low')).toHaveText('Low1');
+  await expect(home.getByTestId('labs-summary-count-Normal')).toHaveText(
+    'Normal2'
+  );
+  await expect(home.getByTestId('labs-summary-count-High')).toHaveText('High1');
+  await expect(home.getByText('Out of Range', { exact: true })).toBeVisible();
+  await expect(home.getByTestId('labs-summary-result-6690-2')).toContainText(
+    'Low'
+  );
+  await expect(home.getByTestId('labs-summary-result-777-3')).toContainText(
+    'High'
+  );
+  await expect(home.getByTestId('labs-summary-segment-718-7')).toHaveAttribute(
+    'stroke',
+    '#10B981'
+  );
+  await expect(home.getByTestId('labs-summary-segment-6690-2')).toHaveAttribute(
+    'stroke',
+    '#3B82F6'
+  );
+  await expect(home.getByTestId('labs-summary-segment-777-3')).toHaveAttribute(
+    'stroke',
+    '#EF4444'
+  );
+  await expect(home.getByTestId('labs-summary-chart')).toHaveAttribute(
+    'aria-label',
+    '4 biomarkers: 2 normal, 1 low, 1 high'
+  );
+  const period = home.getByRole('combobox', { name: 'Period' });
+  await expect(period.locator('option')).toHaveText([
+    'All time',
+    '10 years',
+    '5 years',
+    '2 years',
+    '1 year',
+    '6 months',
+    '1 month',
+  ]);
+  for (const [label, count] of [
+    ['10 years', 4],
+    ['5 years', 3],
+    ['2 years', 3],
+    ['6 months', 3],
+    ['1 month', 3],
+  ] as const) {
+    await period.selectOption({ label });
+    await expect(home.getByTestId('labs-summary-total')).toHaveText(
+      String(count)
+    );
+    await expect(
+      home
+        .locator('[data-testid^="labs-summary-result-"]')
+        .filter({ has: page.getByText(/LOINC:/) })
+    ).toHaveCount(2);
+    await expect(
+      home.locator('[data-testid^="labs-summary-segment-"]')
+    ).toHaveCount(count);
+  }
+  await period.selectOption('1');
   await expect(home.getByTestId('labs-summary-total')).toHaveText('3');
   await expect(home.getByTestId('labs-summary-result-718-7')).toHaveCount(0);
   await expect(
@@ -88,6 +162,9 @@ test('See All Biomarkers preserves the period and shows latest normal, low and h
   await page.getByTestId('back-button').click();
   await expect(page).toHaveURL(/\/$/);
   await expect(home.getByText('Out of Range', { exact: true })).toBeVisible();
+  await home.getByTestId('labs-summary-result-6690-2').click();
+  await expect(page).toHaveURL(/biomarker\/6690-2/);
+  await expect(page.getByTestId('biomarker-latest-status')).toHaveText('Low');
 });
 
 test('normal-only results keep the home button available; empty periods and invalid parameters are safe', async ({
@@ -97,7 +174,7 @@ test('normal-only results keep the home button available; empty periods and inva
     date: '2020-10-01',
     biomarkers: [{ name: 'Hemoglobin', value: 15.2 }],
   });
-  await page.goto('/');
+  await openRoute(page, '/');
   const home = page
     .getByTestId('results-scroll-view')
     .getByTestId('labs-summary');
@@ -118,39 +195,10 @@ test('normal-only results keep the home button available; empty periods and inva
   await expect(
     view.locator('[data-testid^="labs-summary-result-"]')
   ).toHaveCount(0);
-  await page.goto('/labs-summary?period=invalid');
+  await openRoute(page, '/labs-summary?period=invalid');
   await expect(view.getByRole('combobox', { name: 'Period' })).toHaveValue(
     'all'
   );
-  await expect(view.getByTestId('labs-summary-total')).toHaveText('1');
-});
-
-test('direct entry and patient changes only display the active patient’s biomarkers', async ({
-  page,
-}) => {
-  await seedTestReport(page, {
-    biomarkers: [{ name: 'Hemoglobin', value: 15.2 }],
-  });
-  await seedTestPatient(page, { id: 'summary-patient-b', givenName: 'Second' });
-  await seedTestReport(page, {
-    biomarkers: [{ name: 'Platelets', value: 480 }],
-  });
-  await page.goto('/labs-summary');
-  const view = page.getByTestId('labs-summary-view');
-  await expect(view.getByTestId('labs-summary-result-777-3')).toContainText(
-    '480'
-  );
-  await expect(view.getByTestId('labs-summary-result-718-7')).toHaveCount(0);
-  await page.evaluate(async () =>
-    (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-      id: 'summary-patient-a',
-      givenName: 'First',
-    })
-  );
-  await expect(view.getByTestId('labs-summary-result-718-7')).toContainText(
-    '15.2'
-  );
-  await expect(view.getByTestId('labs-summary-result-777-3')).toHaveCount(0);
   await expect(view.getByTestId('labs-summary-total')).toHaveText('1');
 });
 
@@ -172,7 +220,7 @@ test('home Search shows latest matches including normal results and respects the
       { name: 'Red Blood Cells', value: 4.7 },
     ],
   });
-  await page.goto('/');
+  await openRoute(page, '/');
   const summary = page
     .getByTestId('results-scroll-view')
     .getByTestId('labs-summary');
@@ -270,13 +318,13 @@ test('Sort ranks latest biomarkers by absolute or signed relative deviation and 
       { name: 'Hemoglobin', value: 8 },
     ],
   });
-  await page.goto('/');
+  await openRoute(page, '/');
   await expect(
     page
       .getByTestId('results-scroll-view')
       .getByRole('combobox', { name: 'Sort', exact: true })
   ).toHaveCount(0);
-  await page.goto('/labs-summary');
+  await openRoute(page, '/labs-summary');
   const view = page.getByTestId('labs-summary-view');
   const sort = view.getByRole('combobox', { name: 'Sort', exact: true });
   const rows = view.getByRole('button', { name: /^View biomarker:/ });

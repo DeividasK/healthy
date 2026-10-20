@@ -44,13 +44,31 @@ export async function takeSnapshot(
   testInfo: TestInfo,
   { keepFocus = false }: { keepFocus?: boolean } = {}
 ): Promise<void> {
+  // The journal's day strip renders the days in view first and the older
+  // ones after. Chromatic replays the page scrolled to the strip's start, so
+  // wait for its first cell.
+  if (await page.getByTestId('actions-week-pager').count())
+    await page
+      .getByTestId('actions-open-calendar')
+      .waitFor({ state: 'attached' });
   // A resting pointer leaves hover styles on whatever is now under it.
   await page.mouse.move(0, 0);
   if (!keepFocus) {
-    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
-    await expect(page.locator(':focus')).toHaveCount(0);
+    // Dialogs move focus in once they are ready, which under load can come
+    // after a first blur; blur until nothing takes focus back.
+    const blurAll = () =>
+      expect
+        .poll(() =>
+          page.evaluate(() => {
+            (document.activeElement as HTMLElement | null)?.blur();
+            return document.querySelector(':focus') === null;
+          })
+        )
+        .toBe(true);
+    await blurAll();
     // Blur handlers close suggestion lists after a short delay (useDismissOnBlur).
     await page.waitForTimeout(200);
+    await blurAll();
   }
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;

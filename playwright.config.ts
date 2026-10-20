@@ -3,8 +3,11 @@ import type { ChromaticConfig } from '@chromatic-com/playwright';
 
 export default defineConfig<ChromaticConfig>({
   testDir: './src/features',
+  globalSetup: './src/features/testing/globalSetup.ts',
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  // Locally one worker per core measured fastest: with the app booted once
+  // per worker, tests no longer saturate the CPU while the dev server works.
+  workers: process.env.CI ? '75%' : '100%',
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   timeout: 30000,
@@ -20,7 +23,7 @@ export default defineConfig<ChromaticConfig>({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], reducedMotion: 'reduce' },
       testMatch: /.*\.e2e\.ts/,
     },
     {
@@ -35,6 +38,11 @@ export default defineConfig<ChromaticConfig>({
         colorScheme: 'light',
         reducedMotion: 'reduce',
         disableAutoSnapshot: true,
+        // Chromatic archives a test's resources once the network is idle.
+        // Its snapshot script resets Playwright's idle state, which after
+        // in-app navigation only returns at the 10 s default. Snapshots
+        // wait for their content, so everything is loaded by then.
+        resourceArchiveTimeout: 1500,
       },
       testMatch: /.*\.visual\.ts/,
     },

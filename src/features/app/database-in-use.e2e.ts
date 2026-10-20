@@ -5,6 +5,9 @@ import {
 } from '@/src/features/testing/testStorage';
 import { mockGoogleIdentityServices } from '@/src/features/testing/mockGoogleDrive';
 
+// Other tabs share the page's storage, so it needs a page of its own.
+test.use({ freshApp: true });
+
 test.describe('Database open in another tab', () => {
   test('a second tab waits for the first instead of crashing', async ({
     page,

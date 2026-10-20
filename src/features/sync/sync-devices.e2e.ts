@@ -10,60 +10,16 @@ import {
   openSecondDevice,
   syncAllTestProfiles,
   getBrowserLocalDate,
+  seedEveryResource,
+  snapshotClinicalTables,
+  RECORD_SECRETS,
+  evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
-const bridge = <T>(
-  page: Page,
-  run: (b: any, arg: any) => Promise<T>,
-  arg?: unknown
-): Promise<T> =>
-  page.evaluate(
-    ({ source, arg }) =>
-      new Function('b', 'arg', `return (${source})(b, arg);`)(
-        (window as any).__HEALTHY_TEST_BRIDGE__,
-        arg
-      ),
-    { source: run.toString(), arg }
-  );
+const snapshot = snapshotClinicalTables;
 
-const CLINICAL_TABLES = [
-  'patients',
-  'conditions',
-  'diagnostic_reports',
-  'observations',
-  'consultations',
-  'consultation_conditions',
-  'clinical_documents',
-  'medication_requests',
-  'service_requests',
-  'medication_administrations',
-  'medication_statements',
-  'organizations',
-  'request_orchestrations',
-  'profile_settings',
-];
-
-/** Every canonical row on a device, for comparing two devices. */
-const snapshot = (page: Page) =>
-  bridge(
-    page,
-    async (b, tables: string[]) => {
-      const result: Record<string, unknown[]> = {};
-      for (const table of tables)
-        result[table] = await b.querySql(
-          table === 'consultation_conditions'
-            ? `SELECT * FROM ${table} ORDER BY consultation_id, condition_id`
-            : table === 'profile_settings'
-              ? `SELECT id, settings_json FROM ${table} ORDER BY id`
-              : `SELECT id, fhir_json FROM ${table} ORDER BY id`
-        );
-      return result;
-    },
-    CLINICAL_TABLES
-  );
-
-/** Seeds one patient with every resource type, linked to each other. */
+/** Seeds one patient with a few linked resources. */
 async function seedLinkedRecord(page: Page) {
   await seedTestPatient(page, { id: 'shared-patient', givenName: 'Alice' });
   await seedTestResources(page, {
@@ -118,85 +74,200 @@ async function seedLinkedRecord(page: Page) {
 }
 
 test.describe('Sync between devices', () => {
-  test('replicates every resource, keeps Drive encrypted and propagates deletions', async ({
+  // One pair of devices goes through every exchange: connecting and
+  // syncing them is most of what a sync test costs.
+  test('two devices replicate, converge, catch up, delete and restore profiles', async ({
     page,
     browser,
   }, testInfo) => {
-    await seedLinkedRecord(page);
-    const { store, phrase } = await connectTestSync(page);
-    await syncTestDevice(page);
-    const contents = driveContents(store);
-    for (const secret of [
-      'Private asthma diagnosis',
-      'Confidential narrative',
-      'Private Clinic',
-      'Alice',
-    ])
-      expect(contents).not.toContain(secret);
-
-    const second = await openSecondDevice(browser, testInfo);
-    await bootstrapApp(second.page);
-    await connectTestSync(second.page, { store, phrase });
-    await syncAllTestProfiles(second.page);
-    expect(await snapshot(second.page)).toEqual(await snapshot(page));
-
-    // Nothing new costs one request to the Drive changes feed.
-    const before = store.requests.length;
-    expect(await syncTestDevice(second.page)).toMatchObject({
-      downloaded: 0,
-      pushed: 0,
-    });
-    expect(store.requests.slice(before)).toEqual([
-      { method: 'GET', path: '/drive/v3/changes' },
-    ]);
-
-    // Deletions (including their cascades) reach the other device.
-    await bridge(page, async (b) => {
-      await b.deleteCondition('asthma');
-      await b.deleteReport('cbc');
-      await b.deleteConsultation('visit');
-      await b.syncNow();
-    });
-    await syncTestDevice(second.page);
-    const afterDelete = await snapshot(second.page);
-    expect(afterDelete).toEqual(await snapshot(page));
-    expect(afterDelete.conditions).toHaveLength(1);
-    expect(afterDelete.diagnostic_reports).toHaveLength(0);
-    expect(afterDelete.clinical_documents).toHaveLength(0);
-    // The treatment survives with its links cleared on both devices.
-    expect(
-      JSON.parse((afterDelete.medication_requests[0] as any).fhir_json)
-    ).not.toHaveProperty('encounter');
-    await second.close();
-  });
-
-  test('converges concurrent edits on the later change', async ({
-    page,
-    browser,
-  }, testInfo) => {
-    await seedLinkedRecord(page);
+    test.slow();
+    await seedEveryResource(page);
+    await seedTestPatient(page, { id: 'second-patient', givenName: 'Bob' });
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);
     const second = await openSecondDevice(browser, testInfo);
-    await bootstrapApp(second.page);
-    await connectTestSync(second.page, { store, phrase });
-    await syncAllTestProfiles(second.page);
 
-    const rename = (title: string) => async (b: any, t: string) => {
-      const condition = await b.getCondition('eczema');
-      condition.code.text = t;
-      await b.saveCondition(condition, 'shared-patient');
-    };
-    // Neither device has seen the other's edit; the second one is later.
-    await bridge(page, rename('first'), 'Edited on first device');
-    await bridge(second.page, rename('second'), 'Edited on second device');
-    await syncTestDevice(page);
-    await syncTestDevice(second.page);
-    await syncTestDevice(page);
-    for (const device of [page, second.page])
+    await test.step('Replicates every resource and keeps Drive encrypted', async () => {
+      const contents = driveContents(store);
+      for (const secret of RECORD_SECRETS)
+        expect(contents).not.toContain(secret);
+      await bootstrapApp(second.page);
+      await connectTestSync(second.page, { store, phrase });
+      await syncAllTestProfiles(second.page);
+      expect(await snapshot(second.page)).toEqual(await snapshot(page));
+
+      // Nothing new costs one request to the Drive changes feed.
+      const before = store.requests.length;
+      expect(await syncTestDevice(second.page)).toMatchObject({
+        downloaded: 0,
+        pushed: 0,
+      });
+      expect(store.requests.slice(before)).toEqual([
+        { method: 'GET', path: '/drive/v3/changes' },
+      ]);
+    });
+
+    await test.step('Converges concurrent edits on the later change', async () => {
+      // Neither device has seen the other's edits; the second one's are later.
+      const edit = async (
+        b: any,
+        {
+          text,
+          dropFirstDiagnosis,
+        }: { text: string; dropFirstDiagnosis: boolean }
+      ) => {
+        const condition = await b.getCondition('asthma');
+        condition.code.text = text;
+        await b.saveCondition(condition, 'shared-patient');
+        const treatment = await b.getTreatment('inhaler');
+        treatment.note = [{ text }];
+        await b.saveTreatment(treatment, 'shared-patient');
+        const encounter = await b.getConsultation('visit');
+        encounter.priority = { text };
+        if (dropFirstDiagnosis) encounter.diagnosis = [encounter.diagnosis[1]];
+        await b.saveEncounter(encounter, 'shared-patient');
+      };
+      await bridge(page, edit, {
+        text: 'Edited on first device',
+        dropFirstDiagnosis: false,
+      });
+      await bridge(second.page, edit, {
+        text: 'Edited on second device',
+        dropFirstDiagnosis: true,
+      });
+      await syncTestDevice(page);
+      await syncTestDevice(second.page);
+      await syncTestDevice(page);
+      const converged = await snapshot(page);
+      expect(await snapshot(second.page)).toEqual(converged);
+      const visit = (await bridge(page, (b) =>
+        b.getConsultation('visit')
+      )) as any;
+      expect(visit.priority.text).toBe('Edited on second device');
+      // The diagnosis links are rebuilt from the winning encounter.
       expect(
-        (await bridge(device, (b) => b.getCondition('eczema'))) as any
-      ).toMatchObject({ code: { text: 'Edited on second device' } });
+        converged.consultation_conditions.filter(
+          (row) => row.consultation_id === 'visit'
+        )
+      ).toEqual([{ consultation_id: 'visit', condition_id: 'eczema' }]);
+      expect(
+        (await bridge(page, (b) => b.getCondition('asthma'))) as any
+      ).toMatchObject({
+        code: {
+          text: 'Edited on second device',
+          coding: [{ code: 'L21' }, {}],
+        },
+      });
+    });
+
+    await test.step('A lagging or new device catches up from a compacted snapshot', async () => {
+      for (const note of ['one', 'two', 'three'])
+        await bridge(
+          page,
+          async (b, text) => {
+            const condition = await b.getCondition('eczema');
+            condition.note = [{ text }];
+            await b.saveCondition(condition, 'shared-patient');
+            await b.syncNow();
+          },
+          note
+        );
+      await bridge(page, (b) => b.compactNow());
+      const [{ device_id: firstDevice }] = await bridge<
+        { device_id: string }[]
+      >(page, (b) => b.querySql('SELECT device_id FROM sync_device'));
+      const firstDeviceFiles = [...store.files.values()].filter(
+        (file) => file.appProperties?.device === firstDevice
+      );
+      // The first device's chunks are folded into one snapshot.
+      expect(firstDeviceFiles.map((file) => file.appProperties?.kind)).toEqual([
+        'snapshot',
+      ]);
+
+      expect((await syncTestDevice(second.page)).downloaded).toBe(1);
+      expect(await snapshot(second.page)).toEqual(await snapshot(page));
+      // A brand-new device restores everything from the snapshot as well.
+      await bridge(second.page, async (b) => {
+        await b.clearDatabase();
+        await b.syncAllProfiles();
+      });
+      expect(await snapshot(second.page)).toEqual(await snapshot(page));
+    });
+
+    await test.step('Propagates deletions with their cascades', async () => {
+      await bridge(page, async (b) => {
+        await b.deleteCondition('eczema');
+        await b.deleteServiceRequest('referral', 'shared-patient');
+        await b.deleteReport('cbc');
+        await b.deleteConsultation('visit');
+        await b.syncNow();
+      });
+      await syncTestDevice(second.page);
+      const afterDelete = await snapshot(second.page);
+      expect(afterDelete).toEqual(await snapshot(page));
+      expect(afterDelete.conditions).toHaveLength(1);
+      expect(afterDelete.service_requests).toHaveLength(0);
+      expect(afterDelete.diagnostic_reports).toHaveLength(0);
+      // The treatment and the visit based on the request survive, unlinked.
+      const fhir = (table: string, id: string) =>
+        JSON.parse(
+          (afterDelete[table].find((row) => row.id === id) as any).fhir_json
+        );
+      expect(fhir('medication_requests', 'inhaler')).not.toHaveProperty(
+        'encounter'
+      );
+      expect(fhir('consultations', 'resulting-visit')).not.toHaveProperty(
+        'basedOn'
+      );
+    });
+
+    await test.step('Removes a profile from one device only and restores it later', async () => {
+      await bridge(second.page, async (b) => {
+        await b.deletePatient('shared-patient', true);
+        await b.syncNow();
+      });
+      // The first device keeps editing the profile; the second does not get it back.
+      await bridge(page, async (b) => {
+        await b.seedCondition({
+          patientId: 'shared-patient',
+          id: 'late',
+          title: 'Added later',
+        });
+        await b.syncNow();
+      });
+      await syncTestDevice(second.page);
+      expect(
+        await bridge(second.page, (b) =>
+          b.querySql(
+            "SELECT id FROM conditions WHERE patient_id = 'shared-patient'"
+          )
+        )
+      ).toEqual([]);
+      expect(
+        await bridge(second.page, (b) => b.listRestorableProfiles())
+      ).toEqual([{ patientId: 'shared-patient', displayName: 'Alice Doe' }]);
+      expect(
+        await bridge(page, (b) =>
+          b.querySql("SELECT id FROM patients WHERE id = 'shared-patient'")
+        )
+      ).toHaveLength(1);
+
+      await bridge(second.page, (b) => b.syncProfile('shared-patient'));
+      expect(await snapshot(second.page)).toEqual(await snapshot(page));
+
+      // Deleting everywhere removes it from the other device too, once the
+      // user there confirms it.
+      await bridge(page, async (b) => {
+        await b.deletePatient('shared-patient');
+        await b.syncNow();
+      });
+      await syncTestDevice(second.page);
+      await bridge(second.page, (b) =>
+        b.applyHeldProfileDeletion('shared-patient')
+      );
+      expect(await snapshot(second.page)).toEqual(await snapshot(page));
+      expect((await snapshot(page)).patients).toHaveLength(1);
+    });
     await second.close();
   });
 
@@ -219,6 +290,7 @@ test.describe('Sync between devices', () => {
     });
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);
+    // Reload so sync starts with the connection made through the bridge.
     await page.goto('/journal');
     // Let the sync that runs on start finish before marking the entry.
     await page.waitForLoadState('networkidle');
@@ -241,114 +313,6 @@ test.describe('Sync between devices', () => {
         )
       )
     ).toEqual([{ medication_request_id: 'vitamin-d' }]);
-    await second.close();
-  });
-
-  test('a lagging or new device catches up from a compacted snapshot', async ({
-    page,
-    browser,
-  }, testInfo) => {
-    await seedLinkedRecord(page);
-    const { store, phrase } = await connectTestSync(page);
-    await syncTestDevice(page);
-    const second = await openSecondDevice(browser, testInfo);
-    await bootstrapApp(second.page);
-    await connectTestSync(second.page, { store, phrase });
-    await syncAllTestProfiles(second.page);
-
-    for (const note of ['one', 'two', 'three'])
-      await bridge(
-        page,
-        async (b, text) => {
-          const condition = await b.getCondition('eczema');
-          condition.note = [{ text }];
-          await b.saveCondition(condition, 'shared-patient');
-          await b.syncNow();
-        },
-        note
-      );
-    await bridge(page, (b) => b.compactNow());
-    const [{ device_id: firstDevice }] = await bridge<{ device_id: string }[]>(
-      page,
-      (b) => b.querySql('SELECT device_id FROM sync_device')
-    );
-    const firstDeviceFiles = [...store.files.values()].filter(
-      (file) => file.appProperties?.device === firstDevice
-    );
-    // The first device's chunks are folded into one snapshot.
-    expect(firstDeviceFiles.map((file) => file.appProperties?.kind)).toEqual([
-      'snapshot',
-    ]);
-
-    expect((await syncTestDevice(second.page)).downloaded).toBe(1);
-    expect(await snapshot(second.page)).toEqual(await snapshot(page));
-    // A brand-new device restores everything from the snapshot as well.
-    await bridge(second.page, async (b) => {
-      await b.clearDatabase();
-      await b.syncAllProfiles();
-    });
-    expect(await snapshot(second.page)).toEqual(await snapshot(page));
-    await second.close();
-  });
-
-  test('removes a profile from one device only and restores it later', async ({
-    page,
-    browser,
-  }, testInfo) => {
-    await seedLinkedRecord(page);
-    await seedTestPatient(page, { id: 'second-patient', givenName: 'Bob' });
-    const { store, phrase } = await connectTestSync(page);
-    await syncTestDevice(page);
-    const second = await openSecondDevice(browser, testInfo);
-    await bootstrapApp(second.page);
-    await connectTestSync(second.page, { store, phrase });
-    await syncAllTestProfiles(second.page);
-
-    await bridge(second.page, async (b) => {
-      await b.deletePatient('shared-patient', true);
-      await b.syncNow();
-    });
-    // The first device keeps editing the profile; the second does not get it back.
-    await bridge(page, async (b) => {
-      await b.seedCondition({
-        patientId: 'shared-patient',
-        id: 'late',
-        title: 'Added later',
-      });
-      await b.syncNow();
-    });
-    await syncTestDevice(second.page);
-    expect(
-      await bridge(second.page, (b) =>
-        b.querySql(
-          "SELECT id FROM conditions WHERE patient_id = 'shared-patient'"
-        )
-      )
-    ).toEqual([]);
-    expect(
-      await bridge(second.page, (b) => b.listRestorableProfiles())
-    ).toEqual([{ patientId: 'shared-patient', displayName: 'Alice Doe' }]);
-    expect(
-      await bridge(page, (b) =>
-        b.querySql("SELECT id FROM patients WHERE id = 'shared-patient'")
-      )
-    ).toHaveLength(1);
-
-    await bridge(second.page, (b) => b.syncProfile('shared-patient'));
-    expect(await snapshot(second.page)).toEqual(await snapshot(page));
-
-    // Deleting everywhere removes it from the other device too, once the
-    // user there confirms it.
-    await bridge(page, async (b) => {
-      await b.deletePatient('shared-patient');
-      await b.syncNow();
-    });
-    await syncTestDevice(second.page);
-    await bridge(second.page, (b) =>
-      b.applyHeldProfileDeletion('shared-patient')
-    );
-    expect(await snapshot(second.page)).toEqual(await snapshot(page));
-    expect((await snapshot(page)).patients).toHaveLength(1);
     await second.close();
   });
 

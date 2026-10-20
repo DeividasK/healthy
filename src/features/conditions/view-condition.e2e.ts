@@ -7,6 +7,7 @@ import {
   seedTestReport,
   seedTestServiceRequest,
   seedTestTreatment,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Condition', () => {
@@ -19,7 +20,7 @@ test.describe('View Condition', () => {
   }) => {
     const condition = await seedTestCondition(page, { title: 'Knee pain' });
     const other = await seedTestCondition(page, { title: 'Back pain' });
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await page.getByTestId('condition-title').waitFor();
     // Nothing related yet: no empty timeline
     await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
@@ -164,7 +165,7 @@ test.describe('View Condition', () => {
       status: 'on-hold',
       reasonConditionIds: [condition.id],
     });
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
 
     const timeline = page.getByTestId('condition-timeline');
     const rows = timeline.getByTestId(/^condition-timeline-item-.*-row$/);
@@ -239,7 +240,7 @@ test.describe('Condition view island', () => {
     page,
   }) => {
     await seedTestCondition(page, { id: 'island-condition', title: 'Island' });
-    await page.goto('/condition/island-condition');
+    await openRoute(page, '/condition/island-condition');
     const dock = page.getByTestId('resource-action-dock');
     const back = dock.getByTestId('back-button');
     await expect(back).toBeVisible();
@@ -264,7 +265,7 @@ test.describe('Condition view island', () => {
     page,
   }) => {
     await seedTestCondition(page, { id: 'escape-condition', title: 'Escape' });
-    await page.goto('/condition/escape-condition');
+    await openRoute(page, '/condition/escape-condition');
     await page.getByTestId('edit-condition-button').click();
     await expect(page.getByTestId('condition-title-input')).toBeVisible();
     await page.getByTestId('cancel-button').click();

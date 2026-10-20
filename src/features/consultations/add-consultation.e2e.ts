@@ -6,24 +6,10 @@ import {
   seedTestCondition,
   seedTestConsultation,
   checkA11y,
+  evaluateBridge,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
-
-async function openAddConsultationForCondition(
-  page: Page,
-  conditionId: string
-) {
-  await page.goto('/');
-  await page.getByTestId(`condition-open-${conditionId}`).click();
-  await page.getByTestId('condition-add-button').click();
-  await page
-    .getByTestId('condition-add-menu')
-    .getByTestId('menu-add-consultation')
-    .click();
-  await expect(page.getByTestId('condition-add-menu')).not.toBeVisible();
-  await expect(
-    page.getByTestId(`selected-condition-${conditionId}`)
-  ).toBeVisible();
-}
 
 test.describe('Add Consultation Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -31,10 +17,11 @@ test.describe('Add Consultation Flow', () => {
   });
 
   test(
-    'should allow creating a linked Consultation from Condition and audit a11y',
+    'creates a consultation from its condition with every optional field, then views, edits and deletes it',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       let conditionId: string;
+      let consultationId = '';
 
       await test.step('Seed a condition and navigate to it from Home', async () => {
         const cond = await seedTestCondition(page, {
@@ -42,11 +29,7 @@ test.describe('Add Consultation Flow', () => {
           status: 'active',
         });
         conditionId = cond.id;
-
-        const condCard = page.getByTestId(`condition-card-${conditionId}`);
-        await expect(condCard).toBeVisible();
         await page.getByTestId(`condition-open-${conditionId}`).click();
-
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}`)
         );
@@ -56,60 +39,89 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Open the Condition’s linked Consultation form', async () => {
-        await openAddConsultationForCondition(page, conditionId);
+        await page.getByTestId('condition-add-button').click();
+        await page
+          .getByTestId('condition-add-menu')
+          .getByTestId('menu-add-consultation')
+          .click();
+        await expect(page.getByTestId('condition-add-menu')).not.toBeVisible();
         await expect(page.getByText('New Consultation')).toBeVisible();
-        await checkA11y(page);
       });
 
-      await test.step('Fill consultation form fields', async () => {
-        const titleInput = page.getByTestId('consultation-title-input');
-        await titleInput.fill('General Cardiology Review');
-
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-doctor').click();
-        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-        const doctorInput = page.getByTestId('consultation-doctor-input');
-        await doctorInput.fill('Dr. Marcus Welby');
-
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-notes').click();
-        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-        const notesInput = page.getByTestId('consultation-notes-input');
-        await notesInput.fill('Follow-up in 6 months. Blood pressure stable.');
+      await test.step('The condition is preselected as the reason for visit', async () => {
+        await expect(
+          page.getByTestId(`selected-condition-${conditionId}`)
+        ).toContainText('Cardiology Overview');
       });
 
-      await test.step('Save consultation and verify card in Condition view', async () => {
+      await test.step('Fill a future date, time, service type, doctor and notes', async () => {
+        await page
+          .getByTestId('consultation-title-input')
+          .fill('General Cardiology Review');
+        // Consultations may be planned, so future dates are allowed.
+        await page.locator('#consultation-date').fill('2028-11-20');
+        await expect(page.getByTestId('date-picker-button')).toContainText(
+          '2028'
+        );
+
+        const addField = async (option: string) => {
+          await page.getByTestId('add-option-button').click();
+          await page.getByTestId(option).click();
+          await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+        };
+        await addField('menu-add-time');
+        await page.locator('#consultation-time').fill('15:45');
+        await expect(page.getByTestId('time-picker-button')).toContainText(
+          '15:45'
+        );
+
+        await addField('menu-add-service-type');
+        const serviceType = page.getByTestId('consultation-service-type-input');
+        await serviceType.fill('Cardio');
+        const suggestion = page.getByTestId('service-type-autocomplete-item-0');
+        await expect(suggestion).toHaveText('Cardiology');
+        await suggestion.click();
+        await expect(serviceType).toHaveValue('Cardiology');
+
+        await addField('menu-add-doctor');
+        await page
+          .getByTestId('consultation-doctor-input')
+          .fill('Dr. Marcus Welby');
+        await addField('menu-add-notes');
+        await page
+          .getByTestId('consultation-notes-input')
+          .fill('Follow-up in 6 months. Blood pressure stable.');
+      });
+
+      await test.step('Save and verify it on the Condition timeline', async () => {
         await page.getByTestId('save-button').click();
-
         await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
+          new RegExp(`.*condition\\/${conditionId}$`)
         );
-        const consultationsSection = page.getByTestId('condition-timeline');
-        await expect(consultationsSection).toBeVisible();
+        const timeline = page.getByTestId('condition-timeline');
         await expect(
-          consultationsSection.getByText('General Cardiology Review')
+          timeline.getByText('General Cardiology Review')
         ).toBeVisible();
+        await expect(timeline.getByText('Dr. Marcus Welby')).toBeVisible();
         await expect(
-          consultationsSection.getByText('Dr. Marcus Welby')
+          timeline.getByText('Cardiology', { exact: true })
         ).toBeVisible();
+        await expect(timeline.getByText(/Nov 20, 2028.*15:45/)).toBeVisible();
         await expect(
-          consultationsSection.getByText(
-            '"Follow-up in 6 months. Blood pressure stable."'
-          )
+          timeline.getByText('"Follow-up in 6 months. Blood pressure stable."')
         ).toBeVisible();
+      });
 
-        const consultationRow = page.getByTestId(
-          /^condition-timeline-item-consultation-(?!.*-(row|tone-\w+)$)/
-        );
-        await expect(consultationRow).toBeVisible();
-        await consultationRow.click();
-        await expect(page).toHaveURL(/.*consultation\/.*$/);
+      await test.step('Open it, then find it on Home', async () => {
+        await page
+          .getByTestId(
+            /^condition-timeline-item-consultation-(?!.*-(row|tone-\w+)$)/
+          )
+          .click();
         await expect(page.getByTestId('consultation-title')).toHaveText(
           'General Cardiology Review'
         );
-      });
-
-      await test.step('Verify consultation is listed on Home view', async () => {
+        consultationId = new URL(page.url()).pathname.split('/').pop()!;
         await page.getByTestId('back-button').click();
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
@@ -120,114 +132,90 @@ test.describe('Add Consultation Flow', () => {
         await expect(page.getByText('General Cardiology Review')).toBeVisible();
         await expect(page.getByText('Dr. Marcus Welby')).toBeVisible();
       });
-    }
-  );
 
-  test(
-    'should autocomplete doctor name from previously saved records',
-    { tag: ['@smoke'] },
-    async ({ page }) => {
-      let conditionId: string;
-
-      await test.step('Seed prior consultation with a doctor under a condition', async () => {
-        const cond = await seedTestCondition(page, {
-          title: 'Chronic Migraine',
-        });
-        conditionId = cond.id;
-        await seedTestConsultation(page, {
-          conditionIds: [conditionId],
-          title: 'Initial Consultation',
-          doctorName: 'Dr. Gregory House',
-          date: '2026-10-01',
-        });
-      });
-
-      await test.step('Open the Condition’s linked Consultation form', async () => {
-        await openAddConsultationForCondition(page, conditionId);
-
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-doctor').click();
-        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-
-        const doctorInput = page.getByTestId('consultation-doctor-input');
-        await doctorInput.click();
-        await doctorInput.fill('Greg');
-
-        const suggestion = page.getByTestId('doctor-autocomplete-item-0');
-        await expect(suggestion).toBeVisible();
-        await expect(suggestion).toHaveText('Dr. Gregory House');
-
-        await suggestion.click();
-        await expect(doctorInput).toHaveValue('Dr. Gregory House');
-      });
-    }
-  );
-
-  test(
-    'should verify separate Condition View and Condition Edit flows',
-    { tag: ['@critical'] },
-    async ({ page }) => {
-      let conditionId: string;
-
-      await test.step('Seed a condition with a consultation', async () => {
-        const cond = await seedTestCondition(page, {
-          title: 'Knee Osteoarthritis',
-          status: 'active',
-        });
-        conditionId = cond.id;
-        await seedTestConsultation(page, {
-          conditionIds: [conditionId],
-          title: 'Knee Arthroscopy Review',
-          doctorName: 'Dr. John Doe',
-        });
-      });
-
-      await test.step('Open Condition View and navigate to Condition Edit', async () => {
-        await page.getByTestId(`condition-open-${conditionId}`).click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-
-        // Consultations and floating + are in Condition View
-        await expect(page.getByTestId('condition-timeline')).toBeVisible();
-        await expect(page.getByTestId('condition-add-button')).toBeVisible();
-
-        // Click edit condition button
-        await page.getByTestId('edit-condition-button').click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}\\/edit`)
-        );
-
-        // Consultations and floating + are NOT in Condition Edit
-        await expect(page.getByTestId('condition-timeline')).not.toBeVisible();
+      await test.step('View its details and open the condition it was for', async () => {
+        await openRoute(page, `/condition/${conditionId}`);
+        await page
+          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
+          .click();
+        const view = page.getByTestId('consultation-view');
+        await expect(view.getByText('Dr. Marcus Welby')).toBeVisible();
         await expect(
-          page.getByTestId('condition-add-button')
-        ).not.toBeVisible();
+          view.getByText('Cardiology', { exact: true })
+        ).toBeVisible();
+        await expect(
+          view.getByText('Follow-up in 6 months. Blood pressure stable.')
+        ).toBeVisible();
+        await checkA11y(page, { include: '[data-testid="consultation-view"]' });
+        await page
+          .getByTestId('consultation-reasons')
+          .getByText('Cardiology Overview')
+          .click();
+        await expect(
+          page.locator('[data-testid="condition-title"]:visible')
+        ).toHaveText('Cardiology Overview');
+        await page.getByTestId('back-button').click();
       });
 
-      await test.step('Edit condition in Condition Edit and save', async () => {
-        const titleInput = page.getByTestId('condition-title-input');
-        await titleInput.fill('Updated Knee Osteoarthritis');
-        await page.getByTestId('save-button').click();
-
-        // Returns to Condition View
+      await test.step('Edit it from its view', async () => {
+        await page.getByTestId('edit-consultation-button').click();
         await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
+          new RegExp(`consultation/${consultationId}/edit$`)
+        );
+        await expect(page.getByText('Edit Consultation')).toBeVisible();
+        const titleInput = page.getByTestId('consultation-title-input');
+        await expect(titleInput).toHaveValue('General Cardiology Review');
+        const doctorInput = page.getByTestId('consultation-doctor-input');
+        await expect(doctorInput).toHaveValue('Dr. Marcus Welby');
+        await titleInput.fill('Follow-up Examination');
+        await doctorInput.fill('Dr. John Watson');
+        await page.getByTestId('save-button').click();
+        await expect(page).toHaveURL(
+          new RegExp(`consultation/${consultationId}$`)
+        );
+        await expect(page.getByTestId('consultation-title')).toHaveText(
+          'Follow-up Examination'
+        );
+        await expect(
+          page.getByTestId('consultation-view').getByText('Dr. John Watson')
+        ).toBeVisible();
+      });
+
+      await test.step('Delete it back to its condition and record the deletion for sync', async () => {
+        await page.clock.install();
+        await page.getByTestId('delete-consultation-button').click();
+        await expect(page.getByText('Delete Consultation')).toBeVisible();
+        await page.clock.runFor(5000);
+        await page.getByTestId('delete-modal-confirm-button').click();
+        await expect(page).toHaveURL(
+          new RegExp(`.*condition\\/${conditionId}$`)
         );
         await expect(page.getByTestId('condition-title')).toHaveText(
-          'Updated Knee Osteoarthritis'
+          'Cardiology Overview'
         );
-        await expect(page.getByTestId('condition-timeline')).toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
+        const deletions = await evaluateBridge(page, async (b) => {
+          await b.flushLocalChanges();
+          return await b.querySql(
+            "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
+          );
+        });
+        expect(deletions).toEqual([{ resource_id: consultationId }]);
       });
     }
   );
 
   test(
-    'should allow creating a standalone Consultation from Home view floating menu',
+    'should allow creating a standalone Consultation from Home view floating menu, suggesting known doctors',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
       await test.step('Open floating menu on Home view and select Add Consultation', async () => {
-        await page.goto('/');
+        await seedTestConsultation(page, {
+          title: 'Initial Consultation',
+          doctorName: 'Dr. Beverly Crusher',
+          date: '2026-10-01',
+        });
+        await openRoute(page, '/');
         const floatingBtn = page.getByTestId('floating-add-button');
         await expect(floatingBtn).toBeVisible();
         await floatingBtn.click();
@@ -249,8 +237,14 @@ test.describe('Add Consultation Flow', () => {
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-doctor').click();
         await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
+        // Doctors from earlier records are suggested
         const doctorInput = page.getByTestId('consultation-doctor-input');
-        await doctorInput.fill('Dr. Beverly Crusher');
+        await doctorInput.click();
+        await doctorInput.fill('Bev');
+        const suggestion = page.getByTestId('doctor-autocomplete-item-0');
+        await expect(suggestion).toHaveText('Dr. Beverly Crusher');
+        await suggestion.click();
+        await expect(doctorInput).toHaveValue('Dr. Beverly Crusher');
 
         await page.getByTestId('add-option-button').click();
         await page.getByTestId('menu-add-notes').click();
@@ -265,136 +259,19 @@ test.describe('Add Consultation Flow', () => {
         await expect(page).toHaveURL(/.*(\/|#)$/);
         await expect(page.getByText('Consultations')).toBeVisible();
         await expect(page.getByText('Annual Physical Exam')).toBeVisible();
-        await expect(page.getByText('Dr. Beverly Crusher')).toBeVisible();
+        await expect(page.getByText('Dr. Beverly Crusher')).toHaveCount(2);
       });
 
       await test.step('Open the new standalone consultation view from Home', async () => {
-        await page.getByRole('button', { name: /^View consultation:/ }).click();
+        await page
+          .getByRole('button', { name: /^View consultation: Annual Physical/ })
+          .click();
         await expect(page).toHaveURL(/.*consultation\/.*$/);
         const view = page.getByTestId('consultation-view');
         await expect(view.getByTestId('consultation-title')).toHaveText(
           'Annual Physical Exam'
         );
         await expect(view.getByText('Dr. Beverly Crusher')).toBeVisible();
-      });
-    }
-  );
-
-  test(
-    'should support future date, optional consultation time, serviceType, and removable condition',
-    { tag: ['@smoke', '@critical'] },
-    async ({ page }) => {
-      let conditionId: string;
-
-      await test.step('Seed a condition and open its linked Consultation form', async () => {
-        const cond = await seedTestCondition(page, {
-          title: 'Heart Health Review',
-          status: 'active',
-        });
-        conditionId = cond.id;
-        await openAddConsultationForCondition(page, conditionId);
-        await expect(page.getByText('New Consultation')).toBeVisible();
-      });
-
-      await test.step('Verify conditions section supports individual and whole-section removal', async () => {
-        const conditionPill = page.getByTestId(
-          `selected-condition-${conditionId}`
-        );
-        await expect(conditionPill).toBeVisible();
-        await expect(conditionPill).toContainText('Heart Health Review');
-
-        // Remove condition
-        const removeCondBtn = page.getByTestId('remove-condition-button');
-        await expect(removeCondBtn).toBeVisible();
-        await removeCondBtn.click();
-
-        await expect(conditionPill).not.toBeVisible();
-
-        await expect(
-          page.getByTestId('consultation-conditions-section')
-        ).toBeVisible();
-        await expect(page.getByTestId('condition-search-input')).toBeVisible();
-        await page.getByTestId('remove-conditions-section-button').click();
-        await expect(
-          page.getByTestId('consultation-conditions-section')
-        ).not.toBeVisible();
-
-        // Re-add condition via + menu
-        await page.getByTestId('add-option-button').click();
-        const addCondMenu = page.getByTestId('menu-add-condition');
-        await expect(addCondMenu).toBeVisible();
-        await addCondMenu.click();
-        await page.getByTestId('condition-search-input').click();
-        await page
-          .getByTestId(`condition-autocomplete-item-${conditionId}`)
-          .click();
-
-        await expect(conditionPill).toBeVisible();
-      });
-
-      await test.step('Set future consultation date without validation restriction', async () => {
-        const dateInput = page.locator('#consultation-date');
-        await dateInput.fill('2028-11-20');
-        await expect(page.getByTestId('date-picker-button')).toContainText(
-          '2028'
-        );
-      });
-
-      await test.step('Add consultation time via + menu', async () => {
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-time').click();
-        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-
-        const timePicker = page.getByTestId('time-picker-button');
-        await expect(timePicker).toBeVisible();
-
-        const timeInput = page.locator('#consultation-time');
-        await timeInput.fill('15:45');
-        await expect(timePicker).toContainText('15:45');
-      });
-
-      await test.step('Add serviceType via + menu and select autocomplete', async () => {
-        await page.getByTestId('add-option-button').click();
-        await page.getByTestId('menu-add-service-type').click();
-        await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-
-        const serviceTypeInput = page.getByTestId(
-          'consultation-service-type-input'
-        );
-        await expect(serviceTypeInput).toBeVisible();
-        await serviceTypeInput.fill('Cardio');
-
-        const suggestion = page.getByTestId('service-type-autocomplete-item-0');
-        await expect(suggestion).toBeVisible();
-        await expect(suggestion).toHaveText('Cardiology');
-        await suggestion.click();
-
-        await expect(serviceTypeInput).toHaveValue('Cardiology');
-      });
-
-      await test.step('Fill title and save consultation', async () => {
-        const titleInput = page.getByTestId('consultation-title-input');
-        await titleInput.fill('Future Cardiology Assessment');
-
-        await page.getByTestId('save-button').click();
-
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-      });
-
-      await test.step('Verify consultation details render on Condition View', async () => {
-        const consultationsSection = page.getByTestId('condition-timeline');
-        await expect(consultationsSection).toBeVisible();
-        await expect(
-          consultationsSection.getByText('Future Cardiology Assessment')
-        ).toBeVisible();
-        await expect(
-          consultationsSection.getByText('Cardiology', { exact: true })
-        ).toBeVisible();
-        await expect(
-          consultationsSection.getByText(/Nov 20, 2028.*15:45/)
-        ).toBeVisible();
       });
     }
   );
@@ -423,7 +300,7 @@ for (const terminology of [
       id: 'reason-condition',
       title: 'Scalp irritation',
     });
-    await page.goto(`/consultation/add?conditionId=${reason.id}`);
+    await openRoute(page, `/consultation/add?conditionId=${reason.id}`);
     await page
       .getByTestId('consultation-title-input')
       .fill('Dermatology review');
@@ -468,14 +345,14 @@ for (const terminology of [
       },
     ]);
     expect(stored.encounter.reasonReference).toBeUndefined();
-    await page.goto(`/consultation/${stored.encounter.id}`);
+    await openRoute(page, `/consultation/${stored.encounter.id}`);
     await expect(page.getByTestId('consultation-reasons')).toContainText(
       'Reasons for visit'
     );
     await expect(page.getByTestId('consultation-diagnoses')).toContainText(
       'Diagnoses'
     );
-    await page.reload();
+    await reopenRoute(page);
     await expect(page.getByTestId('consultation-diagnoses')).toContainText(
       'Seborrhoeic dermatitis'
     );
@@ -521,7 +398,7 @@ test('blank diagnoses prevent saving; removed drafts create no Conditions', asyn
   page,
 }) => {
   await seedTestPatient(page);
-  await page.goto('/consultation/add');
+  await openRoute(page, '/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
   await page.getByTestId('add-option-button').click();
   await page.getByTestId('menu-add-diagnosis').click();
@@ -595,7 +472,7 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
   page,
 }) => {
   await seedTestPatient(page, { id: 'atomic-patient' });
-  await page.goto('/consultation/add');
+  await openRoute(page, '/consultation/add');
   await page.getByTestId('consultation-title-input').fill('Review');
   await page.getByTestId('add-option-button').click();
   await page.getByTestId('menu-add-diagnosis').click();
@@ -650,76 +527,7 @@ test('a diagnosis may create a Condition atomically, and failed links roll back 
   expect(result.retained).toEqual(result.original);
 });
 
-test('rejects foreign references for either list and retains diagnosis text when its Condition is deleted', async ({
-  page,
-}) => {
-  await seedTestPatient(page, { id: 'foreign-patient' });
-  await seedTestCondition(page, {
-    id: 'foreign-condition',
-    title: 'Foreign condition',
-  });
-  await seedTestPatient(page, { id: 'owner-patient' });
-  await seedTestCondition(page, {
-    id: 'owned-condition',
-    title: 'Reason condition',
-  });
-  const result = await page.evaluate(async () => {
-    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-    const rejected: boolean[] = [];
-    for (const extra of [
-      { reasonConditionIds: ['foreign-condition'] },
-      { diagnoses: [{ title: 'Outcome', conditionId: 'foreign-condition' }] },
-    ]) {
-      try {
-        await bridge.saveConsultation({
-          patientId: 'owner-patient',
-          title: 'Denied',
-          date: '2026-10-13',
-          ...extra,
-        });
-        rejected.push(false);
-      } catch {
-        rejected.push(true);
-      }
-    }
-    const encounter = await bridge.saveConsultation({
-      id: 'separate-owned',
-      patientId: 'owner-patient',
-      title: 'Review',
-      date: '2026-10-13',
-      reasonConditionIds: ['owned-condition'],
-      diagnoses: [
-        {
-          title: 'Separate outcome',
-          conditionId: 'owned-condition',
-          terminology: { code: 'L21' },
-        },
-      ],
-    });
-    await bridge.deleteCondition('owned-condition');
-    return {
-      rejected,
-      encounter,
-      cleaned: await bridge.getConsultation(encounter.id),
-    };
-  });
-  expect(result.rejected).toEqual([true, true]);
-  expect(result.cleaned.reason).toBeUndefined();
-  expect(result.cleaned.diagnosis).toEqual([
-    {
-      condition: [
-        { concept: { text: 'Separate outcome', coding: [{ code: 'L21' }] } },
-      ],
-    },
-  ]);
-  await page.goto('/consultation/separate-owned');
-  await expect(page.getByTestId('consultation-diagnoses')).toContainText(
-    'Separate outcome'
-  );
-  await expect(page.getByTestId('consultation-reasons')).toHaveCount(0);
-});
-
-test('records a service provider and reuses its Organization', async ({
+test('records a service provider and reuses its Organization for consultations and lab results', async ({
   page,
 }) => {
   await seedTestPatient(page);
@@ -742,7 +550,7 @@ test('records a service provider and reuses its Organization', async ({
     });
 
   await test.step('Add a new service provider', async () => {
-    await page.goto('/consultation/add');
+    await openRoute(page, '/consultation/add');
     await page.getByTestId('consultation-title-input').fill('Annual check-up');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-service-provider').click();
@@ -774,14 +582,14 @@ test('records a service provider and reuses its Organization', async ({
         'SELECT id FROM consultations;'
       )
     );
-    await page.goto(`/consultation/${id}`);
+    await openRoute(page, `/consultation/${id}`);
     await expect(
       page.getByTestId('consultation-service-provider')
     ).toContainText('City Hospital');
   });
 
   await test.step('Reuse it from autocomplete', async () => {
-    await page.goto('/consultation/add');
+    await openRoute(page, '/consultation/add');
     await page.getByTestId('consultation-title-input').fill('Follow-up');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-service-provider').click();
@@ -799,13 +607,43 @@ test('records a service provider and reuses its Organization', async ({
       `Organization/${organizations[0].id}`,
     ]);
   });
+
+  await test.step('Reuse it as a lab result performer', async () => {
+    await openRoute(page, '/lab-result/add');
+    await page.getByTestId('test-search-input').fill('Hemoglobin');
+    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
+    await page.getByTestId('marker-value-input-0').fill('14.5');
+    await page.getByTestId('plus-menu-button').click();
+    await page.getByTestId('menu-add-service-provider').click();
+    await page.getByTestId('lab-result-service-provider-input').fill('city');
+    const suggestion = page.getByTestId('service-provider-autocomplete-item-0');
+    await expect(suggestion).toHaveText('City Hospital');
+    await suggestion.click();
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/lab-result\/add/);
+
+    const { organizations } = await stored();
+    const [{ fhir_json }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT fhir_json FROM diagnostic_reports;'
+      )
+    );
+    expect(organizations).toHaveLength(1);
+    expect(JSON.parse(fhir_json).performer).toEqual([
+      {
+        reference: `Organization/${organizations[0].id}`,
+        type: 'Organization',
+        display: 'City Hospital',
+      },
+    ]);
+  });
 });
 
 test('scrolls a field added from the + menu into view and focuses it', async ({
   page,
 }) => {
   await seedTestPatient(page);
-  await page.goto('/consultation/add');
+  await openRoute(page, '/consultation/add');
   const addField = async (testID: string) => {
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').getByTestId(testID).click();

@@ -44,6 +44,7 @@ pnpm expo install --fix      # fix incompatible package versions
   - Tests **MUST** be updated if possible to keep testing succinct.
   - Implementation plans **MUST** describe new E2E tests that will be written.
   - Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
+  - Keep the suite fast; it is CPU-bound and each worker boots the app once and resets it in place before every test. Seed with the seed helpers, navigate with `openRoute`, and never `page.goto`/`page.reload` unless loading or restarting is what the test checks. Extend a feature's add → view → edit → delete journey with `test.step` instead of adding tests that seed the same record. Test behaviour owned by a shared component once. Wait for state, never for time. Opt out of the shared app (`freshApp`) only for tests about loading, other tabs or legacy schemas. Details: `.agents/skills/testing-workflow/SKILL.md` ("Keeping the E2E Suite Fast").
 
 ## Navigation & Routing
 

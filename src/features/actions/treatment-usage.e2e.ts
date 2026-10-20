@@ -9,6 +9,8 @@ import {
   getTestTreatmentUsage,
   seedTestPatient,
   seedTestResources,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
 
 const treatmentId = 'usage-treatment';
@@ -66,12 +68,12 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
       getBrowserLocalDate(page, offset)
     )
   );
-  await page.goto('/journal');
+  await openRoute(page, '/journal');
   await expect(page.getByTestId('actions-day-label')).toBeVisible();
   await expect(
     page.getByTestId(`treatment-log-row-${treatmentId}`)
   ).toHaveCount(0);
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   await page.getByTestId('treatment-usage-start').click();
   await expect(page.getByTestId('treatment-usage-form-title')).toHaveText(
     'Start taking: Vitamin D'
@@ -79,7 +81,6 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(
     page.getByTestId('treatment-usage-instructions-input')
   ).toHaveValue('1 capsule daily');
-  await checkA11y(page);
   await saveChange(page, dates[1]);
   await page.getByTestId('treatment-usage-change').click();
   await expect(
@@ -138,7 +139,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   }
   expect(statements[1].note).toEqual([{ text: 'Waiting for a refill' }]);
   expect((await getTestTreatment(page, treatmentId)).status).toBe('active');
-  await page.reload();
+  await reopenRoute(page);
   const usageRows = page.getByTestId(/^treatment-usage-period-/);
   const badge = page.getByTestId('treatment-usage-section-count');
   const toggle = page.getByTestId('treatment-usage-list-toggle');
@@ -171,7 +172,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
     ).toHaveCount(0);
   }
   for (const [index, date] of dates.entries()) {
-    await page.goto(`/journal?date=${date}`);
+    await openRoute(page, `/journal?date=${date}`);
     await expect(page.getByTestId('actions-day-label')).toBeVisible();
     await expect(
       page.getByTestId(`treatment-log-row-${treatmentId}`)
@@ -179,7 +180,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   }
   // Removing a previously collapsed entry updates the total and removes the
   // toggle when the entire list fits in the three-row preview.
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   await toggle.click();
   await removePeriod(page, statements[0].id);
   await expect(usageRows).toHaveCount(3);
@@ -187,14 +188,12 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(toggle).toHaveCount(0);
 });
 
-test('validates dates, removes optional notes and confirms removing a period', async ({
-  page,
-}) => {
+test('validates dates and confirms removing a period', async ({ page }) => {
   const yesterday = await getBrowserLocalDate(page, -1);
   await seedTestResources(page, {
     treatmentUsage: [{ treatmentId, action: 'start', date: yesterday }],
   });
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   await page.getByTestId('treatment-usage-change').click();
   const date = page.getByTestId('treatment-usage-date-picker').locator('input');
   await expect(date).toHaveAttribute('max', await getBrowserLocalDate(page));
@@ -204,16 +203,8 @@ test('validates dates, removes optional notes and confirms removing a period', a
     `The date cannot be before ${yesterday}`
   );
   expect(await getTestTreatmentUsage(page, treatmentId)).toHaveLength(1);
-  await page.getByTestId('add-option-button').click();
-  await page.getByTestId('menu-add-usage-notes').click();
-  await page
-    .getByTestId('treatment-usage-notes-input')
-    .fill('Discard this note');
-  await page.getByTestId('remove-usage-notes-button').click();
-  await expect(page.getByTestId('treatment-usage-notes-input')).toHaveCount(0);
   await saveChange(page, await getBrowserLocalDate(page));
   const statements = await getTestTreatmentUsage(page, treatmentId);
-  expect(statements[1].note).toBeUndefined();
   await editPeriod(page, statements[1].id);
   await page.getByTestId('treatment-usage-remove-button').click();
   await page.getByTestId('delete-modal-cancel-button').click();
@@ -247,7 +238,7 @@ test('explains a failed period removal and keeps the dialog open for retry', asy
   await seedTestResources(page, {
     treatmentUsage: [{ treatmentId, action: 'start', date: today }],
   });
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   const [statement] = await getTestTreatmentUsage(page, treatmentId);
   await page.evaluate(() =>
     (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
@@ -317,7 +308,7 @@ test('a new regimen starts a period, keeps earlier days on the old dose and flag
       doseIndex: 0,
     })),
   });
-  await page.goto('/treatment/regimen');
+  await openRoute(page, '/treatment/regimen');
   await expect(page.getByTestId('treatment-dosage')).toHaveText(
     '2 tablets in the morning'
   );
@@ -379,14 +370,14 @@ test('a new regimen starts a period, keeps earlier days on the old dose and flag
   // old one on a day the new one covers is flagged.
   const row = page.getByTestId('treatment-log-row-regimen-0');
   const warning = page.getByTestId('treatment-log-mismatch-regimen-0');
-  await page.goto(`/journal?date=${threeAgo}`);
+  await openRoute(page, `/journal?date=${threeAgo}`);
   await expect(row).toContainText('2 tablets in the morning');
   await expect(warning).toHaveCount(0);
-  await page.goto(`/journal?date=${yesterday}`);
+  await openRoute(page, `/journal?date=${yesterday}`);
   await expect(row).toContainText('2 tablets in the morning');
   await expect(warning).toHaveText("Doesn't match the current regimen");
   await checkA11y(page);
-  await page.goto(`/journal?date=${today}`);
+  await openRoute(page, `/journal?date=${today}`);
   await expect(row).toContainText('1 tablet in the morning');
   await expect(warning).toHaveCount(0);
   await page.getByTestId('treatment-log-taken-regimen-0').click();
@@ -414,7 +405,7 @@ test('free-text dosing starts from the prescription and a same-day new regimen c
       },
     ],
   });
-  await page.goto('/treatment/text-dosing');
+  await openRoute(page, '/treatment/text-dosing');
   await page.getByTestId('treatment-usage-start').click();
   await expect(
     page.getByTestId('treatment-usage-instructions-input')
@@ -428,7 +419,7 @@ test('free-text dosing starts from the prescription and a same-day new regimen c
       { treatmentId: 'text-dosing', date: yesterday, answer: 'taken' },
     ],
   });
-  await page.goto('/treatment/text-dosing');
+  await openRoute(page, '/treatment/text-dosing');
   await page.getByTestId('treatment-usage-change').click();
   await page.getByTestId('treatment-usage-kind-change').click();
   const instructions = page.getByTestId('treatment-usage-instructions-input');
@@ -453,14 +444,14 @@ test('free-text dosing starts from the prescription and a same-day new regimen c
   expect(
     (await getTestTreatment(page, 'text-dosing')).dosageInstruction
   ).toEqual([{ text: '1 capsule daily' }]);
-  await page.goto(`/journal?date=${yesterday}`);
+  await openRoute(page, `/journal?date=${yesterday}`);
   await expect(page.getByTestId('treatment-log-row-text-dosing')).toContainText(
     '1 capsule daily'
   );
   await expect(
     page.getByTestId('treatment-log-mismatch-text-dosing')
   ).toBeVisible();
-  await page.goto(`/journal?date=${today}`);
+  await openRoute(page, `/journal?date=${today}`);
   await expect(page.getByTestId('treatment-log-row-text-dosing')).toBeVisible();
   await expect(
     page.getByTestId('treatment-log-mismatch-text-dosing')
@@ -486,7 +477,7 @@ test('edits a period status, notes and regimen but not its dates', async ({
       { treatmentId, action: 'pause', date: yesterday, notes: 'Refill' },
     ],
   });
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   const [, paused] = await getTestTreatmentUsage(page, treatmentId);
   await editPeriod(page, paused.id);
   await expect(page.getByTestId('treatment-usage-date-picker')).toHaveCount(0);
@@ -523,7 +514,7 @@ test('edits a period status, notes and regimen but not its dates', async ({
   await expect(
     page.getByTestId(`treatment-usage-period-${paused.id}`)
   ).toContainText('Kept taking it after all');
-  await page.goto(`/journal?date=${yesterday}`);
+  await openRoute(page, `/journal?date=${yesterday}`);
   await expect(
     page.getByTestId(`treatment-log-row-${treatmentId}`)
   ).toBeVisible();
@@ -533,7 +524,7 @@ test('starting a supplement without a prescription asks for its regimen', async 
   page,
 }) => {
   const today = await getBrowserLocalDate(page);
-  await page.goto(viewUrl);
+  await openRoute(page, viewUrl);
   await page.getByTestId('treatment-usage-start').click();
   await expect(page.getByTestId('treatment-regimen-field')).toBeVisible();
   await page.getByTestId('save-usage-button').click();
