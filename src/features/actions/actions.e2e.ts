@@ -557,7 +557,7 @@ test.describe('My actions: journal organisation', () => {
         treatment('org-cream', 'Hydrocortisone cream'),
       ],
     });
-    await page.goto('/journal');
+    await openRoute(page, '/journal');
 
     // Parts of the day in clock order; an exact time joins the nearest one,
     // and treatments without a time come last.
