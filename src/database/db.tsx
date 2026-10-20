@@ -74,6 +74,15 @@ export interface DatabaseProviderProps {
 }
 
 /**
+ * Starts opening the database before the app's first render, so the two
+ * overlap. `DatabaseProvider` reports a failure; calling this again is safe.
+ */
+export function preloadDatabase(): void {
+  void claimDatabaseTab();
+  initializeDatabase().catch(() => {});
+}
+
+/**
  * Opens and migrates the database while the app renders. Screens read through
  * `getDb()`, which waits for it, and show their own loading states meanwhile.
  * On web, only one tab opens the database; others wait until it closes.

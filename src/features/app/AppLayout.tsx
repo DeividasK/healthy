@@ -14,7 +14,7 @@ import {
 } from '@/src/features/profile/ActivePatientContext';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { SyncProvider } from '@/src/context/SyncContext';
-import { DatabaseProvider } from '@/src/database/db';
+import { DatabaseProvider, preloadDatabase } from '@/src/database/db';
 import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
 import { setupTestBridge } from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
@@ -23,6 +23,7 @@ import { registerPwa } from './registerPwa';
 // to it: placeholders show while the database opens and data arrives.
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ fade: true });
+preloadDatabase();
 
 function AppReadyHandler() {
   useEffect(() => {
