@@ -49,12 +49,13 @@ test.describe('App startup', () => {
 
     await page.goto('/');
     await expect(page.getByTestId('app-header')).toBeVisible();
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
-    await expect(page.getByTestId('home-skeleton')).toBeVisible();
+    await expect(page.getByTestId('app-loading-skeleton')).toBeVisible();
+    // Screens wait for the profile, so nothing can be saved without one.
+    await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
 
     releaseDatabase();
     // A fresh install has no profile yet, so Home sends the user to create one.
     await expect(page).toHaveURL(/profile\/new/);
-    await expect(page.getByTestId('home-skeleton')).toHaveCount(0);
+    await expect(page.getByTestId('app-loading-skeleton')).toHaveCount(0);
   });
 });

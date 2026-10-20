@@ -68,10 +68,7 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import {
-  getActivePatient,
-  getAllPatients,
-} from '@/src/features/profile/patientService';
+import { getAllPatients } from '@/src/features/profile/patientService';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import { LabsSummary, latestBiomarkers } from './LabsSummary';
@@ -280,21 +277,6 @@ export function HomeView() {
       }
     }
   }, [activePatientId]);
-
-  // Starts loading the active profile's records while the profile context is
-  // still loading, so they are often ready by the time it is.
-  useEffect(() => {
-    if (!isPatientLoading) return;
-    getActivePatient()
-      .then(async (patient) => {
-        if (!patient?.id || homeDataCache.has(patient.id)) return;
-        const prefetched = await fetchHomeData(patient.id);
-        if (!homeDataCache.has(patient.id))
-          homeDataCache.set(patient.id, prefetched);
-      })
-      // The regular load reports failures.
-      .catch(() => {});
-  }, [isPatientLoading]);
 
   useFocusEffect(
     useCallback(() => {

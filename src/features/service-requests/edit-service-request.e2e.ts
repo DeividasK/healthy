@@ -283,9 +283,10 @@ test.describe('Edit Service Request', () => {
     await page.getByTestId(`service-request-lab-result-${report.id}`).click();
     await expect(page.getByTestId('lab-result-title')).toBeVisible();
     await page.getByTestId(`lab-result-service-request-${request.id}`).click();
-    await expect(page.getByTestId('service-request-title')).toHaveText(
-      'Blood count'
-    );
+    // The request's earlier screen stays mounted, hidden, below this one.
+    await expect(
+      page.getByTestId('service-request-title').filter({ visible: true })
+    ).toHaveText('Blood count');
 
     // The request's condition shows the result on its timeline
     await page.goto(`/condition/${condition.id}`);

@@ -8,7 +8,11 @@ import '../../../global.css';
 
 import { AppChrome } from '@/src/components/AppChrome';
 import { NAV_THEME } from '@/src/theme';
-import { ActivePatientProvider } from '@/src/features/profile/ActivePatientContext';
+import {
+  ActivePatientProvider,
+  useActivePatient,
+} from '@/src/features/profile/ActivePatientContext';
+import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { SyncProvider } from '@/src/context/SyncContext';
 import { DatabaseProvider } from '@/src/database/db';
 import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
@@ -16,7 +20,7 @@ import { setupTestBridge } from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
 // Keep the splash screen up until the app chrome has rendered, then fade out
-// to it: screens show their own loading states while their data arrives.
+// to it: placeholders show while the database opens and data arrives.
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ fade: true });
 
@@ -62,16 +66,23 @@ function useBlurOnScreenChange() {
 
 function RootLayoutNav() {
   useBlurOnScreenChange();
+  // Screens mount once the database is open and the active profile is known,
+  // so nothing can be read or saved without it. The header shows meanwhile.
+  const { isLoading } = useActivePatient();
   return (
     <ThemeProvider value={NAV_THEME.light}>
       <StatusBar style="dark" />
       <AppChrome>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: Platform.OS === 'web' ? 'none' : 'default',
-          }}
-        />
+        {isLoading ? (
+          <ResourceSkeleton testID="app-loading-skeleton" />
+        ) : (
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: Platform.OS === 'web' ? 'none' : 'default',
+            }}
+          />
+        )}
       </AppChrome>
       <ProfileDeletedRemotelyModal />
     </ThemeProvider>
