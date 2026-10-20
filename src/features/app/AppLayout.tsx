@@ -13,6 +13,7 @@ import { NAV_THEME } from '@/src/theme';
 import { ActivePatientProvider } from '@/src/features/profile/ActivePatientContext';
 import { SyncProvider } from '@/src/context/SyncContext';
 import { DatabaseProvider } from '@/src/database/db';
+import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
 import { setupTestBridge } from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
@@ -97,6 +98,7 @@ function RootLayoutNav() {
           }}
         />
       </AppChrome>
+      <ProfileDeletedRemotelyModal />
     </ThemeProvider>
   );
 }

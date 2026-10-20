@@ -16,6 +16,8 @@ export const CLINICAL_TABLES = [
   'medication_administrations',
   'medication_statements',
   'organizations',
+  'request_orchestrations',
+  'profile_settings',
 ];
 
 /** Text that only appears inside the seeded record, never on Drive. */
@@ -221,6 +223,23 @@ export async function seedEveryResource(
         { system: 'https://example.org/medication', code: 'synthetic-code' },
       ];
       await b.saveTreatment(treatment, patientId);
+
+      // A treatment bundle and the profile's settings travel with it too.
+      await b.seedBundle({
+        id: 'evening',
+        title: 'Evening',
+        times: [{ kind: 'when', code: 'EVE' }],
+        memberIds: ['inhaler'],
+      });
+      await b.saveProfileSettings({
+        timesOfDay: {
+          MORN: '06:45',
+          NOON: '12:00',
+          AFT: '15:00',
+          EVE: '18:00',
+          HS: '22:30',
+        },
+      });
     },
     patientId
   );

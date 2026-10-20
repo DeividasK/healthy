@@ -53,6 +53,24 @@ async function seedLinkedRecord(page: Page) {
       },
     ],
   });
+  // A treatment bundle and the profile's settings replicate too.
+  await bridge(page, async (b) => {
+    await b.seedBundle({
+      id: 'morning',
+      title: 'Morning',
+      times: [{ kind: 'when', code: 'MORN' }],
+      memberIds: ['inhaler'],
+    });
+    await b.saveProfileSettings({
+      timesOfDay: {
+        MORN: '07:00',
+        NOON: '12:00',
+        AFT: '15:00',
+        EVE: '18:00',
+        HS: '22:00',
+      },
+    });
+  });
 }
 
 test.describe('Sync between devices', () => {
@@ -310,12 +328,16 @@ test.describe('Sync between devices', () => {
     await bridge(second.page, (b) => b.syncProfile('shared-patient'));
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
 
-    // Deleting everywhere removes it from the other device too.
+    // Deleting everywhere removes it from the other device too, once the
+    // user there confirms it.
     await bridge(page, async (b) => {
       await b.deletePatient('shared-patient');
       await b.syncNow();
     });
     await syncTestDevice(second.page);
+    await bridge(second.page, (b) =>
+      b.applyHeldProfileDeletion('shared-patient')
+    );
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
     expect((await snapshot(page)).patients).toHaveLength(1);
     await second.close();
@@ -326,6 +348,9 @@ test.describe('Sync between devices', () => {
   }) => {
     await seedTestPatient(page);
     await bridge(page, async (b) => {
+      // Let the upload check scheduled by the save above run first, so it
+      // never reads the tables while they are being dropped.
+      await new Promise((resolve) => setTimeout(resolve, 2500));
       const names = await b.querySql(
         "SELECT name, type FROM sqlite_master WHERE name LIKE 'sync_%' AND type IN ('table', 'trigger')"
       );
@@ -362,7 +387,9 @@ test.describe('Sync between devices', () => {
         UNION ALL SELECT 'MedicationStatement', id FROM medication_statements
         UNION ALL SELECT 'ServiceRequest', id FROM service_requests
         UNION ALL SELECT 'Composition', id FROM clinical_documents
-        UNION ALL SELECT 'Organization', id FROM organizations`);
+        UNION ALL SELECT 'Organization', id FROM organizations
+        UNION ALL SELECT 'RequestOrchestration', id FROM request_orchestrations
+        UNION ALL SELECT 'ProfileSettings', id FROM profile_settings`);
       const versions = await b.querySql(
         'SELECT resource_type AS type, resource_id AS id, deleted FROM sync_row_versions'
       );
@@ -382,7 +409,12 @@ test.describe('Sync between devices', () => {
         .filter((v: any) => v.deleted)
         .map((v: any) => `${v.type}/${v.id}`)
         .sort()
-    ).toEqual(['Condition/eczema', 'MedicationRequest/inhaler']);
+    ).toEqual([
+      'Condition/eczema',
+      'MedicationRequest/inhaler',
+      // Its only treatment deleted, the bundle goes with it.
+      'RequestOrchestration/morning',
+    ]);
     // The cascade rewrote the visit's reason, and that rewrite is what syncs.
     const visit = state.changes.find((c: any) => c.id === 'visit');
     expect(visit.payload).not.toContain('Condition/eczema');

@@ -27,6 +27,15 @@ import {
   type TreatmentInput,
 } from '@/src/features/treatments/treatmentService';
 import {
+  getBundleById,
+  saveBundle,
+} from '@/src/features/bundles/bundleService';
+import type { BundleValues } from '@/src/features/bundles/bundleModel';
+import {
+  getProfileSettings,
+  saveProfileSettings,
+} from '@/src/features/settings/profileSettingsRepository';
+import {
   fetchServiceRequestById,
   insertServiceRequestRecord,
   deleteServiceRequestRecord,
@@ -43,10 +52,14 @@ import {
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
 import {
+  applyHeldProfileDeletion,
   compactNow,
   createVault,
   deleteCloudData,
+  keepHeldProfileOnDevice,
+  listProfileDeletionHolds,
   listRestorableProfiles,
+  restoreHeldProfile,
   loadVaultKeys,
   startSyncingPatient,
   stopSyncingPatient,
@@ -219,6 +232,15 @@ export function setupTestBridge(
           deleteFromCloud,
         }
       ),
+    listProfileDeletionHolds,
+    applyHeldProfileDeletion: async (patientId: string) =>
+      applyHeldProfileDeletion(
+        await connectedProvider(),
+        await vaultKeys(),
+        patientId
+      ),
+    restoreHeldProfile,
+    keepHeldProfileOnDevice,
     /** A device choosing every local and cloud profile, then syncing. */
     syncAllProfiles: async () => {
       const provider = await connectedProvider();
@@ -532,6 +554,29 @@ export function setupTestBridge(
         authoredDate:
           input.authoredOn || new Date().toISOString().split('T')[0],
       });
+    },
+    seedBundle: async (
+      input: BundleValues & { id?: string; patientId?: string }
+    ) => {
+      const patientId = await resolvePatientId(input.patientId);
+      if (!patientId) throw new Error('No patient to seed a bundle for');
+      const id = await saveBundle({ ...input, patientId });
+      return await getBundleById(id, patientId);
+    },
+    getBundle: async (id: string, patientId?: string) => {
+      const resolved = await resolvePatientId(patientId);
+      return resolved ? getBundleById(id, resolved) : null;
+    },
+    getProfileSettings: async (patientId?: string) => {
+      const resolved = await resolvePatientId(patientId);
+      return resolved ? getProfileSettings(resolved) : null;
+    },
+    saveProfileSettings: async (
+      settings: Parameters<typeof saveProfileSettings>[1],
+      patientId?: string
+    ) => {
+      const resolved = await resolvePatientId(patientId);
+      if (resolved) await saveProfileSettings(resolved, settings);
     },
   };
 }

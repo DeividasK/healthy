@@ -1,0 +1,28 @@
+# Changelog fragments: see docs/releasing.md and https://changie.dev/config/
+changesDir: .changes
+unreleasedDir: unreleased
+headerPath: header.tpl.md
+changelogPath: CHANGELOG.md
+versionExt: md
+versionFormat: '## [{{.Version}}] - {{.Time.Format "2006-01-02"}}'
+kindFormat: '### {{.Kind}}'
+changeFormat: '- {{.Body}}'
+kinds:
+  - label: Added
+  - label: Changed
+  - label: Fixed
+  - label: Removed
+  - label: Security
+# Blank lines around headings, as Prettier formats Markdown.
+newlines:
+  beforeKind: 1
+  afterKind: 1
+  endOfVersion: 1
+  beforeChangelogVersion: 1
+replacements:
+  - path: app.json
+    find: '^    "version": ".*",'
+    replace: '    "version": "{{.VersionNoPrefix}}",'
+  - path: package.json
+    find: '^  "version": ".*",'
+    replace: '  "version": "{{.VersionNoPrefix}}",'

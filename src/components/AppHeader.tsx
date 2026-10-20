@@ -1,16 +1,22 @@
 import React from 'react';
 import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { Settings } from 'lucide-react-native';
 import { AppLogo } from './AppLogo';
 import { OfflineHeaderIndicator, useIsOffline } from './OfflineHeaderIndicator';
 import { SyncHeaderIndicator } from './SyncHeaderIndicator';
 import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 
+/** Profile on the left, the logo (home) centred, sync status and settings on the right. */
 export function AppHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const isOffline = useIsOffline();
+  // The profile and its settings show once a profile exists.
+  const { activePatient } = useActivePatient();
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -30,11 +36,28 @@ export function AppHeader() {
             <AppLogo size={28} color={COLORS.light.primary} />
           </TouchableOpacity>
         </View>
-        <View style={styles.profile}>
-          {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
+        {activePatient && (
           <View style={styles.button}>
             <ProfileHeaderButton />
           </View>
+        )}
+        <View style={styles.end}>
+          {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
+          {activePatient && (
+            <TouchableOpacity
+              testID="settings-header-button"
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              style={styles.button}
+              activeOpacity={0.7}
+              onPress={() => {
+                Keyboard.dismiss();
+                if (pathname !== '/settings') router.navigate('/settings');
+              }}
+            >
+              <Settings size={22} color={COLORS.light.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -58,8 +81,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: { position: 'absolute', left: 16 },
-  profile: {
+  // Centred on the whole header, whatever sits at either end.
+  logo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Taps beside the logo reach the buttons at either end.
+    pointerEvents: 'box-none',
+  },
+  end: {
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',

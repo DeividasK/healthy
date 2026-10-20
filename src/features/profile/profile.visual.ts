@@ -9,7 +9,7 @@ import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
-    await seedTestPatient(page);
+    await seedTestPatient(page, { id: 'patient-visual' });
     await openRoute(page, '/profile');
     await page.getByTestId('active-profile-card').waitFor();
 
@@ -43,7 +43,7 @@ test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Connected Google Sync State', async ({
     page,
   }, testInfo) => {
-    await seedTestPatient(page);
+    await seedTestPatient(page, { id: 'patient-visual' });
     await connectTestSync(page, { userEmail: 'alice@gmail.com' });
     // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');

@@ -29,6 +29,11 @@ export interface TimingDraft {
   periodUnit: string;
   /** Comma-joined `Timing.repeat.when` codes. */
   when: string;
+  /**
+   * Comma-joined `Timing.repeat.timeOfDay` clock times (HH:mm). A timing has
+   * these or `when`, never both (FHIR tim-10).
+   */
+  timeOfDay?: string;
   boundsValue: string;
   boundsUnit: string;
 }
@@ -112,7 +117,14 @@ const WHEN_LABELS: Partial<Record<When, { label: string; phrase: string }>> = {
   EVE: { label: 'Evening', phrase: 'in the evening' },
   HS: { label: 'Bedtime', phrase: 'at bedtime' },
 };
-const OFFERED_WHEN: When[] = ['MORN', 'NOON', 'AFT', 'EVE', 'HS'];
+export const OFFERED_WHEN: When[] = ['MORN', 'NOON', 'AFT', 'EVE', 'HS'];
+
+/** The Time of Day option for exact clock times (`Timing.repeat.timeOfDay`). */
+export const SPECIFIC_TIME = 'time';
+
+/** A part of the day's label, e.g. "Morning", or the code when unknown. */
+export const getWhenLabel = (code: string) =>
+  WHEN_LABELS[code as When]?.label || code;
 
 const TIME_UNITS: Record<TimeUnit, { singular: string; plural: string }> = {
   s: { singular: 'second', plural: 'seconds' },
@@ -155,10 +167,13 @@ export function getRouteOptions(current = ''): NativeSelectOption[] {
 
 export function getWhenOptions(current = ''): NativeSelectOption[] {
   return withCurrent(
-    OFFERED_WHEN.map((code) => ({
-      id: code,
-      label: WHEN_LABELS[code]!.label,
-    })),
+    [
+      ...OFFERED_WHEN.map((code) => ({
+        id: code,
+        label: WHEN_LABELS[code]!.label,
+      })),
+      { id: SPECIFIC_TIME, label: 'At a specific time' },
+    ],
     current,
     current
       .split(',')
@@ -186,10 +201,28 @@ export function createTimingDraft(): TimingDraft {
     period: '1',
     periodUnit: 'd',
     when: '',
+    timeOfDay: '',
     boundsValue: '',
     boundsUnit: 'd',
   };
 }
+
+/** The Time of Day select's value: a part of the day or a specific time. */
+export const getTimeOfDayChoice = (timing: TimingDraft) =>
+  timing.timeOfDay ? SPECIFIC_TIME : timing.when;
+
+/** Chooses a part of the day, or a specific time (08:00 until changed). */
+export function chooseTimeOfDay(
+  timing: TimingDraft,
+  choice: string
+): TimingDraft {
+  return choice === SPECIFIC_TIME
+    ? { ...timing, when: '', timeOfDay: timing.timeOfDay || '08:00' }
+    : { ...timing, when: choice, timeOfDay: '' };
+}
+
+/** "08:00:00" as "08:00". */
+export const formatClockTime = (time: string) => time.slice(0, 5);
 
 export function createDoseDraft(): DoseDraft {
   return {
@@ -263,6 +296,10 @@ export function getRegimenDraft(
         period: numberText(repeat?.period) || '1',
         periodUnit: repeat?.periodUnit || 'd',
         when: repeat?.when?.join(',') || '',
+        // Shown only without `when`; stored data may carry both (tim-10).
+        timeOfDay: repeat?.when?.length
+          ? ''
+          : repeat?.timeOfDay?.map(formatClockTime).join(',') || '',
         boundsValue: numberText(repeat?.boundsDuration?.value),
         boundsUnit: repeat?.boundsDuration?.code || 'd',
       },
@@ -292,6 +329,8 @@ export function getOptionalDoseValue(
       return dose[field];
     case 'bounds':
       return dose.timing.boundsValue;
+    case 'when':
+      return dose.timing.when || dose.timing.timeOfDay || '';
     default:
       return dose.timing[field];
   }
@@ -319,7 +358,8 @@ export function showDoseField(
     timing: { ...dose.timing },
   };
   if (field === 'route' && !next.route) next.route = ROUTES[0].code;
-  if (field === 'when' && !next.timing.when) next.timing.when = OFFERED_WHEN[0];
+  if (field === 'when' && !next.timing.when && !next.timing.timeOfDay)
+    next.timing.when = OFFERED_WHEN[0];
   return next;
 }
 
@@ -331,8 +371,10 @@ export function hideDoseField(
   const shownFields = dose.shownFields?.filter((shown) => shown !== field);
   const next = { ...dose, shownFields, timing: { ...dose.timing } };
   if (field === 'bounds') next.timing.boundsValue = '';
-  else if (field === 'frequencyMax' || field === 'when')
-    next.timing[field] = '';
+  else if (field === 'when') {
+    next.timing.when = '';
+    next.timing.timeOfDay = '';
+  } else if (field === 'frequencyMax') next.timing[field] = '';
   else next[field] = '';
   return next;
 }
@@ -453,6 +495,12 @@ function applyTiming(
   delete repeat.period;
   delete repeat.periodUnit;
   delete repeat.when;
+  // Times stored beside `when` (not shown) stay while `when` is unchanged.
+  const keepsTimes =
+    Boolean(sourceRepeat?.when?.length) &&
+    draft.when === sourceRepeat?.when?.join(',') &&
+    !draft.timeOfDay;
+  if (!keepsTimes) delete repeat.timeOfDay;
   delete repeat.boundsDuration;
 
   const frequency = draft.frequency.trim();
@@ -468,6 +516,12 @@ function applyTiming(
       draft.when === sourceRepeat?.when?.join(',')
         ? sourceRepeat.when
         : (draft.when.split(',') as When[]);
+  else if (draft.timeOfDay)
+    repeat.timeOfDay =
+      draft.timeOfDay ===
+      sourceRepeat?.timeOfDay?.map(formatClockTime).join(',')
+        ? sourceRepeat.timeOfDay
+        : draft.timeOfDay.split(',').map((time) => `${time}:00`);
   const bounds = draft.boundsValue.trim();
   if (bounds) {
     const unit = draft.boundsUnit as TimeUnit;
@@ -648,9 +702,13 @@ export function formatDose(dosage: Dosage): string {
   const bounds = repeat?.boundsDuration;
   const boundsUnit =
     bounds?.code && isTimeUnit(bounds.code) ? TIME_UNITS[bounds.code] : null;
-  const when = repeat?.when
-    ?.map((code) => WHEN_LABELS[code]?.phrase || code)
-    .join(' and ');
+  const when =
+    repeat?.when
+      ?.map((code) => WHEN_LABELS[code]?.phrase || code)
+      .join(' and ') ||
+    (repeat?.timeOfDay?.length
+      ? `at ${repeat.timeOfDay.map(formatClockTime).join(' and ')}`
+      : undefined);
   // A time of day implies once a day: "1 tablet in the morning".
   const isOnceDaily =
     repeat?.frequency === 1 &&

@@ -114,6 +114,33 @@ export interface SeedTreatmentUsageOptions {
   patientId?: string;
 }
 
+export interface SeedBundleOptions {
+  id?: string;
+  patientId?: string;
+  title: string;
+  /** Parts of the day (e.g. MORN) or clock times (e.g. "07:30"). */
+  times?: string[];
+  memberIds: string[];
+}
+
+/** Seeds a treatment bundle (RequestOrchestration) through the real service. */
+export async function seedTestBundle(
+  page: Page,
+  { times = [], ...options }: SeedBundleOptions
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    async (input) =>
+      await (window as any).__HEALTHY_TEST_BRIDGE__.seedBundle(input),
+    {
+      ...options,
+      times: times.map((time) =>
+        /^\d/.test(time) ? { kind: 'time', time } : { kind: 'when', code: time }
+      ),
+    }
+  );
+}
+
 /** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
 export async function seedTestResources(
   page: Page,

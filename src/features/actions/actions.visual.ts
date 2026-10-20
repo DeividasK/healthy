@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  seedTestBundle,
   seedTestPatient,
   seedTestResources,
   openRoute,
@@ -114,5 +115,17 @@ test.describe('My actions - Visual Regression', () => {
         'DROP TRIGGER fail_journal_insert;'
       )
     );
+  });
+
+  test('A bundle answered in part, opened', async ({ page }, testInfo) => {
+    const bundle = await seedTestBundle(page, {
+      title: 'Morning supplements',
+      times: ['MORN'],
+      memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
+    });
+    await page.goto('/journal');
+    // Answers are mixed today, so the bundle opens on its treatments.
+    await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
+    await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
   });
 });
