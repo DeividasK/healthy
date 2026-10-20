@@ -3,6 +3,7 @@ import {
   takeSnapshot,
   seedTestPatient,
   seedTestReport,
+  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
@@ -19,7 +20,7 @@ test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
     date: '2026-10-01',
     biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
   });
-  await page.goto('/biomarker/718-7');
+  await openRoute(page, '/biomarker/718-7');
   await page.getByTestId('biomarker-title').waitFor();
   await takeSnapshot(
     page,
@@ -42,7 +43,7 @@ test('Biomarker detail - Red Blood Cells history', async ({
     date: '2026-09-01',
     biomarkers: [{ name: 'Red Blood Cells', value: 4.8 }],
   });
-  await page.goto('/biomarker/789-8');
+  await openRoute(page, '/biomarker/789-8');
   await page.getByTestId('biomarker-title').waitFor();
   await takeSnapshot(
     page,

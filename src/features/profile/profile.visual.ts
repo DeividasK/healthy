@@ -3,20 +3,21 @@ import {
   takeSnapshot,
   waitForSyncIdle,
   seedTestPatient,
+  openRoute,
 } from '@/src/features/testing/visualTest';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
     await seedTestPatient(page);
-    await page.goto('/profile');
+    await openRoute(page, '/profile');
     await page.getByTestId('active-profile-card').waitFor();
 
     await takeSnapshot(page, 'Profile View - Details and Switcher', testInfo);
   });
 
   test('Profile View - Add Profile Options', async ({ page }, testInfo) => {
-    await page.goto('/profile/new');
+    await openRoute(page, '/profile/new');
     await page.getByTestId('option-create-profile').waitFor();
 
     await takeSnapshot(page, 'Profile View - Add Profile Options', testInfo);
@@ -44,6 +45,7 @@ test.describe('Profile Views - Visual Regression', () => {
   }, testInfo) => {
     await seedTestPatient(page);
     await connectTestSync(page, { userEmail: 'alice@gmail.com' });
+    // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');
     await page.getByTestId('up-to-date-button').waitFor();
     await waitForSyncIdle(page);

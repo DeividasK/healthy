@@ -6,6 +6,7 @@ import {
   seedTestTreatment,
   getTestTreatment,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Treatment Flow', () => {
@@ -28,7 +29,7 @@ test.describe('Edit Treatment Flow', () => {
     const before = await getTestTreatment(page, treatment.id);
     expect(before.text.div).toContain('Amoxicillin 500mg');
 
-    await page.goto(`/treatment/${treatment.id}`);
+    await openRoute(page, `/treatment/${treatment.id}`);
     await page.getByTestId('edit-treatment-button').click();
     await expect(page).toHaveURL(/.*treatment\/[a-zA-Z0-9_-]+\/edit$/);
     await expect(
@@ -85,7 +86,7 @@ test.describe('Edit Treatment Flow', () => {
       intent: 'proposal',
       status: 'on-hold',
     });
-    await page.goto(`/treatment/${treatment.id}`);
+    await openRoute(page, `/treatment/${treatment.id}`);
     await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
     await expect(
       page.getByTestId('treatment-view').getByText('On Hold')
@@ -150,7 +151,7 @@ test.describe('Edit Treatment Flow', () => {
       stored
     );
 
-    await page.goto(`/treatment/${seeded.id}/edit`);
+    await openRoute(page, `/treatment/${seeded.id}/edit`);
     await expect(
       page.getByTestId('treatment-regimen-p1-d1-amount-input')
     ).toHaveValue('4');
@@ -198,7 +199,7 @@ test.describe('Edit Treatment Flow', () => {
       await page.getByTestId('add-option-button').click();
       await expect(page.getByTestId('form-add-menu')).toBeVisible();
     };
-    await page.goto(`/treatment/${treatment.id}/edit`);
+    await openRoute(page, `/treatment/${treatment.id}/edit`);
     await expect(page.getByTestId('treatment-instructions-input')).toHaveValue(
       'As needed for pain'
     );
@@ -249,7 +250,7 @@ test.describe('Edit Treatment Flow', () => {
         ),
       seeded
     );
-    await page.goto(`/treatment/${seeded.id}`);
+    await openRoute(page, `/treatment/${seeded.id}`);
     // Both are shown under the one Dosage heading
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       'One each morning\nin the morning'

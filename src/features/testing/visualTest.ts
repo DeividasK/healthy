@@ -50,9 +50,19 @@ export async function takeSnapshot(
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await expect(page.locator(':focus')).toHaveCount(0);
     // Blur handlers close suggestion lists after a short delay (useDismissOnBlur).
-    await page.waitForTimeout(200);
+    await expect(
+      page.locator('[data-testid$="autocomplete-list"]')
+    ).toHaveCount(0);
   }
   await takeChromaticSnapshot(page, name, testInfo);
+  // The snapshot script attaches a throwaway iframe, which resets Playwright's
+  // network-idle state until a request finishes. Without one, as after
+  // in-app navigation, Chromatic's archive step waits out its full 10 s
+  // timeout for an idle network after the test.
+  await page.evaluate(() =>
+    fetch('/manifest.json', { cache: 'no-store' }).catch(() => undefined)
+  );
+  await page.waitForLoadState('networkidle');
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {
     const file = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -80,6 +90,7 @@ export async function waitForSyncIdle(page: Page): Promise<void> {
 }
 
 export {
+  openRoute,
   seedTestPatient,
   seedTestResources,
   seedTestReport,

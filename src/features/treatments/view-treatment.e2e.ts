@@ -9,6 +9,7 @@ import {
   findTreatmentsSection,
   checkA11y,
   getBrowserLocalDate,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Treatment Flow', () => {
@@ -16,7 +17,7 @@ test.describe('View Treatment Flow', () => {
     await seedTestPatient(page);
   });
 
-  test('preserves long multi-line instructions across reload', async ({
+  test('shows long multi-line instructions as prescribed and as being taken', async ({
     page,
   }) => {
     const longInstructions = [
@@ -35,7 +36,7 @@ test.describe('View Treatment Flow', () => {
       takingSince: await getBrowserLocalDate(page, -7),
     });
 
-    await page.goto(`/treatment/${treatment.id}`);
+    await openRoute(page, `/treatment/${treatment.id}`);
     await expect(page.getByTestId('treatment-title')).toHaveText(
       'Doxycycline 100mg'
     );
@@ -50,11 +51,6 @@ test.describe('View Treatment Flow', () => {
       longInstructions
     );
     await checkA11y(page, { include: '[data-testid="treatment-view"]' });
-
-    await page.reload();
-    await expect(page.getByTestId('treatment-dosage')).toHaveText(
-      longInstructions
-    );
     const stored = await getTestTreatment(page, treatment.id);
     expect(stored.dosageInstruction?.[0]?.text).toBe(longInstructions);
   });
@@ -76,7 +72,7 @@ test.describe('View Treatment Flow', () => {
     });
 
     await page.clock.install();
-    await page.goto(`/treatment/${treatment.id}`);
+    await openRoute(page, `/treatment/${treatment.id}`);
     await page.getByTestId('delete-treatment-button').click();
     await page.clock.runFor(5000);
     await page.getByTestId('delete-modal-confirm-button').click();
@@ -88,27 +84,6 @@ test.describe('View Treatment Flow', () => {
     expect(docAfter).toBeDefined();
     expect(findTreatmentsSection(docAfter)).toBeUndefined();
   });
-
-  test('isolates treatments by profile when switching active patients', async ({
-    page,
-  }) => {
-    await seedTestTreatment(page, {
-      title: 'Atorvastatin 20mg',
-      dosageInstructions: 'Take 1 tablet at bedtime.',
-    });
-    await page.goto('/');
-    await expect(page.getByText('Atorvastatin 20mg')).toBeVisible();
-
-    await page.evaluate(async () => {
-      await (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-        givenName: 'Jane',
-        familyName: 'Smith',
-      });
-    });
-    await page.goto('/');
-    await expect(page.getByText('Atorvastatin 20mg')).not.toBeVisible();
-    await expect(page.getByText('Nothing to show yet')).toBeVisible();
-  });
 });
 
 test('the island centers Start taking and keeps Edit available beside it', async ({
@@ -116,7 +91,7 @@ test('the island centers Start taking and keeps Edit available beside it', async
 }) => {
   await seedTestPatient(page);
   const treatment = await seedTestTreatment(page, { title: 'Island edge' });
-  await page.goto(`/treatment/${treatment.id}`);
+  await openRoute(page, `/treatment/${treatment.id}`);
   const edit = page.getByTestId('edit-treatment-button');
   await expect(edit).toBeVisible();
   const start = page.getByTestId('treatment-usage-start');
@@ -154,7 +129,7 @@ test('unstarted treatment scroll region supports keyboard access', async ({
     ).join('\n\n'),
     notes: 'Not yet started.',
   });
-  await page.goto(`/treatment/${treatment.id}`);
+  await openRoute(page, `/treatment/${treatment.id}`);
   await expect(page.getByTestId('treatment-title')).toHaveText(
     'Unstarted treatment'
   );

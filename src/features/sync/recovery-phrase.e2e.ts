@@ -10,6 +10,7 @@ import {
   openSecondDevice,
   syncAllTestProfiles,
   bootstrapApp,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
@@ -24,6 +25,22 @@ async function readPhrase(page: Page): Promise<string> {
   return (await field.textContent())!;
 }
 
+/**
+ * Refocuses the window `times` times, each past the 2s focus-sync throttle,
+ * on a fake clock instead of waiting in real time.
+ */
+async function focusPastSyncThrottle(page: Page, times: number) {
+  await page.clock.install();
+  for (let i = 0; i < times; i++) {
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.clock.fastForward(2100);
+  }
+  // A database round trip queues behind any sync the focus started.
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.querySql('SELECT 1;')
+  );
+}
+
 test.describe('Google Drive sync with a recovery phrase', () => {
   test('sets up encrypted sync, shows the phrase and disconnects with cloud deletion', async ({
     page,
@@ -31,7 +48,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const store = await mockGoogleDrive(page);
     await mockGoogleAuthRoutes(page, { userEmail: 'alice@gmail.com' });
     await seedTestPatient(page);
-    await page.goto('/profile');
+    await openRoute(page, '/profile');
     await page.getByTestId('google-signin-button').click();
 
     await expect(page).toHaveURL(/\/sync\/recovery-phrase/);
@@ -254,7 +271,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
   }) => {
     await mockGoogleDrive(page);
     await mockGoogleAuthRoutes(page, { userEmail: 'testuser@gmail.com' });
-    await page.goto('/profile/restore-from-google-drive');
+    await openRoute(page, '/profile/restore-from-google-drive');
     await page.getByTestId('connect-google-drive-button').click();
     const modal = page.getByTestId('no-profiles-found-modal');
     await expect(page.getByTestId('no-profiles-message')).toHaveText(
@@ -292,6 +309,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
         (key) => JSON.parse(localStorage.getItem(key)!),
         CONFIG_KEY
       );
+    // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');
     // Renewing on web needs Google's popup, which browsers block without a
     // click, so the background sync on start leaves the token alone.
@@ -321,6 +339,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       userEmail: 'bob@gmail.com',
     });
     store.acceptedToken = 'revoked-everywhere';
+    // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');
     await expect(page.getByTestId('sync-now-button')).toBeVisible();
     await expect(page.getByTestId('connected-user-email')).toHaveText(
@@ -347,10 +366,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
         };
       };
     });
-    for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-      await page.waitForTimeout(2100);
-    }
+    await focusPastSyncThrottle(page, 3);
     expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(0);
     expect(driveRequests).toEqual([]);
   });
@@ -370,12 +386,10 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       if (/googleapis\.com|accounts\.google\.com/.test(request.url()))
         googleRequests.push(request.url());
     });
+    // Reload so sync starts again with no profile marked as synced.
     await page.goto('/');
     await page.getByTestId('floating-add-button').waitFor();
-    for (let i = 0; i < 2; i++) {
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-      await page.waitForTimeout(2100);
-    }
+    await focusPastSyncThrottle(page, 2);
     expect(googleRequests).toEqual([]);
   });
 });

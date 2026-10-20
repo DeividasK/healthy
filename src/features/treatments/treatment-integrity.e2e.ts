@@ -9,6 +9,7 @@ import {
   findTreatmentsSection,
   seedTestCondition,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
@@ -20,7 +21,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
 }) => {
   // Associated conditions are only offered when a condition exists.
   await seedTestCondition(page, { title: 'Integrity condition' });
-  await page.goto('/treatment/add');
+  await openRoute(page, '/treatment/add');
   await expect(page.getByTestId('treatment-status-select')).toHaveValue(
     'active'
   );
@@ -60,7 +61,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
       'SELECT id FROM medication_requests'
     )
   );
-  await page.goto(`/treatment/${rows[0].id}/edit`);
+  await openRoute(page, `/treatment/${rows[0].id}/edit`);
   for (const field of textFields) {
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveValue(
       `Saved ${field}`
@@ -69,7 +70,7 @@ test('optional fields can be added, removed, re-added, and cleared after reload'
   }
   await page.getByTestId('save-treatment-button').click();
   await expect(page).not.toHaveURL(/\/edit$/);
-  await page.goto(`/treatment/${rows[0].id}/edit`);
+  await openRoute(page, `/treatment/${rows[0].id}/edit`);
   for (const field of textFields) {
     await expect(page.getByTestId(`treatment-${field}-input`)).toHaveCount(0);
   }
@@ -137,7 +138,7 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
       ),
     resource
   );
-  await page.goto('/treatment/imported-request/edit');
+  await openRoute(page, '/treatment/imported-request/edit');
   await expect(page.getByTestId('treatment-intent-select')).toHaveValue(
     'proposal'
   );
@@ -207,7 +208,7 @@ test('linking preserves document metadata and unlinking an origin survives edits
   );
   const second = await seedTestTreatment(page, { title: 'Second treatment' });
   // Link the second treatment and unlink the origin in one edit
-  await page.goto(`/consultation/${consultation.id}/edit`);
+  await openRoute(page, `/consultation/${consultation.id}/edit`);
   // The field is shown because the consultation already lists a treatment
   await page.getByTestId('link-treatment-search-input').click();
   await page
@@ -223,13 +224,13 @@ test('linking preserves document metadata and unlinking an origin survives edits
   expect(findTreatmentsSection(linked).entry).toEqual([
     { reference: `MedicationRequest/${second.id}` },
   ]);
-  await page.goto(`/treatment/${treatment.id}/edit`);
+  await openRoute(page, `/treatment/${treatment.id}/edit`);
   await page
     .getByTestId('treatment-title-input')
     .fill('Renamed origin treatment');
   await page.getByTestId('save-treatment-button').click();
   await expect(page).not.toHaveURL(/\/edit$/);
-  await page.goto(`/consultation/${consultation.id}`);
+  await openRoute(page, `/consultation/${consultation.id}`);
   await expect(
     page.getByTestId(`consultation-treatment-${second.id}`)
   ).toBeVisible();
@@ -333,7 +334,7 @@ test('deleting a reason condition keeps the treatment, its wording and editabili
   expect(cleaned.reason).toEqual([{ concept: { text: 'Migraine attacks' } }]);
   expect(cleaned.meta.lastUpdated > treatment.meta.lastUpdated).toBe(true);
 
-  await page.goto(`/treatment/${treatment.id}/edit`);
+  await openRoute(page, `/treatment/${treatment.id}/edit`);
   await page.getByTestId('treatment-title-input').fill('Sumatriptan 100mg');
   await page.getByTestId('save-treatment-button').click();
   await expect(page.getByTestId('treatment-title')).toHaveText(
@@ -403,35 +404,6 @@ test('recodes a development-era treatments section instead of adding another', a
   ]);
 });
 
-test('switching patients unmounts edit fields and restores the correct form on return', async ({
-  page,
-}) => {
-  const treatment = await seedTestTreatment(page, {
-    title: 'First patient private treatment',
-  });
-  await page.goto(`/treatment/${treatment.id}/edit`);
-  await expect(page.getByTestId('treatment-title-input')).toHaveValue(
-    'First patient private treatment'
-  );
-  await page.getByTestId('treatment-title-input').fill('Unsaved private draft');
-  await page.evaluate(() =>
-    (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-      id: 'second-integrity-patient',
-      givenName: 'Second',
-    })
-  );
-  await expect(page.getByTestId('edit-treatment-not-found')).toBeVisible();
-  await expect(page.getByTestId('treatment-title-input')).toHaveCount(0);
-  await page.evaluate(() =>
-    (window as any).__HEALTHY_TEST_BRIDGE__.setActivePatient(
-      'integrity-patient'
-    )
-  );
-  await expect(page.getByTestId('treatment-title-input')).toHaveValue(
-    'First patient private treatment'
-  );
-});
-
 test('new documents are authored by the patient and requesters default to the consultation specialist', async ({
   page,
 }) => {
@@ -440,7 +412,7 @@ test('new documents are authored by the patient and requesters default to the co
     title: 'Attribution visit',
     doctorName: 'Encounter clinician',
   });
-  await page.goto(`/treatment/add?consultationId=${consultation.id}`);
+  await openRoute(page, `/treatment/add?consultationId=${consultation.id}`);
   await expect(page.getByTestId('treatment-requester-input')).toHaveValue(
     'Encounter clinician'
   );

@@ -20,11 +20,12 @@ import { registerPwa } from './registerPwa';
 SplashScreen.preventAutoHideAsync();
 
 function AppReadyHandler() {
+  const navigation = useNavigationContainerRef();
   useEffect(() => {
     SplashScreen.hideAsync();
-    setupTestBridge();
+    setupTestBridge(navigation);
     registerPwa();
-  }, []);
+  }, [navigation]);
 
   return null;
 }

@@ -6,6 +6,7 @@ import {
   seedTestConsultation,
   seedTestServiceRequest,
   seedTestReport,
+  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Service Request - Visual Regression', () => {
@@ -42,7 +43,7 @@ test.describe('Edit Service Request - Visual Regression', () => {
       biomarkers: [{ name: 'Hemoglobin', value: 13.1 }],
     });
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('service-request-form-title').waitFor();
     await takeSnapshot(page, 'Service Request - Edit Form Populated', testInfo);
   });

@@ -9,6 +9,7 @@ import {
   getTestClinicalDocument,
   findTreatmentsSection,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Consultation Flow', () => {
@@ -16,11 +17,15 @@ test.describe('View Consultation Flow', () => {
     await seedTestPatient(page);
   });
 
-  test('opens from Home, edits, and deletes a consultation', async ({
+  test('shows a consultation from its condition and deletes it back to the condition', async ({
     page,
   }) => {
+    const condition = await seedTestCondition(page, {
+      title: 'Migraine Study',
+    });
     const consultation = await seedTestConsultation(page, {
-      id: 'consultation-view-home-flow',
+      id: 'consultation-view-delete',
+      conditionIds: [condition.id],
       title: 'Annual Physical Exam',
       doctorName: 'Dr. Beverly Crusher',
       serviceType: 'Primary care',
@@ -28,7 +33,10 @@ test.describe('View Consultation Flow', () => {
       notes: 'Follow-up next year.',
       status: 'completed',
     });
-    await page.getByTestId(`consultation-open-${consultation.id}`).click();
+    await page.getByTestId(`condition-open-${condition.id}`).click();
+    await page
+      .getByTestId(`condition-timeline-item-consultation-${consultation.id}`)
+      .click();
     await expect(page).toHaveURL(
       new RegExp(`.*consultation\\/${consultation.id}$`)
     );
@@ -41,43 +49,26 @@ test.describe('View Consultation Flow', () => {
     await expect(view.getByText('Follow-up next year.')).toBeVisible();
     await checkA11y(page, { include: '[data-testid="consultation-view"]' });
 
-    await page.getByTestId('edit-consultation-button').click();
-    await expect(page).toHaveURL(
-      new RegExp(`.*consultation\\/${consultation.id}\\/edit`)
-    );
-    await page.getByTestId('consultation-title-input').fill('Updated Physical');
-    await page.getByTestId('save-button').click();
-    await expect(page).toHaveURL(
-      new RegExp(`.*consultation\\/${consultation.id}$`)
-    );
-    await expect(page.getByTestId('consultation-title')).toHaveText(
-      'Updated Physical'
-    );
-
-    await page.getByTestId('delete-consultation-button').click();
-    const modal = page.getByTestId('delete-confirmation-modal');
-    await expect(modal).toBeVisible();
-    await page.getByTestId('delete-modal-cancel-button').click();
-    await expect(modal).not.toBeVisible();
-    await expect(page.getByTestId('consultation-title')).toHaveText(
-      'Updated Physical'
-    );
-
     await page.clock.install();
     await page.getByTestId('delete-consultation-button').click();
-    const confirmButton = page.getByTestId('delete-modal-confirm-button');
-    await expect(confirmButton).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByText('Delete Consultation')).toBeVisible();
     await page.clock.runFor(5000);
-    await expect(confirmButton).toBeEnabled();
-    await confirmButton.click();
-    await expect(page).toHaveURL(/.*(\/|#)$/);
-    await expect(
-      page.getByTestId(`consultation-card-${consultation.id}`)
-    ).toHaveCount(0);
-    await page.reload();
-    await expect(
-      page.getByTestId(`consultation-card-${consultation.id}`)
-    ).toHaveCount(0);
+    await page.getByTestId('delete-modal-confirm-button').click();
+    // Deleting returns to the condition, whose timeline is now empty.
+    await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
+    await expect(page.getByTestId('condition-title')).toHaveText(
+      'Migraine Study'
+    );
+    await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
+
+    const deletions = await page.evaluate(async () => {
+      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+      await bridge.flushLocalChanges();
+      return await bridge.querySql(
+        "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
+      );
+    });
+    expect(deletions).toEqual([{ resource_id: consultation.id }]);
   });
 
   test('keeps consultation details available when the linked condition fails to load', async ({
@@ -95,7 +86,6 @@ test.describe('View Consultation Flow', () => {
       doctorName: 'Dr. Sarah Connor',
       notes: 'Consultation notes remain available.',
     });
-    await page.reload();
     await page.getByTestId(`condition-open-${condition.id}`).click();
     await expect(
       page.getByTestId(
@@ -144,7 +134,7 @@ test.describe('View Consultation Flow', () => {
       serviceType: 'Cardiology',
     });
 
-    await page.goto(`/consultation/${consultation.id}`);
+    await openRoute(page, `/consultation/${consultation.id}`);
     await expect(page.getByTestId('consultation-title')).toHaveText(
       'Cardiology Follow-up'
     );
@@ -194,7 +184,7 @@ test.describe('View Consultation Flow', () => {
     expect(findTreatmentsSection(docAfterUnlink)).toBeUndefined();
 
     expect(await getTestTreatment(page, treatment.id)).toBeTruthy();
-    await page.goto('/');
+    await openRoute(page, '/');
     await expect(page.getByText('Lisinopril 10mg')).toBeVisible();
   });
 });

@@ -7,6 +7,7 @@ import {
   seedTestServiceRequest,
   getTestServiceRequest,
   evaluateBridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Consultation Flow', () => {
@@ -85,105 +86,20 @@ test.describe('Edit Consultation Flow', () => {
     }
   );
 
-  test(
-    'should delete a linked Consultation from its view page with confirmation modal',
-    { tag: ['@critical'] },
-    async ({ page }) => {
-      let conditionId = '';
-      let consultationId = '';
-
-      await test.step('Seed condition with consultation', async () => {
-        const cond = await seedTestCondition(page, {
-          title: 'Migraine Study',
-        });
-        conditionId = cond.id;
-
-        const cons = await seedTestConsultation(page, {
-          conditionIds: [conditionId],
-          title: 'Consultation To Delete',
-          doctorName: 'Dr. Strange',
-          date: '2026-10-02',
-        });
-        consultationId = cons.id;
-      });
-
-      await test.step('Open the consultation view and test delete cancellation', async () => {
-        await page.getByTestId(`condition-open-${conditionId}`).click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-
-        await page
-          .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
-          .click();
-        await expect(page).toHaveURL(
-          new RegExp(`.*consultation\\/${consultationId}$`)
-        );
-
-        const deleteBtn = page.getByTestId('delete-consultation-button');
-        await deleteBtn.click();
-
-        const modal = page.getByTestId('delete-confirmation-modal');
-        await expect(modal).toBeVisible();
-        await expect(page.getByText('Delete Consultation')).toBeVisible();
-
-        const cancelBtn = page.getByTestId('delete-modal-cancel-button');
-        await cancelBtn.click();
-        await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('consultation-title')).toHaveText(
-          'Consultation To Delete'
-        );
-      });
-
-      await test.step('Re-open modal, verify countdown, and confirm deletion', async () => {
-        await page.clock.install();
-        await page.getByTestId('delete-consultation-button').click();
-
-        const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-        await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
-        await expect(confirmBtn).toContainText('Delete (');
-
-        await page.clock.runFor(5000);
-        await expect(confirmBtn).toHaveText('Delete');
-        await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
-        await confirmBtn.click();
-      });
-
-      await test.step('Verify consultation removed from Condition view and its deletion recorded for sync', async () => {
-        await expect(page).toHaveURL(
-          new RegExp(`.*condition\\/${conditionId}`)
-        );
-        await expect(
-          page.getByText('Consultation To Delete')
-        ).not.toBeVisible();
-        await expect(page.getByTestId('condition-timeline')).toHaveCount(0);
-
-        const deletions = await page.evaluate(async () => {
-          const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-          await bridge.flushLocalChanges();
-          return await bridge.querySql(
-            "SELECT resource_id FROM sync_changes WHERE resource_type = 'Encounter' AND op = 'delete'"
-          );
-        });
-        expect(deletions).toEqual([{ resource_id: consultationId }]);
-      });
-    }
-  );
-
   test('edits and removes the service provider', async ({ page }) => {
     const consultation = await seedTestConsultation(page, {
       title: 'Dental check',
       serviceProviderName: 'Smile Clinic',
     });
 
-    await page.goto(`/consultation/${consultation.id}/edit`);
+    await openRoute(page, `/consultation/${consultation.id}/edit`);
     const input = page.getByTestId('consultation-service-provider-input');
     await expect(input).toHaveValue('Smile Clinic');
     await page.getByTestId('remove-service-provider-button').click();
     await expect(input).toHaveCount(0);
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);
-    await page.goto(`/consultation/${consultation.id}`);
+    await openRoute(page, `/consultation/${consultation.id}`);
     await expect(page.getByTestId('consultation-title')).toBeVisible();
     await expect(page.getByTestId('consultation-service-provider')).toHaveCount(
       0
@@ -229,7 +145,7 @@ test.describe('Edit Consultation Flow', () => {
     );
     const { reference } = (await encounter()).serviceProvider;
 
-    await page.goto(`/consultation/${consultation.id}/edit`);
+    await openRoute(page, `/consultation/${consultation.id}/edit`);
     // The name comes from the stored Organization.
     await expect(
       page.getByTestId('consultation-service-provider-input')
@@ -263,7 +179,7 @@ test.describe('Edit Consultation Flow', () => {
       consultationId: referring.id,
     });
 
-    await page.goto(`/consultation/${visit.id}/edit`);
+    await openRoute(page, `/consultation/${visit.id}/edit`);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-service-request').click();
     for (const request of [referral, echo]) {
@@ -281,7 +197,7 @@ test.describe('Edit Consultation Flow', () => {
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/edit$/);
 
-    await page.goto(`/consultation/${visit.id}`);
+    await openRoute(page, `/consultation/${visit.id}`);
     await expect(
       page.getByTestId(`consultation-based-on-${referral.id}`)
     ).toBeVisible();
@@ -303,13 +219,13 @@ test.describe('Edit Consultation Flow', () => {
     expect((await getTestServiceRequest(page, referral.id)).encounter).toEqual({
       reference: `Encounter/${referring.id}`,
     });
-    await page.goto(`/service-request/${echo.id}`);
+    await openRoute(page, `/service-request/${echo.id}`);
     await expect(
       page.getByTestId(`linked-consultation-${referring.id}`)
     ).toBeVisible();
 
     // Removing the origin link clears the origin.
-    await page.goto(`/consultation/${visit.id}/edit`);
+    await openRoute(page, `/consultation/${visit.id}/edit`);
     await page
       .getByRole('button', { name: 'Remove service-request Echocardiogram' })
       .click();

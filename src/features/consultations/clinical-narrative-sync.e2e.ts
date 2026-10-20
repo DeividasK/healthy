@@ -8,7 +8,6 @@ import {
   getTestClinicalDocument,
   connectTestSync,
   syncTestDevice,
-  driveContents,
 } from '@/src/features/testing/testStorage';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
@@ -254,37 +253,6 @@ test.describe('Clinical Narrative and Composition Sync', () => {
     expect(v1Restore.patients).toBe(1);
     expect(v1Restore.consultations).toBe(1);
     expect(v1Restore.clinicalDocuments).toBe(0);
-  });
-
-  test('encrypted Google Drive sync backs up and restores Composition', async ({
-    page,
-  }) => {
-    const cons = await seedTestConsultation(page, {
-      id: 'cons-drive-sync',
-      title: 'Synced Visit',
-      doctorName: 'Dr. Beverly Crusher',
-      date: '2026-10-13',
-      notes: 'Drive sync note.',
-      status: 'completed',
-    });
-
-    const comp = await getTestClinicalDocument(page, cons.id);
-    expect(comp).not.toBeNull();
-
-    const { store } = await connectTestSync(page);
-    await syncTestDevice(page);
-    expect(driveContents(store)).not.toContain('Drive sync note.');
-
-    // A cleared database is a new device with the same account and phrase.
-    const restoredComp = await page.evaluate(async () => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      await bridge.clearDatabase();
-      await bridge.syncAllProfiles();
-      return await bridge.getClinicalDocumentByConsultationId(
-        'cons-drive-sync'
-      );
-    });
-    expect(restoredComp).toEqual(comp);
   });
 
   test('records deletions only when they commit', async ({ page }) => {

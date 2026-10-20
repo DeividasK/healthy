@@ -8,6 +8,7 @@ import {
   getTestClinicalDocument,
   findServiceRequestSection,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Service Request Flow', () => {
@@ -21,7 +22,7 @@ test.describe('Add Service Request Flow', () => {
     const condition = await seedTestCondition(page, {
       title: 'Gallstones',
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-service-request').click();
     await expect(page).toHaveURL(/.*service-request\/add$/);
@@ -164,7 +165,7 @@ test.describe('Add Service Request Flow', () => {
       doctorName: 'Dr. Julian Bashir',
       date: '2026-03-02',
     });
-    await page.goto(`/consultation/${consultation.id}`);
+    await openRoute(page, `/consultation/${consultation.id}`);
     await page.getByTestId('consultation-add-treatment').click();
     // Menu options name what they add, without verbs.
     await expect(page.getByTestId('option-create-new-treatment')).toHaveText(
@@ -229,7 +230,7 @@ test.describe('Add Service Request Flow', () => {
     page,
   }) => {
     const condition = await seedTestCondition(page, { title: 'Hypertension' });
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await page.getByTestId('condition-add-button').click();
     await page.getByTestId('menu-add-service-request').click();
     await page

@@ -113,51 +113,6 @@ export async function createPatientViaUI(page: Page): Promise<void> {
   await expect(page.getByTestId('floating-add-button')).toBeVisible();
 }
 
-export async function createReportViaUI(
-  page: Page,
-  options: {
-    biomarkers: {
-      name: string;
-      value: string;
-      unit?: string;
-    }[];
-    notes?: string;
-  }
-): Promise<void> {
-  await page.getByTestId('floating-add-button').click();
-  await page.getByTestId('menu-add-lab-results').click();
-
-  for (let i = 0; i < options.biomarkers.length; i++) {
-    const b = options.biomarkers[i];
-    const searchInput = page.getByTestId('test-search-input');
-    await searchInput.fill(b.name);
-
-    const option = page.locator('[data-testid^="autocomplete-item-"]').first();
-    await option.click();
-
-    const valInput = page.getByTestId(`marker-value-input-${i}`);
-    await valInput.fill(b.value);
-
-    if (b.unit) {
-      const unitPicker = page.getByTestId(`marker-unit-select-${i}`);
-      if (await unitPicker.isVisible()) {
-        await unitPicker.selectOption(b.unit);
-      }
-    }
-  }
-
-  if (options.notes) {
-    await page.getByTestId('plus-menu-button').click();
-    await page.getByTestId('menu-add-notes').click();
-    await expect(page.getByTestId('form-add-menu')).not.toBeVisible();
-    const notesInput = page.getByTestId('notes-input');
-    await notesInput.fill(options.notes);
-  }
-
-  await page.getByTestId('save-button').click();
-  await page.waitForURL(/.*(\/|#)$/);
-}
-
 export interface AddConditionOptions {
   title?: string;
   status?: string;
@@ -254,6 +209,7 @@ export function setupConsoleMonitor(page: Page): ConsoleMonitor {
 }
 
 export * from './testSeed';
+export * from './testRecords';
 export * from './mockGoogleDrive';
 export * from './testA11y';
 export * from './testDataFactory';

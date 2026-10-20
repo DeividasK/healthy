@@ -157,6 +157,31 @@ export async function bootstrapApp(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Opens a route like `page.goto`, with the same Home-then-route stack, but
+ * without reloading the app once it has booted. A reload costs a full bundle
+ * parse and database open, so keep `page.goto`/`page.reload` for tests about
+ * a fresh boot or persistence.
+ */
+export async function openRoute(page: Page, path: string): Promise<void> {
+  if (page.url() === 'about:blank') {
+    await page.goto(path);
+    return;
+  }
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  await page.evaluate(
+    (href) => (window as any).__HEALTHY_TEST_BRIDGE__.navigate(href),
+    path
+  );
+  await page.waitForURL((url) => url.pathname + url.search === path);
+}
+
+/** Remounts the current screen so it reads the database again. */
+export async function reopenRoute(page: Page): Promise<void> {
+  const url = new URL(page.url());
+  await openRoute(page, url.pathname + url.search);
+}
+
 /** Seeds a Patient through the real service; a fresh page starts on Home. */
 export async function seedTestPatient(
   page: Page,

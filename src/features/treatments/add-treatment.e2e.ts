@@ -8,6 +8,7 @@ import {
   findTreatmentsSection,
   getTestClinicalDocument,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Treatment Flow', () => {
@@ -21,7 +22,7 @@ test.describe('Add Treatment Flow', () => {
     const condition = await seedTestCondition(page, {
       title: 'Acute sinusitis',
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId('floating-add-button').click();
     await page.getByTestId('menu-add-treatment').click();
     await expect(page).toHaveURL(/.*treatment\/add$/);
@@ -112,7 +113,7 @@ test.describe('Add Treatment Flow', () => {
       reasonConditionIds: [headache.id],
     });
 
-    await page.goto(`/consultation/${consultation.id}`);
+    await openRoute(page, `/consultation/${consultation.id}`);
     await page.getByTestId('consultation-add-treatment').click();
     await page.getByTestId('option-create-new-treatment').click();
     await expect(page).toHaveURL(
@@ -202,7 +203,7 @@ test.describe('Add Treatment Flow', () => {
       doctorName: 'Dr. Known Specialist',
     });
 
-    await page.goto('/treatment/add');
+    await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Ibuprofen 400mg');
     await expect(page.getByTestId('treatment-requester-input')).toHaveCount(0);
     await page.getByTestId('add-option-button').click();
@@ -250,7 +251,7 @@ test.describe('Treatment form keyboard support', () => {
   test('highlights selects and date fields on keyboard focus', async ({
     page,
   }) => {
-    await page.goto('/treatment/add');
+    await openRoute(page, '/treatment/add');
     const outline = (testID: string) =>
       page
         .getByTestId(testID)
@@ -281,8 +282,7 @@ test.describe('Treatment form keyboard support', () => {
       ['/profile/new', 'patient-given-name-input'],
     ];
     for (const [route, firstField] of forms) {
-      await page.goto('/');
-      await page.goto(route);
+      await openRoute(page, route);
       await expect(page.getByTestId(firstField)).toBeFocused();
       if (route !== '/profile/new' && route !== '/lab-result/add') {
         await expect(page.locator(`[id="${firstField}-label"]`)).toContainText(
@@ -307,14 +307,14 @@ test.describe('Treatment form keyboard support', () => {
   });
 
   test('Cmd/Ctrl+Enter runs the primary island action', async ({ page }) => {
-    await page.goto('/');
+    await openRoute(page, '/');
     await expect(page.getByTestId('floating-add-button')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.getByTestId('floating-add-menu')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
 
-    await page.goto('/treatment/add');
+    await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Keyboard saved');
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.getByTestId('treatment-title')).toHaveText(
@@ -325,7 +325,7 @@ test.describe('Treatment form keyboard support', () => {
   test('records split doses, a later phase and a dispense quantity as a structured regimen', async ({
     page,
   }) => {
-    await page.goto('/treatment/add');
+    await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Prednisolone 5mg');
     const openMenu = async () => {
       await page.getByTestId('add-option-button').click();
@@ -456,7 +456,7 @@ test.describe('Treatment form keyboard support', () => {
       code: '{tablet}',
     });
 
-    await page.goto(`/treatment/${id}`);
+    await openRoute(page, `/treatment/${id}`);
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       [
         'Phase 1: 2 tablets oral in the morning, for 7 days',

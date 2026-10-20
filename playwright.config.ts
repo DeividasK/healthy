@@ -3,6 +3,7 @@ import type { ChromaticConfig } from '@chromatic-com/playwright';
 
 export default defineConfig<ChromaticConfig>({
   testDir: './src/features',
+  globalSetup: './src/features/testing/globalSetup.ts',
   fullyParallel: true,
   workers: process.env.CI ? 2 : undefined,
   forbidOnly: !!process.env.CI,

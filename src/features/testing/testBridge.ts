@@ -77,6 +77,7 @@ import { createGoogleDriveProvider } from '@/src/features/sync/providers/googleD
 import { flushLocalChanges } from '@/src/features/sync/changeLog';
 import { clearAllDatabaseTables, getDb } from '@/src/database/db';
 import { Platform } from 'react-native';
+import { router, type Href, type useNavigationContainerRef } from 'expo-router';
 import {
   createOrUpdatePatient,
   deletePatient,
@@ -116,11 +117,27 @@ async function resolvePatientId(
   return undefined;
 }
 
-export function setupTestBridge() {
+export function setupTestBridge(
+  navigation?: ReturnType<typeof useNavigationContainerRef>
+) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   if (process.env.NODE_ENV === 'production' && !__DEV__) return;
 
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
+    /**
+     * Opens a route without reloading the app, with the stack a deep link
+     * builds: Home, then the route. Resetting first unmounts other screens
+     * at once instead of animating them out.
+     */
+    navigate: (href: string) => {
+      navigation?.resetRoot({
+        index: 0,
+        routes: [
+          { name: '__root', state: { index: 0, routes: [{ name: 'index' }] } },
+        ],
+      });
+      if (href !== '/') router.push(href as Href);
+    },
     verifyDiagnosisMigration,
     getCondition: fetchConditionById,
     saveCondition: insertConditionRecord,

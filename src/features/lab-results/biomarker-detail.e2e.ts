@@ -2,6 +2,8 @@ import { test, expect } from '@/src/features/testing/testStorage';
 import {
   seedTestPatient,
   seedTestReport,
+  openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testSeed';
 
 test.describe('Biomarker detail', () => {
@@ -38,46 +40,6 @@ test.describe('Biomarker detail', () => {
     expect(rejectedReports).toHaveLength(0);
   });
 
-  test('shows only the active patient on direct entry and patient changes', async ({
-    page,
-  }) => {
-    await seedTestPatient(page, {
-      id: 'history-patient-a',
-      givenName: 'First',
-    });
-    await seedTestReport(page, {
-      biomarkers: [{ name: 'Red Blood Cells', value: 4.5 }],
-    });
-    await seedTestPatient(page, {
-      id: 'history-patient-b',
-      givenName: 'Second',
-    });
-    await seedTestReport(page, {
-      biomarkers: [{ name: 'Red Blood Cells', value: 6.1 }],
-    });
-    await page.goto('/biomarker/789-8');
-    const latest = page.getByTestId('biomarker-latest-value');
-    const history = page.getByTestId('biomarker-history-list');
-    await expect(latest).toHaveText('6.1');
-    await expect(history.getByText('4.5', { exact: true })).toHaveCount(0);
-    await page.evaluate(async () =>
-      (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-        id: 'history-patient-a',
-        givenName: 'First',
-      })
-    );
-    await expect(latest).toHaveText('4.5');
-    await expect(history.getByText('6.1', { exact: true })).toHaveCount(0);
-    await page.evaluate(async () =>
-      (window as any).__HEALTHY_TEST_BRIDGE__.seedPatient({
-        id: 'history-patient-b',
-        givenName: 'Second',
-      })
-    );
-    await expect(latest).toHaveText('6.1');
-    await expect(history.getByText('4.5', { exact: true })).toHaveCount(0);
-  });
-
   test('uses matching reference units and normalizes mixed-unit history', async ({
     page,
   }) => {
@@ -88,7 +50,7 @@ test.describe('Biomarker detail', () => {
     });
     {
       const result = { date: '2026-10-01', value: '150', unit: 'g/L' };
-      await page.goto('/lab-result/add');
+      await openRoute(page, '/lab-result/add');
       await page.getByTestId('test-search-input').fill('Hemoglobin');
       await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
       await page.getByTestId('marker-value-input-0').fill(result.value);
@@ -138,7 +100,7 @@ test.describe('Biomarker detail', () => {
         [JSON.stringify(observation), id]
       );
     }, latestObservation.id);
-    await page.goto('/biomarker/718-7');
+    await openRoute(page, '/biomarker/718-7');
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
     await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('g/L');
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
@@ -196,11 +158,12 @@ test.describe('Biomarker detail', () => {
         [JSON.stringify(observation), id]
       );
     }, latestObservation.id);
+    // Reload: raw SQL emits no change event for the mounted Home to pick up.
     await page.goto('/');
     await expect(page.getByTestId('biomarker-row-718-7').first()).toContainText(
       'High'
     );
-    await page.goto('/biomarker/718-7');
+    await openRoute(page, '/biomarker/718-7');
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
       'High'
     );
@@ -228,7 +191,7 @@ test.describe('Biomarker detail', () => {
         [JSON.stringify(observation), 'unknown-unit', row.id]
       );
     });
-    await page.reload();
+    await reopenRoute(page);
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
     await expect(
       history.getByText('unknown-unit', { exact: true })
@@ -251,14 +214,14 @@ test.describe('Biomarker detail', () => {
         );
       }
     });
-    await page.reload();
+    await reopenRoute(page);
     await expect(
       history.getByText('unknown-unit', { exact: true })
     ).toHaveCount(0);
     await expect(
       page.getByText('Biomarker not found.', { exact: true })
     ).toBeVisible();
-    await page.goto('/');
+    await openRoute(page, '/');
     await expect(page.getByTestId(/^report-card-/).first()).toBeVisible();
     await expect(page.getByTestId('biomarker-row-718-7')).toHaveCount(0);
     await expect(chart).toBeHidden();
@@ -289,7 +252,7 @@ test.describe('Biomarker detail', () => {
       biomarkers: [{ name: 'Red Blood Cells', value: 6.1 }],
     });
 
-    await page.goto('/');
+    await openRoute(page, '/');
     const row = page.getByTestId('biomarker-row-789-8').first();
     await expect(row).toBeVisible();
     await row.click();

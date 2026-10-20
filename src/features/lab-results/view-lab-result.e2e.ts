@@ -3,6 +3,7 @@ import {
   expect,
   seedTestPatient,
   seedTestReport,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
@@ -25,7 +26,7 @@ test.describe('View Lab Result', () => {
         { name: 'White Blood Cells', value: 12.4, unit: '10*3/uL' },
       ],
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId(`view-report-button-${report.id}`).click();
     await expect(page).toHaveURL(new RegExp(`lab-result/${report.id}$`));
 
@@ -56,25 +57,11 @@ test.describe('View Lab Result', () => {
     await expect(page).toHaveURL(/biomarker\/718-7$/);
   });
 
-  test('leaves out notes and provider when the report has none', async ({
-    page,
-  }) => {
-    const { report } = await seedTestReport(page, {
-      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
-    });
-    await page.goto(`/lab-result/${report.id}`);
-    await expect(page.getByTestId('lab-result-title')).toBeVisible();
-    await expect(page.getByTestId('lab-result-notes-section')).toHaveCount(0);
-    await expect(page.getByTestId('lab-result-service-provider')).toHaveCount(
-      0
-    );
-  });
-
   test('edits and returns to the updated view', async ({ page }) => {
     const { report } = await seedTestReport(page, {
       biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
     });
-    await page.goto(`/lab-result/${report.id}`);
+    await openRoute(page, `/lab-result/${report.id}`);
     await page.getByTestId('edit-lab-result-button').click();
     await expect(page).toHaveURL(new RegExp(`lab-result/${report.id}/edit`));
     await page.getByTestId('marker-value-input-0').fill('11.2');
@@ -90,8 +77,14 @@ test.describe('View Lab Result', () => {
     const { report } = await seedTestReport(page, {
       biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
     });
-    await page.goto('/');
+    await openRoute(page, '/');
     await page.getByTestId(`view-report-button-${report.id}`).click();
+    // A report without notes or provider shows neither section.
+    await expect(page.getByTestId('lab-result-title')).toBeVisible();
+    await expect(page.getByTestId('lab-result-notes-section')).toHaveCount(0);
+    await expect(page.getByTestId('lab-result-service-provider')).toHaveCount(
+      0
+    );
     await page.clock.install();
     await page.getByTestId('delete-lab-result-button').click();
     await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
@@ -100,7 +93,7 @@ test.describe('View Lab Result', () => {
 
     await expect(page).toHaveURL(/.*(\/|#)$/);
     await expect(page.getByTestId(`report-card-${report.id}`)).toHaveCount(0);
-    await page.goto(`/lab-result/${report.id}`);
+    await openRoute(page, `/lab-result/${report.id}`);
     await expect(page.getByText('Lab result not found.')).toBeVisible();
   });
 });

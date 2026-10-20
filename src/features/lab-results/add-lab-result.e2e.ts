@@ -4,6 +4,7 @@ import {
   expect,
   seedTestPatient,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -88,6 +89,25 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(notesInput).toBeVisible();
         await notesInput.fill('Fasting routine checkup');
 
+        // Date and an added time use native inputs behind their buttons.
+        await expect(page.getByTestId('menu-add-time')).toHaveCount(0);
+        await page
+          .getByTestId('date-picker-button')
+          .locator('input[type="date"]')
+          .fill('2026-09-20');
+        await expect(page.getByTestId('date-picker-button')).toContainText(
+          'Sep 20'
+        );
+        await plusMenuBtn.click();
+        await page.getByTestId('menu-add-time').click();
+        await page
+          .getByTestId('time-picker-button')
+          .locator('input[type="time"]')
+          .fill('08:15');
+        await expect(page.getByTestId('time-picker-button')).toContainText(
+          '08:15'
+        );
+
         const saveButton = page.getByTestId('save-button');
         await expect(saveButton).toBeVisible();
         await saveButton.click();
@@ -135,36 +155,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       });
     }
   );
-
-  test('should open and update date and time via native dropdown inputs', async ({
-    page,
-  }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
-
-    // Verify date picker button has native date input and updates with valid past date
-    const dateInput = page
-      .getByTestId('date-picker-button')
-      .locator('input[type="date"]');
-    await expect(dateInput).toBeAttached();
-    await dateInput.fill('2026-09-20');
-    await expect(page.getByTestId('date-picker-button')).toContainText(
-      'Sep 20'
-    );
-
-    // Add time from plus menu
-    const plusMenuBtn = page.getByTestId('plus-menu-button');
-    await plusMenuBtn.click();
-    await page.getByTestId('menu-add-time').click();
-
-    // Verify time picker button has native time input and updates
-    const timeInput = page
-      .getByTestId('time-picker-button')
-      .locator('input[type="time"]');
-    await expect(timeInput).toBeAttached();
-    await timeInput.fill('08:15');
-    await expect(page.getByTestId('time-picker-button')).toContainText('08:15');
-  });
 
   test('should disable add when all optional fields are present and re-enable it when removed', async ({
     page,
@@ -398,7 +388,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('records a service provider as an Organization performer', async ({
     page,
   }) => {
-    await page.goto('/lab-result/add');
+    await openRoute(page, '/lab-result/add');
     await page.getByTestId('test-search-input').fill('Hemoglobin');
     await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
     await page.getByTestId('marker-value-input-0').fill('14.5');

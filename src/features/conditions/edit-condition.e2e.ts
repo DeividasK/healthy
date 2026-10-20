@@ -3,7 +3,9 @@ import {
   expect,
   seedTestPatient,
   seedTestCondition,
+  seedTestConsultation,
   DEFAULT_CONDITION_TITLE,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Condition Flow', () => {
@@ -11,7 +13,7 @@ test.describe('Edit Condition Flow', () => {
     await seedTestPatient(page);
   });
 
-  test('explains a failed deletion and allows retrying from the confirmation modal', async ({
+  test('deletes from the view island after a countdown, explaining a failure and allowing retry', async ({
     page,
     consoleMonitor,
   }) => {
@@ -19,11 +21,26 @@ test.describe('Edit Condition Flow', () => {
       id: 'condition-delete-failure',
       title: 'Condition to delete',
     });
-    await page.reload();
-    await page.getByTestId(`condition-open-${condition.id}`).click();
+    await page.getByRole('button', { name: /^View condition:/ }).click();
     await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
     );
+    // Edit forms do not delete; the view page's island does.
+    await page.getByTestId('edit-condition-button').click();
+    await expect(page.getByTestId('condition-title-input')).toBeVisible();
+    await expect(page.getByTestId('delete-condition-button')).toHaveCount(0);
+    await page.getByTestId('cancel-button').click();
+
+    const deleteButton = page.getByTestId('delete-condition-button');
+    const modal = page.getByTestId('delete-confirmation-modal');
+    await deleteButton.click();
+    await expect(modal).toBeVisible();
+    await page.getByTestId('delete-modal-cancel-button').click();
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByTestId('condition-title')).toHaveText(
+      'Condition to delete'
+    );
+
     await page.evaluate(async () => {
       await (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
         `CREATE TEMP TRIGGER fail_condition_delete BEFORE DELETE ON conditions
@@ -33,9 +50,13 @@ test.describe('Edit Condition Flow', () => {
     });
     consoleMonitor.ignore('Failed to delete resource:');
     await page.clock.install();
-    await page.getByTestId('delete-condition-button').click();
-    await page.clock.runFor(5000);
+    await deleteButton.click();
     const confirm = page.getByTestId('delete-modal-confirm-button');
+    // Confirming unlocks only after a 5 second countdown.
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+    await expect(confirm).toContainText('Delete (');
+    await page.clock.runFor(5000);
+    await expect(confirm).toHaveText('Delete');
     await expect(confirm).toBeEnabled();
     const dialogPromise = page.waitForEvent('dialog');
     const clickPromise = confirm.click();
@@ -44,7 +65,7 @@ test.describe('Edit Condition Flow', () => {
     expect(dialog.message()).toBe('Error\nFailed to delete. Please try again.');
     await dialog.accept();
     await clickPromise;
-    await expect(page.getByTestId('delete-confirmation-modal')).toBeVisible();
+    await expect(modal).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`condition/${condition.id}$`));
     await expect(page.getByTestId('condition-title')).toHaveText(
       'Condition to delete'
@@ -57,28 +78,37 @@ test.describe('Edit Condition Flow', () => {
     });
     await confirm.click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(
-      page.getByTestId(`condition-card-${condition.id}`)
-    ).toHaveCount(0);
+    await expect(page.getByText('Nothing to show yet')).toBeVisible();
     await page.reload();
-    await expect(
-      page.getByTestId(`condition-card-${condition.id}`)
-    ).toHaveCount(0);
+    await expect(page.getByText('Nothing to show yet')).toBeVisible();
   });
 
   test(
     'should allow editing an existing Condition',
     { tag: ['@smoke'] },
     async ({ page }) => {
-      await test.step('Create an initial condition', async () => {
-        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
+      await test.step('Create an initial condition with a consultation', async () => {
+        const condition = await seedTestCondition(page, {
+          title: DEFAULT_CONDITION_TITLE,
+        });
+        await seedTestConsultation(page, {
+          conditionIds: [condition.id],
+          title: 'Knee Arthroscopy Review',
+        });
       });
 
       await test.step('Open edit condition screen and verify initial title', async () => {
         await page.getByRole('button', { name: /^View condition:/ }).click();
+        // The timeline and its + belong to the view, not the edit form.
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
+        await expect(page.getByTestId('condition-add-button')).toBeVisible();
         await page.getByTestId('edit-condition-button').click();
         await expect(page).toHaveURL(/.*condition\/.*\/edit/);
         await expect(page.getByText('Edit Condition')).toBeVisible();
+        await expect(page.getByTestId('condition-timeline')).not.toBeVisible();
+        await expect(
+          page.getByTestId('condition-add-button')
+        ).not.toBeVisible();
 
         const titleInput = page.getByTestId('condition-title-input');
         await expect(titleInput).toHaveValue(DEFAULT_CONDITION_TITLE);
@@ -92,72 +122,18 @@ test.describe('Edit Condition Flow', () => {
         await expect(page.getByTestId('condition-title')).toHaveText(
           'Updated Condition'
         );
+        await expect(page.getByTestId('condition-timeline')).toBeVisible();
       });
     }
   );
 
-  test(
-    'should open Condition View and delete from its island',
-    { tag: ['@critical'] },
-    async ({ page }) => {
-      await test.step('Create a condition', async () => {
-        await seedTestCondition(page, { title: DEFAULT_CONDITION_TITLE });
-      });
-
-      await test.step('Click condition card to open Condition View', async () => {
-        await page.getByRole('button', { name: /^View condition:/ }).click();
-        await expect(page).toHaveURL(/.*condition\/[a-zA-Z0-9_-]+$/);
-        await expect(page.getByTestId('condition-title')).toHaveText(
-          DEFAULT_CONDITION_TITLE
-        );
-      });
-
-      await test.step('Delete condition from the view page', async () => {
-        // Edit forms no longer delete; the view page's island does.
-        await page.getByTestId('edit-condition-button').click();
-        await expect(page.getByTestId('condition-title-input')).toBeVisible();
-        await expect(page.getByTestId('delete-condition-button')).toHaveCount(
-          0
-        );
-        await page.getByTestId('cancel-button').click();
-        const deleteBtn = page.getByTestId('delete-condition-button');
-        await deleteBtn.click();
-
-        const modal = page.getByTestId('delete-confirmation-modal');
-        await expect(modal).toBeVisible();
-
-        const cancelBtn = page.getByTestId('delete-modal-cancel-button');
-        await cancelBtn.click();
-        await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('condition-title')).toHaveText(
-          DEFAULT_CONDITION_TITLE
-        );
-
-        await page.clock.install();
-        await deleteBtn.click();
-        const confirmBtn = page.getByTestId('delete-modal-confirm-button');
-        await expect(confirmBtn).toHaveAttribute('aria-disabled', 'true');
-
-        await page.clock.runFor(5000);
-        await expect(confirmBtn).toHaveText('Delete');
-        await expect(confirmBtn).not.toHaveAttribute('aria-disabled', 'true');
-        await confirmBtn.click();
-      });
-
-      await test.step('Verify returned to Home and condition removed', async () => {
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText(DEFAULT_CONDITION_TITLE)).not.toBeVisible();
-        await expect(page.getByText('Nothing to show yet')).toBeVisible();
-      });
-    }
-  );
   test('opens the add menu and creates a linked Consultation', async ({
     page,
   }) => {
     const initial = await seedTestCondition(page, {
       title: 'Initial Condition',
     });
-    await page.goto(`/condition/${initial.id}`);
+    await openRoute(page, `/condition/${initial.id}`);
     const view = page.getByTestId('condition-view');
     const addButton = page.getByTestId('condition-add-button');
     const menu = page.getByTestId('condition-add-menu');
@@ -269,12 +245,6 @@ test.describe('Edit Condition Flow', () => {
     await expect(view.getByTestId('condition-title')).toHaveText(
       'Initial Condition'
     );
-    await expect(
-      view
-        .getByTestId('condition-timeline')
-        .getByText('Linked Consultation', { exact: true })
-    ).toBeVisible();
-    await page.reload();
     await expect(
       view
         .getByTestId('condition-timeline')
@@ -401,7 +371,7 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
       ),
     original
   );
-  await page.goto('/condition/preserved-condition/edit');
+  await openRoute(page, '/condition/preserved-condition/edit');
   await page.getByTestId('condition-title-input').fill('Updated wording');
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
@@ -414,7 +384,7 @@ test('ordinary condition edits preserve diagnosis coding and unexposed FHIR meta
     code: { ...original.code, text: 'Updated wording' },
   });
 
-  await page.goto('/condition/preserved-condition/edit');
+  await openRoute(page, '/condition/preserved-condition/edit');
   await page.getByTestId('status-picker-select').selectOption('inactive');
   await page
     .getByTestId('verification-picker-button')
@@ -468,7 +438,7 @@ test('edits verification independently and roundtrips source and standard catego
       resource.subject.reference.split('/')[1]
     );
   }, condition);
-  await page.goto(`/condition/${condition.id}/edit`);
+  await openRoute(page, `/condition/${condition.id}/edit`);
   await expect(
     page.getByRole('combobox', { name: 'Category', exact: true })
   ).toHaveValue('ESI kontekstas');
@@ -481,14 +451,14 @@ test('edits verification independently and roundtrips source and standard catego
 
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
-  await page.goto(`/condition/${condition.id}`);
+  await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-category-0')).toHaveText(
     'Category: ESI kontekstas'
   );
   await expect(page.getByTestId('condition-verification-status')).toHaveText(
     'Verification status: Confirmed'
   );
-  await page.goto(`/condition/${condition.id}/edit`);
+  await openRoute(page, `/condition/${condition.id}/edit`);
   await expect(page.getByTestId('condition-category-input')).toHaveValue(
     'ESI kontekstas'
   );
@@ -496,7 +466,7 @@ test('edits verification independently and roundtrips source and standard catego
   await page.getByTestId('condition-category-input').selectOption('Temporary');
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
-  await page.goto(`/condition/${condition.id}`);
+  await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-category-0')).toHaveText(
     'Category: Temporary'
   );
@@ -516,14 +486,14 @@ test('edits verification independently and roundtrips source and standard catego
       ],
     },
   ]);
-  await page.goto(`/condition/${condition.id}/edit`);
+  await openRoute(page, `/condition/${condition.id}/edit`);
   await page
     .getByTestId('verification-picker-button')
     .selectOption('differential');
 
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
-  await page.goto(`/condition/${condition.id}`);
+  await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-verification-status')).toHaveText(
     'Verification status: Differential'
   );
@@ -533,7 +503,7 @@ test('edits verification independently and roundtrips source and standard catego
   );
   expect(saved.clinicalStatus.coding[0].code).toBe('inactive');
   expect(saved.verificationStatus.coding[0].code).toBe('differential');
-  await page.goto(`/condition/${condition.id}/edit`);
+  await openRoute(page, `/condition/${condition.id}/edit`);
   const dock = page.getByTestId('resource-action-dock');
   const ids = ['cancel-button', 'save-button', 'add-option-button'];
   const positions = await Promise.all(
@@ -582,7 +552,7 @@ test('edits verification independently and roundtrips source and standard catego
   await page.getByTestId('remove-category-button').click();
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
-  await page.goto(`/condition/${condition.id}`);
+  await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-title')).toBeVisible();
   saved = await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),

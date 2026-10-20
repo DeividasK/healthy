@@ -4,6 +4,7 @@ import {
   waitForMenuToggle,
   seedTestPatient,
   seedTestCondition,
+  openRoute,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Consultation View - Visual Regression', () => {
@@ -14,7 +15,7 @@ test.describe('Add Consultation View - Visual Regression', () => {
   test('Consultation View - Add New Form', async ({ page }, testInfo) => {
     // Reasons for visit are only offered when a condition exists.
     await seedTestCondition(page, { title: 'Scalp condition' });
-    await page.goto('/consultation/add');
+    await openRoute(page, '/consultation/add');
     await page.getByTestId('consultation-title-input').waitFor();
 
     await takeSnapshot(page, 'Consultation View - Add New Form', testInfo);
@@ -53,7 +54,7 @@ test.describe('Add Consultation View - Visual Regression', () => {
       id: 'add-second',
       title: 'Androgenic alopecia',
     });
-    await page.goto('/consultation/add?conditionId=add-first');
+    await openRoute(page, '/consultation/add?conditionId=add-first');
     await page
       .getByTestId('consultation-title-input')
       .fill('Dermatology review');

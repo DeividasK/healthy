@@ -3,6 +3,7 @@ import {
   expect,
   seedTestPatient,
   checkA11y,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Condition Flow', () => {
@@ -13,7 +14,7 @@ test.describe('Add Condition Flow', () => {
   test('field labels are labels for their controls and mark required ones', async ({
     page,
   }) => {
-    await page.goto('/condition/add');
+    await openRoute(page, '/condition/add');
     // A required text input and a required native select
     for (const id of ['condition-title-input', 'status-picker-select']) {
       await expect(page.locator(`label[for="${id}"]`)).toHaveText(/ \*$/);
@@ -178,7 +179,7 @@ test.describe('Condition form island', () => {
   test('centers the add menu on its + and turns the + into a close icon', async ({
     page,
   }) => {
-    await page.goto('/condition/add');
+    await openRoute(page, '/condition/add');
     const add = page.getByTestId('add-option-button');
     await add.click();
     const menu = page.getByTestId('form-add-menu');

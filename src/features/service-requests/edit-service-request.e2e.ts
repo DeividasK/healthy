@@ -10,6 +10,7 @@ import {
   getTestClinicalDocument,
   findServiceRequestSection,
   evaluateBridge as bridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Service Request', () => {
@@ -52,7 +53,7 @@ test.describe('Edit Service Request', () => {
       request.id
     );
 
-    await page.goto(`/service-request/${request.id}`);
+    await openRoute(page, `/service-request/${request.id}`);
     await expect(page.getByTestId('service-request-intent')).toContainText(
       'Directive'
     );
@@ -128,7 +129,7 @@ test.describe('Edit Service Request', () => {
       }
     );
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await expect(
       page.getByTestId(`link-consultation-role-${first.id}`)
     ).toHaveValue('origin');
@@ -205,7 +206,7 @@ test.describe('Edit Service Request', () => {
       title: 'Iron studies',
     });
 
-    await page.goto(`/condition/${condition.id}/edit`);
+    await openRoute(page, `/condition/${condition.id}/edit`);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-service-request').click();
     await page.getByTestId('link-service-request-search-input').click();
@@ -216,7 +217,7 @@ test.describe('Edit Service Request', () => {
     await expect(
       page.getByTestId(`condition-service-request-count-${condition.id}`)
     ).toBeVisible();
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await expect(
       page.getByTestId(`condition-timeline-item-service-request-${request.id}`)
     ).toBeVisible();
@@ -224,7 +225,7 @@ test.describe('Edit Service Request', () => {
       { reference: { reference: `Condition/${condition.id}` } },
     ]);
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page
       .getByTestId('remove-service-request-reasonCondition-button')
       .click();
@@ -264,7 +265,7 @@ test.describe('Edit Service Request', () => {
         )[0].fhir_json
       ).basedOn;
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-lab-result').click();
     await page.getByTestId('link-lab-result-search-input').click();
@@ -288,12 +289,12 @@ test.describe('Edit Service Request', () => {
     );
 
     // The request's condition shows the result on its timeline
-    await page.goto(`/condition/${condition.id}`);
+    await openRoute(page, `/condition/${condition.id}`);
     await expect(
       page.getByTestId(`condition-timeline-item-lab-result-${report.id}`)
     ).toBeVisible();
 
-    await page.goto(`/service-request/${request.id}/edit`);
+    await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('link-remove-lab-result-button').click();
     await page.getByTestId('save-service-request-button').click();
     await expect(page.getByTestId('service-request-title')).toBeVisible();

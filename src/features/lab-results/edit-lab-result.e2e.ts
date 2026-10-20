@@ -5,6 +5,7 @@ import {
   seedTestReport,
   seedTestServiceRequest,
   evaluateBridge as bridge,
+  openRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Lab Results Flow', () => {
@@ -16,25 +17,14 @@ test.describe('Edit Lab Results Flow', () => {
     'should replace "CBC Panel" badge with "Edit" icon and allow editing existing report results',
     { tag: ['@smoke'] },
     async ({ page }) => {
-      await test.step('Create an initial report with Hemoglobin and WBC', async () => {
-        await page.getByTestId('floating-add-button').click();
-        await page.getByTestId('menu-add-lab-results').click();
-        const searchInput = page.getByTestId('test-search-input');
-        await searchInput.fill('Hemoglobin');
-        await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-        await page.getByTestId('marker-value-input-0').fill('14.5');
-
-        await searchInput.fill('WBC');
-        await page.getByTestId('autocomplete-item-cbc_wbc').click();
-        await page.getByTestId('marker-value-input-1').fill('6.8');
-
-        const plusBtn = page.getByTestId('plus-menu-button');
-        await plusBtn.click();
-        await page.getByTestId('menu-add-notes').click();
-        await page.getByTestId('notes-input').fill('Initial checkup note');
-
-        await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
+      await test.step('Seed an initial report with Hemoglobin and WBC', async () => {
+        await seedTestReport(page, {
+          notes: 'Initial checkup note',
+          biomarkers: [
+            { name: 'Hemoglobin', value: 14.5 },
+            { name: 'White Blood Cells', value: 6.8 },
+          ],
+        });
       });
 
       await test.step('Verify Edit button exists on report card', async () => {
@@ -120,26 +110,13 @@ test.describe('Edit Lab Results Flow', () => {
         ).not.toBeVisible();
         await expect(page.getByText('"Updated checkup note"')).toBeVisible();
       });
-      await test.step('Cancel and confirm deletion from the edit island', async () => {
+      await test.step('Delete it from the edit island', async () => {
         await page.getByTestId(/^edit-report-button-/).click();
-        await page.getByTestId('delete-report-button').click();
-        const modal = page.getByTestId('delete-confirmation-modal');
-        await expect(modal).toBeVisible();
-        await page.getByTestId('delete-modal-cancel-button').click();
-        await expect(modal).not.toBeVisible();
-        await expect(page.getByTestId('notes-input')).toHaveValue(
-          'Updated checkup note'
-        );
-
         await page.clock.install();
         await page.getByTestId('delete-report-button').click();
-        const confirm = page.getByTestId('delete-modal-confirm-button');
-        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
         await page.clock.runFor(5000);
-        await confirm.click();
+        await page.getByTestId('delete-modal-confirm-button').click();
         await expect(page).toHaveURL(/\/$/);
-        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
-        await page.reload();
         await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
       });
     }
@@ -227,7 +204,7 @@ test.describe('Edit Lab Results Flow', () => {
       [report.id, JSON.stringify(practitioner)]
     );
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     const input = page.getByTestId('lab-result-service-provider-input');
     await expect(input).toHaveValue('City Laboratory');
     await page.getByTestId('remove-service-provider-button').click();
@@ -272,7 +249,7 @@ test.describe('Edit Lab Results Flow', () => {
       [report.id, JSON.stringify([performer])]
     );
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await expect(page.getByTestId('marker-value-input-0')).toHaveValue('14.5');
     await expect(
       page.getByTestId('lab-result-service-provider-input')
@@ -317,7 +294,7 @@ test.describe('Edit Lab Results Flow', () => {
         )[0].fhir_json
       ).basedOn;
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await page.getByTestId('plus-menu-button').click();
     await page.getByTestId('menu-link-service-request').click();
     await page.getByTestId('link-service-request-search-input').click();
@@ -332,7 +309,7 @@ test.describe('Edit Lab Results Flow', () => {
     expect(await storedBasedOn()).toEqual(linked);
 
     // Saving other changes keeps the link
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await expect(
       page.getByTestId(`link-selected-service-request-${request.id}`)
     ).toBeVisible();
@@ -341,7 +318,7 @@ test.describe('Edit Lab Results Flow', () => {
     await expect(page).not.toHaveURL(/\/edit$/);
     expect(await storedBasedOn()).toEqual(linked);
 
-    await page.goto(`/lab-result/${report.id}/edit`);
+    await openRoute(page, `/lab-result/${report.id}/edit`);
     await page.getByTestId('remove-link-service-request-button').click();
     await page.getByTestId('save-button').click();
     await expect(page).not.toHaveURL(/\/edit$/);
