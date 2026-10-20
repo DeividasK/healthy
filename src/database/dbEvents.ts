@@ -16,7 +16,9 @@ export type DatabaseTable =
   | 'medication_administrations'
   | 'medication_statements'
   | 'request_orchestrations'
-  | 'profile_settings';
+  | 'profile_settings'
+  // Sync metadata: which profiles sync, and held remote deletions.
+  | 'sync_profiles';
 
 type Listener = (tables: DatabaseTable[]) => void;
 

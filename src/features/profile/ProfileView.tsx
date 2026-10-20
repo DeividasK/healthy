@@ -22,6 +22,7 @@ import {
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { GoogleSyncCard } from './GoogleSyncCard';
+import { PatientIdText } from './PatientIdText';
 
 export function ProfileView() {
   const router = useRouter();
@@ -116,6 +117,17 @@ export function ProfileView() {
                 {birthDateFormatted}
               </Text>
             </View>
+
+            {activePatient?.id && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Patient ID</Text>
+                <PatientIdText
+                  id={activePatient.id}
+                  testID="profile-id-value"
+                  style={styles.idValue}
+                />
+              </View>
+            )}
           </View>
 
           {/* Switch Profile Section */}
@@ -165,8 +177,9 @@ export function ProfileView() {
                       {pInitials}
                     </Text>
                   </View>
-                  <View>
+                  <View style={styles.patientItemText}>
                     <Text style={styles.patientItemName}>{pName}</Text>
+                    <PatientIdText id={pId} testID={`profile-item-id-${pId}`} />
                   </View>
                 </View>
 
@@ -268,6 +281,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   infoLabel: {
+    flexShrink: 0,
     fontSize: 15,
     color: COLORS.light.muted,
   },
@@ -275,6 +289,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.light.foreground,
+  },
+  idValue: {
+    flexShrink: 1,
+    marginLeft: 16,
+    textAlign: 'right',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -320,6 +339,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flexShrink: 1,
+  },
+  patientItemText: {
+    flexShrink: 1,
   },
   patientMiniAvatar: {
     width: 38,

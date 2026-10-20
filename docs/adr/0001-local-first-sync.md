@@ -62,10 +62,14 @@ Replace the per-resource Drive files with an **append-only, encrypted change log
    - Saves no longer start a full sync.
 9. **Choosing profiles.** Each device chooses which profiles it syncs (`sync_profiles`), as with the previous per-profile Google Drive connection. Connecting Google Drive syncs the active profile only; other profiles are connected from their own sync card, and profiles already in the cloud are picked from "Restore from Google Drive". Changes to profiles a device does not sync are neither uploaded nor applied there; Patient changes still update a catalog of cloud profiles for that list.
    - **Starting to sync a profile** merges its history from every device, then uploads local changes.
-   - **Stopping** keeps the profile on the device. With "Delete this profile from Google Drive" ticked, its records are deleted from the cloud and other devices (as tombstones) but kept locally; connecting it again uploads them anew. Stopping the last synced profile also disconnects the account, as before.
+   - **Stopping** keeps the profile on the device. With "Delete this profile from Google Drive" ticked, its records are deleted from the cloud (as tombstones) but kept locally, and other devices ask before deleting them (see 10); connecting it again uploads them anew. Stopping the last synced profile also disconnects the account, as before.
 10. **Deleting profiles.**
 
-- **Delete everywhere** (option ticked, profile synced) writes tombstones for the patient and all of their resources.
+- **Delete everywhere** (option ticked, profile synced) writes tombstones for the patient and all of their resources. The Patient tombstone is uploaded first. Once they are uploaded, the deleting device stops syncing the profile, so a copy restored by another device is offered under "Restore from Google Drive" there instead of coming back on its own.
+- **On other devices** that sync the profile and still have it, a winning Patient tombstone is not applied. The profile is held (`sync_profiles.deletion_hold_hlc`): none of its incoming changes are applied, its local edits are not uploaded, and a dialog that cannot be dismissed shows its name and patient ID and asks what to do:
+  - **Delete from this device** (after a confirmation) downloads the profile's history again and applies the deletion.
+  - **Restore to Google Drive** re-stamps every local record of the profile, so the next upload wins over the tombstones on every device.
+  - **Keep only on this device** stops syncing the profile and marks its cloud copy deleted, so syncing it again later uploads it anew. With no other synced profile, the account disconnects.
 - **Remove from this device only** uploads pending edits, then deletes local rows without tombstones and stops syncing the profile, so it doesn't come back. It stays available under "Restore from Google Drive".
 - A profile that isn't synced is removed from this device only, so a later reconnect can never delete it from the cloud.
 

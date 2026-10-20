@@ -52,10 +52,14 @@ import {
   restoreFromZipBytes,
 } from '@/src/services/zipArchiveService';
 import {
+  applyHeldProfileDeletion,
   compactNow,
   createVault,
   deleteCloudData,
+  keepHeldProfileOnDevice,
+  listProfileDeletionHolds,
   listRestorableProfiles,
+  restoreHeldProfile,
   loadVaultKeys,
   startSyncingPatient,
   stopSyncingPatient,
@@ -211,6 +215,15 @@ export function setupTestBridge() {
           deleteFromCloud,
         }
       ),
+    listProfileDeletionHolds,
+    applyHeldProfileDeletion: async (patientId: string) =>
+      applyHeldProfileDeletion(
+        await connectedProvider(),
+        await vaultKeys(),
+        patientId
+      ),
+    restoreHeldProfile,
+    keepHeldProfileOnDevice,
     /** A device choosing every local and cloud profile, then syncing. */
     syncAllProfiles: async () => {
       const provider = await connectedProvider();

@@ -28,6 +28,7 @@ import { useSync } from '@/src/context/SyncContext';
 import { listRestorableProfiles } from '@/src/features/sync/engine';
 import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
+import { PatientIdText } from './PatientIdText';
 
 export interface AddProfileViewProps {
   initialTab?: 'create' | 'file' | 'gdrive';
@@ -540,7 +541,13 @@ export function AddProfileView({
                           {pInitials}
                         </Text>
                       </View>
-                      <Text style={styles.remoteProfileName}>{pName}</Text>
+                      <View style={styles.remoteProfileText}>
+                        <Text style={styles.remoteProfileName}>{pName}</Text>
+                        <PatientIdText
+                          id={pId}
+                          testID={`remote-profile-id-${pId}`}
+                        />
+                      </View>
                     </View>
 
                     <View
@@ -764,6 +771,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  remoteProfileText: {
+    flex: 1,
+  },
   remoteAvatar: {
     width: 34,
     height: 34,
@@ -779,7 +789,6 @@ const styles = StyleSheet.create({
     color: COLORS.light.primary,
   },
   remoteProfileName: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.light.foreground,

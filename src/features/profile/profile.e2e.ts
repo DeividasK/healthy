@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   createConditionViaUI,
   checkA11y,
+  evaluateBridge,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
@@ -28,6 +29,12 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         await expect(page.getByTestId('profile-display-name')).toHaveText(
           'John Doe'
         );
+        // The patient ID tells apart profiles with the same name.
+        const [{ id }] = await evaluateBridge(page, (b) =>
+          b.querySql('SELECT id FROM patients')
+        );
+        await expect(page.getByTestId('profile-id-value')).toHaveText(id);
+        await expect(page.getByTestId(`profile-item-id-${id}`)).toHaveText(id);
         // Muted #717973 text (4.48:1) and the Google sign-in button still
         // fall just short of 4.5:1.
         await checkA11y(page, { disableRules: ['color-contrast'] });

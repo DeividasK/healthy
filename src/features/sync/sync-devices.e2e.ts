@@ -337,12 +337,16 @@ test.describe('Sync between devices', () => {
     await bridge(second.page, (b) => b.syncProfile('shared-patient'));
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
 
-    // Deleting everywhere removes it from the other device too.
+    // Deleting everywhere removes it from the other device too, once the
+    // user there confirms it.
     await bridge(page, async (b) => {
       await b.deletePatient('shared-patient');
       await b.syncNow();
     });
     await syncTestDevice(second.page);
+    await bridge(second.page, (b) =>
+      b.applyHeldProfileDeletion('shared-patient')
+    );
     expect(await snapshot(second.page)).toEqual(await snapshot(page));
     expect((await snapshot(page)).patients).toHaveLength(1);
     await second.close();
