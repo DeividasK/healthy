@@ -2,7 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Copy, Group, Pill } from 'lucide-react-native';
+import {
+  ArrowUpDown,
+  Check,
+  Clock,
+  Copy,
+  Group,
+  Pill,
+} from 'lucide-react-native';
 import Animated, {
   ReduceMotion,
   SlideInLeft,
@@ -15,12 +22,24 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import type { JournalOrder } from '@/src/features/settings/profileSettings';
+import { saveProfileSettings } from '@/src/features/settings/profileSettingsRepository';
 import { COLORS } from '@/src/theme/colors';
 import { ActionDayPills } from './ActionDayPills';
 import { ActionCalendar } from './ActionCalendar';
-import { TreatmentLogRow } from './TreatmentLogRow';
+import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 import { BundleLogRow } from './BundleLogRow';
-import { getBundleChanges, groupActionDay } from './bundleGrouping';
+import {
+  getBundleChanges,
+  groupActionDay,
+  type JournalRow,
+} from './bundleGrouping';
+import {
+  canMoveJournalRow,
+  groupJournalRows,
+  moveJournalRow,
+  type JournalGroup,
+} from './journalGroups';
 import { useJournalBundles } from './useJournalBundles';
 import { CheckboxRow } from './CheckboxRow';
 import {
@@ -248,6 +267,59 @@ function ActionsForPatient({
       )
     : [];
 
+  // While the journal is reordered, rows move instead of taking answers.
+  // Moves show at once and save one after another; until the last is saved
+  // and reloaded, the order shown is the one moved to.
+  const [isReordering, setIsReordering] = useState(false);
+  const [movedOrder, setMovedOrder] = useState<JournalOrder | null>(null);
+  const [orderSavesPending, setOrderSavesPending] = useState(0);
+  const orderSaves = useRef(Promise.resolve());
+  const queueOrderSave = useCallback((save: () => Promise<void>) => {
+    orderSaves.current = orderSaves.current.then(save);
+  }, []);
+  const journalOrder =
+    (orderSavesPending > 0 && movedOrder) || journalBundles?.journalOrder || {};
+  const groups = groupJournalRows(
+    shownRows,
+    journalBundles?.timesOfDay ?? {},
+    journalOrder
+  );
+  // A day without times keeps a single list of treatments.
+  const isGrouped = groups.some((group) => group.id !== 'any');
+  const canReorder = groups.some(
+    (group) => group.rows.length > 0 && canMoveJournalRow(group.rows, 0, 1)
+  );
+
+  const moveRow = (group: JournalGroup, index: number, delta: -1 | 1) => {
+    const next: JournalOrder = {
+      ...journalOrder,
+      [group.id]: moveJournalRow(
+        group.rows,
+        index,
+        delta,
+        journalOrder[group.id]
+      ),
+    };
+    const date = selected;
+    setMovedOrder(next);
+    setOrderSavesPending((count) => count + 1);
+    const reload = journalBundles?.reload;
+    queueOrderSave(async () => {
+      try {
+        await saveProfileSettings(activePatientId, { journalOrder: next });
+        await reload?.();
+      } catch (err) {
+        console.error('Failed to save journal order:', err);
+        setSaveErrorsByDate((current) => ({
+          ...current,
+          [date]: 'Failed to save the order. Please try again.',
+        }));
+      } finally {
+        setOrderSavesPending((count) => count - 1);
+      }
+    });
+  };
+
   const handleAnswer = async (
     item: ActionItem,
     answer: TreatmentLogAnswer | null
@@ -371,6 +443,53 @@ function ActionsForPatient({
       params: { id: item.treatment.id || '' },
     });
 
+  const renderRow = (row: JournalRow, group: JournalGroup, index: number) => {
+    const reorder: ReorderHandlers | undefined = isReordering
+      ? {
+          onMoveUp: canMoveJournalRow(group.rows, index, -1)
+            ? () => moveRow(group, index, -1)
+            : undefined,
+          onMoveDown: canMoveJournalRow(group.rows, index, 1)
+            ? () => moveRow(group, index, 1)
+            : undefined,
+        }
+      : undefined;
+    return row.kind === 'bundle' ? (
+      <BundleLogRow
+        key={row.key}
+        row={row}
+        isLeaving={isLeaving}
+        isSaving={(item) => savingKeys.includes(item.key)}
+        reorder={reorder}
+        onAnswerAll={(pressed) =>
+          void applyAnswers(
+            shown.date,
+            getBundleChanges(row.items, pressed),
+            'bundle'
+          )
+        }
+        onAnswer={(item, answer) => void handleAnswer(item, answer)}
+        onOpen={() =>
+          router.push({
+            pathname: '/bundle/[id]',
+            params: { id: row.bundle.id || '' },
+          })
+        }
+        onOpenTreatment={openTreatment}
+      />
+    ) : (
+      <TreatmentLogRow
+        key={row.item.key}
+        item={row.item}
+        isLeaving={isLeaving}
+        disabled={isLeaving || savingKeys.includes(row.item.key)}
+        reorder={reorder}
+        onAnswer={(answer) => void handleAnswer(row.item, answer)}
+        onOpen={() => openTreatment(row.item)}
+      />
+    );
+  };
+
   const selectDay = (date: string) => {
     router.setParams({ date: date === today ? undefined : date });
   };
@@ -398,7 +517,8 @@ function ActionsForPatient({
           onOpenCalendar={() => setIsCalendarOpen(true)}
           keysEnabled={!isCalendarOpen}
           leading={
-            copyable.length > 0 && (
+            copyable.length > 0 &&
+            !isReordering && (
               <CheckboxRow
                 testID="actions-copy-previous-day"
                 label="Copy answers from previous day"
@@ -420,77 +540,46 @@ function ActionsForPatient({
         ) : hasLoadError ? (
           <Text style={styles.errorText}>Failed to load treatments.</Text>
         ) : (
-          <>
-            <ResourceSection
-              icon={Pill}
-              title="Treatments"
-              testID="actions-treatments-section"
+          groups.length > 0 && (
+            <Animated.View
+              key={shown.date}
+              entering={
+                shown.isLater === null
+                  ? undefined
+                  : shown.isLater
+                    ? rowsSlide.laterIn
+                    : rowsSlide.earlierIn
+              }
+              exiting={
+                isLeavingForLater === false
+                  ? rowsSlide.earlierOut
+                  : rowsSlide.laterOut
+              }
+              pointerEvents={isLeaving ? 'none' : 'auto'}
+              aria-hidden={isLeaving}
+              importantForAccessibility={
+                isLeaving ? 'no-hide-descendants' : 'auto'
+              }
             >
-              {shownRows.length > 0 && (
-                <Animated.View
-                  key={shown.date}
-                  entering={
-                    shown.isLater === null
-                      ? undefined
-                      : shown.isLater
-                        ? rowsSlide.laterIn
-                        : rowsSlide.earlierIn
-                  }
-                  exiting={
-                    isLeavingForLater === false
-                      ? rowsSlide.earlierOut
-                      : rowsSlide.laterOut
-                  }
-                  pointerEvents={isLeaving ? 'none' : 'auto'}
-                  aria-hidden={isLeaving}
-                  importantForAccessibility={
-                    isLeaving ? 'no-hide-descendants' : 'auto'
-                  }
-                >
-                  {shownRows.map((row) =>
-                    row.kind === 'bundle' ? (
-                      <BundleLogRow
-                        key={row.key}
-                        row={row}
-                        isLeaving={isLeaving}
-                        isSaving={(item) => savingKeys.includes(item.key)}
-                        onAnswerAll={(pressed) =>
-                          void applyAnswers(
-                            shown.date,
-                            getBundleChanges(row.items, pressed),
-                            'bundle'
-                          )
-                        }
-                        onAnswer={(item, answer) =>
-                          void handleAnswer(item, answer)
-                        }
-                        onOpen={() =>
-                          router.push({
-                            pathname: '/bundle/[id]',
-                            params: { id: row.bundle.id || '' },
-                          })
-                        }
-                        onOpenTreatment={openTreatment}
-                      />
-                    ) : (
-                      <TreatmentLogRow
-                        key={row.item.key}
-                        item={row.item}
-                        isLeaving={isLeaving}
-                        disabled={
-                          isLeaving || savingKeys.includes(row.item.key)
-                        }
-                        onAnswer={(answer) =>
-                          void handleAnswer(row.item, answer)
-                        }
-                        onOpen={() => openTreatment(row.item)}
-                      />
-                    )
-                  )}
-                </Animated.View>
-              )}
-            </ResourceSection>
-          </>
+              {groups.map((group) => {
+                const sectionTestID = isGrouped
+                  ? `actions-group-${group.id}`
+                  : 'actions-treatments-section';
+                return (
+                  <ResourceSection
+                    key={group.id}
+                    icon={isGrouped ? Clock : Pill}
+                    title={isGrouped ? group.label : 'Treatments'}
+                    testID={isLeaving ? undefined : sectionTestID}
+                  >
+                    {group.rows.map((row, index) =>
+                      renderRow(row, group, index)
+                    )}
+                  </ResourceSection>
+                );
+              })}
+            </Animated.View>
+          )
         )}
       </ScrollView>
       {isCalendarOpen && (
@@ -503,21 +592,40 @@ function ActionsForPatient({
         />
       )}
       <ResourceActionDock
-        actions={[
-          {
-            label: 'New bundle',
-            testID: 'actions-new-bundle-button',
-            icon: Group,
-            onPress: () => router.push('/bundle/add'),
-          },
-          {
-            label: 'Done',
-            testID: 'actions-done-button',
-            icon: Check,
-            onPress: handleDone,
-            primary: true,
-          },
-        ]}
+        actions={
+          isReordering
+            ? [
+                {
+                  label: 'Done reordering',
+                  testID: 'actions-reorder-done-button',
+                  icon: Check,
+                  onPress: () => setIsReordering(false),
+                  primary: true,
+                },
+              ]
+            : [
+                {
+                  label: 'New bundle',
+                  testID: 'actions-new-bundle-button',
+                  icon: Group,
+                  onPress: () => router.push('/bundle/add'),
+                },
+                {
+                  label: 'Reorder',
+                  testID: 'actions-reorder-button',
+                  icon: ArrowUpDown,
+                  onPress: () => setIsReordering(true),
+                  disabled: !canReorder,
+                },
+                {
+                  label: 'Done',
+                  testID: 'actions-done-button',
+                  icon: Check,
+                  onPress: handleDone,
+                  primary: true,
+                },
+              ]
+        }
       />
     </SafeAreaView>
   );

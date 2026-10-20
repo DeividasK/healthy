@@ -4,15 +4,22 @@ import type { RequestOrchestration } from 'fhir/r5';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getAllBundles } from '@/src/features/bundles/bundleService';
 import { getProfileSettings } from '@/src/features/settings/profileSettingsRepository';
-import { DEFAULT_TIMES_OF_DAY } from '@/src/features/settings/profileSettings';
+import {
+  DEFAULT_TIMES_OF_DAY,
+  type JournalOrder,
+} from '@/src/features/settings/profileSettings';
 import type { TimesOfDay } from './bundleGrouping';
 
-/** The profile's bundles and times of day, kept current for the journal. */
+/**
+ * The profile's bundles, times of day and journal order, kept current for
+ * the journal.
+ */
 export function useJournalBundles(patientId: string) {
   const [state, setState] = useState<{
     patientId: string;
     bundles: RequestOrchestration[];
     timesOfDay: TimesOfDay;
+    journalOrder: JournalOrder;
   } | null>(null);
 
   const loadSequence = useRef(0);
@@ -26,12 +33,22 @@ export function useJournalBundles(patientId: string) {
         getProfileSettings(patientId),
       ]);
       if (sequence === loadSequence.current)
-        setState({ patientId, bundles, timesOfDay: settings.timesOfDay });
+        setState({
+          patientId,
+          bundles,
+          timesOfDay: settings.timesOfDay,
+          journalOrder: settings.journalOrder ?? {},
+        });
     } catch (err) {
       // The journal still works without its bundles.
       console.error('Failed to load bundles:', err);
       if (sequence === loadSequence.current)
-        setState({ patientId, bundles: [], timesOfDay: DEFAULT_TIMES_OF_DAY });
+        setState({
+          patientId,
+          bundles: [],
+          timesOfDay: DEFAULT_TIMES_OF_DAY,
+          journalOrder: {},
+        });
     }
   }, [patientId]);
 
@@ -41,5 +58,6 @@ export function useJournalBundles(patientId: string) {
     load
   );
 
-  return state?.patientId === patientId ? state : null;
+  const current = state?.patientId === patientId ? state : null;
+  return current && { ...current, reload: load };
 }

@@ -18,19 +18,22 @@ import {
 import { formatTreatmentCount } from '@/src/features/bundles/BundleRelatedRow';
 import { COLORS } from '@/src/theme/colors';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
-import { AnswerButtons } from './AnswerButtons';
+import { AnswerButtons, ReorderButtons } from './AnswerButtons';
 import { getBundleAnswer, type BundleRow } from './bundleGrouping';
-import { TreatmentLogRow } from './TreatmentLogRow';
+import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 
 /**
  * One time of a bundle in the journal: its buttons answer every dose it
  * groups. The chevron shows the doses, each with its own buttons; the row
- * opens the bundle. Open while answers are mixed, until toggled.
+ * opens the bundle. Open while answers are mixed, until toggled. While the
+ * journal is reordered, move buttons replace the chevron and answers, and
+ * the doses stay hidden.
  */
 export function BundleLogRow({
   row,
   isLeaving = false,
   isSaving,
+  reorder,
   onAnswerAll,
   onAnswer,
   onOpen,
@@ -39,6 +42,8 @@ export function BundleLogRow({
   row: BundleRow;
   isLeaving?: boolean;
   isSaving: (item: ActionItem) => boolean;
+  /** Set while the journal is reordered. */
+  reorder?: ReorderHandlers;
   onAnswerAll: (answer: TreatmentLogAnswer) => void;
   onAnswer: (item: ActionItem, answer: TreatmentLogAnswer | null) => void;
   onOpen: () => void;
@@ -50,7 +55,7 @@ export function BundleLogRow({
   const answered = row.items.filter((item) => item.answer);
   const taken = row.items.filter((item) => item.answer === 'taken').length;
   const isMixed = answered.length > 0 && !answer;
-  const isOpen = toggled ?? isMixed;
+  const isOpen = !reorder && (toggled ?? isMixed);
   const treatmentCount = new Set(row.items.map((item) => item.treatment.id))
     .size;
   const testID = (name: string) =>
@@ -81,29 +86,39 @@ export function BundleLogRow({
         accessibilityLabel={`View bundle: ${title}`}
         onPress={onOpen}
         accessory={
-          <View style={styles.accessory}>
-            <TouchableOpacity
-              testID={testID('toggle')}
-              accessibilityRole="button"
-              accessibilityLabel={`${isOpen ? 'Hide' : 'Show'} treatments in ${name}`}
-              aria-expanded={isOpen}
-              accessibilityState={{ expanded: isOpen }}
-              style={styles.toggle}
-              activeOpacity={0.6}
-              onPress={() => setToggled(!isOpen)}
-            >
-              <Chevron color={COLORS.light.iconMuted} size={20} />
-            </TouchableOpacity>
-            <AnswerButtons
-              answer={answer}
+          reorder ? (
+            <ReorderButtons
               name={name}
-              disabled={isLeaving || row.items.some(isSaving)}
-              testIDPrefix={
-                isLeaving ? undefined : { prefix: 'bundle-log', rowId: row.key }
-              }
-              onAnswer={(pressed) => onAnswerAll(pressed ?? answer!)}
+              testIDSuffix={isLeaving ? undefined : row.key}
+              {...reorder}
             />
-          </View>
+          ) : (
+            <View style={styles.accessory}>
+              <TouchableOpacity
+                testID={testID('toggle')}
+                accessibilityRole="button"
+                accessibilityLabel={`${isOpen ? 'Hide' : 'Show'} treatments in ${name}`}
+                aria-expanded={isOpen}
+                accessibilityState={{ expanded: isOpen }}
+                style={styles.toggle}
+                activeOpacity={0.6}
+                onPress={() => setToggled(!isOpen)}
+              >
+                <Chevron color={COLORS.light.iconMuted} size={20} />
+              </TouchableOpacity>
+              <AnswerButtons
+                answer={answer}
+                name={name}
+                disabled={isLeaving || row.items.some(isSaving)}
+                testIDPrefix={
+                  isLeaving
+                    ? undefined
+                    : { prefix: 'bundle-log', rowId: row.key }
+                }
+                onAnswer={(pressed) => onAnswerAll(pressed ?? answer!)}
+              />
+            </View>
+          )
         }
       />
       {isOpen && (

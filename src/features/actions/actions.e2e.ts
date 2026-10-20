@@ -1,7 +1,10 @@
+import type { Locator } from '@playwright/test';
+import type { RegimenDraft } from '@/src/features/treatments/regimen';
 import {
   test,
   expect,
   checkA11y,
+  evaluateBridge,
   getBrowserLocalDate,
   getTestTreatmentLog,
   seedTestPatient,
@@ -488,3 +491,140 @@ for (const mode of ['answer', 'copy'] as const) {
       .toMatchObject({ status: 'completed' });
   });
 }
+
+/** A once-daily regimen of one tablet at a part of the day or a clock time. */
+const onceDailyAt = (at: string): RegimenDraft => ({
+  phases: [
+    {
+      doses: [
+        {
+          amount: '1',
+          amountMax: '',
+          unit: '{tablet}',
+          route: '',
+          site: '',
+          patientInstruction: '',
+          timing: {
+            frequency: '1',
+            frequencyMax: '',
+            period: '1',
+            periodUnit: 'd',
+            when: /^\d/.test(at) ? '' : at,
+            timeOfDay: /^\d/.test(at) ? at : '',
+            boundsValue: '',
+            boundsUnit: 'd',
+          },
+        },
+      ],
+    },
+  ],
+});
+
+/** Test IDs of the journal rows in a section, top to bottom. */
+const rowIds = (section: Locator) =>
+  section
+    .locator('[data-testid^="treatment-log-row-"]')
+    .evaluateAll((rows) =>
+      rows
+        .map((row) => row.getAttribute('data-testid')!)
+        .filter((id) => !id.endsWith('-open'))
+    );
+
+test.describe('My actions: journal organisation', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedTestPatient(page);
+  });
+
+  test('groups treatments by time of day and keeps the order users give', async ({
+    page,
+  }) => {
+    const started = await getBrowserLocalDate(page, -3);
+    const treatment = (id: string, title: string, at?: string) => ({
+      id,
+      title,
+      status: 'active' as const,
+      authoredOn: started,
+      takingSince: started,
+      ...(at ? { regimen: onceDailyAt(at) } : {}),
+    });
+    await seedTestResources(page, {
+      treatments: [
+        treatment('org-iron', 'Iron', 'MORN'),
+        treatment('org-magnesium', 'Magnesium', 'EVE'),
+        treatment('org-vit-d', 'Vitamin D', 'MORN'),
+        treatment('org-zinc', 'Zinc', '07:30'),
+        treatment('org-cream', 'Hydrocortisone cream'),
+      ],
+    });
+    await page.goto('/journal');
+
+    // Parts of the day in clock order; an exact time joins the nearest one,
+    // and treatments without a time come last.
+    const sections = page.locator('[data-testid^="actions-group-"]');
+    await expect(sections).toHaveCount(3);
+    expect(
+      await sections.evaluateAll((all) =>
+        all.map((section) => section.getAttribute('data-testid'))
+      )
+    ).toEqual(['actions-group-MORN', 'actions-group-EVE', 'actions-group-any']);
+    const morning = page.getByTestId('actions-group-MORN');
+    await expect(morning.getByRole('heading')).toHaveText('Morning');
+    await expect(page.getByTestId('actions-group-any')).toContainText(
+      'Any time'
+    );
+    await expect(
+      page
+        .getByTestId('actions-group-EVE')
+        .getByTestId('treatment-log-row-org-magnesium-0')
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('actions-group-any')
+        .getByTestId('treatment-log-row-org-cream')
+    ).toBeVisible();
+    // Within a part of the day, earlier times come first.
+    const initial = await rowIds(morning);
+    expect(initial).toHaveLength(3);
+    expect(initial[0]).toBe('treatment-log-row-org-zinc-0');
+    await checkA11y(page);
+
+    // Reordering swaps answers for move buttons, within each part of the day.
+    await page.getByTestId('actions-reorder-button').click();
+    await expect(
+      page.getByTestId('treatment-log-taken-org-zinc-0')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('journal-move-up-org-zinc-0')).toBeDisabled();
+    await expect(
+      page.getByTestId('journal-move-down-org-magnesium-0')
+    ).toBeDisabled();
+    const last = initial[2].replace('treatment-log-row-', '');
+    await page.getByTestId(`journal-move-up-${last}`).click();
+    await page.getByTestId(`journal-move-up-${last}`).click();
+    const moved = [initial[2], initial[0], initial[1]];
+    await expect.poll(() => rowIds(morning)).toEqual(moved);
+    await expect(page.getByTestId(`journal-move-up-${last}`)).toBeDisabled();
+    await checkA11y(page);
+    await page.getByTestId('actions-reorder-done-button').click();
+    await expect(
+      page.getByTestId('treatment-log-taken-org-zinc-0')
+    ).toBeVisible();
+
+    // The order is kept in the profile's settings, for every day.
+    await expect
+      .poll(
+        async () =>
+          (await evaluateBridge(page, (b) => b.getProfileSettings()))
+            ?.journalOrder?.MORN
+      )
+      .toEqual(
+        moved.map(
+          (id) =>
+            `MedicationRequest/${id.replace('treatment-log-row-', '').replace(/-0$/, '')}`
+        )
+      );
+    await page.reload();
+    await expect.poll(() => rowIds(morning)).toEqual(moved);
+    await page.getByTestId('actions-previous-day').click();
+    await expect.poll(() => rowIds(morning)).toEqual(moved);
+  });
+});

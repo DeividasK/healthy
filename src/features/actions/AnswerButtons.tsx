@@ -1,6 +1,12 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Check, X, type LucideIcon } from 'lucide-react-native';
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  X,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 import type { TreatmentLogAnswer } from './actionDays';
 
@@ -63,6 +69,50 @@ export function AnswerButtons({
   );
 }
 
+/**
+ * "Move up" and "move down" buttons, shown instead of a journal row's answer
+ * buttons while the journal is reordered. A missing handler disables its
+ * button.
+ */
+export function ReorderButtons({
+  name,
+  testIDSuffix,
+  onMoveUp,
+  onMoveDown,
+}: {
+  /** What is moved, read in the buttons' labels. */
+  name: string;
+  /** e.g. the row id gives `journal-move-up-<rowId>`; omitted while leaving. */
+  testIDSuffix?: string;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+}) {
+  const button = (
+    direction: 'up' | 'down',
+    Icon: LucideIcon,
+    onPress?: () => void
+  ) => (
+    <TouchableOpacity
+      testID={testIDSuffix && `journal-move-${direction}-${testIDSuffix}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Move ${name} ${direction}`}
+      accessibilityState={{ disabled: !onPress }}
+      disabled={!onPress}
+      style={[styles.button, !onPress && styles.disabled]}
+      activeOpacity={0.6}
+      onPress={onPress}
+    >
+      <Icon color={COLORS.light.iconMuted} size={18} strokeWidth={2.5} />
+    </TouchableOpacity>
+  );
+  return (
+    <View style={styles.buttons}>
+      {button('up', ArrowUp, onMoveUp)}
+      {button('down', ArrowDown, onMoveDown)}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   buttons: {
     flexDirection: 'row',
@@ -81,5 +131,8 @@ const styles = StyleSheet.create({
   },
   notTaken: {
     backgroundColor: COLORS.light.textSecondary,
+  },
+  disabled: {
+    opacity: 0.4,
   },
 });
