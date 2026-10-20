@@ -1,0 +1,82 @@
+name: Release
+
+# Pushing to `release` ships the version in app.json: a GitHub Release with its
+# CHANGELOG.md section, and the web app on GitHub Pages. EAS builds and submits
+# Android from the same push (.eas/workflows/android-release.yml).
+on:
+  push:
+    branches: [release]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  github-release:
+    name: GitHub Release
+    permissions:
+      contents: write
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          save-cache: false
+
+      - name: Verify Release Notes
+        run: pnpm release:verify
+
+      # A push that keeps the version (e.g. a merge back from main without a
+      # prepared release) leaves the existing release alone.
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="v$(node -p "require('./app.json').expo.version")"
+          if gh release view "$version" > /dev/null 2>&1; then
+            echo "$version is already released."
+            exit 0
+          fi
+          pnpm --silent release:notes > release-notes.md
+          gh release create "$version" --target "$GITHUB_SHA" --title "$version" --notes-file release-notes.md
+
+  deploy-to-github-pages:
+    name: Build & Deploy to GitHub Pages
+    needs: [github-release]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+
+      - name: Build for GitHub Pages
+        uses: ./.github/actions/build-web
+        with:
+          base-url: /healthy
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+          include-hidden-files: true
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

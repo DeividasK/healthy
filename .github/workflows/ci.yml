@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The changelog check diffs the branch against origin/main.
+          fetch-depth: 0
       - uses: pnpm/setup@v3
         with:
           cache: true
@@ -30,6 +32,8 @@ jobs:
         run: pnpm dlx expo-doctor
       - name: Pure Function Tests
         run: pnpm test:unit
+      - name: Changelog Fragment Check
+        run: pnpm changelog:check
 
   android:
     name: Android Debug Build
