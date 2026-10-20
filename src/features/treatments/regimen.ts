@@ -194,9 +194,10 @@ export const getPeriodUnitOptions = (current = '') =>
 export const getCourseUnitOptions = (current = '') =>
   timeUnitOptions(COURSE_UNITS, current);
 
+/** A new timing, prefilled as once a day. */
 export function createTimingDraft(): TimingDraft {
   return {
-    frequency: '',
+    frequency: '1',
     frequencyMax: '',
     period: '1',
     periodUnit: 'd',
@@ -224,9 +225,10 @@ export function chooseTimeOfDay(
 /** "08:00:00" as "08:00". */
 export const formatClockTime = (time: string) => time.slice(0, 5);
 
+/** A new dose, prefilled as 1 tablet once a day. */
 export function createDoseDraft(): DoseDraft {
   return {
-    amount: '',
+    amount: '1',
     amountMax: '',
     unit: '{tablet}',
     route: '',

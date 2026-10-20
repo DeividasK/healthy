@@ -135,6 +135,9 @@ function AddTreatmentForPatient({
       patientId: activePatientId,
       consultationId: originId,
       requesterName: values.requesterName,
+      usageStart: values.usageStart
+        ? formatLocalDate(values.usageStart)
+        : undefined,
     });
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {

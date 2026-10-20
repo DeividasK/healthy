@@ -14,6 +14,7 @@ import {
   FolderPlus,
   MessageSquareText,
   Package,
+  Play,
   Repeat,
   Tablets,
   User,
@@ -73,6 +74,8 @@ export interface TreatmentFormValues {
   notes?: string | null;
   /** Selected links to other resources, keyed by resource type. */
   links?: Record<string, LinkSelection>;
+  /** New treatments only: the day taking it starts, if chosen. */
+  usageStart?: Date;
 }
 
 export interface TreatmentFormProps {
@@ -171,6 +174,16 @@ export function TreatmentForm({
         empty: '',
         initial: initialValues?.notes || '',
       },
+      usageStart: {
+        label: 'Start taking',
+        icon: Play,
+        empty: null as Date | null,
+        // New treatments start being taken today unless dismissed; usage of
+        // a saved treatment is recorded from its page.
+        initial: isEditing ? null : new Date(),
+        added: () => new Date(),
+        available: !isEditing,
+      },
     },
     { testIDPrefix: 'menu-add-treatment-' }
   );
@@ -182,6 +195,7 @@ export function TreatmentForm({
     reason,
     reasonCondition: reasonConditionIds,
     notes,
+    usageStart,
   } = fields.values;
   const visibleFields = fields.shown;
   const hasChanges = useHasChanges({
@@ -196,6 +210,7 @@ export function TreatmentForm({
     reasonConditionIds,
     notes,
     requesterName,
+    usageStart: usageStart ? formatLocalDate(usageStart) : null,
     links: links.values,
   });
 
@@ -217,7 +232,10 @@ export function TreatmentForm({
     const fieldError =
       (visibleFields.regimen && validateRegimen(regimen)) ||
       (visibleFields.dispenseQuantity &&
-        validateQuantity(dispenseQuantity, 'Quantity to dispense'));
+        validateQuantity(dispenseQuantity, 'Quantity to dispense')) ||
+      (usageStart &&
+        formatLocalDate(usageStart) < formatLocalDate(authoredDate) &&
+        "Start taking cannot be before the treatment's date");
     if (fieldError) {
       setErrorMessage(fieldError);
       return;
@@ -265,6 +283,7 @@ export function TreatmentForm({
           : [],
         notes: visibleFields.notes ? notes.trim() || null : null,
         links: links.values,
+        usageStart: usageStart ?? undefined,
       });
     } catch (err: any) {
       console.error('Failed to save treatment:', err);
@@ -424,6 +443,28 @@ export function TreatmentForm({
                         unit,
                       }))
                     }
+                  />
+                </FormField>
+              );
+            }
+            if (id === 'usageStart') {
+              return (
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  nativeID="treatment-usageStart-input"
+                >
+                  <NativeDatePicker
+                    value={usageStart}
+                    onChange={(date) => {
+                      if (date) fields.set('usageStart', date);
+                    }}
+                    testID="treatment-usageStart-picker"
+                    id="treatment-usageStart-input"
+                    name="usageStart"
+                    variant="input"
+                    // Taking it can be planned to start on a later day.
+                    allowFuture
                   />
                 </FormField>
               );

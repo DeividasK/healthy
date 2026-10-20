@@ -146,6 +146,21 @@ test('dates in the future or before the current period are rejected', () => {
   });
 });
 
+test('taking it can start on a later day, but not before the treatment date', () => {
+  const entered = { ...treatment, authoredOn: '2026-10-10' };
+  const start = (date: string) =>
+    planUsageChange([], 'start', date, TODAY, 'x', entered, 'p1');
+  expect(summary(apply([], start('2026-10-20')))).toEqual([
+    'taking 2026-10-20 ',
+  ]);
+  expect(summary(apply([], start('2026-10-10')))).toEqual([
+    'taking 2026-10-10 ',
+  ]);
+  expect(start('2026-10-09')).toEqual({
+    error: "The date cannot be before the treatment's date, 2026-10-10",
+  });
+});
+
 test('removing a period closes the gap it leaves', () => {
   const statements = run([
     ['start', '2026-10-01'],

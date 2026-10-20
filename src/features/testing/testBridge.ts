@@ -523,8 +523,11 @@ export function setupTestBridge(
         title: input.title,
         intent: input.intent || 'plan',
         status: input.status || 'unknown',
+        // Taking it cannot start before the treatment's date.
         authoredDate:
-          input.authoredOn || new Date().toISOString().split('T')[0],
+          input.authoredOn ||
+          input.takingSince ||
+          new Date().toISOString().split('T')[0],
         dosageInstructions: input.dosageInstructions,
         regimen: input.regimen,
         dispenseQuantity: input.dispenseQuantity,

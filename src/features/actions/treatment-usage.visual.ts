@@ -15,6 +15,7 @@ test('Usage form: start, stop with notes, resume', async ({
         id: 'visual-usage',
         title: 'Vitamin D',
         status: 'active',
+        authoredOn: '2026-10-01',
         dosageInstructions: '1 capsule daily with food',
       },
     ],
@@ -23,7 +24,7 @@ test('Usage form: start, stop with notes, resume', async ({
   await page.getByTestId('treatment-usage-start').click();
   await page.getByTestId('save-usage-button').waitFor();
   await takeSnapshot(page, 'Treatment usage - Start taking', testInfo);
-  // A supplement without a prescription opens on an empty regimen.
+  // A supplement without a prescription opens on a regimen of 1 tablet once a day.
   await seedTestResources(page, {
     treatments: [
       { id: 'visual-supplement', title: 'Magnesium', status: 'active' },
@@ -152,6 +153,7 @@ test('Usage form: edit and remove a period', async ({ page }, testInfo) => {
         id: 'visual-edit',
         title: 'Vitamin D',
         status: 'active',
+        authoredOn: '2026-10-01',
         dosageInstructions: '1 capsule daily with food',
       },
     ],
