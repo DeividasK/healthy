@@ -36,6 +36,11 @@ export default defineConfig<ChromaticConfig>({
         colorScheme: 'light',
         reducedMotion: 'reduce',
         disableAutoSnapshot: true,
+        // Chromatic archives a test's resources once the network is idle.
+        // Its snapshot script resets Playwright's idle state, which after
+        // in-app navigation only returns at the 10 s default. Snapshots
+        // wait for their content, so everything is loaded by then.
+        resourceArchiveTimeout: 1500,
       },
       testMatch: /.*\.visual\.ts/,
     },
