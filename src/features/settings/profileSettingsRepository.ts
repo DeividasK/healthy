@@ -78,3 +78,18 @@ export async function saveProfileSettings(
     patientId
   );
 }
+
+/** Every profile's stored settings, for backups. */
+export async function fetchAllProfileSettingsRecords(): Promise<
+  { settings: ProfileSettingsRecord; patientId: string }[]
+> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    settings_json: string;
+    patient_id: string;
+  }>('SELECT settings_json, patient_id FROM profile_settings ORDER BY id;');
+  return rows.map((row) => ({
+    settings: JSON.parse(row.settings_json),
+    patientId: row.patient_id,
+  }));
+}

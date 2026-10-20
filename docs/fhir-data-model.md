@@ -421,8 +421,10 @@ are stored as JSON in `profile_settings` (one row per profile, id
 records, right after its `Patient`. Today they hold the clock time each part
 of the day stands for (`timesOfDay`: Morning 08:00, Noon 12:00, Afternoon
 15:00, Evening 18:00 and Bedtime 22:00 by default), edited on the Settings
-page. Keys a device does not know are kept on save. ZIP archives do not carry
-settings; a restored profile starts with the defaults.
+page. Keys a device does not know are kept on save. ZIP archives carry them
+as `records/profile_settings_<patient id>.json` envelopes
+(`{ settings, patientId }`), restored right after patients; archives without
+them still restore, and those profiles start with the defaults.
 
 ### Migration v18
 

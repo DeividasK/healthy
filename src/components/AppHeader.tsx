@@ -10,11 +10,12 @@ import { ProfileHeaderButton } from '@/src/features/profile/ProfileHeaderButton'
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 
+/** Profile on the left, the logo (home) centred, sync status and settings on the right. */
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const isOffline = useIsOffline();
-  // Settings belong to a profile.
+  // The profile and its settings show once a profile exists.
   const { activePatient } = useActivePatient();
 
   return (
@@ -35,11 +36,13 @@ export function AppHeader() {
             <AppLogo size={28} color={COLORS.light.primary} />
           </TouchableOpacity>
         </View>
-        <View style={styles.profile}>
-          {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
+        {activePatient && (
           <View style={styles.button}>
             <ProfileHeaderButton />
           </View>
+        )}
+        <View style={styles.end}>
+          {isOffline ? <OfflineHeaderIndicator /> : <SyncHeaderIndicator />}
           {activePatient && (
             <TouchableOpacity
               testID="settings-header-button"
@@ -78,8 +81,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: { position: 'absolute', left: 16 },
-  profile: {
+  // Centred on the whole header, whatever sits at either end.
+  logo: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Taps beside the logo reach the buttons at either end.
+    pointerEvents: 'box-none',
+  },
+  end: {
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',

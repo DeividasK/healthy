@@ -21,6 +21,8 @@ export function ProfileHeaderButton({
   const pathname = usePathname();
   const { activePatient } = useActivePatient();
   const initials = getPatientInitials(activePatient);
+  // Nothing to show before a profile exists.
+  if (!activePatient) return null;
 
   return (
     <TouchableOpacity
@@ -30,8 +32,7 @@ export function ProfileHeaderButton({
       activeOpacity={0.7}
       style={[styles.button, style]}
       onPress={() => {
-        const target = activePatient ? '/profile' : '/profile/new';
-        if (pathname !== target) router.navigate(target);
+        if (pathname !== '/profile') router.navigate('/profile');
       }}
     >
       {initials && initials !== 'S' ? (

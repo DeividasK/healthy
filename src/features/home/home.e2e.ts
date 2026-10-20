@@ -21,9 +21,15 @@ test.describe('Fresh Install Onboarding Redirect', () => {
     async ({ page, browser, baseURL }) => {
       await page.goto('/');
       await expect(page).toHaveURL(/profile\/new/);
+      // Before a profile exists the header shows only the logo.
+      await expect(page.getByTestId('app-home-button')).toBeVisible();
+      await expect(page.getByTestId('profile-header-button')).toHaveCount(0);
+      await expect(page.getByTestId('settings-header-button')).toHaveCount(0);
       await createPatientViaUI(page);
       await page.reload();
       await expect(page.getByTestId('floating-add-button')).toBeVisible();
+      await expect(page.getByTestId('profile-header-button')).toBeVisible();
+      await expect(page.getByTestId('settings-header-button')).toBeVisible();
 
       const isolated = await browser.newContext({ baseURL });
       try {
@@ -79,7 +85,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(page.getByText('Lab Results', { exact: true })).toBeVisible();
   });
 
-  test('keeps the shared header mounted, logo on the left, and island transitions continuous', async ({
+  test('keeps the shared header mounted, logo in the centre, and island transitions continuous', async ({
     page,
   }) => {
     const condition = await seedTestCondition(page, {
@@ -101,9 +107,21 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     const primarySize = (await primaryButton.boundingBox())!;
     expect(collapsedSize.width).toBeLessThan(primarySize.width);
     expect(collapsedSize.height).toBeLessThan(primarySize.height);
+    // The logo sits in the middle of the header.
+    const headerBox = (await header.boundingBox())!;
+    const centredX = headerBox.x + (headerBox.width - 44) / 2;
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(16);
+      .toBeCloseTo(centredX);
+    // The profile is at the start of the header and settings at the end.
+    const profileBox = (await page
+      .getByTestId('profile-header-button')
+      .boundingBox())!;
+    const settingsBox = (await page
+      .getByTestId('settings-header-button')
+      .boundingBox())!;
+    expect(profileBox.x).toBeLessThan(centredX);
+    expect(settingsBox.x).toBeGreaterThan(centredX + 44);
 
     // Sample actual positions across route changes to verify visible motion and persistence.
     await page.evaluate(() => {
@@ -139,7 +157,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(page.getByTestId('delete-condition-button')).toBeVisible();
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(16);
+      .toBeCloseTo(centredX);
     const motion = await page.evaluate(() => {
       const state = (window as any).__headerMotion;
       cancelAnimationFrame(state.frame);
@@ -156,7 +174,9 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     });
     expect(motion.persisted).toBe(true);
     expect(motion.primaryPersisted).toBe(true);
-    expect(motion.positions.every((x) => x === 16)).toBe(true);
+    expect(motion.positions.every((x) => Math.abs(x - centredX) < 1)).toBe(
+      true
+    );
     expect(motion.heights.length).toBeGreaterThan(0);
     expect(
       motion.heights.every((height) => height === primarySize.height)
@@ -267,7 +287,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await expect(page.getByTestId('back-button')).toHaveCount(0);
     await expect
       .poll(async () => (await logo.boundingBox())?.x)
-      .toBeCloseTo(16);
+      .toBeCloseTo(centredX);
     await expect(dock.getByTestId('floating-add-button')).toBeVisible();
   });
 

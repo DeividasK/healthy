@@ -50,6 +50,11 @@ import {
   insertRequestOrchestrationRecord,
 } from '@/src/features/bundles/bundlesRepository';
 import {
+  fetchAllProfileSettingsRecords,
+  insertProfileSettingsRecord,
+  type ProfileSettingsRecord,
+} from '@/src/features/settings/profileSettingsRepository';
+import {
   fetchAllMedicationAdministrationRecords,
   insertMedicationAdministrationRecord,
 } from '@/src/features/actions/medicationAdministrationsRepository';
@@ -74,6 +79,7 @@ export interface ZipExportSummary {
   serviceRequestCount: number;
   organizationCount: number;
   bundleCount: number;
+  profileSettingsCount: number;
   fileName: string;
 }
 
@@ -93,6 +99,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     serviceRequests,
     organizations,
     bundles,
+    profileSettings,
   ] = await Promise.all([
     fetchAllPatients(),
     fetchAllDiagnosticReportRecords(),
@@ -105,6 +112,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     fetchAllServiceRequestRecords(),
     fetchAllOrganizationRecords(),
     fetchAllRequestOrchestrationRecords(),
+    fetchAllProfileSettingsRecords(),
   ]);
 
   const zipFiles: Record<string, Uint8Array> = {};
@@ -190,6 +198,12 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
       strToU8(jsonStr);
   }
 
+  // Export each profile's settings (app infrastructure, not FHIR)
+  for (const { settings, patientId } of profileSettings) {
+    const jsonStr = JSON.stringify({ settings, patientId }, null, 2);
+    zipFiles[`records/profile_settings_${patientId}.json`] = strToU8(jsonStr);
+  }
+
   // Manifest v2 with FHIR version and complete resource inventory
   const manifest = {
     version: 2,
@@ -206,6 +220,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     serviceRequestCount: serviceRequests.length,
     organizationCount: organizations.length,
     bundleCount: bundles.length,
+    profileSettingsCount: profileSettings.length,
   };
   zipFiles['manifest.json'] = strToU8(JSON.stringify(manifest, null, 2));
 
@@ -231,6 +246,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     serviceRequestCount: serviceRequests.length,
     organizationCount: organizations.length,
     bundleCount: bundles.length,
+    profileSettingsCount: profileSettings.length,
     fileName,
   };
 }
@@ -253,6 +269,7 @@ export async function restoreFromZipBytes(
   serviceRequests: number;
   organizations: number;
   bundles: number;
+  profileSettings: number;
 }> {
   const unzipped = unzipSync(zipBytes);
 
@@ -267,6 +284,7 @@ export async function restoreFromZipBytes(
   let restoredServiceRequests = 0;
   let restoredOrganizations = 0;
   let restoredBundles = 0;
+  let restoredProfileSettings = 0;
   let legacyKey: import('expo-crypto').AESEncryptionKey | null = null;
 
   const patientResources: Patient[] = [];
@@ -294,6 +312,10 @@ export async function restoreFromZipBytes(
     patientId: string;
   }[] = [];
   const compositionResources: { doc: Composition; patientId: string }[] = [];
+  const profileSettingsRecords: {
+    settings: ProfileSettingsRecord;
+    patientId: string;
+  }[] = [];
   const bundleResources: {
     bundle: RequestOrchestration;
     patientId: string;
@@ -327,6 +349,17 @@ export async function restoreFromZipBytes(
 
     try {
       const parsed = JSON.parse(jsonText);
+      if (
+        path.startsWith('records/profile_settings_') &&
+        parsed.settings &&
+        typeof parsed.patientId === 'string'
+      ) {
+        profileSettingsRecords.push({
+          settings: parsed.settings,
+          patientId: parsed.patientId,
+        });
+        continue;
+      }
       const isClinicalEnvelope =
         path.startsWith('records/clinical_document_') &&
         parsed.resource?.resourceType === 'Composition';
@@ -443,13 +476,22 @@ export async function restoreFromZipBytes(
     observations.forEach(assertCBCObservation);
   }
 
-  // Restore in dependency order: Patients -> Organizations -> Conditions -> DiagnosticReports -> Encounters -> MedicationRequests -> MedicationStatements -> MedicationAdministrations -> ServiceRequests -> RequestOrchestrations -> Compositions
+  // Restore in dependency order: Patients -> ProfileSettings -> Organizations -> Conditions -> DiagnosticReports -> Encounters -> MedicationRequests -> MedicationStatements -> MedicationAdministrations -> ServiceRequests -> RequestOrchestrations -> Compositions
   for (const patient of patientResources) {
     try {
       await insertPatientRecord(patient);
       restoredPatients++;
     } catch (err) {
       console.warn('Failed to insert patient record from zip:', err);
+    }
+  }
+
+  for (const { settings, patientId } of profileSettingsRecords) {
+    try {
+      await insertProfileSettingsRecord(settings, patientId);
+      restoredProfileSettings++;
+    } catch (err) {
+      console.warn('Failed to insert profile settings from zip:', err);
     }
   }
 
@@ -558,5 +600,6 @@ export async function restoreFromZipBytes(
     serviceRequests: restoredServiceRequests,
     organizations: restoredOrganizations,
     bundles: restoredBundles,
+    profileSettings: restoredProfileSettings,
   };
 }
