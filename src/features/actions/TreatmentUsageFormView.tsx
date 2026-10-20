@@ -176,6 +176,11 @@ function UsageChangeForm({
   // and for a new regimen.
   const isNewRegimen = isTaking && changeKind === 'change';
   const showsDosing = !isTaking || isNewRegimen;
+  const action: UsageAction = isTaking
+    ? changeKind
+    : current === 'on-hold'
+      ? 'resume'
+      : 'start';
 
   // Optional fields wait behind the + until added.
   const options: AddOptionItem[] = [
@@ -184,11 +189,6 @@ function UsageChangeForm({
   ];
 
   const handleSave = async () => {
-    const action: UsageAction = isTaking
-      ? changeKind
-      : current === 'on-hold'
-        ? 'resume'
-        : 'start';
     const dosage = showsDosing ? dosing.toDosage() : undefined;
     const fieldError =
       (showsDosing && dosing.validate()) ||
@@ -242,6 +242,8 @@ function UsageChangeForm({
           id="treatment-usage-date-input"
           name="usageDate"
           variant="input"
+          // Taking it can be planned to start on a later day.
+          allowFuture={action === 'start'}
         />
       </FormField>
       {isTaking && (

@@ -98,6 +98,7 @@ export async function seedEveryResource(
         id: 'inhaler',
         title: 'Treatment to back up',
         consultationId: 'visit',
+        authoredOn: '2026-10-01',
         reasonConditionIds: ['asthma'],
         dosageInstructions: 'First line\nSecond line',
         reason: 'Original indication',

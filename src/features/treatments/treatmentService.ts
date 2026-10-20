@@ -29,6 +29,15 @@ import {
   getTreatmentReasonConditionIds,
 } from '@/src/utils/fhirUtils';
 import {
+  getUsagePeriods,
+  planUsageChange,
+} from '@/src/features/actions/treatmentUsage';
+import {
+  fetchMedicationStatements,
+  insertMedicationStatementRecord,
+} from '@/src/features/actions/medicationStatementsRepository';
+import { formatLocalDate } from '@/src/utils/dateUtils';
+import {
   applyDosing,
   buildDraftQuantity,
   formatQuantityText,
@@ -62,6 +71,11 @@ export interface TreatmentInput {
   notes?: string | null;
   /** Who ordered or recommended it; null/empty removes, undefined keeps. */
   requesterName?: string | null;
+  /**
+   * New treatments only: the day (YYYY-MM-DD) taking it starts, recorded as
+   * a period of use. It may be in the future, not before the treatment date.
+   */
+  usageStart?: string;
 }
 
 /** LOINC section code for medications in clinical documents (IPS, C-CDA). */
@@ -118,6 +132,9 @@ export async function createOrUpdateTreatment(
         `Cannot edit treatment ${treatId}: belongs to a different patient`
       );
     }
+    if (existing && input.usageStart) {
+      throw new Error('Start taking an existing treatment from its page');
+    }
 
     const authoredDateStr =
       input.authoredDate ||
@@ -129,6 +146,19 @@ export async function createOrUpdateTreatment(
       !/(Z|[+-]\d{2}:\d{2})$/.test(authoredDateStr)
     ) {
       throw new Error('Authored date-time requires a timezone offset');
+    }
+
+    // Usage cannot start before the treatment's date.
+    if (existing && input.authoredDate) {
+      const [firstPeriod] = getUsagePeriods(
+        await fetchMedicationStatements(patientId, treatId),
+        treatId
+      );
+      if (firstPeriod && input.authoredDate.slice(0, 10) > firstPeriod.start) {
+        throw new Error(
+          `The date cannot be after usage started, ${firstPeriod.start}`
+        );
+      }
     }
 
     const now = new Date().toISOString();
@@ -273,6 +303,25 @@ export async function createOrUpdateTreatment(
 
     await insertMedicationRequestRecord(medicationRequest, patientId, true);
 
+    if (input.usageStart) {
+      // Starts on the prescribed regimen, as starting from its page does.
+      const plan = planUsageChange(
+        [],
+        'start',
+        input.usageStart,
+        formatLocalDate(new Date()),
+        `use-${Crypto.randomUUID()}`,
+        medicationRequest,
+        patientId,
+        undefined,
+        undefined,
+        medicationRequest.dosageInstruction
+      );
+      if ('error' in plan) throw new Error(plan.error);
+      for (const statement of plan.save)
+        await insertMedicationStatementRecord(statement, patientId, true);
+    }
+
     // Only explicit creation/linking changes document membership. Origin is
     // provenance and must not silently restore a link removed by the user.
     if (input.consultationId) {
@@ -296,7 +345,11 @@ export async function createOrUpdateTreatment(
     result = await persist();
   });
 
-  notifyDatabaseChanged(['medication_requests', 'clinical_documents']);
+  notifyDatabaseChanged([
+    'medication_requests',
+    'clinical_documents',
+    ...(input.usageStart ? ['medication_statements' as const] : []),
+  ]);
   return result;
 }
 

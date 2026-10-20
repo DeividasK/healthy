@@ -15,6 +15,8 @@ import {
 
 const treatmentId = 'usage-treatment';
 const viewUrl = `/treatment/${treatmentId}`;
+/** Recorded well before any day these tests take it. */
+const authoredOn = '2020-01-01';
 
 async function saveChange(page: Page, date: string, url = viewUrl) {
   await page
@@ -44,7 +46,9 @@ async function removePeriod(page: Page, statementId: string) {
 test.beforeEach(async ({ page }) => {
   await seedTestPatient(page, { id: 'usage-patient' });
   await seedTestResources(page, {
-    treatments: [{ id: treatmentId, title: 'Vitamin D', status: 'active' }],
+    treatments: [
+      { id: treatmentId, title: 'Vitamin D', status: 'active', authoredOn },
+    ],
   });
 });
 
@@ -59,6 +63,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
         id: treatmentId,
         title: 'Vitamin D',
         status: 'active',
+        authoredOn,
         dosageInstructions: '1 capsule daily',
       },
     ],
@@ -401,6 +406,7 @@ test('free-text dosing starts from the prescription and a same-day new regimen c
         id: 'text-dosing',
         title: 'Vitamin B12',
         status: 'active',
+        authoredOn,
         dosageInstructions: '1 capsule daily',
       },
     ],
@@ -527,6 +533,13 @@ test('starting a supplement without a prescription asks for its regimen', async 
   await openRoute(page, viewUrl);
   await page.getByTestId('treatment-usage-start').click();
   await expect(page.getByTestId('treatment-regimen-field')).toBeVisible();
+  // The regimen starts as 1 tablet once a day.
+  const amount = page.getByTestId('treatment-regimen-p1-d1-amount-input');
+  await expect(amount).toHaveValue('1');
+  await expect(
+    page.getByTestId('treatment-regimen-p1-d1-frequency-input')
+  ).toHaveValue('1');
+  await amount.fill('');
   await page.getByTestId('save-usage-button').click();
   await expect(page.getByTestId('treatment-usage-form-error')).toHaveText(
     'Enter a min amount'

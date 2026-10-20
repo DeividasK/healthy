@@ -4,12 +4,20 @@ import { getWhenLabel } from '@/src/features/treatments/regimen';
 export type PartOfDay = 'MORN' | 'NOON' | 'AFT' | 'EVE' | 'HS';
 
 /**
+ * The journal's order within each part of the day (or `any`): resource keys
+ * (`MedicationRequest/<id>`, `RequestOrchestration/<id>`), first on top.
+ */
+export type JournalOrder = Partial<Record<PartOfDay | 'any', string[]>>;
+
+/**
  * A profile's settings. App infrastructure, not a FHIR resource: synced as
  * `ProfileSettings` with the profile's records.
  */
 export interface ProfileSettings {
   /** The clock time (HH:mm) each part of the day stands for. */
   timesOfDay: Record<PartOfDay, string>;
+  /** The order the user gave the journal's rows. */
+  journalOrder?: JournalOrder;
 }
 
 export const DEFAULT_TIMES_OF_DAY: Record<PartOfDay, string> = {
@@ -34,7 +42,25 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
     if (typeof time === 'string' && CLOCK_TIME.test(time))
       timesOfDay[code] = time;
   }
-  return { ...stored, timesOfDay } as ProfileSettings;
+  // Groups this version does not know are kept for newer devices.
+  const storedOrder = stored?.journalOrder;
+  const journalOrder: JournalOrder =
+    storedOrder &&
+    typeof storedOrder === 'object' &&
+    !Array.isArray(storedOrder)
+      ? { ...storedOrder }
+      : {};
+  for (const code of [
+    ...PARTS_OF_DAY.map((part) => part.code),
+    'any',
+  ] as const) {
+    const keys = journalOrder[code];
+    if (keys === undefined) continue;
+    if (Array.isArray(keys))
+      journalOrder[code] = keys.filter((key) => typeof key === 'string');
+    else delete journalOrder[code];
+  }
+  return { ...stored, timesOfDay, journalOrder } as ProfileSettings;
 }
 
 export const getProfileSettingsId = (patientId: string) =>
