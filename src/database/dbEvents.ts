@@ -15,6 +15,8 @@ export type DatabaseTable =
   | 'service_requests'
   | 'medication_administrations'
   | 'medication_statements'
+  | 'request_orchestrations'
+  | 'profile_settings'
   // Sync metadata: which profiles sync, and held remote deletions.
   | 'sync_profiles';
 

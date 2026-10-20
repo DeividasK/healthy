@@ -10,6 +10,7 @@ import type {
   Observation,
   Organization,
   Patient,
+  RequestOrchestration,
   ServiceRequest,
 } from 'fhir/r5';
 import type { DatabaseTable } from '@/src/database/dbEvents';
@@ -23,6 +24,11 @@ import { insertMedicationStatementRecord } from '@/src/features/actions/medicati
 import { insertMedicationAdministrationRecord } from '@/src/features/actions/medicationAdministrationsRepository';
 import { insertServiceRequestRecord } from '@/src/features/service-requests/serviceRequestsRepository';
 import { insertClinicalDocumentRecord } from '@/src/features/consultations/clinicalDocumentsRepository';
+import { insertRequestOrchestrationRecord } from '@/src/features/bundles/bundlesRepository';
+import {
+  insertProfileSettingsRecord,
+  type ProfileSettingsRecord,
+} from '@/src/features/settings/profileSettingsRepository';
 import type { SyncResourceType } from './types';
 
 type Resource = Record<string, unknown>;
@@ -50,7 +56,8 @@ async function readJson(
 }
 
 /**
- * Every replicated FHIR resource type. Adding a resource type to the app means
+ * Every replicated record type: FHIR resources, plus profile settings (app
+ * infrastructure). Adding a resource type to the app means
  * adding it here, to `SYNC_RESOURCE_TYPES` and to the capture triggers.
  */
 export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
@@ -60,6 +67,23 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     read: (db, id) => readJson(db, 'patients', id),
     put: (resource) =>
       insertPatientRecord(resource as unknown as Patient, true),
+  },
+  ProfileSettings: {
+    table: 'profile_settings',
+    tables: ['profile_settings'],
+    async read(db, id) {
+      const row = await db.getFirstAsync<{ settings_json: string }>(
+        'SELECT settings_json FROM profile_settings WHERE id = ?;',
+        [id]
+      );
+      return row ? JSON.parse(row.settings_json) : null;
+    },
+    put: (record, patientId) =>
+      insertProfileSettingsRecord(
+        record as unknown as ProfileSettingsRecord,
+        patientId,
+        true
+      ),
   },
   Organization: {
     table: 'organizations',
@@ -124,6 +148,7 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
       'medication_requests',
       'medication_administrations',
       'medication_statements',
+      'request_orchestrations',
     ],
     read: (db, id) => readJson(db, 'medication_requests', id),
     put: (resource, patientId) =>
@@ -162,6 +187,17 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     put: (resource, patientId) =>
       insertServiceRequestRecord(
         resource as unknown as ServiceRequest,
+        patientId,
+        true
+      ),
+  },
+  RequestOrchestration: {
+    table: 'request_orchestrations',
+    tables: ['request_orchestrations'],
+    read: (db, id) => readJson(db, 'request_orchestrations', id),
+    put: (resource, patientId) =>
+      insertRequestOrchestrationRecord(
+        resource as unknown as RequestOrchestration,
         patientId,
         true
       ),

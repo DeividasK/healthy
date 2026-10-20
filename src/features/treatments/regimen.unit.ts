@@ -3,15 +3,18 @@ import type { Dosage, MedicationRequest } from 'fhir/r5';
 import {
   applyDosing,
   applyRegimen,
+  chooseTimeOfDay,
   createDoseDraft,
   duplicateDoseDraft,
   formatDose,
   formatDosingLines,
   formatRegimenLines,
   getRegimenDraft,
+  getTimeOfDayChoice,
   hideDoseField,
   isDoseFieldShown,
   showDoseField,
+  SPECIFIC_TIME,
   validateRegimen,
   type DoseDraft,
   type RegimenDraft,
@@ -290,4 +293,34 @@ test('dosing edits replace the regimen or text and read back as lines', () => {
     formatDose(fromText[0]),
   ]);
   expect(formatDosingLines(undefined)).toEqual([]);
+});
+
+test('a dose at a specific time is stored as timeOfDay, never with when', () => {
+  const dose = createDoseDraft();
+  dose.amount = '1';
+  dose.timing = chooseTimeOfDay(
+    { ...dose.timing, frequency: '1', when: 'MORN' },
+    SPECIFIC_TIME
+  );
+  expect(dose.timing).toMatchObject({ when: '', timeOfDay: '08:00' });
+  dose.timing.timeOfDay = '07:30';
+  const [dosage] = applyRegimen([], { phases: [{ doses: [dose] }] });
+  expect(dosage.timing?.repeat).toEqual({
+    frequency: 1,
+    period: 1,
+    periodUnit: 'd',
+    timeOfDay: ['07:30:00'],
+  });
+  expect(formatDose(dosage)).toBe('1 tablet at 07:30');
+
+  const [draft] = getRegimenDraft(request([dosage])).phases[0].doses;
+  expect(getTimeOfDayChoice(draft.timing)).toBe(SPECIFIC_TIME);
+  draft.timing = chooseTimeOfDay(draft.timing, 'EVE');
+  const [evening] = applyRegimen([dosage], { phases: [{ doses: [draft] }] });
+  expect(evening.timing?.repeat).toEqual({
+    frequency: 1,
+    period: 1,
+    periodUnit: 'd',
+    when: ['EVE'],
+  });
 });

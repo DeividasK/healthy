@@ -26,6 +26,7 @@ interface LinkedResourcesFieldProps {
   idPrefix?: string;
   /** Resource name used in test IDs, e.g. `condition`. */
   itemType?: string;
+  required?: boolean;
 }
 
 /** Linked resources with remove buttons and a search box to link more. */
@@ -41,6 +42,7 @@ export function LinkedResourcesField({
   testID,
   idPrefix = '',
   itemType = 'condition',
+  required = false,
 }: LinkedResourcesFieldProps) {
   const [query, setQuery] = useState('');
   const {
@@ -64,6 +66,7 @@ export function LinkedResourcesField({
     <FormField
       label={label}
       nativeID={searchID}
+      required={required}
       style={isFocused && styles.raised}
       testID={testID}
       removeTestID={removeTestID}

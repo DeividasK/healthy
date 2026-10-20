@@ -391,6 +391,13 @@ test.describe('Treatment form keyboard support', () => {
     await expect(dose(1, 2, 'boundsValue-input')).toHaveValue('7');
     await dose(1, 2, 'amount-input').fill('1');
     await dose(1, 2, 'when-select').selectOption('EVE');
+    // Or at a specific clock time instead of a part of the day
+    await dose(1, 2, 'when-select').selectOption({
+      label: 'At a specific time',
+    });
+    await page
+      .locator('#treatment-regimen-p1-d2-timeOfDay-input')
+      .fill('20:30');
     // Another dose starts empty and takes focus
     await addFrom('p1', 'dose');
     await expect(dose(1, 3, 'amount-input')).toBeFocused();
@@ -440,7 +447,8 @@ test.describe('Treatment form keyboard support', () => {
       periodUnit: 'd',
       when: ['MORN'],
     });
-    expect(dosages[1].timing.repeat.when).toEqual(['EVE']);
+    expect(dosages[1].timing.repeat.timeOfDay).toEqual(['20:30:00']);
+    expect(dosages[1].timing.repeat.when).toBeUndefined();
     expect(dosages[1].timing.repeat.boundsDuration).toMatchObject({
       value: 7,
       code: 'd',
@@ -460,7 +468,7 @@ test.describe('Treatment form keyboard support', () => {
     await expect(page.getByTestId('treatment-dosage')).toHaveText(
       [
         'Phase 1: 2 tablets oral in the morning, for 7 days',
-        'Phase 1: 1 tablet oral in the evening, for 7 days',
+        'Phase 1: 1 tablet oral at 20:30, for 7 days',
         'Phase 2: 1 tablet, 1–2 times a day',
       ].join('\n')
     );

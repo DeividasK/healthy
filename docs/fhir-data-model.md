@@ -360,3 +360,75 @@ then), and each treatment log without `dosage` gets `dosage.text` from the
 treatment's free-text dosing (logs of structured doses already carry theirs).
 The rows are stamped and captured for sync like any edit; devices migrating
 separately write the same content. Older app versions ignore the elements.
+
+## Treatment bundles
+
+Treatments taken together (e.g. a morning set of supplements) can be grouped
+into a bundle, mainly so the journal answers them with one tap. A bundle is a
+FHIR R5 `RequestOrchestration` stored in `request_orchestrations`
+(`status: active`, `intent: plan`, `subject` and `author` the patient):
+
+- `action[0]` is the bundle: `title` is its name, `groupingBehavior` is
+  `visual-group` ("a visual grouping of actions") and `selectionBehavior` is
+  `all`.
+- Its sub-actions are the times it is taken, each with `timingTiming.repeat`
+  holding either one `when` code (a part of the day) or one `timeOfDay`
+  (an exact clock time); never both (tim-10). A bundle without a time has a
+  single sub-action without timing.
+- Each time's sub-actions reference the treatments
+  (`resource: MedicationRequest/<id>`); every time lists the same treatments
+  (rqg-1: an action has a resource or sub-actions, not both).
+
+Editing changes only the name, times and treatments; other elements, and
+the actions of treatments that stay, are kept. Treatments must belong to the
+same patient; one not stored yet is tolerated so sync and restores can apply
+in any order. Deleting a treatment removes it from its bundles in the same
+transaction, and a bundle left without treatments is deleted. Deleting a
+bundle keeps its treatments and their logs.
+
+Logs are unchanged: one `MedicationAdministration` per treatment dose and
+day. A bundle's answer in the journal is derived from its doses' logs, so
+nothing is stored for the bundle itself:
+
+- Each due dose has a clock time: its `timeOfDay`, or its part of the day's
+  time from the profile's settings (see Profile settings); free-text dosing
+  and doses without a time have none.
+- Bundles claim doses in creation order and a dose joins at most one time.
+  A bundle without a time takes all its treatments' doses. Otherwise a dose
+  at the same clock time as one of the bundle's times joins it, doses
+  without a time fill its remaining times in order, and a treatment with a
+  single dose that day always joins, at the nearest time.
+- Answers flagged as not matching the day's regimen are never grouped.
+- The bundle's ✓ and ✗ answer every dose it groups that day, replacing
+  earlier answers; pressing the selected one again clears them. Its
+  treatments can still be answered one by one.
+- Membership applies to every day, past days included; logs never change.
+
+Doses can also be taken at an exact time: the regimen's Time of Day offers
+"At a specific time", stored as `Dosage.timing.repeat.timeOfDay` instead of
+`when`. Stored doses carrying both keep their `timeOfDay` while `when` is
+unchanged.
+
+ZIP archives carry `records/request_orchestration_*.json` envelopes,
+restored after service requests and before Compositions. Encrypted sync
+replicates `RequestOrchestration` after `ServiceRequest`.
+
+## Profile settings
+
+Each profile's settings are app infrastructure, not a FHIR resource. They
+are stored as JSON in `profile_settings` (one row per profile, id
+`settings-<patient id>`) and synced as `ProfileSettings` with the profile's
+records, right after its `Patient`. Today they hold the clock time each part
+of the day stands for (`timesOfDay`: Morning 08:00, Noon 12:00, Afternoon
+15:00, Evening 18:00 and Bedtime 22:00 by default), edited on the Settings
+page. Keys a device does not know are kept on save. ZIP archives carry them
+as `records/profile_settings_<patient id>.json` envelopes
+(`{ settings, patientId }`), restored right after patients; archives without
+them still restore, and those profiles start with the defaults.
+
+### Migration v18
+
+v18 is additive and non-breaking: it creates `request_orchestrations`
+(canonical JSON plus projected patient, title and status) with an index, and
+`profile_settings`, each with its sync capture triggers. Its `repair` step
+re-creates the triggers on every start. No existing table or record changes.

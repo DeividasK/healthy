@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Copy, Pill } from 'lucide-react-native';
+import { Check, Copy, Group, Pill } from 'lucide-react-native';
 import Animated, {
   ReduceMotion,
   SlideInLeft,
@@ -19,6 +19,9 @@ import { COLORS } from '@/src/theme/colors';
 import { ActionDayPills } from './ActionDayPills';
 import { ActionCalendar } from './ActionCalendar';
 import { TreatmentLogRow } from './TreatmentLogRow';
+import { BundleLogRow } from './BundleLogRow';
+import { getBundleChanges, groupActionDay } from './bundleGrouping';
+import { useJournalBundles } from './useJournalBundles';
 import { CheckboxRow } from './CheckboxRow';
 import {
   getActionDays,
@@ -198,6 +201,8 @@ function ActionsForPatient({
     }
   }, [activePatientId, today]);
 
+  const journalBundles = useJournalBundles(activePatientId);
+
   const loadCalendarDays = useCallback(
     (dates: string[]) => getActionDays(activePatientId, dates),
     [activePatientId]
@@ -233,7 +238,15 @@ function ActionsForPatient({
   const day = daysByDate[selected];
   const isLoading =
     isPatientLoading ||
-    (!hasLoadError && (loadedPatientId !== activePatientId || !day));
+    (!hasLoadError &&
+      (loadedPatientId !== activePatientId || !day || !journalBundles));
+  const shownRows = shownDay
+    ? groupActionDay(
+        shownDay.items,
+        journalBundles?.bundles ?? [],
+        journalBundles?.timesOfDay ?? {}
+      )
+    : [];
 
   const handleAnswer = async (
     item: ActionItem,
@@ -276,7 +289,8 @@ function ActionsForPatient({
   const applyAnswers = useCallback(
     async (
       date: string,
-      changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[]
+      changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[],
+      kind: 'copy' | 'bundle' = 'copy'
     ) => {
       if (!changes.length) return;
       setSaveErrorsByDate((current) => ({ ...current, [date]: undefined }));
@@ -299,10 +313,18 @@ function ActionsForPatient({
       try {
         await setTreatmentLogs(changes, date, activePatientId);
       } catch (err) {
-        console.error('Failed to copy treatment logs:', err);
+        console.error(
+          kind === 'copy'
+            ? 'Failed to copy treatment logs:'
+            : 'Failed to save bundle answers:',
+          err
+        );
         setSaveErrorsByDate((current) => ({
           ...current,
-          [date]: 'Failed to copy treatment answers. Please try again.',
+          [date]:
+            kind === 'copy'
+              ? 'Failed to copy treatment answers. Please try again.'
+              : 'Failed to save treatment answers. Please try again.',
         }));
       } finally {
         setSavingKeys((current) =>
@@ -342,6 +364,12 @@ function ActionsForPatient({
     );
     void applyAnswers(selected, changes);
   };
+
+  const openTreatment = (item: ActionItem) =>
+    router.push({
+      pathname: '/treatment/[id]',
+      params: { id: item.treatment.id || '' },
+    });
 
   const selectDay = (date: string) => {
     router.setParams({ date: date === today ? undefined : date });
@@ -398,7 +426,7 @@ function ActionsForPatient({
               title="Treatments"
               testID="actions-treatments-section"
             >
-              {!!shownDay?.items.length && (
+              {shownRows.length > 0 && (
                 <Animated.View
                   key={shown.date}
                   entering={
@@ -419,21 +447,46 @@ function ActionsForPatient({
                     isLeaving ? 'no-hide-descendants' : 'auto'
                   }
                 >
-                  {shownDay.items.map((item) => (
-                    <TreatmentLogRow
-                      key={item.key}
-                      item={item}
-                      isLeaving={isLeaving}
-                      disabled={isLeaving || savingKeys.includes(item.key)}
-                      onAnswer={(answer) => void handleAnswer(item, answer)}
-                      onOpen={() =>
-                        router.push({
-                          pathname: '/treatment/[id]',
-                          params: { id: item.treatment.id || '' },
-                        })
-                      }
-                    />
-                  ))}
+                  {shownRows.map((row) =>
+                    row.kind === 'bundle' ? (
+                      <BundleLogRow
+                        key={row.key}
+                        row={row}
+                        isLeaving={isLeaving}
+                        isSaving={(item) => savingKeys.includes(item.key)}
+                        onAnswerAll={(pressed) =>
+                          void applyAnswers(
+                            shown.date,
+                            getBundleChanges(row.items, pressed),
+                            'bundle'
+                          )
+                        }
+                        onAnswer={(item, answer) =>
+                          void handleAnswer(item, answer)
+                        }
+                        onOpen={() =>
+                          router.push({
+                            pathname: '/bundle/[id]',
+                            params: { id: row.bundle.id || '' },
+                          })
+                        }
+                        onOpenTreatment={openTreatment}
+                      />
+                    ) : (
+                      <TreatmentLogRow
+                        key={row.item.key}
+                        item={row.item}
+                        isLeaving={isLeaving}
+                        disabled={
+                          isLeaving || savingKeys.includes(row.item.key)
+                        }
+                        onAnswer={(answer) =>
+                          void handleAnswer(row.item, answer)
+                        }
+                        onOpen={() => openTreatment(row.item)}
+                      />
+                    )
+                  )}
                 </Animated.View>
               )}
             </ResourceSection>
@@ -451,6 +504,12 @@ function ActionsForPatient({
       )}
       <ResourceActionDock
         actions={[
+          {
+            label: 'New bundle',
+            testID: 'actions-new-bundle-button',
+            icon: Group,
+            onPress: () => router.push('/bundle/add'),
+          },
           {
             label: 'Done',
             testID: 'actions-done-button',

@@ -1,6 +1,10 @@
-/** FHIR resource types replicated by sync, in dependency (apply) order. */
+/**
+ * Record types replicated by sync, in dependency (apply) order: FHIR resource
+ * types, plus `ProfileSettings` (app infrastructure, not a FHIR resource).
+ */
 export const SYNC_RESOURCE_TYPES = [
   'Patient',
+  'ProfileSettings',
   'Organization',
   'Condition',
   'DiagnosticReport',
@@ -9,6 +13,7 @@ export const SYNC_RESOURCE_TYPES = [
   'MedicationStatement',
   'MedicationAdministration',
   'ServiceRequest',
+  'RequestOrchestration',
   'Composition',
 ] as const;
 

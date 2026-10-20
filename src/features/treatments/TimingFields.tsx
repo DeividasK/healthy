@@ -2,10 +2,13 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FormField, FormTextInput } from '@/src/components/FormField';
 import { NativeSelect } from '@/src/components/NativeSelect';
+import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import type { NativeSelectOption } from '@/src/components/NativeSelect.types';
 import {
+  chooseTimeOfDay,
   getCourseUnitOptions,
   getPeriodUnitOptions,
+  getTimeOfDayChoice,
   getWhenOptions,
   type TimingDraft,
 } from './regimen';
@@ -92,12 +95,31 @@ export function TimingFields({
           testID={id('when', 'select')}
           name={`${idPrefix}-when`}
           label="Time of Day"
-          value={value.when}
+          value={getTimeOfDayChoice(value)}
           options={getWhenOptions(value.when)}
-          onChange={set('when')}
+          onChange={(choice) => onChange(chooseTimeOfDay(value, choice))}
         />
       </FormField>
     );
+  // An exact clock time, chosen as "At a specific time".
+  const times = value.timeOfDay?.split(',') || [];
+  const time = shown.when && times.length > 0 && (
+    <FormField label="Time" nativeID={id('timeOfDay', 'input')} required>
+      <NativeTimePicker
+        // The editor changes the first time; further stored times are kept.
+        value={times[0]}
+        onChange={(picked) =>
+          onChange({
+            ...value,
+            timeOfDay: [picked, ...times.slice(1)].join(','),
+          })
+        }
+        testID={id('timeOfDay', 'input')}
+        id={id('timeOfDay', 'input')}
+        name={`${idPrefix}-timeOfDay`}
+      />
+    </FormField>
+  );
 
   return (
     <>
@@ -107,6 +129,7 @@ export function TimingFields({
         {maxTimes || timeOfDay(true)}
       </View>
       {maxTimes && timeOfDay(false)}
+      {time}
       <View style={fieldRowStyles.row}>
         <FormField
           label="Every"

@@ -32,7 +32,12 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { getQuantityDraft, getRegimenDraft } from './regimen';
 import { COLORS } from '@/src/theme/colors';
-import { Stethoscope } from 'lucide-react-native';
+import { Group, Stethoscope } from 'lucide-react-native';
+import {
+  getBundleLinkOptions,
+  getBundlesWithTreatment,
+  setTreatmentInBundle,
+} from '@/src/features/bundles/bundleService';
 import {
   diffLinkIds,
   type LinkFieldConfig,
@@ -81,12 +86,16 @@ function EditTreatmentForPatient({
           knownSpecialists,
           consultationOptions,
           linkedConsultationIds,
+          bundleOptions,
+          linkedBundles,
         ] = await Promise.all([
           getTreatmentById(id, activePatientId),
           getAllConditions(activePatientId),
           getDistinctDoctorNames(activePatientId),
           getConsultationLinkOptions(activePatientId),
           getConsultationIdsLinkingTreatment(id, activePatientId),
+          getBundleLinkOptions(activePatientId),
+          getBundlesWithTreatment(id, activePatientId),
         ]);
         if (!isMounted) return;
         setConditions(patientConditions);
@@ -98,6 +107,15 @@ function EditTreatmentForPatient({
             icon: Stethoscope,
             options: consultationOptions,
             initialIds: linkedConsultationIds,
+          },
+          {
+            type: 'bundle',
+            label: 'Bundles',
+            icon: Group,
+            options: bundleOptions,
+            initialIds: linkedBundles.flatMap((bundle) =>
+              bundle.id ? [bundle.id] : []
+            ),
           },
         ]);
         if (!treatment) {
@@ -190,6 +208,14 @@ function EditTreatmentForPatient({
         consultationId,
         activePatientId
       );
+    const bundleChanges = diffLinkIds(
+      linkFields[1].initialIds,
+      values.links?.bundle.ids || []
+    );
+    for (const bundleId of bundleChanges.added)
+      await setTreatmentInBundle(id, bundleId, activePatientId, true);
+    for (const bundleId of bundleChanges.removed)
+      await setTreatmentInBundle(id, bundleId, activePatientId, false);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();

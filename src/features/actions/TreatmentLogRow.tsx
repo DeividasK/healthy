@@ -1,16 +1,9 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import {
-  Check,
-  Tablets,
-  TriangleAlert,
-  X,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { Tablets, TriangleAlert } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
-import { COLORS } from '@/src/theme/colors';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
+import { AnswerButtons } from './AnswerButtons';
 
 /**
  * A treatment, or one scheduled dose of it, with "not taken" (×) and "taken"
@@ -33,35 +26,6 @@ export function TreatmentLogRow({
 }) {
   const title = getTreatmentTitle(item.treatment);
   const name = item.dose ? `${title}, ${item.dose.text}` : title;
-  const button = (
-    value: TreatmentLogAnswer,
-    Icon: LucideIcon,
-    label: string,
-    selectedStyle: object
-  ) => {
-    const selected = item.answer === value;
-    return (
-      <TouchableOpacity
-        testID={isLeaving ? undefined : `treatment-log-${value}-${item.rowId}`}
-        accessibilityRole="checkbox"
-        accessibilityLabel={`Mark ${name} ${label}`}
-        aria-checked={selected}
-        accessibilityState={{ checked: selected, disabled }}
-        disabled={disabled}
-        style={[styles.button, selected && selectedStyle]}
-        activeOpacity={0.6}
-        onPress={() => onAnswer(selected ? null : value)}
-      >
-        <Icon
-          color={
-            selected ? COLORS.light.primaryForeground : COLORS.light.iconMuted
-          }
-          size={18}
-          strokeWidth={2.5}
-        />
-      </TouchableOpacity>
-    );
-  };
   return (
     <ResourceRow
       testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
@@ -87,32 +51,18 @@ export function TreatmentLogRow({
       accessibilityLabel={`View treatment: ${title}`}
       onPress={onOpen}
       accessory={
-        <View style={styles.buttons}>
-          {button('not-taken', X, 'not taken', styles.notTaken)}
-          {button('taken', Check, 'taken', styles.taken)}
-        </View>
+        <AnswerButtons
+          answer={item.answer}
+          name={name}
+          disabled={disabled}
+          testIDPrefix={
+            isLeaving
+              ? undefined
+              : { prefix: 'treatment-log', rowId: item.rowId }
+          }
+          onAnswer={onAnswer}
+        />
       }
     />
   );
 }
-
-const styles = StyleSheet.create({
-  buttons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  button: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.pillBackground,
-  },
-  taken: {
-    backgroundColor: COLORS.light.primary,
-  },
-  notTaken: {
-    backgroundColor: COLORS.light.textSecondary,
-  },
-});

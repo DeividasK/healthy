@@ -49,6 +49,8 @@ test.beforeEach(async ({ page }) => {
 test('start, pause, resume and stop persist FHIR periods and only ask on taking days', async ({
   page,
 }) => {
+  // Opens the journal on each of seven days, a full app load each time.
+  test.setTimeout(60_000);
   await seedTestResources(page, {
     treatments: [
       {

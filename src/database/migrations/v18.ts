@@ -1,30 +1,54 @@
 import type { DatabaseMigration } from './types';
+import { captureTriggers } from './syncTriggers';
 
-const COLUMN = 'deletion_hold_hlc';
+const triggers = captureTriggers([
+  ['request_orchestrations', 'RequestOrchestration', 'patient_id'],
+  ['profile_settings', 'ProfileSettings', 'patient_id'],
+]);
 
 /**
- * Lets a device hold a profile that another device deleted from the cloud
- * until the user decides what to do with this device's copy, instead of
- * applying the deletion straight away.
+ * Adds treatment bundles (FHIR R5 RequestOrchestration) and per-profile
+ * settings (app infrastructure, e.g. the clock time of each part of the day).
  *
- * Non-breaking and additive: adds one nullable column to the `sync_profiles`
- * sync-metadata table, holding the HLC of the remote Patient deletion while
- * the decision is pending. No clinical table or FHIR JSON changes. The column
- * is added in `repair`, which runs on every start, so databases whose
- * `sync_profiles` was created or rebuilt by an earlier repair get it too.
+ * Non-breaking and additive: creates two tables, an index and their sync
+ * capture triggers. Existing tables and data are untouched. Bundle members
+ * live in canonical JSON (`action.action.action.resource`); deleting a
+ * treatment removes it from its bundles in the same transaction. `repair`
+ * re-creates the triggers on every start, because rebuilding a table drops
+ * them.
  */
 export const migrationV18: DatabaseMigration = {
   version: 18,
-  description: 'Hold remotely deleted profiles until the user decides',
+  description:
+    'Add treatment bundle (RequestOrchestration) and profile settings storage with sync capture triggers',
   isBreaking: false,
-  sql: 'SELECT 1;',
-  async repair(db) {
-    const columns = await db.getAllAsync<{ name: string }>(
-      'PRAGMA table_info(sync_profiles);'
+  sql: `
+    CREATE TABLE IF NOT EXISTS request_orchestrations (
+      id TEXT PRIMARY KEY,
+      patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      fhir_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
-    if (!columns.some((column) => column.name === COLUMN))
-      await db.execAsync(
-        `ALTER TABLE sync_profiles ADD COLUMN ${COLUMN} TEXT;`
+    CREATE INDEX IF NOT EXISTS idx_request_orchestrations_patient ON request_orchestrations(patient_id);
+    CREATE TABLE IF NOT EXISTS profile_settings (
+      id TEXT PRIMARY KEY,
+      patient_id TEXT NOT NULL UNIQUE REFERENCES patients(id) ON DELETE CASCADE,
+      settings_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    ${triggers}
+  `,
+  async repair(db) {
+    for (const table of ['request_orchestrations', 'profile_settings']) {
+      const hasTable = await db.getFirstAsync(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?;",
+        [table]
       );
+      if (!hasTable) return;
+    }
+    await db.execAsync(triggers);
   },
 };
