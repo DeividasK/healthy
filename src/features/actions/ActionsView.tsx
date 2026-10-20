@@ -615,6 +615,13 @@ function ActionsForPatient({
               ]
             : [
                 {
+                  label: 'Done',
+                  testID: 'actions-done-button',
+                  icon: Check,
+                  onPress: handleDone,
+                  primary: true,
+                },
+                {
                   label: 'New bundle',
                   testID: 'actions-new-bundle-button',
                   icon: Group,
@@ -626,13 +633,6 @@ function ActionsForPatient({
                   icon: ArrowUpDown,
                   onPress: () => setIsReordering(true),
                   disabled: !canReorder,
-                },
-                {
-                  label: 'Done',
-                  testID: 'actions-done-button',
-                  icon: Check,
-                  onPress: handleDone,
-                  primary: true,
                 },
               ]
         }
