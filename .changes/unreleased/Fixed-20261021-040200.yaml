@@ -1,0 +1,3 @@
+kind: Fixed
+body: A treatment dose's Time field now only appears when you choose "At a specific time", not for parts of the day like Morning or Evening.
+time: 2026-10-21T04:02:00.217259546Z
