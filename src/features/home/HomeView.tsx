@@ -298,6 +298,7 @@ export function HomeView() {
       'medication_requests',
       'medication_administrations',
       'medication_statements',
+      'procedures',
       'service_requests',
       'clinical_documents',
     ],
@@ -405,7 +406,9 @@ export function HomeView() {
             contentContainerStyle={styles.scrollListContent}
           >
             {/* Journal: the last 7 days of treatment logs */}
-            {actionDays.some((day) => day.items.length > 0) && (
+            {actionDays.some(
+              (day) => day.items.length + (day.procedures?.length ?? 0) > 0
+            ) && (
               <ResourceSection
                 icon={ListChecks}
                 title="Journal"

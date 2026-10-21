@@ -388,6 +388,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       'medication_statements',
       'medication_administrations',
       'service_requests',
+      'procedures',
       'organizations',
       'request_orchestrations',
       'profile_settings',

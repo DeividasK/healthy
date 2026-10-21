@@ -198,6 +198,8 @@ test.describe('Sync between devices', () => {
       await bridge(page, async (b) => {
         await b.deleteCondition('eczema');
         await b.deleteServiceRequest('referral', 'shared-patient');
+        // Its journal logs (Procedures) go with it.
+        await b.deleteServiceRequest('meditation', 'shared-patient');
         await b.deleteReport('cbc');
         await b.deleteConsultation('visit');
         await b.syncNow();
@@ -207,6 +209,7 @@ test.describe('Sync between devices', () => {
       expect(afterDelete).toEqual(await snapshot(page));
       expect(afterDelete.conditions).toHaveLength(1);
       expect(afterDelete.service_requests).toHaveLength(0);
+      expect(afterDelete.procedures).toHaveLength(0);
       expect(afterDelete.diagnostic_reports).toHaveLength(0);
       // The treatment and the visit based on the request survive, unlinked.
       const fhir = (table: string, id: string) =>
@@ -359,6 +362,7 @@ test.describe('Sync between devices', () => {
         UNION ALL SELECT 'MedicationAdministration', id FROM medication_administrations
         UNION ALL SELECT 'MedicationStatement', id FROM medication_statements
         UNION ALL SELECT 'ServiceRequest', id FROM service_requests
+        UNION ALL SELECT 'Procedure', id FROM procedures
         UNION ALL SELECT 'Composition', id FROM clinical_documents
         UNION ALL SELECT 'Organization', id FROM organizations
         UNION ALL SELECT 'RequestOrchestration', id FROM request_orchestrations

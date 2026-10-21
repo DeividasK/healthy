@@ -123,6 +123,7 @@ export async function deletePatientRecord(id: string): Promise<void> {
     'service_requests',
     'medication_administrations',
     'medication_statements',
+    'procedures',
     'clinical_documents',
     'organizations',
     'request_orchestrations',

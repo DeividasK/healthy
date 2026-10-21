@@ -218,7 +218,7 @@ Reference cleanup is transactional:
 ZIP archives carry `records/service_request_*.json` envelopes; restore order is
 patients, organizations, conditions, reports, encounters, treatments, service
 requests, then Compositions. Encrypted sync replicates `ServiceRequest` after
-`MedicationRequest` and before `Composition`.
+`MedicationRequest` and before `Procedure`.
 
 ### Migration v14
 
@@ -229,6 +229,62 @@ grouped requests), its indexes and its sync capture triggers. The originating
 consultation foreign key is `ON DELETE SET NULL`; deleting a patient cascades.
 `Encounter.basedOn` lives in canonical Encounter JSON and needs no column. No
 existing table or record changes; backup restore remains the recovery path.
+
+### Repeating service requests
+
+A procedure or activity done repeatedly (e.g. 3 PRP sessions every 4–6
+weeks, or 30 minutes of reading every day) keeps its schedule in
+`occurrenceTiming.repeat`, the R5 choice alternative to the planned date
+(`occurrenceDateTime`); setting one removes the other:
+
+- `period`, `periodMax` and `periodUnit` (`d`, `wk` or `mo`): how often
+  ("every 4–6 weeks"). A new schedule has `frequency: 1`.
+- `count`: how many sessions in all, when limited.
+- `duration` with `durationUnit: min`: the planned minutes each time.
+- `when` (a part of the day) or `timeOfDay` (an exact time), never both
+  (tim-10).
+
+The form edits only these elements; others (e.g. `boundsPeriod`, `event`)
+are kept, and removing the schedule removes `repeat` but keeps the rest of
+the timing. A schedule starts on `repeat.boundsPeriod.start`, else on
+`authoredOn`.
+
+## Procedure logs
+
+The journal asks about each repeating service request whose status is
+`active` or `unknown` from its start, while fewer than `count` sessions are
+done, once `period` has passed since the last completed session (overdue
+sessions stay asked). "Every 4–6 weeks" shows its window (due from 4, until 6
+weeks after the last session); a daily schedule shows none. Each answer is a
+FHIR R5 `Procedure` stored in `procedures`:
+
+- One per request and day, id `<service request id>-<day>`, so answers from
+  several devices update the same resource.
+- `basedOn`: the `ServiceRequest` (`type: 'ServiceRequest'`); `code` and
+  `category` are copied from it when the log is created; `subject` is the
+  patient. Procedure covers activities the patient performs themselves
+  (R5 lists exercise and counselling); no performer is recorded.
+- `status`: `completed` when done (a session), `not-done` when not. Clearing
+  an answer deletes the resource; "not done" answers are not sessions.
+- When it happened: a date-only `occurrenceDateTime`, or, with a duration,
+  `occurrenceTiming` with the day as `event[0]` and `repeat.duration` in
+  minutes (`durationUnit: min`). A new "done" answer records the planned
+  duration, which the journal lets the user change in steps of 5 or type;
+  clearing it returns to `occurrenceDateTime`. A timed `occurrencePeriod`
+  from elsewhere reads as its length. Other elements are kept on update.
+
+The service request page lists completed sessions, newest first, each
+opening its journal day. Deleting a service request or patient deletes its
+logs by cascade, which sync records as deletions. ZIP archives carry
+`records/procedure_*.json` envelopes, restored after service requests and
+before bundles. Encrypted sync replicates `Procedure` after `ServiceRequest`.
+
+### Migration v20
+
+v20 is additive and non-breaking: it creates `procedures` (canonical JSON
+plus projected patient, service request, status and day), its indexes and
+its sync capture triggers. The service request and patient foreign keys
+cascade on delete. No existing table or record changes.
 
 ## Treatment logs
 
@@ -411,7 +467,7 @@ unchanged.
 
 ZIP archives carry `records/request_orchestration_*.json` envelopes,
 restored after service requests and before Compositions. Encrypted sync
-replicates `RequestOrchestration` after `ServiceRequest`.
+replicates `RequestOrchestration` after `Procedure`.
 
 ## Profile settings
 

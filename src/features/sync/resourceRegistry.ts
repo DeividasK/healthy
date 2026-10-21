@@ -10,6 +10,7 @@ import type {
   Observation,
   Organization,
   Patient,
+  Procedure,
   RequestOrchestration,
   ServiceRequest,
 } from 'fhir/r5';
@@ -23,6 +24,7 @@ import { insertMedicationRequestRecord } from '@/src/features/treatments/treatme
 import { insertMedicationStatementRecord } from '@/src/features/actions/medicationStatementsRepository';
 import { insertMedicationAdministrationRecord } from '@/src/features/actions/medicationAdministrationsRepository';
 import { insertServiceRequestRecord } from '@/src/features/service-requests/serviceRequestsRepository';
+import { insertProcedureRecord } from '@/src/features/actions/proceduresRepository';
 import { insertClinicalDocumentRecord } from '@/src/features/consultations/clinicalDocumentsRepository';
 import { insertRequestOrchestrationRecord } from '@/src/features/bundles/bundlesRepository';
 import {
@@ -182,7 +184,8 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
   },
   ServiceRequest: {
     table: 'service_requests',
-    tables: ['service_requests'],
+    // Deleting a service request cascades to its logs.
+    tables: ['service_requests', 'procedures'],
     read: (db, id) => readJson(db, 'service_requests', id),
     put: (resource, patientId) =>
       insertServiceRequestRecord(
@@ -190,6 +193,13 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
         patientId,
         true
       ),
+  },
+  Procedure: {
+    table: 'procedures',
+    tables: ['procedures'],
+    read: (db, id) => readJson(db, 'procedures', id),
+    put: (resource, patientId) =>
+      insertProcedureRecord(resource as unknown as Procedure, patientId, true),
   },
   RequestOrchestration: {
     table: 'request_orchestrations',

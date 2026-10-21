@@ -6,6 +6,7 @@ import {
   seedTestConsultation,
   seedTestServiceRequest,
   seedTestReport,
+  seedTestResources,
 } from '@/src/features/testing/visualTest';
 
 test.describe('View Service Request - Visual Regression', () => {
@@ -77,5 +78,42 @@ test.describe('View Service Request - Visual Regression', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await takeSnapshot(page, 'Service Request View - Wide layout', testInfo);
+  });
+
+  test('A repeating procedure with its sessions', async ({
+    page,
+  }, testInfo) => {
+    await seedTestPatient(page);
+    await seedTestResources(page, {
+      serviceRequests: [
+        {
+          id: 'visual-prp',
+          title: 'PRP injection',
+          category: '71388002',
+          status: 'active',
+          authoredOn: '2026-08-20',
+          requesterName: 'Dr. Beverly Crusher',
+          schedule: {
+            period: 4,
+            periodMax: 6,
+            periodUnit: 'wk',
+            count: 3,
+            duration: 45,
+          },
+        },
+      ],
+      procedureLogs: [
+        { serviceRequestId: 'visual-prp', date: '2026-09-02', answer: 'taken' },
+        {
+          serviceRequestId: 'visual-prp',
+          date: '2026-10-07',
+          answer: 'taken',
+          duration: 50,
+        },
+      ],
+    });
+    await page.goto('/service-request/visual-prp');
+    await page.getByTestId('service-request-session-2').waitFor();
+    await takeSnapshot(page, 'Service Request View - Sessions', testInfo);
   });
 });
