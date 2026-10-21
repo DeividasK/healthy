@@ -12,13 +12,15 @@ import type { TreatmentLogAnswer } from './actionDays';
 
 /**
  * "Not taken" (×) and "taken" (✓) buttons for a journal row. Pressing the
- * selected button again clears the answer.
+ * selected button again clears the answer. `mixed` tints both while a group
+ * is fully answered with both answers.
  */
 export function AnswerButtons({
   answer,
   name,
   testIDPrefix,
   disabled = false,
+  mixed = false,
   labels = { taken: 'taken', notTaken: 'not taken' },
   onAnswer,
 }: {
@@ -28,6 +30,8 @@ export function AnswerButtons({
   /** e.g. `treatment-log` gives `treatment-log-taken-<rowId>`; omitted while leaving. */
   testIDPrefix?: { prefix: string; rowId: string };
   disabled?: boolean;
+  /** Every item of a group is answered, some taken and some not. */
+  mixed?: boolean;
   /** The answers in words, e.g. "done" and "not done" for a procedure. */
   labels?: { taken: string; notTaken: string };
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
@@ -36,9 +40,12 @@ export function AnswerButtons({
     value: TreatmentLogAnswer,
     Icon: LucideIcon,
     label: string,
-    selectedStyle: object
+    selectedStyle: object,
+    tintStyle: object,
+    tintColor: string
   ) => {
     const selected = answer === value;
+    const tinted = mixed && !answer;
     return (
       <TouchableOpacity
         testID={
@@ -47,16 +54,20 @@ export function AnswerButtons({
         }
         accessibilityRole="checkbox"
         accessibilityLabel={`Mark ${name} ${label}`}
-        aria-checked={selected}
-        accessibilityState={{ checked: selected, disabled }}
+        aria-checked={tinted ? 'mixed' : selected}
+        accessibilityState={{ checked: tinted ? 'mixed' : selected, disabled }}
         disabled={disabled}
-        style={[styles.button, selected && selectedStyle]}
+        style={[styles.button, selected && selectedStyle, tinted && tintStyle]}
         activeOpacity={0.6}
         onPress={() => onAnswer(selected ? null : value)}
       >
         <Icon
           color={
-            selected ? COLORS.light.primaryForeground : COLORS.light.iconMuted
+            selected
+              ? COLORS.light.primaryForeground
+              : tinted
+                ? tintColor
+                : COLORS.light.iconMuted
           }
           size={18}
           strokeWidth={2.5}
@@ -66,8 +77,22 @@ export function AnswerButtons({
   };
   return (
     <View style={styles.buttons}>
-      {button('not-taken', X, labels.notTaken, styles.notTaken)}
-      {button('taken', Check, labels.taken, styles.taken)}
+      {button(
+        'not-taken',
+        X,
+        labels.notTaken,
+        styles.notTaken,
+        styles.notTakenTint,
+        COLORS.light.textSecondary
+      )}
+      {button(
+        'taken',
+        Check,
+        labels.taken,
+        styles.taken,
+        styles.takenTint,
+        COLORS.light.primary
+      )}
     </View>
   );
 }
@@ -134,6 +159,13 @@ const styles = StyleSheet.create({
   },
   notTaken: {
     backgroundColor: COLORS.light.textSecondary,
+  },
+  // Lighter than the selected answers, for a group answered both ways.
+  takenTint: {
+    backgroundColor: COLORS.light.emptyIconContainer,
+  },
+  notTakenTint: {
+    backgroundColor: COLORS.light.pillBorder,
   },
   disabled: {
     opacity: 0.4,

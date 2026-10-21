@@ -216,6 +216,47 @@ test('a structured regimen lists one row per dose of the current phase', () => {
   ).toEqual([['regimen-2026-10-15-2', '1 tablet in the evening', 'not-taken']]);
 });
 
+test('a dose taken every few days is due on every such day from its start', () => {
+  const everyOther: Dosage = {
+    ...dose(1, 'EVE'),
+    timing: {
+      repeat: { frequency: 1, period: 2, periodUnit: 'd', when: ['EVE'] },
+    },
+  };
+  const weekly: Dosage = {
+    ...dose(1, 'MORN'),
+    timing: {
+      repeat: { frequency: 1, period: 1, periodUnit: 'wk', when: ['MORN'] },
+    },
+  };
+  const rows = (id: string, dosage: Dosage, start: string, date: string) =>
+    buildActionDay(
+      date,
+      [
+        {
+          ...treatment(id, 'active', '2026-10-01'),
+          dosageInstruction: [dosage],
+        },
+      ],
+      [],
+      [taking(id, start)]
+    ).items.map((item) => item.rowId);
+
+  // Treatments started a day apart alternate.
+  expect(rows('retinol', everyOther, '2026-10-01', '2026-10-05')).toEqual([
+    'retinol-0',
+  ]);
+  expect(rows('retinol', everyOther, '2026-10-01', '2026-10-06')).toEqual([]);
+  expect(rows('azelaic', everyOther, '2026-10-02', '2026-10-05')).toEqual([]);
+  expect(rows('azelaic', everyOther, '2026-10-02', '2026-10-06')).toEqual([
+    'azelaic-0',
+  ]);
+  expect(rows('weekly', weekly, '2026-10-01', '2026-10-08')).toEqual([
+    'weekly-0',
+  ]);
+  expect(rows('weekly', weekly, '2026-10-01', '2026-10-09')).toEqual([]);
+});
+
 test('labels name today, yesterday and older days', () => {
   expect(formatDayLabel('2026-10-08', '2026-10-08')).toBe('Today');
   expect(formatDayLabel('2026-10-07', '2026-10-08')).toBe('Yesterday');

@@ -183,10 +183,14 @@ test.describe('Treatment bundles', () => {
       .poll(() => getTestTreatmentLog(page, `j-iron-${today}`))
       .toBeNull();
 
-    // Partial intake: open the bundle and answer one treatment.
+    // Partial intake: open the bundle and answer one treatment. Answered
+    // both ways, the bundle's buttons are both tinted.
     await page.getByTestId(`bundle-log-toggle-${key}`).click();
     await page.getByTestId('treatment-log-not-taken-j-omega').click();
-    await expect(takenAll).toHaveAttribute('aria-checked', 'false');
+    await expect(takenAll).toHaveAttribute('aria-checked', 'mixed');
+    await expect(
+      page.getByTestId(`bundle-log-not-taken-${key}`)
+    ).toHaveAttribute('aria-checked', 'mixed');
     await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
       '1 of 2 taken'
     );
