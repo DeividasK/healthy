@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
-import { DATABASE_MIGRATIONS } from './migrations';
+import {
+  DATABASE_MIGRATIONS,
+  REPAIRS_APPLIED_KEY,
+  REPAIRS_REVISION,
+} from './migrations';
 import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
@@ -31,19 +35,38 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   )) as { user_version?: number } | null | undefined;
   let currentVersion = verRow?.user_version ?? 0;
 
+  // Repairs only fix the schema, so once they have succeeded for the latest
+  // version and this set of repairs, later starts skip them.
+  const latestVersion = DATABASE_MIGRATIONS.at(-1)?.version ?? 0;
+  const repairsId = `${latestVersion}.${REPAIRS_REVISION}`;
+  const repairsApplied =
+    currentVersion >= latestVersion &&
+    (
+      await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_settings WHERE key = ?;',
+        [REPAIRS_APPLIED_KEY]
+      )
+    )?.value === repairsId;
+
   // Sequentially apply missing migrations
   for (const migration of DATABASE_MIGRATIONS) {
     const pending = currentVersion < migration.version;
-    if (pending || migration.repair) {
+    const repair = repairsApplied ? undefined : migration.repair;
+    if (pending || repair) {
       await db.withTransactionAsync(async () => {
         if (pending) await db.execAsync(migration.sql);
-        await migration.repair?.(db);
+        await repair?.(db);
         if (pending)
           await db.execAsync(`PRAGMA user_version = ${migration.version};`);
       });
       if (pending) currentVersion = migration.version;
     }
   }
+  if (!repairsApplied)
+    await db.runAsync(
+      'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?);',
+      [REPAIRS_APPLIED_KEY, repairsId]
+    );
 
   serializeTransactions(db);
   dbInstance = db;

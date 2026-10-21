@@ -1,4 +1,8 @@
-import { test, expect } from '@/src/features/testing/testStorage';
+import {
+  test,
+  expect,
+  seedTestPatient,
+} from '@/src/features/testing/testStorage';
 
 // Loading the app is what these tests are about.
 test.use({ freshApp: true });
@@ -60,5 +64,47 @@ test.describe('App startup', () => {
     // A fresh install has no profile yet, so Home sends the user to create one.
     await expect(page).toHaveURL(/profile\/new/);
     await expect(page.getByTestId('app-loading-skeleton')).toHaveCount(0);
+  });
+
+  test('runs the schema repairs once per repair revision, not on every start', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    const sql = (query: string) =>
+      page.evaluate(async (query) => {
+        await new Promise<void>((resolve) => {
+          const ready = () =>
+            (window as any).__HEALTHY_TEST_BRIDGE__
+              ? resolve()
+              : setTimeout(ready, 20);
+          ready();
+        });
+        return (window as any).__HEALTHY_TEST_BRIDGE__.querySql(query);
+      }, query);
+    const hasTrigger = async () =>
+      (
+        await sql(
+          "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'sync_organizations_insert'"
+        )
+      ).length === 1;
+    const restart = async () => {
+      // Restarting is what this test is about.
+      await page.reload();
+      await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    };
+
+    expect(await hasTrigger()).toBe(true);
+    // Repairs that already ran for this revision are skipped on restart:
+    // a capture trigger dropped since stays dropped.
+    await sql('DROP TRIGGER sync_organizations_insert');
+    await restart();
+    expect(await hasTrigger()).toBe(false);
+
+    // An older revision runs them again, restoring the trigger.
+    await sql(
+      "UPDATE app_settings SET value = '0.0' WHERE key = 'schema_repairs_applied'"
+    );
+    await restart();
+    expect(await hasTrigger()).toBe(true);
   });
 });
