@@ -362,6 +362,8 @@ test.describe('Treatment form keyboard support', () => {
   });
 
   test('Cmd/Ctrl+Enter runs the primary island action', async ({ page }) => {
+    // + comes with the first record.
+    await seedTestCondition(page, { title: 'Asthma' });
     await openRoute(page, '/');
     await expect(page.getByTestId('floating-add-button')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+Enter');

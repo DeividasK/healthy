@@ -106,7 +106,7 @@ export function EditProfileView() {
       }
 
       if (remainingCount === 0) {
-        router.replace('/profile/new');
+        router.replace('/welcome');
       } else {
         router.replace('/profile');
       }

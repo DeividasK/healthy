@@ -6,7 +6,7 @@ test.describe('Database In Use View - Visual Regression', () => {
   }, testInfo) => {
     const firstTab = await page.context().newPage();
     await firstTab.goto('/');
-    await firstTab.getByTestId('patient-given-name-input').waitFor();
+    await firstTab.getByTestId('welcome-get-started').waitFor();
 
     await page.goto('/');
     await page.getByText('Healthy is already open in another tab').waitFor();

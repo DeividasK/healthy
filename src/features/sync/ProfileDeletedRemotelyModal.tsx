@@ -38,7 +38,7 @@ export function ProfileDeletedRemotelyModal() {
     try {
       await resolveProfileDeletion(profile.patientId, choice);
       if (choice === 'delete' && (await getAllPatients()).length === 0)
-        router.replace('/profile/new');
+        router.replace('/welcome');
     } catch (err) {
       console.warn('Failed to resolve the profile deletion:', err);
       setError(

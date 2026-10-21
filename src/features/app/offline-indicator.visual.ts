@@ -7,7 +7,7 @@ import {
 test.describe('Offline Indicator - Visual Regression', () => {
   test('Header - Offline', async ({ page, context }, testInfo) => {
     await seedTestPatient(page);
-    await page.getByText('Nothing to show yet', { exact: true }).waitFor();
+    await page.getByTestId('start-your-record').waitFor();
 
     await context.setOffline(true);
     await page.getByTestId('offline-header-indicator').waitFor();

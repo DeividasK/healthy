@@ -1,6 +1,7 @@
 import {
   test,
   takeSnapshot,
+  waitForMenuToggle,
   waitForSyncIdle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
@@ -23,28 +24,36 @@ test.describe('Profile Views - Visual Regression', () => {
     await takeSnapshot(page, 'Profile View - Switcher Open', testInfo);
   });
 
-  test('Profile View - Add Profile Options', async ({ page }, testInfo) => {
+  test('Profile View - Add a profile', async ({ page }, testInfo) => {
+    await seedTestPatient(page, { id: 'patient-visual' });
     await page.goto('/profile/new');
-    await page.getByTestId('option-create-profile').waitFor();
+    await page.getByTestId('add-profile-header-title').waitFor();
+    await takeSnapshot(page, 'Profile View - Add a profile', testInfo);
 
-    await takeSnapshot(page, 'Profile View - Add Profile Options', testInfo);
-    await page.getByTestId('option-restore-file').click();
-    await page.getByText('Restore From Backup', { exact: true }).waitFor();
-
+    for (const option of [
+      'menu-add-family-name',
+      'menu-add-birth-date',
+      'menu-add-gender',
+      'menu-add-photo',
+    ]) {
+      await page.getByTestId('add-option-button').click();
+      await waitForMenuToggle(page, 'add-option-button', true);
+      await page.getByTestId(option).click();
+      await waitForMenuToggle(page, 'add-option-button', false);
+    }
+    await page.getByTestId('upload-photo-button').waitFor();
     await takeSnapshot(
       page,
-      'Profile View - Restore From File Option',
+      'Profile View - Add a profile with optional fields',
       testInfo
     );
+  });
 
-    await page.getByTestId('option-restore-gdrive').click();
-    await page.getByText('Google Drive Sync', { exact: true }).waitFor();
-
-    await takeSnapshot(
-      page,
-      'Profile View - Restore From Google Drive Option',
-      testInfo
-    );
+  test('Profile View - Restore a profile', async ({ page }, testInfo) => {
+    await seedTestPatient(page, { id: 'patient-visual' });
+    await page.goto('/profile/restore');
+    await page.getByTestId('restore-from-file').waitFor();
+    await takeSnapshot(page, 'Profile View - Restore a profile', testInfo);
   });
 
   test('Profile View - Connected Google Sync State', async ({
