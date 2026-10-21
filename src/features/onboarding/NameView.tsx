@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { FormField } from '@/src/components/FormField';
@@ -37,7 +37,13 @@ export function NameView() {
   useActionDock(NO_ACTIONS);
 
   // A profile made elsewhere (or this one, once saved) means setup is done.
-  if (patients.length > 0 && !saving) return <Redirect href="/" />;
+  const setUpElsewhere = patients.length > 0 && !saving;
+  useFocusEffect(
+    useCallback(() => {
+      if (setUpElsewhere) router.dismissTo('/');
+    }, [setUpElsewhere, router])
+  );
+  if (setUpElsewhere) return null;
 
   const canSave = givenName.trim().length > 0 && !saving;
 

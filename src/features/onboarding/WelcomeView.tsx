@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -105,7 +105,14 @@ export function WelcomeView() {
   useActionDock(NO_ACTIONS);
 
   // Welcome is for a device with no profile yet.
-  if (patients.length > 0) return <Redirect href="/" />;
+  const hasProfile = patients.length > 0;
+  // Only while in front: under Home after setup, it stays put.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasProfile) router.dismissTo('/');
+    }, [hasProfile, router])
+  );
+  if (hasProfile) return null;
 
   const getStarted = () => {
     const heart = heartRef.current;
