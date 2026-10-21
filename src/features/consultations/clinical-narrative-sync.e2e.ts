@@ -341,7 +341,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
     });
     // The queues are imported when the app starts.
     await page.reload();
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await expect(page.getByTestId('profile-header-button')).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -350,7 +350,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
       )
       .toBeNull();
     await page.reload();
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await expect(page.getByTestId('profile-header-button')).toBeVisible();
     expect(await deletionChanges(page)).toEqual([
       {
         resourceType: 'Composition',

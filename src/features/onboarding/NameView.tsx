@@ -17,11 +17,11 @@ import { createOrUpdatePatient } from '@/src/features/profile/patientService';
 import { useActionDock } from '@/src/components/AppChrome';
 import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
-
-const NO_ACTIONS: DockAction[] = [];
 import { OnboardingButton } from './OnboardingButton';
 import { requestLogoBeat } from './logoHandoff';
 import { slideIn } from './motion';
+
+const NO_ACTIONS: DockAction[] = [];
 
 /** How long the saved tick shows before Home. */
 const SAVED_PAUSE_MS = 420;

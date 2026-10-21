@@ -18,8 +18,7 @@ test.describe('Edit Lab Results Flow', () => {
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('Create report with specific date (2026-09-26)', async () => {
-        await page.getByTestId('floating-add-button').click();
-        await page.getByTestId('menu-add-lab-results').click();
+        await page.getByTestId('start-lab-result').click();
 
         const datePicker = page.getByTestId('date-picker-button');
         const dateInput = datePicker.locator('input[type="date"]');

@@ -25,11 +25,11 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useActionDock } from '@/src/components/AppChrome';
 import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
-
-const NO_ACTIONS: DockAction[] = [];
 import { OnboardingButton } from './OnboardingButton';
 import { setHeroLogoRect } from './logoHandoff';
 import { HEARTBEAT, pop, rise } from './motion';
+
+const NO_ACTIONS: DockAction[] = [];
 
 const HERO_SIZE = 88;
 

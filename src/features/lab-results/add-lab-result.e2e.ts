@@ -16,9 +16,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     'adds CBC lab results, then views, edits and deletes them',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
-      await test.step('Open Add Lab Results screen from floating button and audit a11y', async () => {
-        await page.getByTestId('floating-add-button').click();
-        const addLabResultsMenuBtn = page.getByTestId('menu-add-lab-results');
+      await test.step('Open Add Lab Results screen from the empty Home and audit a11y', async () => {
+        const addLabResultsMenuBtn = page.getByTestId('start-lab-result');
         await expect(addLabResultsMenuBtn).toBeVisible();
         await addLabResultsMenuBtn.click();
 
@@ -270,8 +269,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
+    await page.getByTestId('start-lab-result').click();
 
     // Label should read "Select Test"
     await expect(page.getByText('Select Test', { exact: true })).toBeVisible();
@@ -326,8 +324,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   }) => {
     // Set small mobile viewport
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
+    await page.getByTestId('start-lab-result').click();
 
     // Add RDW-CV
     const searchInput = page.getByTestId('test-search-input');
@@ -357,8 +354,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('limits date and time to now and pulls a later time back when the date returns to today', async ({
     page,
   }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-lab-results').click();
+    await page.getByTestId('start-lab-result').click();
     const dateInput = page
       .getByTestId('date-picker-button')
       .locator('input[type="date"]');

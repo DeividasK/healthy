@@ -74,7 +74,9 @@ test.describe('First-run onboarding', () => {
       await test.step('Welcome is done once a profile exists', async () => {
         await bridge(page, (b) => b.navigate('/welcome'));
         await expect(page).toHaveURL(/\/$/);
-        await expect(page.getByTestId('start-your-record')).toBeVisible();
+        await expect(
+          page.locator('[data-testid="start-your-record"]:visible')
+        ).toBeVisible();
       });
 
       await test.step('A starter row opens its form; + arrives with the first record', async () => {
