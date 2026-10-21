@@ -21,6 +21,9 @@ import {
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { GoogleSyncCard } from './GoogleSyncCard';
+import { IconTextButton } from './IconTextButton';
+import { PatientAvatar } from './PatientAvatar';
+import { getPatientPhotoUri } from './patientPhoto';
 import { PatientIdText } from './PatientIdText';
 import { LoadingView } from '@/src/components/LoadingView';
 
@@ -87,13 +90,17 @@ export function ProfileView() {
           {/* Active Profile Card */}
           <View style={styles.profileCard} testID="active-profile-card">
             <View style={styles.avatarSection}>
-              <View style={styles.avatarCircle}>
+              <PatientAvatar
+                photoUri={getPatientPhotoUri(activePatient)}
+                style={styles.avatarCircle}
+                testID="profile-avatar"
+              >
                 {activeInitials && activeInitials !== 'S' ? (
                   <Text style={styles.avatarInitials}>{activeInitials}</Text>
                 ) : (
                   <User size={36} color={COLORS.light.primary} />
                 )}
-              </View>
+              </PatientAvatar>
               <Text style={styles.profileName} testID="profile-display-name">
                 {activeName}
               </Text>
@@ -131,15 +138,12 @@ export function ProfileView() {
           {/* Switch Profile Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Profiles</Text>
-            <TouchableOpacity
+            <IconTextButton
               testID="add-new-profile-button"
-              style={styles.addProfileButton}
+              icon={Plus}
+              label="Add Profile"
               onPress={() => router.push('/profile/new')}
-              activeOpacity={0.7}
-            >
-              <Plus size={16} color={COLORS.light.primary} />
-              <Text style={styles.addProfileButtonText}>Add Profile</Text>
-            </TouchableOpacity>
+            />
           </View>
 
           {patients.map((p) => {
@@ -160,11 +164,13 @@ export function ProfileView() {
                 activeOpacity={0.7}
               >
                 <View style={styles.patientItemLeft}>
-                  <View
+                  <PatientAvatar
+                    photoUri={getPatientPhotoUri(p)}
                     style={[
                       styles.patientMiniAvatar,
                       isSelected && styles.patientMiniAvatarActive,
                     ]}
+                    testID={`profile-item-avatar-${pId}`}
                   >
                     <Text
                       style={[
@@ -174,7 +180,7 @@ export function ProfileView() {
                     >
                       {pInitials}
                     </Text>
-                  </View>
+                  </PatientAvatar>
                   <View style={styles.patientItemText}>
                     <Text style={styles.patientItemName}>{pName}</Text>
                     <PatientIdText id={pId} testID={`profile-item-id-${pId}`} />
@@ -299,19 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.light.foreground,
-  },
-  addProfileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  addProfileButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.primary,
   },
   patientItemCard: {
     flexDirection: 'row',

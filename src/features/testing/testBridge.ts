@@ -31,6 +31,7 @@ import {
   getBundleById,
   saveBundle,
 } from '@/src/features/bundles/bundleService';
+import type { Attachment } from 'fhir/r5';
 import type { BundleValues } from '@/src/features/bundles/bundleModel';
 import {
   getProfileSettings,
@@ -370,6 +371,7 @@ export function setupTestBridge(
       familyName?: string;
       gender?: 'male' | 'female' | 'other' | 'unknown';
       birthDate?: string;
+      photo?: Attachment;
     }) => {
       const patient = await createOrUpdatePatient(input);
       if (patient.id) {

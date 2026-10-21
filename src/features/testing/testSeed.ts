@@ -1,5 +1,5 @@
 import { test, type Page } from '@playwright/test';
-import type { MedicationRequest, ServiceRequest } from 'fhir/r5';
+import type { Attachment, MedicationRequest, ServiceRequest } from 'fhir/r5';
 import type {
   QuantityDraft,
   RegimenDraft,
@@ -11,6 +11,7 @@ export interface SeedPatientOptions {
   familyName?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   birthDate?: string;
+  photo?: Attachment;
 }
 
 export interface SeedConditionOptions {
@@ -256,6 +257,7 @@ export async function seedTestPatient(
           familyName: opts?.familyName || 'Doe',
           gender: opts?.gender,
           birthDate: opts?.birthDate,
+          photo: opts?.photo,
         });
         // A fresh page then opens on Home, as after creating a profile.
         if (home) bridge.navigate('/');

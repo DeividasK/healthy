@@ -34,6 +34,11 @@ references, codings and `meta.lastUpdated`. Sync resolves concurrent edits per
 resource by hybrid logical clock ([ADR 0001](adr/0001-local-first-sync.md)).
 Patient ownership is enforced on writes.
 
+A profile photo is `Patient.photo[0]`, an inline Attachment (`contentType`
+`image/jpeg`, base64 `data`, `width`, `height`) cropped to a square of at most
+256 px. It lives in the Patient JSON, so backups and sync carry it with no
+schema migration or separate file.
+
 App settings, sync metadata and storage timestamps are infrastructure rather
 than clinical FHIR resources. This optional terminology change needs no schema
 migration, new storage keys or data conversion; existing text-only records remain

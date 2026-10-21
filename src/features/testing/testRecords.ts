@@ -2,6 +2,10 @@ import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { evaluateBridge, seedTestPatient, seedTestResources } from './testSeed';
 
+/** A 24×16 PNG (green with a pale centre stripe) used as a profile photo. */
+export const TEST_PHOTO_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAABgAAAAQCAIAAACDRijCAAAAJ0lEQVR4nGO0TQlgwAamtNZiFc+pbsYqzoRVlAwwatCoQaMGjVSDANg6BBHAZq0iAAAAAElFTkSuQmCC';
+
 /** Every table that holds a synced, backed-up clinical record. */
 export const CLINICAL_TABLES = [
   'patients',
@@ -74,7 +78,16 @@ export async function seedEveryResource(
   page: Page,
   patientId = 'shared-patient'
 ): Promise<void> {
-  await seedTestPatient(page, { id: patientId, givenName: 'Alice' });
+  await seedTestPatient(page, {
+    id: patientId,
+    givenName: 'Alice',
+    photo: {
+      contentType: 'image/png',
+      data: TEST_PHOTO_PNG,
+      width: 24,
+      height: 16,
+    },
+  });
   await seedTestResources(page, {
     conditions: [
       {
