@@ -61,8 +61,8 @@ test.describe('App startup', () => {
     await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
 
     releaseDatabase();
-    // A fresh install has no profile yet, so Home sends the user to create one.
-    await expect(page).toHaveURL(/profile\/new/);
+    // A fresh install has no profile yet, so Home sends the user to Welcome.
+    await expect(page).toHaveURL(/\/welcome$/);
     await expect(page.getByTestId('app-loading-skeleton')).toHaveCount(0);
   });
 

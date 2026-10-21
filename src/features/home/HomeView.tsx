@@ -75,6 +75,7 @@ import {
 } from '@/src/database/dbEvents';
 import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import { LabsSummary, latestBiomarkers } from './LabsSummary';
+import { StartYourRecord } from './StartYourRecord';
 import { BiomarkerResultRow } from './BiomarkerResultRow';
 
 const blurActiveElement = () => {
@@ -186,6 +187,7 @@ export function HomeView() {
   const router = useRouter();
   const pathname = usePathname();
   const {
+    activePatient,
     activePatientId,
     patients,
     isLoading: isPatientLoading,
@@ -206,7 +208,7 @@ export function HomeView() {
     actionDays,
   } = data ?? EMPTY_HOME_DATA;
 
-  // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
+  // With no profile (fresh install or all profiles deleted), start at Welcome.
   useEffect(() => {
     if (pathname !== '/') return;
     if (!isPatientLoading && patients.length === 0) {
@@ -214,7 +216,7 @@ export function HomeView() {
       getAllPatients().then((actualPatients) => {
         if (!isMounted) return;
         if (actualPatients.length === 0) {
-          router.replace('/profile/new');
+          router.replace('/welcome');
         } else {
           refreshPatients();
         }
@@ -387,16 +389,10 @@ export function HomeView() {
         {!data ? (
           <ResourceSkeleton testID="home-skeleton" />
         ) : !hasAnyData ? (
-          /* Empty State when no results or conditions yet */
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <FileText color={COLORS.light.primary} size={36} />
-            </View>
-            <Text style={styles.emptyTitle}>Nothing to show yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Track changes to your biomarkers over time by adding test results.
-            </Text>
-          </View>
+          <StartYourRecord
+            patient={activePatient}
+            profileCount={patients.length}
+          />
         ) : (
           /* Results and Conditions View */
           <ScrollView
@@ -785,8 +781,11 @@ export function HomeView() {
           ]}
         />
 
+        {/* The empty state's rows are how to start; + comes with the first record. */}
         <ResourceActionDock
-          onAdd={() => setShowAddMenu((visible) => !visible)}
+          onAdd={
+            hasAnyData ? () => setShowAddMenu((visible) => !visible) : undefined
+          }
           addLabel="Add record"
           addTestID="floating-add-button"
           addMenuExpanded={showAddMenu}
@@ -815,34 +814,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.light.pillBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    color: COLORS.light.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
   },
   scrollList: {
     flex: 1,

@@ -32,8 +32,7 @@ export function RestoreVaultView() {
     try {
       await unlockWithPhrase(phrase);
       if (profile) await setProfileSynced(profile, true);
-      if (next === 'pick')
-        router.replace('/profile/restore-from-google-drive?pick=1');
+      if (next === 'pick') router.replace('/profile/restore?pick=1');
       else if (router.canGoBack()) router.back();
       else router.replace('/profile');
     } catch (err) {

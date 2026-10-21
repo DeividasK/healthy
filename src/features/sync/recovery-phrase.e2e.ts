@@ -144,8 +144,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const { page: device, close } = await openSecondDevice(browser, testInfo);
     await mockGoogleDrive(device, store);
     await mockGoogleAuthRoutes(device);
-    await openRoute(device, '/profile/restore-from-google-drive');
-    await device.getByTestId('connect-google-drive-button').click();
+    await openRoute(device, '/profile/restore');
+    await device.getByTestId('restore-from-google-drive').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
 
     const input = device.getByTestId('recovery-phrase-input');
@@ -170,7 +170,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       firstPicker.getByTestId('remote-profile-item-alice')
     ).toContainText('Alice Doe');
     await firstPicker.getByTestId('restore-selected-profiles-button').click();
-    await expect(device.getByTestId('floating-add-button')).toBeVisible();
+    await expect(device.getByTestId('start-your-record')).toBeVisible();
     await device.goto('/profile');
     await expect(device.getByTestId('profile-display-name').first()).toHaveText(
       'Alice Doe'
@@ -184,16 +184,16 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(modal.getByText('Delete from Google Drive')).toBeVisible();
     await device.clock.runFor(5000);
     await modal.getByTestId('delete-modal-confirm-button').click();
-    await expect(device).toHaveURL(/\/profile\/new/);
+    await expect(device).toHaveURL(/\/welcome$/);
 
-    await device.getByTestId('option-restore-gdrive').click();
-    await device.getByTestId('connect-google-drive-button').click();
+    await device.getByTestId('welcome-restore').click();
+    await device.getByTestId('restore-from-google-drive').click();
     const picker = device.getByTestId('google-profile-picker-modal');
     await expect(picker.getByTestId('remote-profile-item-alice')).toContainText(
       'Alice Doe'
     );
     await picker.getByTestId('restore-selected-profiles-button').click();
-    await expect(device.getByTestId('floating-add-button')).toBeVisible();
+    await expect(device.getByTestId('start-your-record')).toBeVisible();
     expect(
       await device.evaluate(() =>
         (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
@@ -286,8 +286,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
   }) => {
     await mockGoogleDrive(page);
     await mockGoogleAuthRoutes(page, { userEmail: 'testuser@gmail.com' });
-    await openRoute(page, '/profile/restore-from-google-drive');
-    await page.getByTestId('connect-google-drive-button').click();
+    await openRoute(page, '/profile/restore');
+    await page.getByTestId('restore-from-google-drive').click();
     const modal = page.getByTestId('no-profiles-found-modal');
     await expect(page.getByTestId('no-profiles-message')).toHaveText(
       'No profiles found in testuser@gmail.com Google Drive.'
@@ -410,7 +410,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     });
     // Reload so sync starts again with no profile marked as synced.
     await page.goto('/');
-    await page.getByTestId('floating-add-button').waitFor();
+    await page.getByTestId('profile-header-button').waitFor();
     await focusPastSyncThrottle(page, 2);
     expect(googleRequests).toEqual([]);
   });
