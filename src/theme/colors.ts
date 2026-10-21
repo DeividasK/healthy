@@ -22,13 +22,6 @@ export const THEME_COLORS = {
     secondarySubtle: '#efe6f0',
     secondaryWash: '#f8f4f8',
 
-    // Tertiary brand: apricot, for care and warmth
-    tertiary: '#c77c4e',
-    tertiaryForeground: '#1a1c1a',
-    tertiaryText: '#8a4f2c',
-    tertiarySubtle: '#f6e6da',
-    tertiaryWash: '#fcf5ef',
-
     // Text & typography
     textSecondary: '#414844',
     mutedForeground: '#414844',
@@ -56,15 +49,15 @@ export const THEME_COLORS = {
     input: '#c1c8c2',
     ring: '#3d6450',
 
+    // Lab result ranges: sage in range, apricot below or above it
+    inRange: '#5a8669',
+    inRangeBg: '#e6efe8',
+    inRangeText: '#3d6450',
+    outOfRange: '#c77c4e',
+    outOfRangeBg: '#f6e6da',
+    outOfRangeText: '#8a4f2c',
+
     // Feedback & badges
-    badgeNormalBg: '#ECFDF5',
-    badgeNormalBorder: '#A7F3D0',
-    badgeNormalText: '#10B981',
-
-    badgeLowBg: '#EFF6FF',
-    badgeLowBorder: '#BFDBFE',
-    badgeLowText: '#3B82F6',
-
     badgeHighBg: '#FEF2F2',
     badgeHighBorder: '#FECACA',
     badgeHighText: '#EF4444',

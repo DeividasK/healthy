@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { COLORS } from '@/src/theme/colors';
 
 /** Places a numeric result on a compact track with low, normal and high regions. */
 export function BiomarkerRangeLine({
@@ -52,9 +53,9 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   segment: { height: 4, opacity: 0.7 },
-  low: { backgroundColor: '#3B82F6' },
-  normal: { backgroundColor: '#10B981' },
-  high: { backgroundColor: '#EF4444' },
+  low: { backgroundColor: COLORS.light.outOfRange },
+  normal: { backgroundColor: COLORS.light.inRange },
+  high: { backgroundColor: COLORS.light.outOfRange },
   divider: {
     position: 'absolute',
     top: 0,

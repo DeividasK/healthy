@@ -1,0 +1,3 @@
+kind: Changed
+body: Lab results now show in-range values in sage green and out-of-range values in a soft apricot, matching the app's colours.
+time: 2026-10-21T15:23:25.130497855Z

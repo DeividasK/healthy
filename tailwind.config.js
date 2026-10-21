@@ -25,10 +25,6 @@ module.exports = {
           DEFAULT: withOpacity('secondary'),
           foreground: withOpacity('secondary-foreground'),
         },
-        tertiary: {
-          DEFAULT: withOpacity('tertiary'),
-          foreground: withOpacity('tertiary-foreground'),
-        },
         destructive: {
           DEFAULT: withOpacity('destructive'),
           foreground: withOpacity('destructive-foreground'),

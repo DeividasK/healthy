@@ -62,15 +62,15 @@ test('See All Biomarkers preserves the period and shows latest normal, low and h
   );
   await expect(home.getByTestId('labs-summary-segment-718-7')).toHaveAttribute(
     'stroke',
-    '#10B981'
+    '#5a8669'
   );
   await expect(home.getByTestId('labs-summary-segment-6690-2')).toHaveAttribute(
     'stroke',
-    '#3B82F6'
+    '#c77c4e'
   );
   await expect(home.getByTestId('labs-summary-segment-777-3')).toHaveAttribute(
     'stroke',
-    '#EF4444'
+    '#c77c4e'
   );
   await expect(home.getByTestId('labs-summary-chart')).toHaveAttribute(
     'aria-label',

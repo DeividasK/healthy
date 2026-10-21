@@ -53,9 +53,9 @@ function periodCutoff(months: number) {
 }
 
 const STATUS_COLORS = {
-  Normal: COLORS.light.badgeNormalText,
-  Low: COLORS.light.badgeLowText,
-  High: COLORS.light.badgeHighText,
+  Normal: COLORS.light.inRange,
+  Low: COLORS.light.outOfRange,
+  High: COLORS.light.outOfRange,
 };
 const CIRCUMFERENCE = 2 * Math.PI * 82;
 

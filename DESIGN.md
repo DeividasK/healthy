@@ -25,10 +25,10 @@ colors:
   on-secondary: '#ffffff'
   secondary-container: '#efe6f0'
   on-secondary-container: '#5e4562'
-  tertiary: '#c77c4e'
-  on-tertiary: '#1a1c1a'
-  tertiary-container: '#f6e6da'
-  on-tertiary-container: '#8a4f2c'
+  tertiary: '#7f4f4f'
+  on-tertiary: '#ffffff'
+  tertiary-container: '#9a6767'
+  on-tertiary-container: '#fffbff'
   error: '#ba1a1a'
   on-error: '#ffffff'
   error-container: '#ffdad6'
@@ -41,10 +41,10 @@ colors:
   secondary-fixed-dim: '#d9c6db'
   on-secondary-fixed: '#2a1b2c'
   on-secondary-fixed-variant: '#5e4562'
-  tertiary-fixed: '#f6e6da'
-  tertiary-fixed-dim: '#ebc3a8'
-  on-tertiary-fixed: '#331a0b'
-  on-tertiary-fixed-variant: '#8a4f2c'
+  tertiary-fixed: '#ffdad9'
+  tertiary-fixed-dim: '#f5b7b7'
+  on-tertiary-fixed: '#331112'
+  on-tertiary-fixed-variant: '#663b3b'
   background: '#f9faf6'
   on-background: '#1a1c1a'
   surface-variant: '#e2e3df'
@@ -158,11 +158,11 @@ The palette is engineered around clean clinical legibility, emotional stability,
 
 - **Primary (`#5A826D`)**: Anchors primary workflows, verification states, and clinical telemetry highlights. Reflects biological equilibrium, vital breath, and medical expertise.
 - **Secondary, dusty plum (`#7A5C7E`)**: The brand's second voice, for personal touches and featured items. Its near-complementary hue never blurs with the sage primary. Text-safe on white (5.7:1); use `#5E4562` for text on its `#EFE6F0` container.
-- **Tertiary, apricot (`#C77C4E`)**: Care and warmth: encouragement, gentle highlights and a warm series beside the cool sage and plum in charts. Pair fills with dark text (`#1A1C1A`, 5.2:1), never white. Use `#8A4F2C` for apricot text on white or on its `#F6E6DA` container. Keep it out of alerts so it is not mistaken for `alert-amber`.
-- Primary actions stay sage. Secondary and tertiary support the primary and never replace it on main actions.
+- Primary actions stay sage. Secondary supports the primary and never replaces it on main actions.
+- **Lab result ranges**: one calm pair drawn from the brand instead of traffic-light colors. In range is sage: `inRange` (`#5A8669`) for range segments and the summary ring, `inRangeText` (`#3D6450`) on `inRangeBg` (`#E6EFE8`, 5.7:1) for badges. Below or above range is apricot: `outOfRange` (`#C77C4E`) for segments and the ring, `outOfRangeText` (`#8A4F2C`) on `outOfRangeBg` (`#F6E6DA`, 5.3:1) for badges. Low and High share apricot, so the badge word and the range-line marker carry the direction; never show the color without them.
 - **Neutrals (`#F8FAFC`, `#FFFFFF`, `#64748B`, `#0F172A`)**: Provide deep atmospheric contrast with pure white card surfaces layered over a micro-slate base, ensuring long-session readability without ocular fatigue.
 - **Clinical Telemetry Accents**:
-  - `alert-rose` (`#F43F5E`): Out-of-range critical markers, urgent clinical alerts, and negative trending indicators.
+  - `alert-rose` (`#F43F5E`): Errors, urgent clinical alerts, and negative trending indicators. Lab results use the range colors above, not this.
   - `alert-amber` (`#F59E0B`): Borderline lab intervals, medication timing warnings, and caution prompts.
   - `privacy-green` (`#10B981`): Hardware-level encryption status, zero-cloud badges, and secure storage telemetry.
 

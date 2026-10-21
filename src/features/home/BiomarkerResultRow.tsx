@@ -183,25 +183,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   badgeNormal: {
-    backgroundColor: COLORS.light.badgeNormalBg,
+    backgroundColor: COLORS.light.inRangeBg,
   },
   badgeLow: {
-    backgroundColor: COLORS.light.badgeLowBg,
+    backgroundColor: COLORS.light.outOfRangeBg,
   },
   badgeHigh: {
-    backgroundColor: COLORS.light.badgeHighBg,
+    backgroundColor: COLORS.light.outOfRangeBg,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
   },
   badgeTextNormal: {
-    color: COLORS.light.badgeNormalText,
+    color: COLORS.light.inRangeText,
   },
   badgeTextLow: {
-    color: COLORS.light.badgeLowText,
+    color: COLORS.light.outOfRangeText,
   },
   badgeTextHigh: {
-    color: COLORS.light.badgeHighText,
+    color: COLORS.light.outOfRangeText,
   },
 });
