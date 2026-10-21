@@ -7,6 +7,7 @@ import {
   createOrUpdatePatient,
   deletePatient,
   getPatientDisplayName,
+  type PatientInput,
 } from './patientService';
 import { useActivePatient } from './ActivePatientContext';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
@@ -18,13 +19,7 @@ export function EditProfileView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refreshPatients, setActivePatientId } = useActivePatient();
   const { vaultState, syncedProfileIds, syncNow } = useSync();
-  const [initialValues, setInitialValues] = useState<{
-    id: string;
-    givenName: string;
-    familyName?: string;
-    gender?: 'male' | 'female' | 'other' | 'unknown';
-    birthDate?: string;
-  } | null>(null);
+  const [initialValues, setInitialValues] = useState<PatientInput | null>(null);
   const [patientName, setPatientName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
@@ -52,6 +47,7 @@ export function EditProfileView() {
           familyName,
           gender: patient.gender as any,
           birthDate: patient.birthDate,
+          photo: patient.photo?.find((photo) => photo.data),
         });
       } catch (err) {
         console.error('Failed to load patient for edit:', err);
@@ -82,13 +78,7 @@ export function EditProfileView() {
     );
   }
 
-  const handleSave = async (values: {
-    id?: string;
-    givenName: string;
-    familyName?: string;
-    gender?: 'male' | 'female' | 'other' | 'unknown';
-    birthDate?: string;
-  }) => {
+  const handleSave = async (values: PatientInput) => {
     await createOrUpdatePatient({
       ...values,
       id,

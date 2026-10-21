@@ -10,6 +10,8 @@ import { useRouter, usePathname } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import { getPatientInitials } from './patientService';
+import { PatientAvatar } from './PatientAvatar';
+import { getPatientPhotoUri } from './patientPhoto';
 import { COLORS } from '@/src/theme/colors';
 
 export function ProfileHeaderButton({
@@ -30,22 +32,28 @@ export function ProfileHeaderButton({
       accessibilityRole="button"
       accessibilityLabel="View Profile"
       activeOpacity={0.7}
-      style={[styles.button, style]}
+      style={style}
       onPress={() => {
         if (pathname !== '/profile') router.navigate('/profile');
       }}
     >
-      {initials && initials !== 'S' ? (
-        <Text style={styles.initialsText}>{initials}</Text>
-      ) : (
-        <User size={18} color={COLORS.light.primary} />
-      )}
+      <PatientAvatar
+        photoUri={getPatientPhotoUri(activePatient)}
+        style={styles.avatar}
+        testID="profile-header-avatar"
+      >
+        {initials && initials !== 'S' ? (
+          <Text style={styles.initialsText}>{initials}</Text>
+        ) : (
+          <User size={18} color={COLORS.light.primary} />
+        )}
+      </PatientAvatar>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
+  avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,

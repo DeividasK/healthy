@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { Patient } from 'fhir/r5';
+import type { Attachment, Patient } from 'fhir/r5';
 import {
   insertPatientRecord,
   fetchAllPatients,
@@ -21,6 +21,7 @@ export interface PatientInput {
   familyName?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
   birthDate?: string; // YYYY-MM-DD
+  photo?: Attachment;
 }
 
 /**
@@ -50,6 +51,7 @@ export async function createOrUpdatePatient(
     ],
     gender: input.gender || undefined,
     birthDate: input.birthDate || undefined,
+    photo: input.photo ? [input.photo] : undefined,
   };
 
   await insertPatientRecord(patient);

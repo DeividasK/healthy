@@ -8,6 +8,7 @@ import {
   checkA11y,
   openRoute,
   evaluateBridge as bridge,
+  TEST_PHOTO_PNG,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
@@ -141,6 +142,57 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
       'Not specified'
     );
+
+    await test.step('Uploads a profile photo, shows it and removes it', async () => {
+      await page.getByTestId('edit-profile-button').click();
+      const fileChooser = page.waitForEvent('filechooser');
+      await page.getByTestId('upload-photo-button').click();
+      await (
+        await fileChooser
+      ).setFiles({
+        name: 'photo.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(TEST_PHOTO_PNG, 'base64'),
+      });
+      await expect(
+        page.getByTestId('patient-avatar-preview-photo')
+      ).toBeVisible();
+      await expect(page.getByTestId('upload-photo-button')).toHaveText(
+        'Change Photo'
+      );
+      await page.getByTestId('save-profile-button').click();
+
+      for (const avatar of [
+        'profile-avatar',
+        'profile-header-avatar',
+        `profile-item-avatar-${id}`,
+      ])
+        await expect(page.getByTestId(`${avatar}-photo`)).toBeVisible();
+      // Stored as a square JPEG on the FHIR Patient, so it syncs and exports.
+      const [row] = await bridge(page, (b) =>
+        b.querySql('SELECT fhir_json FROM patients')
+      );
+      expect(JSON.parse(row.fhir_json).photo).toEqual([
+        {
+          contentType: 'image/jpeg',
+          data: expect.stringMatching(/^\/9j\//),
+          width: 16,
+          height: 16,
+        },
+      ]);
+
+      await page.getByTestId('edit-profile-button').click();
+      await expect(
+        page.getByTestId('patient-avatar-preview-photo')
+      ).toBeVisible();
+      await page.getByTestId('remove-photo-button').click();
+      await expect(page.getByTestId('remove-photo-button')).toHaveCount(0);
+      await page.getByTestId('save-profile-button').click();
+      await expect(page.getByTestId('profile-avatar')).toHaveText('JS');
+      await expect(page.getByTestId('profile-header-avatar-photo')).toHaveCount(
+        0
+      );
+    });
 
     await test.step('Offers creating or restoring another profile', async () => {
       await openRoute(page, '/profile/new');

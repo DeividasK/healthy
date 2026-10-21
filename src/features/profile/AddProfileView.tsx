@@ -21,6 +21,7 @@ import {
   getAllPatients,
   getPatientDisplayName,
   getPatientInitials,
+  type PatientInput,
 } from './patientService';
 import { useActivePatient } from './ActivePatientContext';
 import { useGoogleAuthSignIn, GoogleAuthPayload } from './useGoogleAuthSignIn';
@@ -244,13 +245,7 @@ export function AddProfileView({
     }
   };
 
-  const handleManualSave = async (values: {
-    id?: string;
-    givenName: string;
-    familyName?: string;
-    gender?: 'male' | 'female' | 'other' | 'unknown';
-    birthDate?: string;
-  }) => {
+  const handleManualSave = async (values: PatientInput) => {
     const created = await createOrUpdatePatient(values);
     await refreshPatients();
     if (created.id) {

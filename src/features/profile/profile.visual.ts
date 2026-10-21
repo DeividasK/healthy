@@ -4,13 +4,17 @@ import {
   waitForSyncIdle,
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
+import { TEST_PHOTO_PNG } from '@/src/features/testing/testRecords';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
-    await seedTestPatient(page, { id: 'patient-visual' });
+    await seedTestPatient(page, {
+      id: 'patient-visual',
+      photo: { contentType: 'image/png', data: TEST_PHOTO_PNG },
+    });
     await page.goto('/profile');
-    await page.getByTestId('active-profile-card').waitFor();
+    await page.getByTestId('profile-avatar-photo').waitFor();
 
     await takeSnapshot(page, 'Profile View - Details and Switcher', testInfo);
   });

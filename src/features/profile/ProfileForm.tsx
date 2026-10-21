@@ -7,11 +7,15 @@ import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { User } from 'lucide-react-native';
+import { ImagePlus, User, X } from 'lucide-react-native';
+import type { Attachment } from 'fhir/r5';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { PatientInput } from './patientService';
+import { PatientAvatar } from './PatientAvatar';
+import { IconTextButton } from './IconTextButton';
+import { getPhotoUri, pickPatientPhoto } from './patientPhoto';
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
@@ -64,14 +68,28 @@ export function ProfileForm({
     }
     return null;
   });
+  const [photo, setPhoto] = useState<Attachment | undefined>(
+    initialValues?.photo
+  );
   const hasChanges = useHasChanges({
     givenName,
     familyName,
     gender,
     birthDate,
+    photo,
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const handlePickPhoto = async () => {
+    try {
+      const picked = await pickPatientPhoto();
+      if (picked) setPhoto(picked);
+    } catch (err) {
+      console.error('Failed to load photo:', err);
+      showAlert('Error', 'Failed to load the photo. Please try another image.');
+    }
+  };
 
   const handleSubmit = async () => {
     const trimmedGiven = givenName.trim();
@@ -92,6 +110,7 @@ export function ProfileForm({
         familyName: familyName.trim() || undefined,
         gender,
         birthDate: formattedBirthDate,
+        photo,
       });
 
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -130,8 +149,28 @@ export function ProfileForm({
         )}
         {/* Avatar Preview */}
         <View style={styles.avatarPreviewContainer}>
-          <View style={styles.avatarCircle}>
+          <PatientAvatar
+            photoUri={getPhotoUri(photo)}
+            style={styles.avatarCircle}
+            testID="patient-avatar-preview"
+          >
             <User size={40} color={COLORS.light.primary} />
+          </PatientAvatar>
+          <View style={styles.photoActions}>
+            <IconTextButton
+              testID="upload-photo-button"
+              icon={ImagePlus}
+              label={photo ? 'Change Photo' : 'Upload Photo'}
+              onPress={handlePickPhoto}
+            />
+            {photo && (
+              <IconTextButton
+                testID="remove-photo-button"
+                icon={X}
+                label="Remove Photo"
+                onPress={() => setPhoto(undefined)}
+              />
+            )}
           </View>
         </View>
 
@@ -257,5 +296,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.pillBorder,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
   },
 });
