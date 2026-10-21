@@ -334,7 +334,7 @@ export function BiomarkerDetailView() {
           )}
         />
       </ResourceSection>
-      <View style={styles.section} testID="biomarker-learn">
+      <View style={styles.learnSection} testID="biomarker-learn">
         <Text style={styles.sectionTitle}>Learn</Text>
         <LearnItem title="About this biomarker">
           {marker?.education?.about ||
@@ -351,28 +351,21 @@ export function BiomarkerDetailView() {
         <LearnItem title="What may be related to a change">
           {marker?.education?.whatMayBeRelatedToAChange || ''}
         </LearnItem>
-        <Text style={styles.learnNote}>
-          A result outside the reference range does not diagnose a condition by
-          itself. Your clinician can interpret it with your other results and
-          health history.
-        </Text>
       </View>
     </ResourceViewLayout>
   );
 }
 
-/** Renders populated educational content as an initially collapsed accordion. */
+/**
+ * A full-width row, divided like resource rows, that expands its educational
+ * text below the title; the chevron on the right turns when open.
+ */
 function LearnItem({ title, children }: { title: string; children: string }) {
   const [expanded, setExpanded] = useState(false);
   if (!children.trim()) return null;
 
   return (
-    <View
-      style={[
-        styles.learnItem,
-        expanded && children.length > 0 && styles.learnItemExpanded,
-      ]}
-    >
+    <View style={styles.learnItem}>
       <Pressable
         accessibilityRole="button"
         aria-expanded={expanded}
@@ -388,12 +381,10 @@ function LearnItem({ title, children }: { title: string; children: string }) {
             expanded && styles.learnChevronExpanded,
           ]}
         >
-          <ChevronDown size={18} color={COLORS.light.foreground} />
+          <ChevronDown size={18} color={COLORS.light.muted} />
         </View>
       </Pressable>
-      {expanded && children.length > 0 && (
-        <Text style={styles.learnText}>{children}</Text>
-      )}
+      {expanded && <Text style={styles.learnText}>{children}</Text>}
     </View>
   );
 }
@@ -686,41 +677,49 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendSwatch: { width: 16, height: 6, borderRadius: 3 },
   legendLabel: { fontSize: 12, color: COLORS.light.textSecondary },
-  learnItem: { marginBottom: 0 },
-  learnItemExpanded: { marginBottom: 18 },
+  // Closes the last row with the same full-width hairline.
+  learnSection: {
+    marginBottom: 28,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.light.cardBorder,
+  },
+  // Spans the screen width like resource rows, divided by the same hairline.
+  learnItem: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.light.cardBorder,
+  },
   learnItemToggle: {
-    minHeight: 40,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 6,
+    gap: 10,
   },
   learnItemTitle: {
+    flex: 1,
     color: COLORS.light.foreground,
-    fontSize: 15,
-    fontWeight: '600',
-    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
+  // Lines up with the chevrons of resource rows.
   learnChevronBox: {
-    width: 24,
-    height: 24,
+    width: 48,
+    height: 48,
+    marginRight: -15,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   learnChevronExpanded: {
     transform: [{ rotate: '180deg' }],
   },
   learnText: {
+    paddingBottom: 16,
     color: COLORS.light.textSecondary,
     fontSize: 14,
     lineHeight: 21,
-  },
-  learnNote: {
-    color: COLORS.light.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 2,
   },
   section: { marginBottom: 28 },
   sectionTitle: {
