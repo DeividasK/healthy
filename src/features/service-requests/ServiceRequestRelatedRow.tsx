@@ -3,8 +3,11 @@ import {
   Calendar,
   CalendarClock,
   CircleDot,
+  Clock,
+  Repeat2,
   Tag,
   Target,
+  Timer,
   User,
 } from 'lucide-react-native';
 import type { ServiceRequest } from 'fhir/r5';
@@ -23,6 +26,12 @@ import {
   getServiceRequestIntentLabel,
   getServiceRequestStatusLabel,
 } from './serviceRequestLabels';
+import {
+  formatScheduleDuration,
+  formatScheduleRepeat,
+  formatScheduleTime,
+  getScheduleRepeat,
+} from './serviceRequestSchedule';
 
 const formatDate = (date: string) =>
   date.includes('T') ? formatDisplayDateTime(date) : formatDisplayDate(date);
@@ -36,6 +45,10 @@ export function getServiceRequestMeta(
   const requester = request.requester?.display;
   const category = getServiceRequestCategoryLabel(request.category?.[0]);
   const planned = request.occurrenceDateTime;
+  const repeat = getScheduleRepeat(request);
+  const schedule = repeat && formatScheduleRepeat(repeat);
+  const time = repeat && formatScheduleTime(repeat);
+  const duration = repeat && formatScheduleDuration(repeat);
   return [
     ...(request.authoredOn
       ? [{ icon: Calendar, text: formatDate(request.authoredOn) }]
@@ -64,6 +77,33 @@ export function getServiceRequestMeta(
             icon: CalendarClock,
             text: `Planned ${formatDate(planned)}`,
             testID: id('service-request-planned-date'),
+          },
+        ]
+      : []),
+    ...(schedule
+      ? [
+          {
+            icon: Repeat2,
+            text: schedule,
+            testID: id('service-request-schedule'),
+          },
+        ]
+      : []),
+    ...(time
+      ? [
+          {
+            icon: Clock,
+            text: time,
+            testID: id('service-request-time-of-day'),
+          },
+        ]
+      : []),
+    ...(duration
+      ? [
+          {
+            icon: Timer,
+            text: duration,
+            testID: id('service-request-duration'),
           },
         ]
       : []),

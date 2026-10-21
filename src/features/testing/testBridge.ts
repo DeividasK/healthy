@@ -79,6 +79,15 @@ import {
 } from '@/src/features/actions/treatmentLogService';
 import { fetchMedicationAdministrationById } from '@/src/features/actions/medicationAdministrationsRepository';
 import {
+  fetchProcedureById,
+  insertProcedureRecord,
+} from '@/src/features/actions/proceduresRepository';
+import { getProcedureLogId } from '@/src/features/actions/procedureDays';
+import {
+  setProcedureDuration,
+  setProcedureLog,
+} from '@/src/features/actions/procedureLogService';
+import {
   getTreatmentLogId,
   type TreatmentLogAnswer,
 } from '@/src/features/actions/actionDays';
@@ -585,6 +594,46 @@ export function setupTestBridge(
       }
       await setTreatmentLog(item, input.date, input.answer, patientId);
     },
+    seedProcedureLog: async (input: {
+      serviceRequestId: string;
+      date: string;
+      /** `null` clears the day's answer. */
+      answer: TreatmentLogAnswer | null;
+      /** Minutes it took, for a done answer. */
+      duration?: number | null;
+      patientId?: string;
+    }) => {
+      const patientId = await resolvePatientId(input.patientId);
+      if (!patientId) throw new Error('No patient to log a procedure for');
+      const request = await fetchServiceRequestById(
+        input.serviceRequestId,
+        patientId
+      );
+      if (!request)
+        throw new Error(`Service request ${input.serviceRequestId} not found`);
+      const key = getProcedureLogId(input.serviceRequestId, input.date);
+      const log = (await fetchProcedureById(key, patientId)) ?? undefined;
+      await setProcedureLog(
+        { key, request, log },
+        input.date,
+        input.answer,
+        patientId
+      );
+      if (input.answer === 'taken' && input.duration !== undefined) {
+        const saved = await fetchProcedureById(key, patientId);
+        await setProcedureDuration(
+          { log: saved ?? undefined },
+          input.date,
+          input.duration,
+          patientId
+        );
+      }
+    },
+    getProcedureLog: async (id: string, patientId?: string) => {
+      const resolved = await resolvePatientId(patientId);
+      return resolved ? fetchProcedureById(id, resolved) : null;
+    },
+    saveProcedure: insertProcedureRecord,
     seedTreatmentUsage: async (input: {
       treatmentId: string;
       action: UsageAction;

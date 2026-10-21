@@ -19,6 +19,7 @@ export function AnswerButtons({
   name,
   testIDPrefix,
   disabled = false,
+  labels = { taken: 'taken', notTaken: 'not taken' },
   onAnswer,
 }: {
   answer: TreatmentLogAnswer | null;
@@ -27,6 +28,8 @@ export function AnswerButtons({
   /** e.g. `treatment-log` gives `treatment-log-taken-<rowId>`; omitted while leaving. */
   testIDPrefix?: { prefix: string; rowId: string };
   disabled?: boolean;
+  /** The answers in words, e.g. "done" and "not done" for a procedure. */
+  labels?: { taken: string; notTaken: string };
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
 }) {
   const button = (
@@ -63,8 +66,8 @@ export function AnswerButtons({
   };
   return (
     <View style={styles.buttons}>
-      {button('not-taken', X, 'not taken', styles.notTaken)}
-      {button('taken', Check, 'taken', styles.taken)}
+      {button('not-taken', X, labels.notTaken, styles.notTaken)}
+      {button('taken', Check, labels.taken, styles.taken)}
     </View>
   );
 }

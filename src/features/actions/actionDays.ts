@@ -14,6 +14,7 @@ import {
   getScheduledDoses,
 } from '@/src/features/treatments/regimen';
 import { getRegimenOn, getUsagePeriods, isTakingOn } from './treatmentUsage';
+import type { ProcedureItem } from './procedureDays';
 
 /** How many days the homepage and the actions view show at once. */
 export const ACTION_WINDOW_DAYS = 7;
@@ -52,6 +53,8 @@ export interface ActionItem {
 export interface ActionDay {
   date: string;
   items: ActionItem[];
+  /** Scheduled procedures and activities due that day. */
+  procedures?: ProcedureItem[];
 }
 
 /** The local day (YYYY-MM-DD) a treatment log is recorded for. */
@@ -233,10 +236,13 @@ export const getTreatmentLogId = (
 export type DayStatus = 'none' | 'empty' | 'partial' | 'complete' | 'future';
 
 export function getDayStatus(day?: ActionDay): DayStatus {
-  if (!day?.items.length) return 'none';
-  const answered = day.items.filter((item) => item.answer).length;
+  const answers = [...(day?.items ?? []), ...(day?.procedures ?? [])].map(
+    (item) => item.answer
+  );
+  if (!answers.length) return 'none';
+  const answered = answers.filter(Boolean).length;
   if (!answered) return 'empty';
-  return answered === day.items.length ? 'complete' : 'partial';
+  return answered === answers.length ? 'complete' : 'partial';
 }
 
 /** A day is complete once everything listed for it is answered. */

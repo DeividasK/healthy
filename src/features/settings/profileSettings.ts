@@ -5,7 +5,8 @@ export type PartOfDay = 'MORN' | 'NOON' | 'AFT' | 'EVE' | 'HS';
 
 /**
  * The journal's order within each part of the day (or `any`): resource keys
- * (`MedicationRequest/<id>`, `RequestOrchestration/<id>`), first on top.
+ * (`MedicationRequest/<id>`, `ServiceRequest/<id>`,
+ * `RequestOrchestration/<id>`), first on top.
  */
 export type JournalOrder = Partial<Record<PartOfDay | 'any', string[]>>;
 

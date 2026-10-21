@@ -2,7 +2,10 @@ import type { MedicationAdministration } from 'fhir/r5';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import { getAllTreatments } from '@/src/features/treatments/treatmentService';
+import { getAllServiceRequests } from '@/src/features/service-requests/serviceRequestService';
 import { fetchMedicationStatements } from './medicationStatementsRepository';
+import { fetchProceduresUpTo } from './proceduresRepository';
+import { buildProcedureItems } from './procedureDays';
 import {
   deleteMedicationAdministrationRecord,
   fetchMedicationAdministrationsInRange,
@@ -15,25 +18,30 @@ import {
   type TreatmentLogAnswer,
 } from './actionDays';
 
-/** The treatments to answer and the answers given on each of `dates`. */
+/**
+ * The treatments and scheduled service requests to answer, and the answers
+ * given, on each of `dates`.
+ */
 export async function getActionDays(
   patientId: string,
   dates: string[]
 ): Promise<ActionDay[]> {
   if (!dates.length) return [];
   const sorted = [...dates].sort();
-  const [treatments, administrations, statements] = await Promise.all([
-    getAllTreatments(patientId),
-    fetchMedicationAdministrationsInRange(
-      patientId,
-      sorted[0],
-      sorted[sorted.length - 1]
-    ),
-    fetchMedicationStatements(patientId),
-  ]);
-  return dates.map((date) =>
-    buildActionDay(date, treatments, administrations, statements)
-  );
+  const last = sorted[sorted.length - 1];
+  const [treatments, administrations, statements, requests, procedures] =
+    await Promise.all([
+      getAllTreatments(patientId),
+      fetchMedicationAdministrationsInRange(patientId, sorted[0], last),
+      fetchMedicationStatements(patientId),
+      getAllServiceRequests(patientId),
+      // Earlier sessions decide when the next one is due.
+      fetchProceduresUpTo(patientId, last),
+    ]);
+  return dates.map((date) => ({
+    ...buildActionDay(date, treatments, administrations, statements),
+    procedures: buildProcedureItems(date, requests, procedures),
+  }));
 }
 
 /**

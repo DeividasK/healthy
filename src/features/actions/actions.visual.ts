@@ -199,4 +199,42 @@ test.describe('My actions - Visual Regression', () => {
     await page.getByTestId('journal-move-up-visual-log-probiotic-0').waitFor();
     await takeSnapshot(page, 'My actions - Reordering', testInfo);
   });
+
+  test('Scheduled procedures and activities', async ({ page }, testInfo) => {
+    await seedTestResources(page, {
+      serviceRequests: [
+        {
+          id: 'visual-prp',
+          title: 'PRP injection',
+          category: '71388002',
+          status: 'active',
+          authoredOn: '2026-08-20',
+          schedule: { period: 4, periodMax: 6, periodUnit: 'wk', count: 3 },
+        },
+        {
+          id: 'visual-reading',
+          title: 'Reading a book',
+          status: 'active',
+          authoredOn: '2026-10-01',
+          schedule: { period: 1, periodUnit: 'd', duration: 30 },
+        },
+      ],
+      procedureLogs: [
+        { serviceRequestId: 'visual-prp', date: '2026-09-02', answer: 'taken' },
+        {
+          serviceRequestId: 'visual-reading',
+          date: '2026-10-08',
+          answer: 'taken',
+          duration: 35,
+        },
+      ],
+    });
+    await page.goto('/journal');
+    await page.getByTestId('procedure-log-duration-visual-reading').waitFor();
+    await takeSnapshot(
+      page,
+      'My actions - Procedures and activities',
+      testInfo
+    );
+  });
 });

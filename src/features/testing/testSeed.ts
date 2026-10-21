@@ -91,6 +91,26 @@ export interface SeedServiceRequestOptions {
   reasonConditionIds?: string[];
   notes?: string;
   requesterName?: string;
+  /** How it repeats, e.g. `{ period: 1, periodUnit: 'd' }` for daily. */
+  schedule?: {
+    period: number;
+    periodMax?: number;
+    periodUnit: 'd' | 'wk' | 'mo';
+    count?: number;
+    duration?: number;
+    when?: string;
+    timeOfDay?: string;
+  };
+}
+
+export interface SeedProcedureLogOptions {
+  serviceRequestId: string;
+  /** Local day, YYYY-MM-DD. */
+  date: string;
+  answer: 'taken' | 'not-taken' | null;
+  /** Minutes it took, for a done answer. */
+  duration?: number | null;
+  patientId?: string;
 }
 
 export interface SeedTreatmentLogOptions {
@@ -152,6 +172,7 @@ export async function seedTestResources(
     serviceRequests?: SeedServiceRequestOptions[];
     treatmentUsage?: SeedTreatmentUsageOptions[];
     treatmentLogs?: SeedTreatmentLogOptions[];
+    procedureLogs?: SeedProcedureLogOptions[];
     reports?: SeedReportOptions[];
   }
 ): Promise<void> {
@@ -171,6 +192,8 @@ export async function seedTestResources(
         await bridge.seedTreatmentUsage(input);
       for (const input of resources.treatmentLogs ?? [])
         await bridge.seedTreatmentLog(input);
+      for (const input of resources.procedureLogs ?? [])
+        await bridge.seedProcedureLog(input);
       for (const input of resources.reports ?? [])
         await bridge.seedReport(input);
     }, resources);
@@ -385,6 +408,23 @@ export async function getTestTreatmentLog(
   return await page.evaluate(
     async ({ logId, patId }) =>
       await (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentLog(
+        logId,
+        patId
+      ),
+    { logId: id, patId: patientId }
+  );
+}
+
+/** Fetches a stored procedure log (Procedure) via the test bridge. */
+export async function getTestProcedureLog(
+  page: Page,
+  id: string,
+  patientId?: string
+): Promise<any> {
+  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
+  return await page.evaluate(
+    async ({ logId, patId }) =>
+      await (window as any).__HEALTHY_TEST_BRIDGE__.getProcedureLog(
         logId,
         patId
       ),
