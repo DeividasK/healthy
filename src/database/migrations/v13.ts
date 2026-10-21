@@ -12,7 +12,7 @@ const triggers = captureTriggers([
  * Non-breaking and additive: creates a new table, its index and sync capture
  * triggers. Existing tables and data are untouched; references live in the
  * canonical Encounter and DiagnosticReport JSON. `repair` re-creates the
- * triggers on every start, because rebuilding a table drops them.
+ * triggers whenever repairs run, because rebuilding a table drops them.
  */
 export const migrationV13: DatabaseMigration = {
   version: 13,

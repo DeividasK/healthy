@@ -10,7 +10,7 @@ const COLUMN = 'deletion_hold_hlc';
  * Non-breaking and additive: adds one nullable column to the `sync_profiles`
  * sync-metadata table, holding the HLC of the remote Patient deletion while
  * the decision is pending. No clinical table or FHIR JSON changes. The column
- * is added in `repair`, which runs on every start, so databases whose
+ * is added in `repair`, which runs whenever repairs run, so databases whose
  * `sync_profiles` was created or rebuilt by an earlier repair get it too.
  */
 export const migrationV19: DatabaseMigration = {

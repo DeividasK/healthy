@@ -14,7 +14,7 @@ const triggers = captureTriggers([
  * capture triggers. Existing tables and data are untouched. Bundle members
  * live in canonical JSON (`action.action.action.resource`); deleting a
  * treatment removes it from its bundles in the same transaction. `repair`
- * re-creates the triggers on every start, because rebuilding a table drops
+ * re-creates the triggers whenever repairs run, because rebuilding a table drops
  * them.
  */
 export const migrationV18: DatabaseMigration = {
