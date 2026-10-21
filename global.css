@@ -12,8 +12,10 @@
     --popover-foreground: 26 28 26;
     --primary: 61 100 80;
     --primary-foreground: 255 255 255;
-    --secondary: 238 238 235;
-    --secondary-foreground: 26 28 26;
+    --secondary: 122 92 126;
+    --secondary-foreground: 255 255 255;
+    --tertiary: 199 124 78;
+    --tertiary-foreground: 26 28 26;
     --muted: 238 238 235;
     --muted-foreground: 65 72 68;
     --accent: 61 100 80;
@@ -37,8 +39,10 @@
     --android-popover-foreground: 26 28 26;
     --android-primary: 61 100 80;
     --android-primary-foreground: 255 255 255;
-    --android-secondary: 238 238 235;
-    --android-secondary-foreground: 26 28 26;
+    --android-secondary: 122 92 126;
+    --android-secondary-foreground: 255 255 255;
+    --android-tertiary: 199 124 78;
+    --android-tertiary-foreground: 26 28 26;
     --android-muted: 238 238 235;
     --android-muted-foreground: 65 72 68;
     --android-accent: 61 100 80;

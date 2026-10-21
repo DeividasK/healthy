@@ -15,6 +15,20 @@ export const THEME_COLORS = {
     primaryLogo: '#5A8669',
     emptyIconContainer: '#d1e9cd',
 
+    // Secondary brand: dusty plum
+    secondary: '#7a5c7e',
+    secondaryForeground: '#ffffff',
+    secondaryText: '#5e4562',
+    secondarySubtle: '#efe6f0',
+    secondaryWash: '#f8f4f8',
+
+    // Tertiary brand: apricot, for care and warmth
+    tertiary: '#c77c4e',
+    tertiaryForeground: '#1a1c1a',
+    tertiaryText: '#8a4f2c',
+    tertiarySubtle: '#f6e6da',
+    tertiaryWash: '#fcf5ef',
+
     // Text & typography
     textSecondary: '#414844',
     mutedForeground: '#414844',

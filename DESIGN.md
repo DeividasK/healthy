@@ -21,14 +21,14 @@ colors:
   primary-container: '#557d68'
   on-primary-container: '#f5fff7'
   inverse-primary: '#a6d0b8'
-  secondary: '#4e644e'
+  secondary: '#7a5c7e'
   on-secondary: '#ffffff'
-  secondary-container: '#d1e9cd'
-  on-secondary-container: '#546a54'
-  tertiary: '#7f4f4f'
-  on-tertiary: '#ffffff'
-  tertiary-container: '#9a6767'
-  on-tertiary-container: '#fffbff'
+  secondary-container: '#efe6f0'
+  on-secondary-container: '#5e4562'
+  tertiary: '#c77c4e'
+  on-tertiary: '#1a1c1a'
+  tertiary-container: '#f6e6da'
+  on-tertiary-container: '#8a4f2c'
   error: '#ba1a1a'
   on-error: '#ffffff'
   error-container: '#ffdad6'
@@ -37,14 +37,14 @@ colors:
   primary-fixed-dim: '#a6d0b8'
   on-primary-fixed: '#002114'
   on-primary-fixed-variant: '#274e3c'
-  secondary-fixed: '#d1e9cd'
-  secondary-fixed-dim: '#b5cdb2'
-  on-secondary-fixed: '#0c200f'
-  on-secondary-fixed-variant: '#374c38'
-  tertiary-fixed: '#ffdad9'
-  tertiary-fixed-dim: '#f5b7b7'
-  on-tertiary-fixed: '#331112'
-  on-tertiary-fixed-variant: '#663b3b'
+  secondary-fixed: '#efe6f0'
+  secondary-fixed-dim: '#d9c6db'
+  on-secondary-fixed: '#2a1b2c'
+  on-secondary-fixed-variant: '#5e4562'
+  tertiary-fixed: '#f6e6da'
+  tertiary-fixed-dim: '#ebc3a8'
+  on-tertiary-fixed: '#331a0b'
+  on-tertiary-fixed-variant: '#8a4f2c'
   background: '#f9faf6'
   on-background: '#1a1c1a'
   surface-variant: '#e2e3df'
@@ -157,7 +157,9 @@ The design movement combines **Minimalism** with subtle **Tactile Precision**: c
 The palette is engineered around clean clinical legibility, emotional stability, and quick cognitive triage:
 
 - **Primary (`#5A826D`)**: Anchors primary workflows, verification states, and clinical telemetry highlights. Reflects biological equilibrium, vital breath, and medical expertise.
-- **Secondary (`#90A78E`)**: Governs lab diagnostic data, continuous vitals (heart rate, SpO2, sleep stages), and secondary pathways.
+- **Secondary, dusty plum (`#7A5C7E`)**: The brand's second voice, for personal touches and featured items. Its near-complementary hue never blurs with the sage primary. Text-safe on white (5.7:1); use `#5E4562` for text on its `#EFE6F0` container.
+- **Tertiary, apricot (`#C77C4E`)**: Care and warmth: encouragement, gentle highlights and a warm series beside the cool sage and plum in charts. Pair fills with dark text (`#1A1C1A`, 5.2:1), never white. Use `#8A4F2C` for apricot text on white or on its `#F6E6DA` container. Keep it out of alerts so it is not mistaken for `alert-amber`.
+- Primary actions stay sage. Secondary and tertiary support the primary and never replace it on main actions.
 - **Neutrals (`#F8FAFC`, `#FFFFFF`, `#64748B`, `#0F172A`)**: Provide deep atmospheric contrast with pure white card surfaces layered over a micro-slate base, ensuring long-session readability without ocular fatigue.
 - **Clinical Telemetry Accents**:
   - `alert-rose` (`#F43F5E`): Out-of-range critical markers, urgent clinical alerts, and negative trending indicators.
