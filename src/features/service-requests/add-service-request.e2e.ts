@@ -159,6 +159,122 @@ test.describe('Add Service Request Flow', () => {
     expect(results[0].n).toBe(0);
   });
 
+  test('schedules a repeating service request instead of a planned date', async ({
+    page,
+  }) => {
+    await openRoute(page, '/service-request/add');
+    await page.getByTestId('service-request-title-input').fill('PRP injection');
+    await page
+      .getByTestId('service-request-category-select')
+      .selectOption('71388002');
+
+    // Schedule details are offered once it repeats; a schedule and a planned
+    // date exclude each other.
+    await page.getByTestId('add-option-button').click();
+    await expect(
+      page.getByTestId('menu-add-service-request-count')
+    ).toHaveCount(0);
+    await page.getByTestId('menu-add-service-request-repeats').click();
+    for (const field of ['periodMax', 'count', 'duration', 'timeOfDay']) {
+      await page.getByTestId('add-option-button').click();
+      await expect(
+        page.getByTestId('menu-add-service-request-plannedDate')
+      ).toHaveCount(0);
+      await page.getByTestId(`menu-add-service-request-${field}`).click();
+    }
+    await page.getByTestId('service-request-period-input').fill('4');
+    await page
+      .getByTestId('service-request-period-unit-select')
+      .selectOption('wk');
+    await page.getByTestId('service-request-period-max-input').fill('2');
+    await page.getByTestId('service-request-count-input').fill('3');
+    await page.getByTestId('service-request-duration-input').fill('30');
+    await page
+      .getByTestId('service-request-time-of-day-select')
+      .selectOption('HS');
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-form-error')).toHaveText(
+      'Up to must be at least the repeat interval'
+    );
+    await page.getByTestId('service-request-period-max-input').fill('6');
+    await checkA11y(page, { include: '[data-testid="service-request-form"]' });
+    await page.getByTestId('save-service-request-button').click();
+
+    // Saving returns Home, where the journal now asks for it.
+    await expect(page.getByTestId('home-actions-section')).toBeVisible();
+    const [{ id }] = await evaluateBridge(page, (b) =>
+      b.querySql('SELECT id FROM service_requests')
+    );
+    await openRoute(page, `/service-request/${id}`);
+    await expect(page.getByTestId('service-request-schedule')).toHaveText(
+      '3 sessions, every 4–6 weeks'
+    );
+    await expect(page.getByTestId('service-request-time-of-day')).toHaveText(
+      'Bedtime'
+    );
+    await expect(page.getByTestId('service-request-duration')).toHaveText(
+      '30 min'
+    );
+    const created = await getTestServiceRequest(page, id);
+    expect(created.occurrenceDateTime).toBeUndefined();
+    expect(created.occurrenceTiming).toEqual({
+      repeat: {
+        frequency: 1,
+        period: 4,
+        periodMax: 6,
+        periodUnit: 'wk',
+        count: 3,
+        duration: 30,
+        durationUnit: 'min',
+        when: ['HS'],
+      },
+    });
+
+    // Editing keeps timing the form does not show; removing the schedule
+    // clears its details and offers the planned date again.
+    await evaluateBridge(
+      page,
+      async (b, requestId: string) => {
+        const stored = await b.getServiceRequest(requestId);
+        stored.occurrenceTiming.repeat.boundsPeriod = { start: '2026-09-01' };
+        await b.saveServiceRequest(stored, stored.subject.reference.slice(8));
+      },
+      id
+    );
+    await openRoute(page, `/service-request/${id}/edit`);
+    await expect(page.getByTestId('service-request-count-input')).toHaveValue(
+      '3'
+    );
+    await page.getByTestId('service-request-count-input').fill('4');
+    await page.getByTestId('remove-service-request-duration-button').click();
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-schedule')).toHaveText(
+      '4 sessions, every 4–6 weeks'
+    );
+    const edited = await getTestServiceRequest(page, id);
+    expect(edited.occurrenceTiming.repeat).toMatchObject({
+      count: 4,
+      boundsPeriod: { start: '2026-09-01' },
+    });
+    expect(edited.occurrenceTiming.repeat.duration).toBeUndefined();
+
+    await openRoute(page, `/service-request/${id}/edit`);
+    await page.getByTestId('remove-service-request-repeats-button').click();
+    await expect(page.getByTestId('service-request-count-input')).toHaveCount(
+      0
+    );
+    await page.getByTestId('add-option-button').click();
+    await expect(
+      page.getByTestId('menu-add-service-request-plannedDate')
+    ).toBeVisible();
+    await page.getByTestId('form-add-menu').press('Escape');
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-schedule')).toHaveCount(0);
+    expect(
+      (await getTestServiceRequest(page, id)).occurrenceTiming
+    ).toBeUndefined();
+  });
+
   test('creates a service request from a consultation, then deletes it with its references', async ({
     page,
   }) => {

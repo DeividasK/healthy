@@ -6,6 +6,7 @@ import {
   type BundleTime,
 } from '@/src/features/bundles/bundleModel';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
+import type { ProcedureItem } from './procedureDays';
 
 /** Clock time (HH:mm) of each part of the day, from the profile's settings. */
 export type TimesOfDay = Partial<Record<string, string>>;
@@ -20,12 +21,26 @@ export interface BundleRow {
   items: ActionItem[];
 }
 
-export type JournalRow = { kind: 'item'; item: ActionItem } | BundleRow;
+export type JournalRow =
+  | { kind: 'item'; item: ActionItem }
+  | { kind: 'procedure'; item: ProcedureItem }
+  | BundleRow;
 
 const minutesOf = (time?: string) => {
   const match = time && /^(\d{2}):(\d{2})/.exec(time);
   return match ? +match[1] * 60 + +match[2] : null;
 };
+
+/** A procedure's clock time in minutes, from its request's schedule. */
+export function getProcedureMinutes(
+  item: ProcedureItem,
+  timesOfDay: TimesOfDay
+): number | null {
+  const repeat = item.request.occurrenceTiming?.repeat;
+  if (repeat?.timeOfDay?.length) return minutesOf(repeat.timeOfDay[0]);
+  if (repeat?.when?.length) return minutesOf(timesOfDay[repeat.when[0]]);
+  return null;
+}
 
 /** A dose's clock time in minutes: its exact time, or its part of the day's. */
 export function getItemMinutes(
@@ -63,7 +78,8 @@ export function getTimeMinutes(
 export function groupActionDay(
   items: ActionItem[],
   bundles: RequestOrchestration[],
-  timesOfDay: TimesOfDay
+  timesOfDay: TimesOfDay,
+  procedures: ProcedureItem[] = []
 ): JournalRow[] {
   const claimed = new Set<string>();
   const rows: (BundleRow & { minutes: number | null; order: number })[] = [];
@@ -141,6 +157,7 @@ export function groupActionDay(
     ...items
       .filter((item) => !claimed.has(item.key))
       .map((item) => ({ kind: 'item' as const, item })),
+    ...procedures.map((item) => ({ kind: 'procedure' as const, item })),
   ];
 }
 

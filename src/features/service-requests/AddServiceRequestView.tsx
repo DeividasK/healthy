@@ -106,6 +106,7 @@ function AddServiceRequestForPatient({
       plannedDate: values.plannedDate
         ? formatLocalDate(values.plannedDate)
         : null,
+      schedule: values.schedule,
       instructions: values.instructions,
       reason: values.reason,
       reasonConditionIds: values.reasonConditionIds,

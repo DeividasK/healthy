@@ -15,6 +15,7 @@ import {
   SERVICE_REQUEST_ROLE_OPTIONS,
   type ServiceRequestConsultationRole,
 } from './serviceRequestService';
+import { toScheduleDraft } from './serviceRequestSchedule';
 import {
   getServiceRequestInstructions,
   getServiceRequestNotes,
@@ -138,6 +139,7 @@ function EditServiceRequestForPatient({
             ? parseLocalDate(request.occurrenceDateTime)
             : null,
           originalPlannedDate: request.occurrenceDateTime,
+          scheduleDraft: toScheduleDraft(request),
           instructions: getServiceRequestInstructions(request) || '',
           reason: getServiceRequestReason(request) || '',
           reasonConditionIds: getReasonConditionIds(request),
@@ -187,6 +189,7 @@ function EditServiceRequestForPatient({
           : values.plannedDate
             ? formatLocalDate(values.plannedDate)
             : null,
+      schedule: values.schedule,
       instructions: values.instructions,
       reason: values.reason,
       reasonConditionIds: values.reasonConditionIds,

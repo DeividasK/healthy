@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, ScrollView } from 'react-native';
+import { StyleSheet, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHasChanges } from '@/src/components/useHasChanges';
 import { FormActionDock } from '@/src/components/FormActionDock';
@@ -11,12 +11,27 @@ import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import type { CodeableConcept, Condition, ServiceRequest } from 'fhir/r5';
 import {
   CalendarClock,
+  Clock,
   FileText,
   FolderPlus,
+  ListOrdered,
   MessageSquareText,
+  Repeat2,
   ScrollText,
+  Timer,
   User,
 } from 'lucide-react-native';
+import { NativeTimePicker } from '@/src/components/NativeTimePicker';
+import {
+  NumberInput,
+  ValueWithUnit,
+} from '@/src/features/treatments/TimingFields';
+import {
+  OFFERED_WHEN,
+  SPECIFIC_TIME,
+  getCourseUnitOptions,
+  getWhenOptions,
+} from '@/src/features/treatments/regimen';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
@@ -39,6 +54,14 @@ import {
   getServiceRequestIntentOptions,
   getServiceRequestStatusOptions,
 } from './serviceRequestLabels';
+import {
+  parseScheduleDraft,
+  type ScheduleDraft,
+  type ServiceRequestSchedule,
+} from './serviceRequestSchedule';
+
+/** Fields that only apply to a request that repeats. */
+const SCHEDULE_DETAILS = ['periodMax', 'count', 'duration', 'timeOfDay'];
 
 export interface ServiceRequestFormValues {
   id?: string;
@@ -52,6 +75,9 @@ export interface ServiceRequestFormValues {
   /** Known planned date; null removes it, undefined keeps the stored value. */
   plannedDate?: Date | null;
   originalPlannedDate?: string;
+  /** How it repeats; null removes the schedule. Loaded as a draft. */
+  schedule?: ServiceRequestSchedule | null;
+  scheduleDraft?: ScheduleDraft;
   requesterName?: string | null;
   instructions?: string | null;
   reason?: string | null;
@@ -102,6 +128,7 @@ export function ServiceRequestForm({
       ? [{ id: condition.id, label: getConditionTitle(condition) }]
       : []
   );
+  const draft = initialValues?.scheduleDraft;
   const fields = useOptionalFields(
     {
       plannedDate: {
@@ -109,6 +136,43 @@ export function ServiceRequestForm({
         icon: CalendarClock,
         empty: null as Date | null,
         initial: initialValues?.plannedDate || null,
+        excludes: ['repeats'],
+      },
+      repeats: {
+        label: 'Repeats Every',
+        icon: Repeat2,
+        empty: { period: '', periodUnit: 'd' },
+        initial: draft && {
+          period: draft.period,
+          periodUnit: draft.periodUnit,
+        },
+        added: () => ({ period: '1', periodUnit: 'd' }),
+        excludes: ['plannedDate'],
+      },
+      periodMax: {
+        label: 'Up To Every',
+        icon: Repeat2,
+        empty: '',
+        initial: draft?.periodMax,
+      },
+      count: {
+        label: 'Sessions',
+        icon: ListOrdered,
+        empty: '',
+        initial: draft?.count,
+      },
+      duration: {
+        label: 'Duration (Minutes)',
+        icon: Timer,
+        empty: '',
+        initial: draft?.duration,
+      },
+      timeOfDay: {
+        label: 'Time of Day',
+        icon: Clock,
+        empty: { choice: '', time: '08:00' },
+        initial: draft && { choice: draft.timeChoice, time: draft.time },
+        added: () => ({ choice: OFFERED_WHEN[0], time: '08:00' }),
       },
       requester: {
         label: 'Requester (Specialist)',
@@ -147,6 +211,11 @@ export function ServiceRequestForm({
   );
   const {
     plannedDate,
+    repeats,
+    periodMax,
+    count,
+    duration,
+    timeOfDay,
     requester: requesterName,
     instructions,
     reason,
@@ -161,6 +230,11 @@ export function ServiceRequestForm({
     status,
     authoredDate,
     plannedDate,
+    repeats,
+    periodMax,
+    count,
+    duration,
+    timeOfDay,
     instructions,
     reason,
     reasonConditionIds,
@@ -170,7 +244,18 @@ export function ServiceRequestForm({
   });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const options = [...fields.menuOptions, ...links.menuOptions];
+  // Schedule details are offered once the request repeats.
+  const options = [
+    ...fields.menuOptions.filter(
+      (option) => visibleFields.repeats || !SCHEDULE_DETAILS.includes(option.id)
+    ),
+    ...links.menuOptions,
+  ];
+  const removeRepeats = () => {
+    fields.remove('repeats');
+    for (const id of SCHEDULE_DETAILS)
+      fields.remove(id as (typeof fields.order)[number]);
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -178,6 +263,28 @@ export function ServiceRequestForm({
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setErrorMessage('Service is required');
+      return;
+    }
+    const schedule = visibleFields.repeats
+      ? parseScheduleDraft(
+          {
+            ...repeats,
+            periodMax,
+            count,
+            duration,
+            timeChoice: timeOfDay.choice,
+            time: timeOfDay.time,
+          },
+          {
+            periodMax: visibleFields.periodMax,
+            count: visibleFields.count,
+            duration: visibleFields.duration,
+            timeOfDay: visibleFields.timeOfDay,
+          }
+        )
+      : null;
+    if (typeof schedule === 'string') {
+      setErrorMessage(schedule);
       return;
     }
     setErrorMessage(null);
@@ -208,6 +315,7 @@ export function ServiceRequestForm({
             initialValues.originalPlannedDate.slice(0, 10)
             ? undefined
             : shownPlannedDate,
+        schedule,
         requesterName: visibleFields.requester
           ? requesterName.trim() || null
           : null,
@@ -352,6 +460,98 @@ export function ServiceRequestForm({
                 </FormField>
               );
             }
+            if (id === 'repeats') {
+              return (
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  onRemove={removeRepeats}
+                  nativeID="service-request-period-input"
+                >
+                  <ValueWithUnit
+                    input={
+                      <NumberInput
+                        id="service-request-period-input"
+                        name="period"
+                        label="Repeats every"
+                        placeholder="e.g. 4"
+                        value={repeats.period}
+                        onChangeText={(text) =>
+                          fields.set('repeats', { ...repeats, period: text })
+                        }
+                      />
+                    }
+                    testID="service-request-period-unit-select"
+                    name="periodUnit"
+                    unitLabel="Repeat unit"
+                    unit={repeats.periodUnit}
+                    options={getCourseUnitOptions(repeats.periodUnit)}
+                    onUnitChange={(unit) =>
+                      fields.set('repeats', { ...repeats, periodUnit: unit })
+                    }
+                  />
+                </FormField>
+              );
+            }
+            if (id === 'periodMax' || id === 'count' || id === 'duration') {
+              const inputID = {
+                periodMax: 'service-request-period-max-input',
+                count: 'service-request-count-input',
+                duration: 'service-request-duration-input',
+              }[id];
+              return (
+                <FormField key={id} {...fieldProps} nativeID={inputID}>
+                  <NumberInput
+                    id={inputID}
+                    name={id}
+                    label={label}
+                    placeholder={
+                      id === 'periodMax'
+                        ? 'e.g. 6'
+                        : id === 'count'
+                          ? 'e.g. 3'
+                          : 'e.g. 30'
+                    }
+                    integer={id === 'count'}
+                    value={fields.values[id]}
+                    onChangeText={(text) => fields.set(id, text)}
+                  />
+                </FormField>
+              );
+            }
+            if (id === 'timeOfDay') {
+              return (
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  nativeID="service-request-time-of-day-select"
+                >
+                  <View style={styles.timeOfDay}>
+                    <NativeSelect
+                      testID="service-request-time-of-day-select"
+                      name="timeOfDay"
+                      label={label}
+                      value={timeOfDay.choice}
+                      options={getWhenOptions(timeOfDay.choice)}
+                      onChange={(choice) =>
+                        fields.set('timeOfDay', { ...timeOfDay, choice })
+                      }
+                    />
+                    {timeOfDay.choice === SPECIFIC_TIME && (
+                      <NativeTimePicker
+                        value={timeOfDay.time}
+                        onChange={(time) =>
+                          fields.set('timeOfDay', { ...timeOfDay, time })
+                        }
+                        testID="service-request-time-input"
+                        id="service-request-time-input"
+                        name="time"
+                      />
+                    )}
+                  </View>
+                </FormField>
+              );
+            }
             if (id === 'requester') {
               return (
                 <AutocompleteTextField
@@ -437,5 +637,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 120,
+  },
+  timeOfDay: {
+    gap: 8,
   },
 });

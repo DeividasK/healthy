@@ -5,6 +5,7 @@ import {
 } from '@/src/features/settings/profileSettings';
 import {
   getItemMinutes,
+  getProcedureMinutes,
   getTimeMinutes,
   type JournalRow,
   type TimesOfDay,
@@ -80,7 +81,10 @@ export function getRowGroup(
     if (row.time?.kind === 'when') add(row.time.code);
     else if (row.time) add(undefined, row.time.time);
   } else {
-    const repeat = row.item.dose?.dosage?.timing?.repeat;
+    const repeat =
+      row.kind === 'procedure'
+        ? row.item.request.occurrenceTiming?.repeat
+        : row.item.dose?.dosage?.timing?.repeat;
     for (const code of repeat?.when ?? []) add(code);
     for (const time of repeat?.timeOfDay ?? []) add(undefined, time);
   }
@@ -88,16 +92,20 @@ export function getRowGroup(
   return found.size === 1 && only ? only : 'any';
 }
 
-/** The resource a row orders by: its treatment, or its bundle. */
+/** The resource a row orders by: its treatment, service request or bundle. */
 export const getJournalRowOrderKey = (row: JournalRow) =>
   row.kind === 'bundle'
     ? `RequestOrchestration/${row.bundle.id}`
-    : `MedicationRequest/${row.item.treatment.id}`;
+    : row.kind === 'procedure'
+      ? `ServiceRequest/${row.item.request.id}`
+      : `MedicationRequest/${row.item.treatment.id}`;
 
 const getRowMinutes = (row: JournalRow, timesOfDay: TimesOfDay) =>
   row.kind === 'bundle'
     ? getTimeMinutes(row.time, timesOfDay)
-    : getItemMinutes(row.item, timesOfDay);
+    : row.kind === 'procedure'
+      ? getProcedureMinutes(row.item, timesOfDay)
+      : getItemMinutes(row.item, timesOfDay);
 
 /**
  * Rows in the user's order: resources in `order` first, as listed, then the

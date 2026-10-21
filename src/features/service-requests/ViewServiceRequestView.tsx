@@ -1,18 +1,34 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FlaskConical, FolderPlus, Stethoscope } from 'lucide-react-native';
+import {
+  Calendar,
+  FlaskConical,
+  FolderPlus,
+  ListChecks,
+  Stethoscope,
+  Timer,
+} from 'lucide-react-native';
 import type {
   Condition,
   DiagnosticReport,
   Encounter,
+  Procedure,
   ServiceRequest,
 } from 'fhir/r5';
 import { getServiceRequestMeta } from './ServiceRequestRelatedRow';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
-import { ResourceSection } from '@/src/components/ResourceSection';
+import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
+import { fetchProceduresByServiceRequestId } from '@/src/features/actions/proceduresRepository';
+import {
+  getProcedureDate,
+  getProcedureDuration,
+} from '@/src/features/actions/procedureDays';
+import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { formatMinutes } from './serviceRequestSchedule';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { ConsultationRelatedRow } from '@/src/features/consultations/ConsultationRelatedRow';
@@ -59,6 +75,8 @@ interface RelatedRecords {
   linked: Encounter[];
   basedOn: Encounter[];
   labResults: DiagnosticReport[];
+  /** Sessions done (completed Procedures based on it), newest first. */
+  sessions: Procedure[];
 }
 
 const NO_RELATED: RelatedRecords = {
@@ -67,6 +85,7 @@ const NO_RELATED: RelatedRecords = {
   linked: [],
   basedOn: [],
   labResults: [],
+  sessions: [],
 };
 
 async function loadConsultations(ids: string[], patientId: string) {
@@ -106,7 +125,7 @@ function ServiceRequestForPatient({
         return;
       }
       const originId = getServiceRequestOriginId(loaded);
-      const [conditions, origin, linkedIds, basedOnIds, labResults] =
+      const [conditions, origin, linkedIds, basedOnIds, labResults, logs] =
         await Promise.all([
           Promise.all(
             getReasonConditionIds(loaded).map((conditionId) =>
@@ -119,6 +138,7 @@ function ServiceRequestForPatient({
           getConsultationIdsLinkingServiceRequest(id, activePatientId),
           getConsultationIdsBasedOnServiceRequest(id, activePatientId),
           getLabResultsByServiceRequestId(id, activePatientId),
+          fetchProceduresByServiceRequestId(id, activePatientId),
         ]);
       const [linked, basedOn] = await Promise.all([
         loadConsultations(
@@ -136,6 +156,7 @@ function ServiceRequestForPatient({
         linked,
         basedOn,
         labResults,
+        sessions: logs.filter((log) => log.status === 'completed').reverse(),
       });
     } catch (err) {
       if (sequence !== loadSequence.current) return;
@@ -154,6 +175,7 @@ function ServiceRequestForPatient({
       'clinical_documents',
       'conditions',
       'diagnostic_reports',
+      'procedures',
     ],
     loadData
   );
@@ -268,6 +290,52 @@ function ServiceRequestForPatient({
           />
         )}
       </View>
+
+      <ResourceSection
+        icon={ListChecks}
+        title="Sessions"
+        count={related.sessions.length}
+        testID="service-request-sessions-section"
+      >
+        {related.sessions.length > 0 && (
+          <CollapsibleList
+            items={related.sessions.map((session, index) => ({
+              session,
+              number: related.sessions.length - index,
+            }))}
+            testID="service-request-sessions"
+            renderItem={({ session, number }) => {
+              const date = getProcedureDate(session);
+              const duration = getProcedureDuration(session);
+              return (
+                <ResourceRow
+                  key={session.id}
+                  testID={`service-request-session-${number}`}
+                  title={`Session ${number}`}
+                  meta={[
+                    ...(date
+                      ? [{ icon: Calendar, text: formatDisplayDate(date) }]
+                      : []),
+                    ...(duration !== null
+                      ? [{ icon: Timer, text: formatMinutes(duration) }]
+                      : []),
+                  ]}
+                  accessibilityLabel={`Open the journal on ${date}`}
+                  onPress={
+                    date
+                      ? () =>
+                          router.push({
+                            pathname: '/journal',
+                            params: { date },
+                          })
+                      : undefined
+                  }
+                />
+              );
+            }}
+          />
+        )}
+      </ResourceSection>
 
       <ResourceSection
         icon={FolderPlus}

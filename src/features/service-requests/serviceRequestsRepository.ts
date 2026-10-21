@@ -342,6 +342,7 @@ export async function deleteServiceRequestRecord(
     if (didDelete) {
       notifyDatabaseChanged([
         'service_requests',
+        'procedures',
         'clinical_documents',
         'consultations',
         'diagnostic_reports',
