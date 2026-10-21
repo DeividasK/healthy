@@ -189,6 +189,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     DELETE FROM clinical_documents;
     DELETE FROM request_orchestrations;
     DELETE FROM profile_settings;
+    DELETE FROM procedures;
     DELETE FROM medication_administrations;
     DELETE FROM medication_statements;
     DELETE FROM medication_requests;
@@ -219,6 +220,7 @@ export async function clearAllDatabaseTables(): Promise<void> {
     'service_requests',
     'medication_administrations',
     'medication_statements',
+    'procedures',
     'request_orchestrations',
     'profile_settings',
     'consultations',

@@ -38,6 +38,10 @@ import {
   SERVICE_REQUEST_CATEGORIES,
   SNOMED_SYSTEM,
 } from './serviceRequestLabels';
+import {
+  withSchedule,
+  type ServiceRequestSchedule,
+} from './serviceRequestSchedule';
 
 export interface ServiceRequestInput {
   id?: string;
@@ -53,6 +57,11 @@ export interface ServiceRequestInput {
   authoredDate?: string; // ISO date or date-time with timezone
   /** Known planned date; null removes it, undefined keeps it. */
   plannedDate?: string | null;
+  /**
+   * How it repeats (`occurrenceTiming.repeat`); null removes the schedule,
+   * undefined keeps it. A schedule replaces the planned date.
+   */
+  schedule?: ServiceRequestSchedule | null;
   /** Original instructions, kept verbatim. */
   instructions?: string | null;
   reason?: string | null;
@@ -169,6 +178,26 @@ export async function createOrUpdateServiceRequest(
         request.occurrenceDateTime = input.plannedDate;
       } else {
         delete request.occurrenceDateTime;
+      }
+    }
+
+    if (input.schedule !== undefined) {
+      if (input.schedule) {
+        // occurrence[x] is a choice: a schedule replaces a known date.
+        delete request.occurrenceDateTime;
+        delete request.occurrencePeriod;
+        request.occurrenceTiming = {
+          ...request.occurrenceTiming,
+          repeat: withSchedule(
+            request.occurrenceTiming?.repeat,
+            input.schedule
+          ),
+        };
+      } else if (request.occurrenceTiming?.repeat?.period) {
+        // Other timing elements (e.g. event dates) are kept.
+        const { repeat: _repeat, ...timing } = request.occurrenceTiming;
+        if (Object.keys(timing).length) request.occurrenceTiming = timing;
+        else delete request.occurrenceTiming;
       }
     }
 

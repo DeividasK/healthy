@@ -11,10 +11,12 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowUpDown,
   Check,
+  ClipboardList,
   Clock,
   Copy,
   Group,
   Pill,
+  type LucideIcon,
 } from 'lucide-react-native';
 import Animated, {
   ReduceMotion,
@@ -35,6 +37,9 @@ import { ActionDayPills } from './ActionDayPills';
 import { ActionCalendar } from './ActionCalendar';
 import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 import { BundleLogRow } from './BundleLogRow';
+import { ProcedureLogRow } from './ProcedureLogRow';
+import type { ProcedureItem } from './procedureDays';
+import { setProcedureDuration, setProcedureLog } from './procedureLogService';
 import {
   getBundleChanges,
   groupActionDay,
@@ -239,6 +244,8 @@ function ActionsForPatient({
       'medication_requests',
       'medication_administrations',
       'medication_statements',
+      'service_requests',
+      'procedures',
     ],
     loadData
   );
@@ -269,7 +276,8 @@ function ActionsForPatient({
     ? groupActionDay(
         shownDay.items,
         journalBundles?.bundles ?? [],
-        journalBundles?.timesOfDay ?? {}
+        journalBundles?.timesOfDay ?? {},
+        shownDay.procedures
       )
     : [];
 
@@ -290,10 +298,45 @@ function ActionsForPatient({
     journalBundles?.timesOfDay ?? {},
     journalOrder
   );
-  // A day without times keeps a single list of treatments.
+  // A day without times keeps a list of treatments, and one of procedures
+  // and activities.
   const isGrouped = groups.some((group) => group.id !== 'any');
-  const canReorder = groups.some(
-    (group) => group.rows.length > 0 && canMoveJournalRow(group.rows, 0, 1)
+  const sections: {
+    key: string;
+    icon: LucideIcon;
+    title: string;
+    testID: string;
+    group: JournalGroup;
+  }[] = isGrouped
+    ? groups.map((group) => ({
+        key: group.id,
+        icon: Clock,
+        title: group.label,
+        testID: `actions-group-${group.id}`,
+        group,
+      }))
+    : groups.flatMap((group) => {
+        const procedures = group.rows.filter((row) => row.kind === 'procedure');
+        const treatments = group.rows.filter((row) => row.kind !== 'procedure');
+        return [
+          {
+            key: 'treatments',
+            icon: Pill,
+            title: 'Treatments',
+            testID: 'actions-treatments-section',
+            group: { ...group, rows: treatments },
+          },
+          {
+            key: 'procedures',
+            icon: ClipboardList,
+            title: 'Procedures & activities',
+            testID: 'actions-procedures-section',
+            group: { ...group, rows: procedures },
+          },
+        ].filter((section) => section.group.rows.length > 0);
+      });
+  const canReorder = sections.some(
+    ({ group }) => group.rows.length > 0 && canMoveJournalRow(group.rows, 0, 1)
   );
 
   const moveRow = (group: JournalGroup, index: number, delta: -1 | 1) => {
@@ -356,6 +399,62 @@ function ActionsForPatient({
       await loadData();
     }
   };
+
+  /** Shows a procedure's change at once; the reload after saving confirms it. */
+  const updateProcedure = (
+    date: string,
+    item: ProcedureItem,
+    change: Partial<ProcedureItem>
+  ) =>
+    setDaysByDate((current) => ({
+      ...current,
+      [date]: {
+        ...current[date],
+        procedures: current[date].procedures?.map((candidate) =>
+          candidate.key === item.key ? { ...candidate, ...change } : candidate
+        ),
+      },
+    }));
+
+  const saveProcedure = async (
+    item: ProcedureItem,
+    change: Partial<ProcedureItem>,
+    save: (date: string) => Promise<void>
+  ) => {
+    if (!day) return;
+    const date = day.date;
+    setSaveErrorsByDate((current) => ({ ...current, [date]: undefined }));
+    setSavingKeys((keys) => [...keys, item.key]);
+    updateProcedure(date, item, change);
+    try {
+      await save(date);
+    } catch (err) {
+      console.error('Failed to save procedure log:', err);
+      setSaveErrorsByDate((current) => ({
+        ...current,
+        [date]: 'Failed to save the answer. Please try again.',
+      }));
+    } finally {
+      setSavingKeys((keys) => keys.filter((key) => key !== item.key));
+      await loadData();
+    }
+  };
+
+  const handleProcedureAnswer = (
+    item: ProcedureItem,
+    answer: TreatmentLogAnswer | null
+  ) =>
+    saveProcedure(item, { answer }, (date) =>
+      setProcedureLog(item, date, answer, activePatientId)
+    );
+
+  const handleProcedureDuration = (
+    item: ProcedureItem,
+    minutes: number | null
+  ) =>
+    saveProcedure(item, { duration: minutes }, (date) =>
+      setProcedureDuration(item, date, minutes, activePatientId)
+    );
 
   const previousDay = daysByDate[addDays(selected, -1)];
   const copyable = day ? getCopyableAnswers(day, previousDay) : [];
@@ -460,6 +559,26 @@ function ActionsForPatient({
             : undefined,
         }
       : undefined;
+    if (row.kind === 'procedure')
+      return (
+        <ProcedureLogRow
+          key={row.item.key}
+          item={row.item}
+          isLeaving={isLeaving}
+          disabled={isLeaving || savingKeys.includes(row.item.key)}
+          reorder={reorder}
+          onAnswer={(answer) => void handleProcedureAnswer(row.item, answer)}
+          onDurationChange={(minutes) =>
+            void handleProcedureDuration(row.item, minutes)
+          }
+          onOpen={() =>
+            router.push({
+              pathname: '/service-request/[id]',
+              params: { id: row.item.request.id || '' },
+            })
+          }
+        />
+      );
     return row.kind === 'bundle' ? (
       <BundleLogRow
         key={row.key}
@@ -570,23 +689,18 @@ function ActionsForPatient({
                   isLeaving ? 'no-hide-descendants' : 'auto'
                 }
               >
-                {groups.map((group) => {
-                  const sectionTestID = isGrouped
-                    ? `actions-group-${group.id}`
-                    : 'actions-treatments-section';
-                  return (
-                    <ResourceSection
-                      key={group.id}
-                      icon={isGrouped ? Clock : Pill}
-                      title={isGrouped ? group.label : 'Treatments'}
-                      testID={isLeaving ? undefined : sectionTestID}
-                    >
-                      {group.rows.map((row, index) =>
-                        renderRow(row, group, index)
-                      )}
-                    </ResourceSection>
-                  );
-                })}
+                {sections.map(({ key, icon, title, testID, group }) => (
+                  <ResourceSection
+                    key={key}
+                    icon={icon}
+                    title={title}
+                    testID={isLeaving ? undefined : testID}
+                  >
+                    {group.rows.map((row, index) =>
+                      renderRow(row, group, index)
+                    )}
+                  </ResourceSection>
+                ))}
               </Animated.View>
             )}
           </View>

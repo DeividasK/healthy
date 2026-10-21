@@ -10,6 +10,7 @@ import type {
   MedicationAdministration,
   MedicationRequest,
   MedicationStatement,
+  Procedure,
   RequestOrchestration,
   Organization,
   ServiceRequest,
@@ -59,6 +60,10 @@ import {
   insertMedicationAdministrationRecord,
 } from '@/src/features/actions/medicationAdministrationsRepository';
 import {
+  fetchAllProcedureRecords,
+  insertProcedureRecord,
+} from '@/src/features/actions/proceduresRepository';
+import {
   fetchAllServiceRequestRecords,
   insertServiceRequestRecord,
 } from '@/src/features/service-requests/serviceRequestsRepository';
@@ -77,6 +82,7 @@ export interface ZipExportSummary {
   medicationAdministrationCount: number;
   medicationStatementCount: number;
   serviceRequestCount: number;
+  procedureCount: number;
   organizationCount: number;
   bundleCount: number;
   profileSettingsCount: number;
@@ -97,6 +103,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     medicationAdministrations,
     medicationStatements,
     serviceRequests,
+    procedures,
     organizations,
     bundles,
     profileSettings,
@@ -110,6 +117,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     fetchAllMedicationAdministrationRecords(),
     fetchAllMedicationStatementRecords(),
     fetchAllServiceRequestRecords(),
+    fetchAllProcedureRecords(),
     fetchAllOrganizationRecords(),
     fetchAllRequestOrchestrationRecords(),
     fetchAllProfileSettingsRecords(),
@@ -181,6 +189,12 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     zipFiles[`records/service_request_${request.id}.json`] = strToU8(jsonStr);
   }
 
+  // Export Procedures (logs of scheduled service requests) as plain JSON
+  for (const { procedure, patientId } of procedures) {
+    const jsonStr = JSON.stringify({ resource: procedure, patientId }, null, 2);
+    zipFiles[`records/procedure_${procedure.id}.json`] = strToU8(jsonStr);
+  }
+
   // Export Organizations (service providers) with their owning patient
   for (const { organization, patientId } of organizations) {
     const jsonStr = JSON.stringify(
@@ -218,6 +232,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     medicationAdministrationCount: medicationAdministrations.length,
     medicationStatementCount: medicationStatements.length,
     serviceRequestCount: serviceRequests.length,
+    procedureCount: procedures.length,
     organizationCount: organizations.length,
     bundleCount: bundles.length,
     profileSettingsCount: profileSettings.length,
@@ -244,6 +259,7 @@ export async function exportZipArchive(): Promise<ZipExportSummary> {
     medicationAdministrationCount: medicationAdministrations.length,
     medicationStatementCount: medicationStatements.length,
     serviceRequestCount: serviceRequests.length,
+    procedureCount: procedures.length,
     organizationCount: organizations.length,
     bundleCount: bundles.length,
     profileSettingsCount: profileSettings.length,
@@ -267,6 +283,7 @@ export async function restoreFromZipBytes(
   medicationAdministrations: number;
   medicationStatements: number;
   serviceRequests: number;
+  procedures: number;
   organizations: number;
   bundles: number;
   profileSettings: number;
@@ -282,6 +299,7 @@ export async function restoreFromZipBytes(
   let restoredMedicationAdministrations = 0;
   let restoredMedicationStatements = 0;
   let restoredServiceRequests = 0;
+  let restoredProcedures = 0;
   let restoredOrganizations = 0;
   let restoredBundles = 0;
   let restoredProfileSettings = 0;
@@ -311,6 +329,7 @@ export async function restoreFromZipBytes(
     request: ServiceRequest;
     patientId: string;
   }[] = [];
+  const procedureResources: { procedure: Procedure; patientId: string }[] = [];
   const compositionResources: { doc: Composition; patientId: string }[] = [];
   const profileSettingsRecords: {
     settings: ProfileSettingsRecord;
@@ -375,6 +394,9 @@ export async function restoreFromZipBytes(
       const isServiceRequestEnvelope =
         path.startsWith('records/service_request_') &&
         parsed.resource?.resourceType === 'ServiceRequest';
+      const isProcedureEnvelope =
+        path.startsWith('records/procedure_') &&
+        parsed.resource?.resourceType === 'Procedure';
       const isOrganizationEnvelope =
         path.startsWith('records/organization_') &&
         parsed.resource?.resourceType === 'Organization';
@@ -388,6 +410,7 @@ export async function restoreFromZipBytes(
         isMedicationAdministrationEnvelope ||
         isMedicationStatementEnvelope ||
         isServiceRequestEnvelope ||
+        isProcedureEnvelope ||
         isOrganizationEnvelope;
       const resource = isEnvelope ? parsed.resource : parsed;
       const archivedPatientId =
@@ -445,6 +468,13 @@ export async function restoreFromZipBytes(
           request.subject?.reference?.replace(/^Patient\//, '') ||
           DEFAULT_PATIENT_ID;
         serviceRequestResources.push({ request, patientId });
+      } else if (resource.resourceType === 'Procedure') {
+        const procedure = resource as Procedure;
+        const patientId =
+          archivedPatientId ||
+          procedure.subject?.reference?.replace(/^Patient\//, '') ||
+          DEFAULT_PATIENT_ID;
+        procedureResources.push({ procedure, patientId });
       } else if (resource.resourceType === 'Organization') {
         // Organizations have no subject; only the envelope names the patient.
         organizationResources.push({
@@ -476,7 +506,7 @@ export async function restoreFromZipBytes(
     observations.forEach(assertCBCObservation);
   }
 
-  // Restore in dependency order: Patients -> ProfileSettings -> Organizations -> Conditions -> DiagnosticReports -> Encounters -> MedicationRequests -> MedicationStatements -> MedicationAdministrations -> ServiceRequests -> RequestOrchestrations -> Compositions
+  // Restore in dependency order: Patients -> ProfileSettings -> Organizations -> Conditions -> DiagnosticReports -> Encounters -> MedicationRequests -> MedicationStatements -> MedicationAdministrations -> ServiceRequests -> Procedures -> RequestOrchestrations -> Compositions
   for (const patient of patientResources) {
     try {
       await insertPatientRecord(patient);
@@ -570,6 +600,15 @@ export async function restoreFromZipBytes(
     }
   }
 
+  for (const { procedure, patientId } of procedureResources) {
+    try {
+      await insertProcedureRecord(procedure, patientId);
+      restoredProcedures++;
+    } catch (err) {
+      console.warn('Failed to insert procedure log record from zip:', err);
+    }
+  }
+
   for (const { bundle, patientId } of bundleResources) {
     try {
       await insertRequestOrchestrationRecord(bundle, patientId);
@@ -598,6 +637,7 @@ export async function restoreFromZipBytes(
     medicationAdministrations: restoredMedicationAdministrations,
     medicationStatements: restoredMedicationStatements,
     serviceRequests: restoredServiceRequests,
+    procedures: restoredProcedures,
     organizations: restoredOrganizations,
     bundles: restoredBundles,
     profileSettings: restoredProfileSettings,

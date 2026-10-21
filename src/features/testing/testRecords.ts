@@ -15,6 +15,7 @@ export const CLINICAL_TABLES = [
   'service_requests',
   'medication_administrations',
   'medication_statements',
+  'procedures',
   'organizations',
   'request_orchestrations',
   'profile_settings',
@@ -115,6 +116,12 @@ export async function seedEveryResource(
         instructions: 'First line\nSecond line',
         plannedDate: '2099-05-01',
       },
+      {
+        id: 'meditation',
+        title: 'Meditation',
+        authoredOn: '2026-10-01',
+        schedule: { period: 1, periodUnit: 'd', duration: 20, when: 'HS' },
+      },
     ],
     treatmentUsage: [
       { treatmentId: 'inhaler', action: 'start', date: '2026-10-01' },
@@ -131,6 +138,19 @@ export async function seedEveryResource(
       { treatmentId: 'inhaler', date: '2026-10-07', answer: 'taken' },
       { treatmentId: 'inhaler', date: '2026-10-08', answer: 'taken' },
       { treatmentId: 'inhaler', date: '2026-10-08', answer: null },
+    ],
+    procedureLogs: [
+      {
+        serviceRequestId: 'meditation',
+        date: '2026-10-07',
+        answer: 'taken',
+        duration: 25,
+      },
+      {
+        serviceRequestId: 'meditation',
+        date: '2026-10-08',
+        answer: 'not-taken',
+      },
     ],
     reports: [
       {
