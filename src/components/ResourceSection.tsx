@@ -102,6 +102,8 @@ export interface ResourceRowAppearance {
 interface ResourceRowProps extends ResourceRowAppearance {
   title: string;
   meta?: ResourceMeta[];
+  /** Plain line under the title, e.g. what a starter row adds. */
+  description?: string;
   /** Quoted text below the row, e.g. consultation notes. */
   note?: string | null;
   /** Opens the resource; without it the row shows no chevron. */
@@ -156,6 +158,7 @@ export function ResourceMetaLine({ meta }: { meta: ResourceMeta[] }) {
 export function ResourceRow({
   title,
   meta = [],
+  description,
   note,
   onPress,
   accessory,
@@ -191,6 +194,7 @@ export function ResourceRow({
       >
         <View style={[styles.main, dimmed && styles.dimmed]}>
           <Text style={styles.rowTitle}>{title}</Text>
+          {description && <Text style={styles.description}>{description}</Text>}
           <ResourceMetaLine meta={meta} />
         </View>
         {onPress ? (
@@ -332,6 +336,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.light.foreground,
+  },
+  description: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.light.textSecondary,
   },
   meta: {
     flexDirection: 'row',

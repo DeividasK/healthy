@@ -1,6 +1,7 @@
 import React from 'react';
-import { AddProfileView } from '@/src/features/profile/AddProfileView';
+import { Redirect } from 'expo-router';
 
+// Kept so older links still land on the restore screen.
 export default function RestoreFromFileScreen() {
-  return <AddProfileView initialTab="file" />;
+  return <Redirect href="/profile/restore" />;
 }

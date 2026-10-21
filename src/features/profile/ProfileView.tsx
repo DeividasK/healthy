@@ -29,7 +29,7 @@ export function ProfileView() {
       getAllPatients().then((actualPatients) => {
         if (!isMounted) return;
         if (actualPatients.length === 0) {
-          router.replace('/profile/new');
+          router.replace('/welcome');
         } else {
           refreshPatients();
         }

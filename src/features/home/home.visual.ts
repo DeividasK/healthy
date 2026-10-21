@@ -16,7 +16,7 @@ test.describe('Home View - Visual Regression', () => {
   });
 
   test('Home View - Empty State', async ({ page }, testInfo) => {
-    await page.getByText('Nothing to show yet', { exact: true }).waitFor();
+    await page.getByTestId('start-your-record').waitFor();
 
     await takeSnapshot(page, 'Home View - Empty State', testInfo);
   });

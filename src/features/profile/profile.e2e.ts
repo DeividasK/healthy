@@ -42,26 +42,56 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
           page.getByTestId('add-profile-header-title')
         ).toBeVisible();
 
+        // Only the name shows; the other details wait behind +.
+        await expect(
+          page.getByTestId('patient-given-name-input')
+        ).toBeFocused();
+        await expect(page.getByTestId('patient-family-name-input')).toHaveCount(
+          0
+        );
+        await expect(page.getByTestId('patient-gender-select')).toHaveCount(0);
+        await expect(page.getByTestId('patient-birth-date-picker')).toHaveCount(
+          0
+        );
         await page.getByTestId('patient-given-name-input').fill('Jane');
-        await page.getByTestId('patient-family-name-input').fill('Doe');
 
-        const genderSelect = page.getByTestId('patient-gender-select');
-        if (await genderSelect.isVisible()) {
-          await genderSelect.selectOption('female');
-        }
+        await page.getByTestId('add-option-button').click();
+        await page.getByTestId('menu-add-family-name').click();
+        await expect(
+          page.getByTestId('patient-family-name-input')
+        ).toBeFocused();
+        await page.getByTestId('patient-family-name-input').fill('Doe');
+        await page.getByTestId('add-option-button').click();
+        await page.getByTestId('menu-add-birth-date').click();
+        await expect(
+          page.getByTestId('patient-birth-date-picker')
+        ).toBeVisible();
+        // Its x clears the field and returns it to the menu.
+        await page.getByTestId('remove-birth-date-button').click();
+        await expect(page.getByTestId('patient-birth-date-picker')).toHaveCount(
+          0
+        );
+        await page.getByTestId('add-option-button').click();
+        await expect(page.getByTestId('menu-add-birth-date')).toBeVisible();
+        await page.keyboard.press('Escape');
 
         await page.getByTestId('save-profile-button').click();
+      });
+
+      await test.step('The new profile opens on its own empty Home', async () => {
+        await expect(page).toHaveURL(/.*(\/|#)$/);
+        await expect(page.getByTestId('start-your-record-heading')).toHaveText(
+          "Jane's record"
+        );
+        await expect(page.getByText('Back Pain')).not.toBeVisible();
+        await openRoute(page, '/profile');
         await expect(
           page.getByTestId('profile-display-name').first()
         ).toHaveText('Jane Doe');
-      });
-
-      await test.step('Navigate to Home and verify record isolation for Jane Doe', async () => {
-        await page.locator('[data-testid="back-button"]:visible').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-
-        await expect(page.getByText('Nothing to show yet')).toBeVisible();
-        await expect(page.getByText('Back Pain')).not.toBeVisible();
+        await expect(page.getByTestId('profile-birth-date-value')).toHaveCount(
+          0
+        );
+        await openRoute(page, '/');
       });
 
       await test.step('Add condition for Jane Doe and verify on Home', async () => {
@@ -135,7 +165,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await page.getByTestId('patient-given-name-input').fill('John');
     await page.getByTestId('patient-family-name-input').fill('Smith');
 
-    // Test setting date of birth
+    // Date of birth waits behind + until added.
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-birth-date').click();
     const dobInput = page.locator('input[name="patientBirthDate"]');
     await dobInput.fill('1990-05-15');
 
@@ -148,17 +180,21 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       /^May 15, 1990, \d+ years$/
     );
 
-    // Re-open and clear date of birth
+    // Re-open: the stored date shows with its x, which clears it.
     await page.getByTestId('edit-profile-button').click();
     await expect(page).toHaveURL(/.*profile\/.*\/edit/);
-    const dobInputEdit = page.locator('input[name="patientBirthDate"]');
-    await dobInputEdit.fill('');
+    await expect(page.locator('input[name="patientBirthDate"]')).toHaveValue(
+      '1990-05-15'
+    );
+    await page.getByTestId('remove-birth-date-button').click();
     await page.getByTestId('save-profile-button').click();
 
     await expect(page.getByTestId('profile-birth-date-value')).toHaveCount(0);
 
     await test.step('Uploads a profile photo, shows it and removes it', async () => {
       await page.getByTestId('edit-profile-button').click();
+      await page.getByTestId('add-option-button').click();
+      await page.getByTestId('menu-add-photo').click();
       const fileChooser = page.waitForEvent('filechooser');
       await page.getByTestId('upload-photo-button').click();
       await (
@@ -172,7 +208,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         page.getByTestId('patient-avatar-preview-photo')
       ).toBeVisible();
       await expect(page.getByTestId('upload-photo-button')).toHaveText(
-        'Change Photo'
+        'Change photo'
       );
       await page.getByTestId('save-profile-button').click();
       await page.getByTestId('switch-profile-button').click();
@@ -211,38 +247,22 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
     await test.step('Offers creating or restoring another profile', async () => {
       await openRoute(page, '/profile/new');
-      await expect(page.getByText('Add Profile')).toBeVisible();
-
-      // Verify 3 options exist
-      await expect(page.getByTestId('option-create-profile')).toBeVisible();
-      await expect(page.getByTestId('option-restore-file')).toBeVisible();
-      await expect(page.getByTestId('option-restore-gdrive')).toBeVisible();
-
-      // "Create" option shows the manual form and doesn't duplicate "New Profile" header
+      await expect(page.getByTestId('add-profile-header-title')).toHaveText(
+        'Add a profile'
+      );
       await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
       await expect(page.getByText('New Profile')).not.toBeVisible();
 
-      // Click "Restore from file" -> navigates to /profile/restore-from-file with "Select profile" button
-      await page.getByTestId('option-restore-file').click();
-      await expect(
-        page.getByTestId('select-profile-file-button')
-      ).toBeVisible();
-      await expect(
-        page.getByRole('button', { name: 'Select profile', exact: true })
-      ).toBeVisible();
-
-      // Click "Restore from Google Drive" -> navigates to /profile/restore-from-google-drive with "Connect Google Drive" button
-      await page.getByTestId('option-restore-gdrive').click();
-      await expect(
-        page.getByTestId('connect-google-drive-button')
-      ).toBeVisible();
-      await expect(
-        page.getByRole('button', { name: 'Connect Google Drive', exact: true })
-      ).toBeVisible();
-
-      // Click "Create" -> navigates back to /profile/new with manual form
-      await page.getByTestId('option-create-profile').click();
-      await expect(page.getByTestId('patient-given-name-input')).toBeVisible();
+      // Restoring is one row away, on the shared Restore screen.
+      await page.getByTestId('add-profile-restore').click();
+      await expect(page).toHaveURL(/\/profile\/restore$/);
+      await expect(page.getByTestId('restore-profile-title')).toHaveText(
+        'Restore a profile'
+      );
+      await expect(page.getByTestId('restore-from-google-drive')).toBeVisible();
+      await expect(page.getByTestId('restore-from-file')).toBeVisible();
+      await page.getByTestId('back-button').click();
+      await expect(page).toHaveURL(/\/profile\/new$/);
     });
 
     await test.step('Deletes the last profile from its edit form', async () => {
@@ -271,9 +291,9 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       await page.clock.runFor(5000);
       await page.getByTestId('delete-modal-confirm-button').click();
 
-      // Since this was the only profile, should redirect straight to /profile/new!
-      await expect(page).toHaveURL(/.*profile\/new/);
-      await expect(page.getByTestId('option-create-profile')).toBeVisible();
+      // With no profile left, the device starts over at Welcome.
+      await expect(page).toHaveURL(/\/welcome$/);
+      await expect(page.getByTestId('welcome-title')).toBeVisible();
 
       // When 0 profiles exist, back button is hidden
       await expect(page.getByTestId('back-button')).not.toBeVisible();

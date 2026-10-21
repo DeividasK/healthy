@@ -42,8 +42,8 @@ test.describe('Add Condition Flow', () => {
     { tag: ['@smoke', '@critical'] },
     async ({ page, consoleMonitor }) => {
       await test.step('Navigate to Add Condition screen and audit a11y', async () => {
-        await page.getByTestId('floating-add-button').click();
-        await page.getByTestId('menu-add-condition').click();
+        // An empty Home starts a first record from its starter rows.
+        await page.getByTestId('start-condition').click();
 
         await expect(page).toHaveURL(/.*condition\/add/);
         await expect(page.getByText('New Condition')).toBeVisible();
@@ -225,8 +225,7 @@ test.describe('New condition form keyboard support', () => {
   test('Escape asks before discarding entered data, defaulting to No', async ({
     page,
   }) => {
-    await page.getByTestId('floating-add-button').click();
-    await page.getByTestId('menu-add-condition').click();
+    await page.getByTestId('start-condition').click();
     await page.getByTestId('condition-title-input').fill('Unsaved condition');
 
     await page.keyboard.press('Escape');

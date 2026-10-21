@@ -342,7 +342,7 @@ test.describe('Sync between devices', () => {
       );
     });
     await page.reload();
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await expect(page.getByTestId('profile-header-button')).toBeVisible();
     const dirty = await bridge(page, (b) =>
       b.querySql('SELECT resource_type FROM sync_dirty')
     );

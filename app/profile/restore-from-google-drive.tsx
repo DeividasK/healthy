@@ -1,6 +1,10 @@
 import React from 'react';
-import { AddProfileView } from '@/src/features/profile/AddProfileView';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
+// Kept so older links still land on the restore screen.
 export default function RestoreFromGoogleDriveScreen() {
-  return <AddProfileView initialTab="gdrive" />;
+  const { pick } = useLocalSearchParams<{ pick?: string }>();
+  return (
+    <Redirect href={pick ? '/profile/restore?pick=1' : '/profile/restore'} />
+  );
 }

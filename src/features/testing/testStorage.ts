@@ -300,7 +300,6 @@ export async function openSecondDevice(
 }
 
 export const DEFAULT_PROFILE_FIRST_NAME = 'John';
-export const DEFAULT_PROFILE_LAST_NAME = 'Doe';
 export const DEFAULT_CONDITION_TITLE = 'Test Condition';
 
 /**
@@ -325,20 +324,16 @@ export async function deleteActiveProfileViaUI(page: Page): Promise<void> {
 }
 
 /**
- * Creates a Patient profile through standard UI flow.
+ * Sets up the first profile the way a new user does: Welcome, then a name.
  */
 export async function createPatientViaUI(page: Page): Promise<void> {
-  // This redirects to new profile creation page
+  // A device with no profile starts at Welcome.
   await page.goto('/');
-  await page
-    .getByTestId('patient-given-name-input')
-    .fill(DEFAULT_PROFILE_FIRST_NAME);
-  await page
-    .getByTestId('patient-family-name-input')
-    .fill(DEFAULT_PROFILE_LAST_NAME);
-  await page.getByTestId('save-profile-button').click();
+  await page.getByTestId('welcome-get-started').click();
+  await page.getByTestId('welcome-name-input').fill(DEFAULT_PROFILE_FIRST_NAME);
+  await page.getByTestId('welcome-name-continue').click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByTestId('floating-add-button')).toBeVisible();
+  await expect(page.getByTestId('start-your-record')).toBeVisible();
 }
 
 export interface AddConditionOptions {
@@ -348,14 +343,22 @@ export interface AddConditionOptions {
 }
 
 /**
- * Creates a Condition through standard UI flow starting from the homepage.
+ * Creates a Condition through standard UI flow starting from the homepage:
+ * its starter row while Home is empty, else the + menu.
  */
 export async function createTestConditionViaUI(
   page: Page,
   options?: AddConditionOptions
 ): Promise<void> {
-  await page.getByTestId('floating-add-button').click();
-  await page.getByTestId('menu-add-condition').click();
+  const plus = page.getByTestId('floating-add-button');
+  const starter = page.getByTestId('start-condition');
+  await expect(plus.or(starter)).toBeVisible();
+  if (await starter.isVisible()) {
+    await starter.click();
+  } else {
+    await plus.click();
+    await page.getByTestId('menu-add-condition').click();
+  }
   await page
     .getByTestId('condition-title-input')
     .fill(options?.title ?? DEFAULT_CONDITION_TITLE);

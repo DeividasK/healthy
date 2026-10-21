@@ -20,14 +20,14 @@ test.describe('Fresh Install Onboarding Redirect', () => {
     { tag: ['@smoke'] },
     async ({ page, browser, baseURL }) => {
       await openRoute(page, '/');
-      await expect(page).toHaveURL(/profile\/new/);
-      // Before a profile exists the header shows only the logo.
-      await expect(page.getByTestId('app-home-button')).toBeVisible();
+      await expect(page).toHaveURL(/\/welcome$/);
+      // Before a profile exists the header has no profile or settings.
+      await expect(page.getByTestId('app-home-button')).toBeAttached();
       await expect(page.getByTestId('profile-header-button')).toHaveCount(0);
       await expect(page.getByTestId('settings-header-button')).toHaveCount(0);
       await createPatientViaUI(page);
       await page.reload();
-      await expect(page.getByTestId('floating-add-button')).toBeVisible();
+      await expect(page.getByTestId('start-your-record')).toBeVisible();
       await expect(page.getByTestId('profile-header-button')).toBeVisible();
       await expect(page.getByTestId('settings-header-button')).toBeVisible();
 
@@ -35,8 +35,8 @@ test.describe('Fresh Install Onboarding Redirect', () => {
       try {
         const otherPage = await isolated.newPage();
         await otherPage.goto('/');
-        await expect(otherPage).toHaveURL(/profile\/new/);
-        await expect(otherPage.getByText('Add Profile')).toBeVisible();
+        await expect(otherPage).toHaveURL(/\/welcome$/);
+        await expect(otherPage.getByTestId('welcome-title')).toBeVisible();
         await seedTestPatient(otherPage, { givenName: 'Separate' });
         await otherPage.goto('/profile');
         await expect(otherPage.getByTestId('profile-display-name')).toHaveText(
@@ -44,7 +44,7 @@ test.describe('Fresh Install Onboarding Redirect', () => {
         );
         await openRoute(page, '/profile');
         await expect(page.getByTestId('profile-display-name')).toHaveText(
-          'John Doe'
+          'John'
         );
       } finally {
         await isolated.close();
@@ -99,11 +99,16 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
   });
 
   test(
-    'starts empty, toggles the add menu and shows a new condition right away',
+    'starts empty, shows a new condition right away, then toggles the add menu',
     { tag: ['@smoke'] },
     async ({ page }) => {
-      await expect(page.getByText('Nothing to show yet')).toBeVisible();
+      // Empty Home suggests a first record; + comes with the first one.
+      await expect(page.getByTestId('start-your-record')).toBeVisible();
+      await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
       await checkA11y(page);
+
+      await createTestConditionViaUI(page, { title: 'Asthma' });
+      await expect(page.getByText('Asthma')).toBeVisible();
 
       const floatingBtn = page.getByTestId('floating-add-button');
       const menu = page.getByTestId('floating-add-menu');
@@ -113,16 +118,13 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       // Tapping + again closes the menu
       await floatingBtn.click();
       await expect(menu).not.toBeVisible();
-
-      await createTestConditionViaUI(page, { title: 'Asthma' });
-      await expect(page.getByText('Asthma')).toBeVisible();
       // Waking the app refreshes without losing what is shown.
       await page.evaluate(() => {
         window.dispatchEvent(new Event('focus'));
         document.dispatchEvent(new Event('visibilitychange'));
       });
       await expect(page.getByText('Asthma')).toBeVisible();
-      await expect(page.getByText('Nothing to show yet')).not.toBeVisible();
+      await expect(page.getByTestId('start-your-record')).toHaveCount(0);
     }
   );
 
@@ -152,7 +154,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       await expect(modal).not.toBeVisible();
       await expect(page).toHaveURL(/\/$/);
       await expect(row).not.toBeVisible();
-      await expect(page.getByText('Nothing to show yet')).toBeVisible();
+      await expect(page.getByTestId('start-your-record')).toBeVisible();
     }
   );
 });
@@ -291,6 +293,8 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
 test.describe('Home add menu keyboard navigation', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
+    // + comes with the first record.
+    await seedTestCondition(page, { title: 'Asthma' });
   });
 
   test('focuses the first option when opened with Cmd/Ctrl+Enter and cycles with arrows and Tab', async ({
