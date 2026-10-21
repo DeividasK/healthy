@@ -168,10 +168,10 @@ export function LabsSummary({
     return (
       <ResourceSection
         icon={FlaskConical}
-        title="Labs Summary"
+        title="Biomarkers"
         count={biomarkers.length}
         testID="labs-summary"
-        pressLabel="Open labs summary"
+        pressLabel="Open biomarkers"
         pressTestID="labs-summary-open"
         onPress={() =>
           router.push({ pathname: '/labs-summary', params: { period } })

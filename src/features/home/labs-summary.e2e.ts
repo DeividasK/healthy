@@ -104,12 +104,12 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await expect(home.getByTestId('labs-summary-grid-cell-718-7')).toHaveCount(1);
   await expect(home.getByTestId('labs-summary-grid-cell-789-8')).toHaveCount(0);
 
-  await home.getByRole('button', { name: 'Open labs summary' }).click();
+  await home.getByRole('button', { name: 'Open biomarkers' }).click();
   await expect(page).toHaveURL(/labs-summary\?period=1$/);
   const view = page.getByTestId('labs-summary-view');
   const summary = view.getByTestId('labs-summary');
   await expect(
-    view.getByRole('heading', { name: 'Labs Summary', exact: true })
+    view.getByRole('heading', { name: 'Biomarkers', exact: true })
   ).toBeVisible();
   await expect(summary.getByRole('combobox', { name: 'Period' })).toHaveValue(
     '1'
@@ -153,24 +153,49 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   );
 });
 
-test('in-range-only results leave out the empty group; empty periods and invalid parameters are safe', async ({
+test('the key and groups list only statuses with results; empty periods and invalid parameters are safe', async ({
   page,
 }) => {
-  await seedTestReport(page, {
+  const { observations } = await seedTestReport(page, {
     date: '2020-10-01',
-    biomarkers: [{ name: 'Hemoglobin', value: 15.2 }],
+    biomarkers: [
+      { name: 'Hemoglobin', value: 15.2 },
+      { name: 'Platelets', value: 250 },
+    ],
   });
+  // An imported result without a value cannot be compared with its range.
+  await page.evaluate(async (id) => {
+    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+    const [row] = await bridge.querySql(
+      'SELECT fhir_json FROM observations WHERE id = ?',
+      [id]
+    );
+    const observation = JSON.parse(row.fhir_json);
+    delete observation.valueQuantity.value;
+    delete observation.interpretation;
+    await bridge.executeSql(
+      'UPDATE observations SET fhir_json = ? WHERE id = ?',
+      [JSON.stringify(observation), id]
+    );
+  }, observations[1].id);
   await openRoute(page, '/');
   const home = page
     .getByTestId('results-scroll-view')
     .getByTestId('labs-summary');
+  await expect(home.getByTestId('labs-summary-grid-status-counts')).toHaveText(
+    'In range1No range1'
+  );
   await expect(
     home.getByTestId('labs-summary-grid-count-outOfRange')
-  ).toHaveText('Out of range0');
-  await expect(home.getByTestId('labs-summary-grid-count-inRange')).toHaveText(
-    'In range1'
+  ).toHaveCount(0);
+  await expect(
+    home.getByTestId('labs-summary-grid-cell-777-3')
+  ).toHaveAccessibleName('Platelets (PLT): No range');
+  await expect(home.getByTestId('labs-summary-grid-cell-777-3')).toHaveCSS(
+    'background-color',
+    'rgb(217, 219, 215)'
   );
-  await home.getByRole('button', { name: 'Open labs summary' }).click();
+  await home.getByRole('button', { name: 'Open biomarkers' }).click();
   const view = page.getByTestId('labs-summary-view');
   await expect(view.getByTestId('labs-summary-groups-inRange')).toContainText(
     '15.2'
@@ -178,11 +203,17 @@ test('in-range-only results leave out the empty group; empty periods and invalid
   await expect(view.getByTestId('labs-summary-groups-outOfRange')).toHaveCount(
     0
   );
+  await expect(
+    view.getByTestId('labs-summary-groups-noRange-count')
+  ).toHaveText('1');
   await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
   await expect(view.getByTestId('labs-summary-total')).toHaveText('0');
   await expect(
     view.getByTestId('labs-summary-grid-squares').getByRole('button')
   ).toHaveCount(0);
+  await expect(view.getByTestId('labs-summary-grid-status-counts')).toHaveText(
+    ''
+  );
   await expect(
     view.locator('[data-testid^="labs-summary-result-"]')
   ).toHaveCount(0);
@@ -190,7 +221,7 @@ test('in-range-only results leave out the empty group; empty periods and invalid
   await expect(view.getByRole('combobox', { name: 'Period' })).toHaveValue(
     'all'
   );
-  await expect(view.getByTestId('labs-summary-total')).toHaveText('1');
+  await expect(view.getByTestId('labs-summary-total')).toHaveText('2');
 });
 
 test('summary Search filters the grouped latest results and respects the period', async ({

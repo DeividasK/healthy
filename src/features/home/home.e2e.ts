@@ -87,7 +87,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       (await page.getByText(text, { exact: true }).first().boundingBox())!.y;
     const order = [
       await top('Conditions'),
-      await top('Labs Summary'),
+      await top('Biomarkers'),
       await top('Treatments'),
       await top('Consultations'),
       await top('Lab Results'),

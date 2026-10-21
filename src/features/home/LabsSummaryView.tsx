@@ -52,7 +52,7 @@ export function LabsSummaryView() {
   return (
     <ResourceViewLayout
       testID="labs-summary-view"
-      title="Labs Summary"
+      title="Biomarkers"
       isLoading={isLoading}
       error={
         isCurrentPatient && data.hasError

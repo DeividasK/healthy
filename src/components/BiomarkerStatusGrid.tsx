@@ -18,10 +18,24 @@ const SQUARE_COLORS: Record<RangeStatus, string> = {
   outOfRange: COLORS.light.outOfRange,
   inRange: COLORS.light.primary,
 };
+const KEY_ENTRIES = [
+  ...RANGE_STATUSES.map((status) => ({
+    key: status as string,
+    status: status as RangeStatus | undefined,
+    label: RANGE_STATUS_LABELS[status],
+    color: SQUARE_COLORS[status],
+  })),
+  {
+    key: 'noRange',
+    status: undefined,
+    label: 'No range',
+    color: COLORS.light.noRange,
+  },
+];
 
 /**
- * One square per biomarker, out of range first, then a key counting each
- * status. Biomarkers without a reference range are light grey and uncounted.
+ * One square per biomarker, out of range first and those without a range
+ * (light grey) last, then a key counting each status that has biomarkers.
  */
 export function BiomarkerStatusGrid({
   items,
@@ -56,21 +70,17 @@ export function BiomarkerStatusGrid({
         ))}
       </View>
       <View style={styles.key} testID={`${testID}-status-counts`}>
-        {RANGE_STATUSES.map((status) => {
+        {KEY_ENTRIES.map(({ key, status, label, color }) => {
           const count = items.filter((item) => item.status === status).length;
-          const label = RANGE_STATUS_LABELS[status];
+          // Only statuses some biomarker has are listed.
+          if (!count) return null;
           return (
             <View
-              key={status}
+              key={key}
               style={styles.keyItem}
-              testID={`${testID}-count-${status}`}
+              testID={`${testID}-count-${key}`}
             >
-              <View
-                style={[
-                  styles.swatch,
-                  { backgroundColor: SQUARE_COLORS[status] },
-                ]}
-              />
+              <View style={[styles.swatch, { backgroundColor: color }]} />
               <Text style={styles.keyLabel}>{label}</Text>
               <CountBadge
                 count={count}
