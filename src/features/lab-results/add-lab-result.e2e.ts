@@ -115,9 +115,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await test.step('Verify saved results render on Home', async () => {
         await expect(page).toHaveURL(/.*(\/|#)$/);
         const home = page.getByTestId('results-scroll-view');
-        await expect(home.getByTestId(/^lab-result-card-/)).toContainText(
-          'Sep 20, 2026'
-        );
         await expect(home.getByTestId('labs-summary-count')).toHaveText('2');
         await expect(
           home.getByTestId('labs-summary-grid-cell-718-7')
@@ -140,7 +137,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
       let reportId = '';
       const results = page.getByTestId('lab-result-results-section');
-      await test.step('View its details from its Home row', async () => {
+      await test.step('View its details from the Biomarkers page', async () => {
+        await page.getByRole('button', { name: 'Open biomarkers' }).click();
+        await expect(page.getByTestId(/^lab-result-card-/)).toContainText(
+          'Sep 20, 2026'
+        );
         await page.getByTestId(/^lab-result-card-/).click();
         await expect(page).toHaveURL(/lab-result\/[^/]+$/);
         reportId = new URL(page.url()).pathname.split('/').pop()!;
@@ -248,7 +249,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await page.clock.runFor(5000);
         await page.getByTestId('delete-modal-confirm-button').click();
         await expect(page).toHaveURL(/\/$/);
-        await expect(page.getByTestId(/^lab-result-card-/)).toHaveCount(0);
+        await expect(page.getByTestId('start-your-record')).toBeVisible();
         await openRoute(page, `/lab-result/${reportId}`);
         await expect(page.getByText('Lab result not found.')).toBeVisible();
       });

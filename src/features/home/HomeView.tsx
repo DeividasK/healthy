@@ -2,7 +2,6 @@ import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
   ClipboardList,
   FileText,
-  FlaskConical,
   FolderPlus,
   ListChecks,
   Pill,
@@ -59,9 +58,8 @@ import {
   subscribeToDatabaseChanges,
   useDatabaseSubscription,
 } from '@/src/database/dbEvents';
-import { LabsSummary, latestBiomarkers } from './LabsSummary';
+import { LabsSummary } from './LabsSummary';
 import { StartYourRecord } from './StartYourRecord';
-import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelatedRow';
 
 const blurActiveElement = () => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -305,8 +303,6 @@ export function HomeView() {
       ...getConsultationReasonConditionIds(consultation),
     ]).size;
 
-  const hasSummary = latestBiomarkers(records).length > 0;
-
   const hasAnyData =
     records.length > 0 ||
     conditions.length > 0 ||
@@ -408,7 +404,8 @@ export function HomeView() {
               </ResourceSection>
             )}
 
-            {hasSummary && <LabsSummary records={records} />}
+            {/* Biomarkers: the latest result of each, as a status grid */}
+            {records.length > 0 && <LabsSummary records={records} />}
 
             {/* Treatments Section */}
             {treatments.length > 0 && (
@@ -532,39 +529,6 @@ export function HomeView() {
                               `consultation-service-request-count-${consId}`
                             ),
                           ])}
-                        />
-                      </View>
-                    );
-                  }}
-                />
-              </ResourceSection>
-            )}
-
-            {/* Lab Results Section */}
-            {records.length > 0 && (
-              <ResourceSection
-                icon={FlaskConical}
-                title="Lab Results"
-                count={records.length}
-                testID="home-lab-results-section"
-              >
-                <CollapsibleList
-                  items={records}
-                  testID="lab-results-list"
-                  renderItem={({ report }) => {
-                    const reportId = report.id || '';
-                    return (
-                      <View
-                        key={reportId}
-                        testID={`lab-result-card-${reportId}`}
-                      >
-                        <LabResultRelatedRow
-                          report={report}
-                          testID={`lab-result-open-${reportId}`}
-                          onPress={() => {
-                            blurActiveElement();
-                            router.push(`/lab-result/${reportId}`);
-                          }}
                         />
                       </View>
                     );

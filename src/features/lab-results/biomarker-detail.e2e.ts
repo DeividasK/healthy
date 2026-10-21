@@ -224,7 +224,7 @@ test.describe('Biomarker detail', () => {
       page.getByText('Biomarker not found.', { exact: true })
     ).toBeVisible();
     await openRoute(page, '/');
-    await expect(page.getByTestId(/^lab-result-card-/).first()).toBeVisible();
+    await expect(page.getByTestId('labs-summary-count')).toHaveText('0');
     await expect(page.getByTestId('labs-summary-grid-cell-718-7')).toHaveCount(
       0
     );

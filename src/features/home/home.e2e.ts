@@ -58,25 +58,19 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await seedTestPatient(page);
   });
 
-  test('lists lab results as rows, last among the sections', async ({
+  test('shows lab results on Home only as the Biomarkers grid; the Biomarkers page lists them', async ({
     page,
   }) => {
     const { report } = await seedTestReport(page, {
       date: '2026-10-02',
       biomarkers: [{ name: 'Hemoglobin', value: 14.5 }],
     });
-    const row = page.getByTestId(`lab-result-open-${report.id}`);
-    await expect(row).toContainText(
-      'Complete blood count (hemogram) panel - Blood by Automated count'
-    );
-    await expect(row).toContainText('Oct 2, 2026');
-    await expect(row).toContainText('Final');
-    await expect(page.getByTestId('home-lab-results-section-count')).toHaveText(
-      '1'
-    );
-    // Home lists reports, not their biomarkers, and edits them from their pages.
-    await expect(page.getByTestId('biomarker-row-718-7')).toHaveCount(0);
-    await expect(page.getByTestId(/^edit-report-button-/)).toHaveCount(0);
+    const home = page.getByTestId('results-scroll-view');
+    await expect(home.getByTestId('labs-summary-count')).toHaveText('1');
+    // Home lists neither reports nor their biomarkers.
+    await expect(home.getByText('Lab Results', { exact: true })).toHaveCount(0);
+    await expect(home.getByTestId(/^lab-result-card-/)).toHaveCount(0);
+    await expect(home.getByTestId('biomarker-row-718-7')).toHaveCount(0);
 
     await seedTestServiceRequest(page, { title: 'Blood panel' });
     await seedTestTreatment(page, { title: 'Order treatment' });
@@ -90,10 +84,22 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       await top('Biomarkers'),
       await top('Treatments'),
       await top('Consultations'),
-      await top('Lab Results'),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
 
+    await home.getByRole('button', { name: 'Open biomarkers' }).click();
+    const view = page.getByTestId('labs-summary-view');
+    await expect(view.getByTestId('lab-results-section-count')).toHaveText('1');
+    const row = view.getByTestId(`lab-result-open-${report.id}`);
+    await expect(row).toContainText(
+      'Complete blood count (hemogram) panel - Blood by Automated count'
+    );
+    await expect(row).toContainText('Oct 2, 2026');
+    await expect(row).toContainText('Final');
+    // The reports follow the grouped biomarkers.
+    expect((await row.boundingBox())!.y).toBeGreaterThan(
+      (await view.getByTestId('labs-summary-result-718-7').boundingBox())!.y
+    );
     await row.click();
     await expect(page).toHaveURL(new RegExp(`lab-result/${report.id}$`));
   });
@@ -135,6 +141,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       const { report } = await seedTestReport(page, {
         biomarkers: [{ name: 'Hemoglobin', value: 14.2 }],
       });
+      await openRoute(page, '/labs-summary');
       const row = page.getByTestId(`lab-result-card-${report.id}`);
       await row.click();
       await expect(page).toHaveURL(new RegExp(`lab-result/${report.id}$`));
@@ -152,8 +159,9 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
       await page.clock.runFor(5000);
       await page.getByTestId('delete-modal-confirm-button').click();
       await expect(modal).not.toBeVisible();
-      await expect(page).toHaveURL(/\/$/);
+      await expect(page).toHaveURL(/labs-summary$/);
       await expect(row).not.toBeVisible();
+      await openRoute(page, '/');
       await expect(page.getByTestId('start-your-record')).toBeVisible();
     }
   );

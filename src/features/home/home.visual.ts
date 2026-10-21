@@ -87,7 +87,7 @@ test.describe('Home View - Visual Regression', () => {
     await page.goto('/');
     await page
       .getByTestId('results-scroll-view')
-      .getByTestId('lab-result-card-report-home-single')
+      .getByTestId('labs-summary-grid-cell-718-7')
       .waitFor();
 
     await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);

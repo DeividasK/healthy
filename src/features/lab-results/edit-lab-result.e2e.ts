@@ -34,8 +34,10 @@ test.describe('Edit Lab Results Flow', () => {
 
         await page.getByTestId('save-button').click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-        await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
+        await page.getByRole('button', { name: 'Open biomarkers' }).click();
+        const row = page.getByTestId(/^lab-result-card-/);
+        await expect(row).toContainText('Sep 26, 2026');
+        await expect(row).not.toContainText('Sep 25, 2026');
       });
 
       const editBtn = page.getByTestId('edit-lab-result-button');
