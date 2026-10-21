@@ -775,12 +775,37 @@ function addCourse(start: string, value: number, unit: string): string | null {
 }
 
 /**
+ * Whether a dose taken once every few days or weeks (e.g. "1 time every 2
+ * days") is due on `date`, counting from `start`, the first day of its
+ * phase. Other doses are due every day.
+ */
+function isIntervalDay(dosage: Dosage, start: string, date: string): boolean {
+  const {
+    frequency,
+    frequencyMax,
+    period = 1,
+    periodUnit,
+  } = dosage.timing?.repeat ?? {};
+  const days =
+    periodUnit === 'd' ? period : periodUnit === 'wk' ? period * 7 : 1;
+  if (frequency !== 1 || frequencyMax || days <= 1 || !Number.isInteger(days))
+    return true;
+  const elapsed = Math.round(
+    (parseLocalDate(date).getTime() - parseLocalDate(start).getTime()) /
+      86400000
+  );
+  return elapsed % days === 0;
+}
+
+/**
  * The structured doses scheduled on a local day, each with its index in
  * `dosageInstruction`; null when the treatment has no structured regimen.
  *
  * Phases follow each other from the day taking starts, each lasting its longest
  * course length (`timing.repeat.boundsDuration`). A phase without a course
  * length continues indefinitely; after the last phase ends nothing is due.
+ * A dose taken every few days is due on every such day from its phase's
+ * start.
  */
 export function getScheduledDoses(
   request: MedicationRequest,
@@ -798,15 +823,18 @@ export function getScheduledDoses(
       dosage: dosages[dose.sourceIndex!],
     }));
     if (!start) return doses;
+    const phaseStart = start;
+    const dueOn = (scheduled: typeof doses) =>
+      scheduled.filter(({ dosage }) => isIntervalDay(dosage, phaseStart, date));
     let end: string | null = null;
     for (const { dosage } of doses) {
       const bounds = dosage.timing?.repeat?.boundsDuration;
-      if (bounds?.value === undefined) return date >= start ? doses : [];
+      if (bounds?.value === undefined) return date >= start ? dueOn(doses) : [];
       const doseEnd = addCourse(start, bounds.value, bounds.code || '');
-      if (!doseEnd) return date >= start ? doses : [];
+      if (!doseEnd) return date >= start ? dueOn(doses) : [];
       if (!end || doseEnd > end) end = doseEnd;
     }
-    if (date < end!) return date >= start ? doses : [];
+    if (date < end!) return date >= start ? dueOn(doses) : [];
     start = end!;
   }
   return [];

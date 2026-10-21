@@ -25,7 +25,8 @@ import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 /**
  * One time of a bundle in the journal: its buttons answer every dose it
  * groups. The chevron shows the doses, each with its own buttons; the row
- * opens the bundle. Open while answers are mixed, until toggled. While the
+ * opens the bundle. Open while answers are mixed, until toggled; once every
+ * dose is answered both ways, both buttons are tinted. While the
  * journal is reordered, move buttons replace the chevron and answers, and
  * the doses stay hidden.
  */
@@ -108,6 +109,7 @@ export function BundleLogRow({
               </TouchableOpacity>
               <AnswerButtons
                 answer={answer}
+                mixed={isMixed && answered.length === row.items.length}
                 name={name}
                 disabled={isLeaving || row.items.some(isSaving)}
                 testIDPrefix={

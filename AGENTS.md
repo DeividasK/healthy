@@ -30,7 +30,8 @@ pnpm expo install --fix      # fix incompatible package versions
 
 ### Verification Guidelines
 
-- **Always run**: `pnpm tsc --noEmit`, `pnpm expo lint`, and `pnpm test:e2e` before declaring any task done. Never declare completion when `pnpm web` or dev server is broken.
+- **Always run**: `pnpm tsc --noEmit`, `pnpm expo lint`, and `pnpm test:e2e` before declaring any task done.
+- **Always update the changelog**: before declaring any task done, check that every user-facing change has its changie fragment (see **Changelog Fragments** below). A task is not done without it. Never declare completion when `pnpm web` or dev server is broken.
 - **Visual Tests (`pnpm test:visual`)**:
   - You **MUST** write visual tests for new views.
   - Visual tests for that view **MUST** be collocated next to the view inside `src/features/<feature>/` and named accordingly (e.g. `src/features/<feature>/<view-name>.visual.ts`).
@@ -83,7 +84,7 @@ Docs: https://docs.expo.dev/eas/index.md
 
 ## Changelog and releases
 
-- **Changelog Fragments**: Every branch that changes what users get adds a changie fragment: `pnpm changie new --interactive=false --kind <Added|Changed|Fixed|Removed|Security> --body "<entry>"`, one per change. Write the entry for the people using the app (what they can now do, what works better), not how it was built: no issue numbers, file names or internal terms. Changes users would not notice (refactors, tests, tooling, dependency bumps) need no fragment; if CI asks for one anyway, add a `Changelog: none` trailer to the commit message. Never edit `CHANGELOG.md` by hand; see `docs/releasing.md`.
+- **Changelog Fragments**: You **MUST** update the changelog for every change users would notice — new features, fixes, behaviour or UI changes — in the same commit as the change, including follow-up changes pushed to an existing branch or pull request. Add a changie fragment: `pnpm changie new --interactive=false --kind <Added|Changed|Fixed|Removed|Security> --body "<entry>"`, one per change. Write the entry for the people using the app (what they can now do, what works better), not how it was built: no issue numbers, file names or internal terms. Changes users would not notice (refactors, tests, tooling, dependency bumps) need no fragment; if CI asks for one anyway, add a `Changelog: none` trailer to the commit message. Never edit `CHANGELOG.md` by hand; see `docs/releasing.md`.
 - **Releases**: Publish a stable GitHub Release to deploy GitHub Pages and Play internal testing. Merges to `main` and tag pushes alone publish nothing. Follow `docs/releasing.md`: prepare the next `YYYY.M.N` date version on a branch from `main`, merge it, then publish its `v<version>` GitHub Release targeting that commit. The workflow advances the internal `release` branch to trigger EAS; never advance it by hand. Never publish a release unless the user asks for one.
 
 ## Cloud sessions

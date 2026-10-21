@@ -90,6 +90,19 @@ test('changes close the current period the day before the next starts', () => {
   expect(isTakingOn(periods, '2026-10-14')).toBe(false);
 });
 
+test('a pause overrides a period of taking that is still open', () => {
+  const open = getUsagePeriods(
+    [
+      buildUsageStatement(treatment, 'p1', 'taking', '2026-10-17', 'a'),
+      buildUsageStatement(treatment, 'p1', 'on-hold', '2026-10-18', 'b'),
+    ],
+    'vit-d'
+  );
+  expect(isTakingOn(open, '2026-10-17')).toBe(true);
+  expect(isTakingOn(open, '2026-10-18')).toBe(false);
+  expect(isTakingOn(open, '2026-10-21')).toBe(false);
+});
+
 test('statements are FHIR R5 MedicationStatements derived from the treatment', () => {
   const statement = buildUsageStatement(
     treatment,
