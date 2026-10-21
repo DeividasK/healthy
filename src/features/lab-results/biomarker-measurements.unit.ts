@@ -7,6 +7,7 @@ import {
   getObservationReferenceRange,
   getObservationStatus,
   isSupportedCBCObservation,
+  toRangeStatus,
 } from './biomarkerMeasurements';
 
 const hemoglobin = CBC_MARKERS.find((marker) => marker.loinc === '718-7')!;
@@ -170,4 +171,11 @@ test('supports one-sided laboratory ranges without inventing a missing bound', (
     high: 140,
   });
   expect(getObservationStatus(highOnly)).toBe('High');
+});
+
+test('collapses low and high results into out of range', () => {
+  expect(toRangeStatus('Low')).toBe('outOfRange');
+  expect(toRangeStatus('High')).toBe('outOfRange');
+  expect(toRangeStatus('Normal')).toBe('inRange');
+  expect(toRangeStatus(undefined)).toBeUndefined();
 });

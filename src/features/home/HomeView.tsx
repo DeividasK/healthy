@@ -1,30 +1,18 @@
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import {
-  Calendar,
   ClipboardList,
   FileText,
+  FlaskConical,
   FolderPlus,
   ListChecks,
-  Pencil,
   Pill,
   Stethoscope,
-  Trash2,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DiagnosticReportRecord } from '@/src/database/types';
-import {
-  getAllReports,
-  deleteReport,
-} from '@/src/features/lab-results/diagnosticReportService';
+import { getAllReports } from '@/src/features/lab-results/diagnosticReportService';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { getAllConsultations } from '@/src/features/consultations/consultationService';
 import { getAllTreatments } from '@/src/features/treatments/treatmentService';
@@ -54,7 +42,6 @@ import type {
   MedicationRequest,
   ServiceRequest,
 } from 'fhir/r5';
-import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import {
   getConsultationConditionIds,
   getConsultationReasonConditionIds,
@@ -65,7 +52,6 @@ import {
 import { COLORS } from '@/src/theme/colors';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -73,9 +59,8 @@ import {
   subscribeToDatabaseChanges,
   useDatabaseSubscription,
 } from '@/src/database/dbEvents';
-import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import { LabsSummary, latestBiomarkers } from './LabsSummary';
-import { BiomarkerResultRow } from './BiomarkerResultRow';
+import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelatedRow';
 
 const blurActiveElement = () => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -228,23 +213,6 @@ export function HomeView() {
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);
 
-  // Delete modal state
-  const [deleteModal, setDeleteModal] = useState<{
-    visible: boolean;
-    type: 'report';
-    id: string;
-    title: string;
-    message: string;
-    requireCountdown: boolean;
-  }>({
-    visible: false,
-    type: 'report',
-    id: '',
-    title: '',
-    message: '',
-    requireCountdown: true,
-  });
-
   const [loadedPatientId, setLoadedPatientId] = useState(activePatientId);
   const activePatientIdRef = useRef(activePatientId);
   const loadGenerationRef = useRef(0);
@@ -308,43 +276,6 @@ export function HomeView() {
       loadData();
     }
   );
-
-  const formatDate = (dateStr: string) => {
-    return formatDisplayDateTime(dateStr);
-  };
-
-  const navigateToAddReport = (id?: string) => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      (document.activeElement as HTMLElement)?.blur?.();
-    }
-    if (id) {
-      router.push(`/lab-result/${id}/edit`);
-    } else {
-      router.push('/lab-result/add');
-    }
-  };
-
-  const handleDeleteReportClick = (id: string) => {
-    setDeleteModal({
-      visible: true,
-      type: 'report',
-      id,
-      title: 'Delete Lab Result',
-      message:
-        'Are you sure you want to delete this lab result? This action cannot be undone.',
-      requireCountdown: true,
-    });
-  };
-
-  const handleConfirmDelete = async () => {
-    try {
-      await deleteReport(deleteModal.id);
-      setDeleteModal((prev) => ({ ...prev, visible: false }));
-      await loadData();
-    } catch (err) {
-      console.error('Failed to delete item:', err);
-    }
-  };
 
   const getConsultationDate = (consultation: Encounter) =>
     consultation.actualPeriod?.start || consultation.plannedStartDate || '';
@@ -481,14 +412,7 @@ export function HomeView() {
               </ResourceSection>
             )}
 
-            {hasSummary && (
-              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                <Text style={styles.sectionTitle}>Labs Summary</Text>
-                <View style={styles.reportCard}>
-                  <LabsSummary records={records} />
-                </View>
-              </View>
-            )}
+            {hasSummary && <LabsSummary records={records} />}
 
             {/* Treatments Section */}
             {treatments.length > 0 && (
@@ -620,95 +544,37 @@ export function HomeView() {
               </ResourceSection>
             )}
 
-            {/* Diagnostic Reports Section */}
+            {/* Lab Results Section */}
             {records.length > 0 && (
-              <View style={[styles.sectionContainer, styles.maxWidthSection]}>
-                {(conditions.length > 0 ||
-                  treatments.length > 0 ||
-                  serviceRequests.length > 0 ||
-                  consultations.length > 0) && (
-                  <Text style={styles.sectionTitle}>Lab Results</Text>
-                )}
-                {records.map((record) => {
-                  const noteText =
-                    record.report.note && record.report.note.length > 0
-                      ? record.report.note.map((n) => n.text).join('\n')
-                      : null;
-
-                  const reportId = record.report.id || '';
-
-                  return (
-                    <View
-                      key={reportId || 'report'}
-                      style={styles.reportCard}
-                      testID={`report-card-${reportId}`}
-                    >
-                      {/* Card Header: Date & Action Icons */}
-                      <View style={styles.cardHeader}>
-                        <TouchableOpacity
-                          testID={`view-report-button-${reportId}`}
-                          style={styles.cardHeaderLeft}
-                          accessibilityRole="button"
-                          accessibilityLabel={`View lab result: ${formatDate(record.report.effectiveDateTime || '')}`}
-                          onPress={() => router.push(`/lab-result/${reportId}`)}
-                          activeOpacity={0.6}
-                        >
-                          <Calendar
-                            color={COLORS.light.iconMuted}
-                            size={16}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.cardDate}>
-                            {formatDate(record.report.effectiveDateTime || '')}
-                          </Text>
-                        </TouchableOpacity>
-                        <View style={styles.cardHeaderActions}>
-                          <TouchableOpacity
-                            testID={`edit-report-button-${reportId}`}
-                            style={styles.editReportButton}
-                            onPress={() => navigateToAddReport(reportId)}
-                            activeOpacity={0.7}
-                          >
-                            <Pencil color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            testID={`delete-report-button-${reportId}`}
-                            style={styles.deleteReportButton}
-                            onPress={() => handleDeleteReportClick(reportId)}
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 color={COLORS.light.iconMuted} size={18} />
-                          </TouchableOpacity>
-                        </View>
+              <ResourceSection
+                icon={FlaskConical}
+                title="Lab Results"
+                count={records.length}
+                testID="home-lab-results-section"
+              >
+                <CollapsibleList
+                  items={records}
+                  testID="lab-results-list"
+                  renderItem={({ report }) => {
+                    const reportId = report.id || '';
+                    return (
+                      <View
+                        key={reportId}
+                        testID={`lab-result-card-${reportId}`}
+                      >
+                        <LabResultRelatedRow
+                          report={report}
+                          testID={`lab-result-open-${reportId}`}
+                          onPress={() => {
+                            blurActiveElement();
+                            router.push(`/lab-result/${reportId}`);
+                          }}
+                        />
                       </View>
-
-                      {/* Notes if available */}
-                      {noteText && (
-                        <View style={styles.cardNoteContainer}>
-                          <Text style={styles.cardNoteText}>
-                            &quot;{noteText}&quot;
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Divider */}
-                      <View style={styles.cardDivider} />
-
-                      {/* Observations List */}
-                      <View style={styles.obsList}>
-                        {record.observations
-                          .filter(isSupportedCBCObservation)
-                          .map((obs) => (
-                            <BiomarkerResultRow
-                              key={obs.id}
-                              observation={obs}
-                            />
-                          ))}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  }}
+                />
+              </ResourceSection>
             )}
           </ScrollView>
         )}
@@ -791,18 +657,6 @@ export function HomeView() {
           addTestID="floating-add-button"
           addMenuExpanded={showAddMenu}
         />
-
-        {/* Delete Confirmation Modal */}
-        <DeleteConfirmationModal
-          visible={deleteModal.visible}
-          title={deleteModal.title}
-          message={deleteModal.message}
-          requireCountdown={deleteModal.requireCountdown}
-          onConfirm={handleConfirmDelete}
-          onCancel={() =>
-            setDeleteModal((prev) => ({ ...prev, visible: false }))
-          }
-        />
       </View>
     </SafeAreaView>
   );
@@ -850,88 +704,5 @@ const styles = StyleSheet.create({
   scrollListContent: {
     padding: 20,
     paddingBottom: 132,
-  },
-  sectionContainer: {
-    marginBottom: 16,
-  },
-  maxWidthSection: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-    marginBottom: 12,
-    marginLeft: 2,
-  },
-  reportCard: {
-    backgroundColor: COLORS.light.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    ...Platform.select({
-      web: {
-        boxShadow: COLORS.light.shadowWebCard,
-      },
-      default: {
-        shadowColor: COLORS.light.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
-      },
-    }),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  cardDate: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  editReportButton: {
-    padding: 6,
-    borderRadius: 6,
-  },
-  deleteReportButton: {
-    padding: 6,
-    borderRadius: 6,
-  },
-  cardNoteContainer: {
-    backgroundColor: COLORS.light.pillBackground,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  cardNoteText: {
-    fontSize: 13,
-    color: COLORS.light.muted,
-    fontStyle: 'italic',
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: COLORS.light.border,
-    marginBottom: 12,
-  },
-  obsList: {
-    gap: 12,
   },
 });

@@ -55,6 +55,17 @@ export const THEME_COLORS = {
     badgeHighBorder: '#FECACA',
     badgeHighText: '#EF4444',
 
+    // Biomarker range status: grid squares, range bars and charts. In range
+    // uses `primary`; tints fill range bar zones, washes fill chart bands.
+    outOfRange: '#c77c4e',
+    // Darker apricot keeps small out-of-range text at 4.5:1 on white.
+    outOfRangeText: '#9C5B34',
+    outOfRangeTint: '#F4E3D8',
+    outOfRangeWash: '#FBF4EF',
+    inRangeTint: '#DCE8E1',
+    inRangeWash: '#E6EFE9',
+    noRange: '#d9dbd7',
+
     // Timeline status tones: row wash, node circle and node icon
     statusPlannedWash: '#f3f7fc',
     statusPlannedNode: '#e3edf9',

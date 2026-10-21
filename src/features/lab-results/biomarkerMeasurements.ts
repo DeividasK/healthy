@@ -6,6 +6,29 @@ import {
 
 export type MeasurementStatus = 'Low' | 'Normal' | 'High';
 export type MeasurementReferenceRange = { low?: number; high?: number };
+/** Displayed status: low and high results are both out of range. */
+export type RangeStatus = 'outOfRange' | 'inRange';
+export const RANGE_STATUSES: RangeStatus[] = ['outOfRange', 'inRange'];
+export const RANGE_STATUS_LABELS: Record<RangeStatus, string> = {
+  outOfRange: 'Out of range',
+  inRange: 'In range',
+};
+
+/** Orders out-of-range results first, then in range, then those without a range; keeps order within each. */
+export function orderByRangeStatus<T extends { status?: RangeStatus }>(
+  items: T[]
+): T[] {
+  const rank = ({ status }: T) => (status ? RANGE_STATUSES.indexOf(status) : 2);
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}
+
+/** Collapses a low, normal or high status into the displayed range status. */
+export function toRangeStatus(
+  status: MeasurementStatus | undefined
+): RangeStatus | undefined {
+  if (!status) return undefined;
+  return status === 'Normal' ? 'inRange' : 'outOfRange';
+}
 
 /** Matches an observation to its CBC catalog definition by code or name. */
 export function getObservationMarker(observation: Observation) {

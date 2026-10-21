@@ -1,0 +1,3 @@
+kind: Changed
+body: The Labs Summary on Home is now a compact grid with one square per biomarker, out-of-range results first, so you can see at a glance how many are out of range. Tap a square to open that biomarker, or the heading to see every result.
+time: 2026-10-21T16:10:19.681163066Z

@@ -115,30 +115,17 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
 
       await test.step('Verify saved results render on Home', async () => {
         await expect(page).toHaveURL(/.*(\/|#)$/);
+        const home = page.getByTestId('results-scroll-view');
+        await expect(home.getByTestId(/^lab-result-card-/)).toContainText(
+          'Sep 20, 2026'
+        );
+        await expect(home.getByTestId('labs-summary-count')).toHaveText('2');
         await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('Hemoglobin (Hgb)')
-        ).toBeVisible();
+          home.getByTestId('labs-summary-grid-cell-718-7')
+        ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
         await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('14.5')
-        ).toBeVisible();
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('White Blood Cells (WBC)')
-        ).toBeVisible();
-        await expect(
-          page
-            .getByTestId('results-scroll-view')
-            .locator('[data-testid^="report-card-"]')
-            .getByText('6.8')
-        ).toBeVisible();
+          home.getByTestId('labs-summary-grid-cell-6690-2')
+        ).toHaveAccessibleName('White Blood Cells (WBC): In range');
         const stored = await page.evaluate(() =>
           (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
             'SELECT fhir_json FROM observations'
@@ -150,14 +137,12 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
             .find((resource: any) => resource.code.coding[0].code === '6690-2')
             .valueQuantity.code
         ).toBe('10*9/L');
-
-        await expect(page.getByText('"Fasting routine checkup"')).toBeVisible();
       });
 
       let reportId = '';
       const results = page.getByTestId('lab-result-results-section');
-      await test.step('View its details from the Home card', async () => {
-        await page.getByTestId(/^view-report-button-/).click();
+      await test.step('View its details from its Home row', async () => {
+        await page.getByTestId(/^lab-result-card-/).click();
         await expect(page).toHaveURL(/lab-result\/[^/]+$/);
         reportId = new URL(page.url()).pathname.split('/').pop()!;
         await expect(page.getByTestId('lab-result-title')).toHaveText(
@@ -176,6 +161,12 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         ).toHaveCount(0);
         await expect(
           page.getByTestId('lab-result-results-section-count')
+        ).toHaveText('2');
+        await expect(
+          results.getByTestId('lab-result-grid-squares').getByRole('button')
+        ).toHaveCount(2);
+        await expect(
+          results.getByTestId('lab-result-groups-inRange-count')
         ).toHaveText('2');
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
           '14.5'
@@ -203,10 +194,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         );
       });
 
-      await test.step('Edit it from its Home card: values, tests and notes', async () => {
-        await openRoute(page, '/');
-        await expect(page.getByText('CBC Panel')).not.toBeVisible();
-        await page.getByTestId(`edit-report-button-${reportId}`).click();
+      await test.step('Edit it again: values, tests and notes', async () => {
+        await page.getByTestId('edit-lab-result-button').click();
         await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
         await expect(page.getByText('Edit Lab Results')).toBeVisible();
         await expect(page.getByTestId('marker-card-0')).toContainText(
@@ -234,24 +223,24 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await page.getByTestId('menu-add-notes').click();
         await page.getByTestId('notes-input').fill('Updated checkup note');
         await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
+        await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}$`));
 
-        const cards = page
-          .getByTestId('results-scroll-view')
-          .locator('[data-testid^="report-card-"]');
-        await expect(cards.getByText('Hemoglobin (Hgb)')).toBeVisible();
-        await expect(cards.getByText('16.2')).toBeVisible();
-        await expect(cards.getByText('11.2')).not.toBeVisible();
-        await expect(cards.getByText('Platelets (PLT)')).toBeVisible();
-        await expect(cards.getByText('250')).toBeVisible();
-        await expect(
-          cards.getByText('White Blood Cells (WBC)')
-        ).not.toBeVisible();
-        await expect(page.getByText('"Updated checkup note"')).toBeVisible();
+        await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
+          '16.2'
+        );
+        await expect(results.getByTestId('biomarker-row-777-3')).toContainText(
+          '250'
+        );
+        await expect(results.getByTestId('biomarker-row-6690-2')).toHaveCount(
+          0
+        );
+        await expect(page.getByTestId('lab-result-notes')).toHaveText(
+          'Updated checkup note'
+        );
       });
 
       await test.step('Delete it from the edit island', async () => {
-        await page.getByTestId(`edit-report-button-${reportId}`).click();
+        await page.getByTestId('edit-lab-result-button').click();
         await page.clock.install();
         await page.getByTestId('delete-report-button').click();
         await expect(
@@ -260,7 +249,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await page.clock.runFor(5000);
         await page.getByTestId('delete-modal-confirm-button').click();
         await expect(page).toHaveURL(/\/$/);
-        await expect(page.getByTestId(/^report-card-/)).toHaveCount(0);
+        await expect(page.getByTestId(/^lab-result-card-/)).toHaveCount(0);
         await openRoute(page, `/lab-result/${reportId}`);
         await expect(page.getByText('Lab result not found.')).toBeVisible();
       });
