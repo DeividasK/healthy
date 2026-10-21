@@ -8,19 +8,23 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronDown, FileText } from 'lucide-react-native';
-import Svg, {
-  Circle,
-  Line,
-  Polyline,
-  Rect,
-  Text as SvgText,
-} from 'react-native-svg';
+import {
+  Calendar,
+  ChevronDown,
+  CircleDot,
+  FileText,
+  FlaskConical,
+  Hash,
+} from 'lucide-react-native';
+import Svg, { Circle, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import type { Observation } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
+import { ResourceSection } from '@/src/components/ResourceSection';
+import { BiomarkerValueRow } from '@/src/features/home/BiomarkerResultRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
@@ -34,8 +38,11 @@ import {
   getObservationStatus,
   getObservationUnitCode,
   isSupportedCBCObservation,
+  RANGE_STATUS_LABELS,
+  RANGE_STATUSES,
+  toRangeStatus,
   type MeasurementReferenceRange,
-  type MeasurementStatus,
+  type RangeStatus,
 } from './biomarkerMeasurements';
 
 type Measurement = {
@@ -44,7 +51,8 @@ type Measurement = {
   unit: string;
   id: string;
   name: string;
-  status?: MeasurementStatus;
+  status?: RangeStatus;
+  reportId: string;
   unitCode: string;
   range?: MeasurementReferenceRange;
 };
@@ -70,7 +78,6 @@ export function BiomarkerDetailView() {
     isLoading: true,
     hasError: false,
   });
-  const [isHistoryListExpanded, setIsHistoryListExpanded] = useState(true);
   const loadGeneration = useRef(0);
   const isCurrentPatient = history.patientId === activePatientId;
   const reports = isCurrentPatient && activePatientId ? history.reports : [];
@@ -147,7 +154,8 @@ export function BiomarkerDetailView() {
               '',
             id: observation.id || `${record.report.id}-${matches.length}`,
             name: displayName,
-            status: getObservationStatus(observation, marker),
+            status: toRangeStatus(getObservationStatus(observation, marker)),
+            reportId: record.report.id || '',
             unitCode: getObservationUnitCode(observation),
             range: getObservationReferenceRange(observation, marker),
           });
@@ -199,6 +207,25 @@ export function BiomarkerDetailView() {
       testID="biomarker-view"
       title={title}
       titleTestID="biomarker-title"
+      meta={[
+        {
+          icon: Calendar,
+          text: formatDisplayDate(latestMeasurement.date),
+          testID: 'biomarker-latest-date',
+        },
+        ...(latestMeasurement.status
+          ? [
+              {
+                icon: CircleDot,
+                text: RANGE_STATUS_LABELS[latestMeasurement.status],
+                testID: 'biomarker-latest-status',
+              },
+            ]
+          : []),
+        ...(marker
+          ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
+          : []),
+      ]}
       actions={
         <ResourceActionDock
           onAdd={() => setShowAddMenu((visible) => !visible)}
@@ -235,80 +262,79 @@ export function BiomarkerDetailView() {
           <Text style={styles.description}>{marker.description}</Text>
         </View>
       )}
-      <View style={styles.latestSection} testID="biomarker-latest">
+      <View style={styles.section} testID="biomarker-latest">
         <Text style={styles.sectionTitle}>Latest</Text>
         <View style={styles.latestValueGroup}>
           <Text style={styles.latestValue} testID="biomarker-latest-value">
             {latestMeasurement.value}
           </Text>
-          <Text style={styles.unit} testID="biomarker-latest-unit">
+          <Text style={styles.latestUnit} testID="biomarker-latest-unit">
             {latestMeasurement.unit}
           </Text>
-          <MeasurementStatusBadge
-            status={latestMeasurement.status}
-            testID="biomarker-latest-status"
-          />
         </View>
+        <BiomarkerRangeLine
+          value={latestMeasurement.value}
+          low={latestMeasurement.range?.low}
+          high={latestMeasurement.range?.high}
+          width="100%"
+          large
+          testID="biomarker-latest-range"
+        />
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Value history</Text>
-        {chartMeasurements.length > 1 && (
+      {chartMeasurements.length > 1 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Value history</Text>
+          <View style={styles.legend} testID="biomarker-chart-legend">
+            {RANGE_STATUSES.map((status) => (
+              <View key={status} style={styles.legendItem}>
+                <View
+                  style={[
+                    styles.legendSwatch,
+                    { backgroundColor: STATUS_COLORS[status] },
+                  ]}
+                />
+                <Text style={styles.legendLabel}>
+                  {RANGE_STATUS_LABELS[status]}
+                </Text>
+              </View>
+            ))}
+          </View>
           <BiomarkerChart
             measurements={chartMeasurements}
             low={latestMeasurement.range?.low}
             high={latestMeasurement.range?.high}
           />
-        )}
-        <View style={styles.historyListContainer}>
-          <Pressable
-            accessibilityRole="button"
-            aria-expanded={isHistoryListExpanded}
-            onPress={() => setIsHistoryListExpanded((expanded) => !expanded)}
-            style={styles.historyListToggle}
-            testID="biomarker-history-list-toggle"
-          >
-            <Text style={styles.historyListTitle}>List</Text>
-            <View
-              style={[
-                styles.learnChevronBox,
-                isHistoryListExpanded && styles.learnChevronExpanded,
-              ]}
-            >
-              <ChevronDown size={18} color={COLORS.light.foreground} />
-            </View>
-          </Pressable>
-          {isHistoryListExpanded && (
-            <View style={styles.history} testID="biomarker-history-list">
-              {[...measurements].reverse().map((measurement) => (
-                <View key={measurement.id} style={styles.historyRow}>
-                  <Text style={styles.historyDate}>
-                    {formatDisplayDate(measurement.date)}
-                  </Text>
-                  <View style={styles.historyValueColumn}>
-                    <View style={styles.valueGroup}>
-                      <Text style={styles.historyValue}>
-                        {measurement.value}
-                      </Text>
-                      <Text style={styles.unit}>{measurement.unit}</Text>
-                      <MeasurementStatusBadge
-                        status={measurement.status}
-                        testID={`biomarker-status-${measurement.id}`}
-                      />
-                    </View>
-                    <BiomarkerRangeLine
-                      value={measurement.value}
-                      low={measurement.range?.low}
-                      high={measurement.range?.high}
-                      testID={`biomarker-history-range-${measurement.id}`}
-                    />
-                  </View>
-                </View>
-              ))}
+        </View>
+      )}
+      <ResourceSection
+        icon={FlaskConical}
+        title="Results"
+        count={measurements.length}
+        testID="biomarker-history"
+      >
+        <CollapsibleList
+          items={[...measurements].reverse()}
+          testID="biomarker-history-list"
+          renderItem={(measurement) => (
+            <View key={measurement.id}>
+              <BiomarkerValueRow
+                title={formatDisplayDate(measurement.date)}
+                value={measurement.value}
+                unit={measurement.unit}
+                low={measurement.range?.low}
+                high={measurement.range?.high}
+                accessibilityLabel={`View lab result: ${formatDisplayDate(measurement.date)}`}
+                testID={`biomarker-history-${measurement.id}`}
+                rangeTestID={`biomarker-history-range-${measurement.id}`}
+                onPress={() =>
+                  router.push(`/lab-result/${measurement.reportId}`)
+                }
+              />
             </View>
           )}
-        </View>
-      </View>
-      <View style={styles.section} testID="biomarker-learn">
+        />
+      </ResourceSection>
+      <View style={styles.learnSection} testID="biomarker-learn">
         <Text style={styles.sectionTitle}>Learn</Text>
         <LearnItem title="About this biomarker">
           {marker?.education?.about ||
@@ -325,28 +351,21 @@ export function BiomarkerDetailView() {
         <LearnItem title="What may be related to a change">
           {marker?.education?.whatMayBeRelatedToAChange || ''}
         </LearnItem>
-        <Text style={styles.learnNote}>
-          A result outside the reference range does not diagnose a condition by
-          itself. Your clinician can interpret it with your other results and
-          health history.
-        </Text>
       </View>
     </ResourceViewLayout>
   );
 }
 
-/** Renders populated educational content as an initially collapsed accordion. */
+/**
+ * A full-width row, divided like resource rows, that expands its educational
+ * text below the title; the chevron on the right turns when open.
+ */
 function LearnItem({ title, children }: { title: string; children: string }) {
   const [expanded, setExpanded] = useState(false);
   if (!children.trim()) return null;
 
   return (
-    <View
-      style={[
-        styles.learnItem,
-        expanded && children.length > 0 && styles.learnItemExpanded,
-      ]}
-    >
+    <View style={styles.learnItem}>
       <Pressable
         accessibilityRole="button"
         aria-expanded={expanded}
@@ -362,51 +381,23 @@ function LearnItem({ title, children }: { title: string; children: string }) {
             expanded && styles.learnChevronExpanded,
           ]}
         >
-          <ChevronDown size={18} color={COLORS.light.foreground} />
+          <ChevronDown size={18} color={COLORS.light.muted} />
         </View>
       </Pressable>
-      {expanded && children.length > 0 && (
-        <Text style={styles.learnText}>{children}</Text>
-      )}
+      {expanded && <Text style={styles.learnText}>{children}</Text>}
     </View>
   );
 }
 
-/** Displays the observation's interpreted or range-derived status. */
-function MeasurementStatusBadge({
-  status,
-  testID,
-}: {
-  status?: MeasurementStatus;
-  testID: string;
-}) {
-  if (!status) return null;
-  return (
-    <View
-      testID={testID}
-      style={[
-        styles.statusBadge,
-        styles[
-          `status${status}` as 'statusLow' | 'statusNormal' | 'statusHigh'
-        ],
-      ]}
-    >
-      <Text
-        style={[
-          styles.statusText,
-          styles[
-            `statusText${status}` as
-              'statusTextLow' | 'statusTextNormal' | 'statusTextHigh'
-          ],
-        ]}
-      >
-        {status}
-      </Text>
-    </View>
-  );
-}
+/** Formats a chart number without floating point noise from unit conversion. */
+const formatChartValue = (value: number) =>
+  String(Number(value.toPrecision(10)));
 
-/** Plots compatible measurements against the latest result's reference bounds. */
+/**
+ * Plots compatible measurements against the latest result's reference range:
+ * a colour-coded axis, a tinted in-range band, each value above its point and
+ * its date below.
+ */
 function BiomarkerChart({
   measurements,
   low,
@@ -416,333 +407,319 @@ function BiomarkerChart({
   low?: number;
   high?: number;
 }) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const maxChartWidth = Math.max(
     1,
-    Math.min(600, screenWidth - insets.left - insets.right - 4)
+    Math.min(600, screenWidth - insets.left - insets.right - 40)
   );
-  const width = chartWidth || Math.max(1, maxChartWidth - 24);
-  const height = 320;
-  // Keep axis labels and date ticks inside the SVG viewport on narrow screens.
-  const paddingLeft = Math.min(64, Math.max(32, width * 0.1));
-  const paddingRight = Math.min(48, Math.max(28, width * 0.12));
-  const paddingTop = 32;
-  const paddingBottom = 48;
+  const width = chartWidth || maxChartWidth;
+  const height = 260;
+  const axisX = 48;
+  const plotRight = width - 8;
+  const plotWidth = Math.max(0, plotRight - axisX);
+  const paddingTop = 12;
+  const plotBottom = height - 44;
   const values = measurements.map((item) => item.value);
-  const lowValue = low ?? Math.min(...values);
-  const highValue = high ?? Math.max(...values);
-  const referenceSpan =
-    highValue - lowValue || Math.max(Math.abs(highValue) * 0.1, 1);
-  const min = Math.min(lowValue, ...values) - referenceSpan * 0.15;
-  const max = Math.max(highValue, ...values) + referenceSpan * 0.15;
-  const spread = max - min;
-  /** Maps a measurement to the chart's vertical coordinate. */
+  const hasRange = low !== undefined || high !== undefined;
+  const rawMin = Math.min(...values, low ?? Infinity);
+  const rawMax = Math.max(...values, high ?? -Infinity);
+  const pad = (rawMax - rawMin || Math.max(Math.abs(rawMax) * 0.1, 1)) * 0.2;
+  // The axis ends are rounded to the precision of the values and limits.
+  const decimals = Math.min(
+    2,
+    Math.max(
+      ...[...values, low, high].map(
+        (value) =>
+          (value === undefined
+            ? ''
+            : formatChartValue(value).split('.')[1] || ''
+          ).length
+      )
+    )
+  );
+  const step = 10 ** -decimals;
+  // Values that cannot be negative keep the axis at or above zero.
+  const min =
+    Math.floor(
+      (rawMin >= 0 ? Math.max(0, rawMin - pad) : rawMin - pad) / step
+    ) * step;
+  const max = Math.ceil((rawMax + pad) / step) * step;
+  /** Maps a value to the chart's vertical coordinate. */
   const yFor = (value: number) =>
-    height -
-    paddingBottom -
-    ((value - min) / spread) * (height - paddingTop - paddingBottom);
-  /** Selects the point color for its position relative to the displayed bounds. */
-  const colorFor = (value: number) =>
-    value < lowValue ? '#3B82F6' : value > highValue ? '#EF4444' : '#10B981';
-  const points = measurements.map((item, index) => {
-    const x =
-      paddingLeft +
-      (index / (measurements.length - 1)) *
-        (width - paddingLeft - paddingRight);
-    const y = yFor(item.value);
-    return { x, y };
-  });
+    plotBottom - ((value - min) / (max - min)) * (plotBottom - paddingTop);
+  const bandTop = yFor(high ?? max);
+  const bandBottom = yFor(low ?? min);
+  /** Status of a value against the displayed range. */
+  const statusFor = (value: number): RangeStatus | undefined =>
+    !hasRange
+      ? undefined
+      : (low !== undefined && value < low) ||
+          (high !== undefined && value > high)
+        ? 'outOfRange'
+        : 'inRange';
+  const inset = 28;
+  const points = measurements.map((item, index) => ({
+    x:
+      axisX +
+      inset +
+      (index / (measurements.length - 1)) * (plotRight - axisX - inset * 2),
+    y: yFor(item.value),
+    status: statusFor(item.value),
+  }));
+  const endStatus = hasRange ? ('outOfRange' as const) : undefined;
+  const axisLabels = [
+    { value: max, text: max.toFixed(decimals), status: endStatus },
+    ...(high !== undefined
+      ? [
+          {
+            value: high,
+            text: formatChartValue(high),
+            status: 'inRange' as const,
+          },
+        ]
+      : []),
+    ...(low !== undefined
+      ? [
+          {
+            value: low,
+            text: formatChartValue(low),
+            status: 'inRange' as const,
+          },
+        ]
+      : []),
+    { value: min, text: min.toFixed(decimals), status: endStatus },
+  ];
   return (
     <View
       style={[styles.chart, { width: maxChartWidth }]}
       testID="biomarker-chart"
       accessibilityLabel="Biomarker values over time"
-      onLayout={(event) =>
-        setChartWidth(
-          Math.max(
-            1,
-            Math.min(maxChartWidth, event.nativeEvent.layout.width) - 24
-          )
-        )
-      }
+      onLayout={(event) => {
+        // A screen laid out off-screen during navigation reports no width.
+        const layoutWidth = event.nativeEvent.layout.width;
+        if (layoutWidth > 0)
+          setChartWidth(Math.min(maxChartWidth, layoutWidth));
+      }}
     >
       <View style={{ width, height }}>
         {/* eslint-disable @typescript-eslint/no-deprecated -- These x/y props position SVG geometry, not deprecated View transforms. */}
         <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+          {hasRange && (
+            <>
+              <Rect
+                x={axisX}
+                y={paddingTop}
+                width={plotWidth}
+                height={bandTop - paddingTop}
+                fill={COLORS.light.outOfRangeWash}
+              />
+              <Rect
+                x={axisX}
+                y={bandTop}
+                width={plotWidth}
+                height={bandBottom - bandTop}
+                fill={COLORS.light.inRangeWash}
+              />
+              <Rect
+                x={axisX}
+                y={bandBottom}
+                width={plotWidth}
+                height={plotBottom - bandBottom}
+                fill={COLORS.light.outOfRangeWash}
+              />
+            </>
+          )}
+          {/* The axis takes the colour of the range it passes through. */}
           <Rect
-            x={paddingLeft}
-            y={yFor(lowValue)}
-            width={width - paddingLeft - paddingRight}
-            height={yFor(min) - yFor(lowValue)}
-            fill="#3B82F6"
-            opacity={0.1}
-          />
-          <Rect
-            x={paddingLeft}
-            y={yFor(highValue)}
-            width={width - paddingLeft - paddingRight}
-            height={yFor(lowValue) - yFor(highValue)}
-            fill="#10B981"
-            opacity={0.1}
-          />
-          <Rect
-            x={paddingLeft}
+            x={axisX - 3}
             y={paddingTop}
-            width={width - paddingLeft - paddingRight}
-            height={yFor(highValue) - paddingTop}
-            fill="#EF4444"
-            opacity={0.1}
+            width={3}
+            height={plotBottom - paddingTop}
+            fill={hasRange ? COLORS.light.outOfRange : COLORS.light.border}
           />
-          <Line
-            x1={paddingLeft}
-            y1={paddingTop}
-            x2={paddingLeft}
-            y2={height - paddingBottom}
-            stroke={COLORS.light.border}
-            strokeWidth="1"
-          />
-          <Line
-            x1={paddingLeft}
-            y1={yFor(highValue)}
-            x2={width - paddingRight}
-            y2={yFor(highValue)}
-            stroke="#EF4444"
-            strokeWidth="1"
-            strokeDasharray="4,4"
-            strokeOpacity={1}
-          />
-          <Line
-            x1={paddingLeft}
-            y1={yFor(lowValue)}
-            x2={width - paddingRight}
-            y2={yFor(lowValue)}
-            stroke="#3B82F6"
-            strokeWidth="1"
-            strokeDasharray="4,4"
-            strokeOpacity={1}
-          />
-          <Line
-            x1={paddingLeft}
-            y1={yFor(min)}
-            x2={width - paddingRight}
-            y2={yFor(min)}
-            stroke={COLORS.light.border}
-            strokeWidth="1"
-          />
-          <SvgText
-            x={paddingLeft - 8}
-            y={yFor(highValue) - 4}
-            fill="#EF4444"
-            fontSize="12"
-            textAnchor="end"
-            fillOpacity={1}
-          >
-            High
-          </SvgText>
-          <SvgText
-            x={paddingLeft - 8}
-            y={yFor(highValue) + 12}
-            fill="#EF4444"
-            fontSize="12"
-            textAnchor="end"
-            fillOpacity={1}
-          >
-            {highValue}
-          </SvgText>
-          <SvgText
-            x={paddingLeft - 8}
-            y={yFor(lowValue) - 4}
-            fill="#3B82F6"
-            fontSize="12"
-            textAnchor="end"
-            fillOpacity={1}
-          >
-            Low
-          </SvgText>
-          <SvgText
-            x={paddingLeft - 8}
-            y={yFor(lowValue) + 12}
-            fill="#3B82F6"
-            fontSize="12"
-            textAnchor="end"
-            fillOpacity={1}
-          >
-            {lowValue}
-          </SvgText>
+          {hasRange && (
+            <Rect
+              x={axisX - 3}
+              y={bandTop}
+              width={3}
+              height={bandBottom - bandTop}
+              fill={COLORS.light.primary}
+            />
+          )}
+          {axisLabels.map(({ value, text, status }, index) => (
+            <SvgText
+              key={index}
+              x={axisX - 8}
+              y={yFor(value) + 4}
+              fill={status ? STATUS_TEXT_COLORS[status] : COLORS.light.muted}
+              fontSize="11"
+              fontWeight="700"
+              textAnchor="end"
+            >
+              {text}
+            </SvgText>
+          ))}
           <Polyline
             points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
             fill="none"
-            stroke="#000000"
-            strokeWidth="0.75"
+            stroke={COLORS.light.pillBorder}
+            strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-          {points.map(({ x, y }, index) => (
-            <React.Fragment key={measurements[index].id}>
-              <Circle
-                cx={x}
-                cy={y}
-                r="6"
-                fill={colorFor(measurements[index].value)}
-              />
-              <SvgText
-                x={x}
-                y={height - 34}
-                fill={COLORS.light.mutedForeground}
-                fontSize="10"
-                textAnchor="middle"
-              >
-                {formatDisplayDate(measurements[index].date).split(', ')[0]}
-              </SvgText>
-              <SvgText
-                x={x}
-                y={height - 20}
-                fill={COLORS.light.mutedForeground}
-                fontSize="10"
-                textAnchor="middle"
-              >
-                {formatDisplayDate(measurements[index].date).split(', ')[1]}
-              </SvgText>
-            </React.Fragment>
-          ))}
+          {points.map(({ x, y, status }, index) => {
+            const [day, year] = formatDisplayDate(
+              measurements[index].date
+            ).split(', ');
+            return (
+              <React.Fragment key={measurements[index].id}>
+                <Circle
+                  cx={x}
+                  cy={y}
+                  r="6"
+                  fill={COLORS.light.background}
+                  stroke={status ? STATUS_COLORS[status] : COLORS.light.muted}
+                  strokeWidth="3"
+                />
+                <SvgText
+                  x={x}
+                  y={y - 14}
+                  fill={
+                    status
+                      ? STATUS_TEXT_COLORS[status]
+                      : COLORS.light.foreground
+                  }
+                  fontSize="12"
+                  fontWeight="700"
+                  textAnchor="middle"
+                >
+                  {formatChartValue(measurements[index].value)}
+                </SvgText>
+                <SvgText
+                  x={x}
+                  y={plotBottom + 18}
+                  fill={COLORS.light.mutedForeground}
+                  fontSize="10"
+                  textAnchor="middle"
+                >
+                  {day}
+                </SvgText>
+                <SvgText
+                  x={x}
+                  y={plotBottom + 32}
+                  fill={COLORS.light.mutedForeground}
+                  fontSize="10"
+                  textAnchor="middle"
+                >
+                  {year}
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
         </Svg>
         {/* eslint-enable @typescript-eslint/no-deprecated */}
         {points.map((point, index) => (
-          <Pressable
+          <View
             key={measurements[index].id}
             testID={`biomarker-point-${index}`}
-            accessibilityRole="button"
-            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${measurements[index].value} ${measurements[index].unit}`}
-            onHoverIn={() => setHoveredIndex(index)}
-            onHoverOut={() => setHoveredIndex(null)}
-            onPressIn={() => setHoveredIndex(index)}
-            onPressOut={() => setHoveredIndex(null)}
+            accessible
+            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${formatChartValue(measurements[index].value)} ${measurements[index].unit}`}
             style={[
-              styles.pointHitTarget,
+              styles.pointTarget,
               { left: point.x - 12, top: point.y - 12 },
             ]}
           />
         ))}
-        {hoveredIndex !== null && (
-          <View
-            testID="biomarker-tooltip"
-            style={[
-              styles.tooltip,
-              {
-                left: Math.min(
-                  Math.max(points[hoveredIndex].x - 90, 0),
-                  width - 180
-                ),
-                top: Math.max(points[hoveredIndex].y - 58, 0),
-              },
-            ]}
-          >
-            <Text style={styles.tooltipDate}>
-              {formatDisplayDate(measurements[hoveredIndex].date)}
-            </Text>
-            <View style={styles.tooltipMeasurement}>
-              <Text style={styles.tooltipValue}>
-                {measurements[hoveredIndex].value}
-              </Text>
-              <Text style={styles.tooltipUnit}>
-                {measurements[hoveredIndex].unit}
-              </Text>
-            </View>
-          </View>
-        )}
       </View>
     </View>
   );
 }
 
+const STATUS_COLORS: Record<RangeStatus, string> = {
+  outOfRange: COLORS.light.outOfRange,
+  inRange: COLORS.light.primary,
+};
+const STATUS_TEXT_COLORS: Record<RangeStatus, string> = {
+  outOfRange: COLORS.light.outOfRangeText,
+  inRange: COLORS.light.primary,
+};
+
 const styles = StyleSheet.create({
-  pointHitTarget: {
+  pointTarget: {
     position: 'absolute',
     width: 24,
     height: 24,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
   },
-  tooltip: {
-    pointerEvents: 'none',
-    position: 'absolute',
-    minWidth: 180,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.light.foreground,
-  },
-  tooltipMeasurement: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  tooltipDate: { color: '#ffffff', fontSize: 12, marginBottom: 3 },
-  tooltipValue: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
-  tooltipUnit: { color: '#ffffff', fontSize: 12, fontWeight: '400' },
-  latestSection: { marginBottom: 20 },
   latestValueGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'baseline',
+    gap: 4,
+    marginBottom: 4,
   },
   latestValue: {
     color: COLORS.light.foreground,
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: '700',
   },
-  learnItem: { marginBottom: 0 },
-  learnItemExpanded: { marginBottom: 18 },
-  historyListToggle: {
-    minHeight: 40,
+  latestUnit: { color: COLORS.light.muted, fontSize: 14 },
+  legend: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 6,
-    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.light.pillBackground,
   },
-  historyListContainer: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'flex-start',
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendSwatch: { width: 16, height: 6, borderRadius: 3 },
+  legendLabel: { fontSize: 12, color: COLORS.light.textSecondary },
+  // Closes the last row with the same full-width hairline.
+  learnSection: {
+    marginBottom: 28,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.light.cardBorder,
   },
-  historyListTitle: {
-    color: COLORS.light.foreground,
-    fontSize: 15,
-    fontWeight: '600',
+  // Spans the screen width like resource rows, divided by the same hairline.
+  learnItem: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.light.cardBorder,
   },
   learnItemToggle: {
-    minHeight: 40,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 6,
+    gap: 10,
   },
   learnItemTitle: {
+    flex: 1,
     color: COLORS.light.foreground,
-    fontSize: 15,
-    fontWeight: '600',
-    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
+  // Lines up with the chevrons of resource rows.
   learnChevronBox: {
-    width: 24,
-    height: 24,
+    width: 48,
+    height: 48,
+    marginRight: -15,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   learnChevronExpanded: {
     transform: [{ rotate: '180deg' }],
   },
   learnText: {
+    paddingBottom: 16,
     color: COLORS.light.textSecondary,
     fontSize: 14,
     lineHeight: 21,
-  },
-  learnNote: {
-    color: COLORS.light.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 2,
   },
   section: { marginBottom: 28 },
   sectionTitle: {
@@ -756,45 +733,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
   },
-  chart: {
-    maxWidth: 600,
-    marginHorizontal: -6,
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: COLORS.light.card,
-    marginBottom: 16,
-  },
-  history: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.border,
-  },
-  historyRow: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.border,
-  },
-  historyDate: { color: COLORS.light.textSecondary, fontSize: 14 },
-  valueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  historyValueColumn: { alignItems: 'flex-end', gap: 8 },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  statusLow: { backgroundColor: COLORS.light.badgeLowBg },
-  statusNormal: { backgroundColor: COLORS.light.badgeNormalBg },
-  statusHigh: { backgroundColor: COLORS.light.badgeHighBg },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  statusTextLow: { color: COLORS.light.badgeLowText },
-  statusTextNormal: { color: COLORS.light.badgeNormalText },
-  statusTextHigh: { color: COLORS.light.badgeHighText },
-  historyValue: {
-    color: COLORS.light.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  unit: { color: COLORS.light.mutedForeground, fontSize: 12 },
+  chart: { maxWidth: 600 },
 });

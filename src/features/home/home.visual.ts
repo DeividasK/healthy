@@ -87,8 +87,7 @@ test.describe('Home View - Visual Regression', () => {
     await page.goto('/');
     await page
       .getByTestId('results-scroll-view')
-      .locator('[data-testid^="report-card-"]')
-      .getByText('Hemoglobin (Hgb)')
+      .getByTestId('labs-summary-grid-cell-718-7')
       .waitFor();
 
     await takeSnapshot(page, 'Home View - Populated Single Report', testInfo);
@@ -123,7 +122,7 @@ test.describe('Home View - Visual Regression', () => {
       biomarkers: [{ name: 'Hemoglobin', value: 8 }],
     });
     await page.goto('/');
-    await page.getByTestId('labs-summary-total').waitFor();
+    await page.getByTestId('labs-summary-grid-cell-777-3').waitFor();
 
     await takeSnapshot(
       page,
@@ -135,19 +134,6 @@ test.describe('Home View - Visual Regression', () => {
       .selectOption({ label: '1 month' });
     await takeSnapshot(page, 'Home View - Labs Summary last month', testInfo);
     await page.screenshot({ path: testInfo.outputPath('labs-summary.png') });
-    const search = page.getByRole('textbox', { name: 'Search', exact: true });
-    await search.fill('Hemoglobin');
-    await page.getByTestId('labs-summary-search-result-718-7').waitFor();
-    await takeSnapshot(page, 'Home View - Labs Summary search match', testInfo);
-    await search.fill('unknown biomarker');
-    await takeSnapshot(
-      page,
-      'Home View - Labs Summary no search results',
-      testInfo
-    );
-    await page.screenshot({
-      path: testInfo.outputPath('labs-summary-search.png'),
-    });
   });
   test('Home View - Collapsed and expanded sections', async ({
     page,

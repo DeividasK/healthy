@@ -34,13 +34,17 @@ test.describe('Edit Lab Results Flow', () => {
 
         await page.getByTestId('save-button').click();
         await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-        await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
+        await page.getByRole('button', { name: 'Open biomarkers' }).click();
+        const row = page.getByTestId(/^lab-result-card-/);
+        await expect(row).toContainText('Sep 26, 2026');
+        await expect(row).not.toContainText('Sep 25, 2026');
       });
 
-      const editBtn = page.getByTestId(/^edit-report-button-/);
+      const editBtn = page.getByTestId('edit-lab-result-button');
+      const reportDate = page.getByTestId('lab-result-date');
 
       await test.step('First edit & save preserves exact date', async () => {
+        await page.getByTestId(/^lab-result-card-/).click();
         await editBtn.click();
         await expect(page).toHaveURL(/.*lab-result\/.*\/edit/);
 
@@ -50,9 +54,8 @@ test.describe('Edit Lab Results Flow', () => {
         await expect(editDateInput).toHaveValue('2026-09-26');
 
         await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-        await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
+        await expect(page).toHaveURL(/lab-result\/[^/]+$/);
+        await expect(reportDate).toHaveText('Sep 26, 2026');
       });
 
       await test.step('Second edit & save still preserves date without drift', async () => {
@@ -66,9 +69,8 @@ test.describe('Edit Lab Results Flow', () => {
         ).toHaveValue('2026-09-26');
 
         await page.getByTestId('save-button').click();
-        await expect(page).toHaveURL(/.*(\/|#)$/);
-        await expect(page.getByText('Sep 26, 2026')).toBeVisible();
-        await expect(page.getByText('Sep 25, 2026')).not.toBeVisible();
+        await expect(page).toHaveURL(/lab-result\/[^/]+$/);
+        await expect(reportDate).toHaveText('Sep 26, 2026');
       });
     }
   );

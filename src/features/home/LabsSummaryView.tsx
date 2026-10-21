@@ -7,9 +7,10 @@ import { getAllReports } from '@/src/features/lab-results/diagnosticReportServic
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { LabResultsSection } from '@/src/features/lab-results/LabResultsSection';
 import { LabsSummary } from './LabsSummary';
 
-/** Full latest-results summary for the active patient and chosen period. */
+/** The active patient's latest biomarker results for the chosen period, then every lab result. */
 export function LabsSummaryView() {
   const { period } = useLocalSearchParams<{ period?: string }>();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
@@ -52,7 +53,7 @@ export function LabsSummaryView() {
   return (
     <ResourceViewLayout
       testID="labs-summary-view"
-      title="Labs Summary"
+      title="Biomarkers"
       isLoading={isLoading}
       error={
         isCurrentPatient && data.hasError
@@ -68,10 +69,16 @@ export function LabsSummaryView() {
           showAll
           initialPeriod={period}
         />
+        <View style={styles.labResults}>
+          <LabResultsSection
+            records={isCurrentPatient && activePatientId ? data.reports : []}
+          />
+        </View>
       </View>
     </ResourceViewLayout>
   );
 }
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'flex-start' },
+  labResults: { marginTop: 32 },
 });

@@ -318,7 +318,10 @@ test('keeps every record to its own profile on every screen', async ({
 
   // Home lists only the active profile's records.
   await openRoute(page, '/');
-  await expect(page.getByTestId('biomarker-row-789-8')).toContainText('6.1');
+  // 6.1 is out of range; the other profile's 4.5 would be in range.
+  await expect(
+    page.getByTestId('labs-summary-grid-cell-789-8')
+  ).toHaveAccessibleName('Red Blood Cells (RBC): Out of range');
   for (const title of [
     'Private asthma diagnosis',
     'Respiratory review',

@@ -8,16 +8,24 @@ import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceSection } from '@/src/components/ResourceSection';
-import { BiomarkerResultRow } from '@/src/features/home/BiomarkerResultRow';
+import { BiomarkerStatusGrid } from '@/src/components/BiomarkerStatusGrid';
+import {
+  getBiomarkerName,
+  getBiomarkerRouteId,
+} from '@/src/features/home/BiomarkerResultRow';
+import { BiomarkerStatusGroups } from '@/src/features/home/BiomarkerStatusGroups';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
 import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { deleteReport, getReportById } from './diagnosticReportService';
-import { isSupportedCBCObservation } from './biomarkerMeasurements';
+import {
+  getObservationStatus,
+  isSupportedCBCObservation,
+  toRangeStatus,
+} from './biomarkerMeasurements';
 import { getLabResultMeta, getLabResultTitle } from './labResultMeta';
-import { COLORS } from '@/src/theme/colors';
 import { goBackOr } from '@/src/utils/navigation';
 
 export function ViewLabResultView() {
@@ -111,7 +119,14 @@ function LabResultForPatient({
     ?.map((note) => note.text)
     .filter(Boolean)
     .join('\n');
-  const results = record.observations.filter(isSupportedCBCObservation);
+  const results = record.observations
+    .filter(isSupportedCBCObservation)
+    .map((observation, index) => ({
+      id: observation.id || String(index),
+      name: getBiomarkerName(observation),
+      observation,
+      status: toRangeStatus(getObservationStatus(observation)),
+    }));
 
   return (
     <ResourceViewLayout
@@ -155,11 +170,27 @@ function LabResultForPatient({
         count={results.length}
         testID="lab-result-results-section"
       >
-        {results.map((observation) => (
-          <View key={observation.id} style={styles.result}>
-            <BiomarkerResultRow observation={observation} />
-          </View>
-        ))}
+        {results.length > 0 && (
+          <>
+            <BiomarkerStatusGrid
+              items={results}
+              testID="lab-result-grid"
+              onPressItem={(observationId) => {
+                const observation = results.find(
+                  (result) => result.id === observationId
+                )!.observation;
+                router.push({
+                  pathname: '/biomarker/[id]',
+                  params: { id: getBiomarkerRouteId(observation) },
+                });
+              }}
+            />
+            <BiomarkerStatusGroups
+              biomarkers={results}
+              testID="lab-result-groups"
+            />
+          </>
+        )}
       </ResourceSection>
 
       <ResourceSection
@@ -185,15 +216,5 @@ const styles = StyleSheet.create({
   details: {
     gap: 16,
     marginBottom: 28,
-  },
-  // Spaces results like resource rows, divided by the same hairline.
-  result: {
-    minHeight: 60,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.cardBorder,
   },
 });

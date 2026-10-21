@@ -1,74 +1,124 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { COLORS } from '@/src/theme/colors';
+import { getRangeZones } from './biomarkerRangeZones';
 
-/** Places a numeric result on a compact track with low, normal and high regions. */
+const ZONE_COLORS = {
+  outOfRange: {
+    line: COLORS.light.outOfRange,
+    fill: COLORS.light.outOfRangeTint,
+  },
+  inRange: { line: COLORS.light.primary, fill: COLORS.light.inRangeTint },
+};
+
+/**
+ * Places a result on a bar of out-of-range and in-range zones sized to the
+ * reference range, marked by a triangle. The large bar also labels the limits.
+ */
 export function BiomarkerRangeLine({
   value,
   low,
   high,
-  width = 96,
+  width = 120,
+  large = false,
   testID,
 }: {
   value: number;
   low?: number;
   high?: number;
-  width?: number;
+  width?: number | '100%';
+  large?: boolean;
   testID?: string;
 }) {
-  if (low === undefined || high === undefined || high <= low) return null;
-
-  const rangeSpan = high - low;
-  const min = Math.min(low, value) - rangeSpan * 0.5;
-  const max = Math.max(high, value) + rangeSpan * 0.5;
-  const scale = max - min;
-  const lowWidth = ((low - min) / scale) * 100;
-  const normalWidth = ((high - low) / scale) * 100;
-  const highWidth = 100 - lowWidth - normalWidth;
-  const markerPosition = ((value - min) / scale) * 100;
+  const layout = getRangeZones(value, low, high);
+  if (!layout) return null;
 
   return (
     <View
-      style={[styles.track, { width }]}
+      style={[styles.container, { width }]}
       testID={testID}
       accessibilityLabel="Value compared with the reference range"
     >
-      <View style={[styles.segment, styles.low, { width: `${lowWidth}%` }]} />
+      <View style={[styles.bar, large && styles.largeBar]}>
+        {layout.zones.map(({ status, width: zoneWidth }, index) => (
+          <View
+            key={index}
+            style={[
+              styles.zone,
+              large && styles.largeZone,
+              {
+                flexGrow: zoneWidth,
+                borderTopColor: ZONE_COLORS[status].line,
+                backgroundColor: ZONE_COLORS[status].fill,
+              },
+            ]}
+          />
+        ))}
+      </View>
       <View
-        style={[styles.segment, styles.normal, { width: `${normalWidth}%` }]}
+        style={[
+          styles.marker,
+          large && styles.largeMarker,
+          { left: `${layout.marker}%` },
+        ]}
       />
-      <View style={[styles.segment, styles.high, { width: `${highWidth}%` }]} />
-      <View style={[styles.divider, { left: `${lowWidth}%` }]} />
-      <View style={[styles.divider, { left: `${lowWidth + normalWidth}%` }]} />
-      <View style={[styles.marker, { left: `${markerPosition}%` }]} />
+      {large && (
+        <View style={styles.limits}>
+          {layout.limits.map(({ value: limit, position }) => (
+            <Text
+              key={limit}
+              style={[styles.limit, { left: `${position}%` }]}
+              testID={testID ? `${testID}-limit` : undefined}
+            >
+              {limit}
+            </Text>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  track: {
-    position: 'relative',
+  // Leaves room above the bar for the triangle marker.
+  container: { position: 'relative', paddingTop: 10 },
+  bar: {
     flexDirection: 'row',
-    height: 4,
+    gap: 1,
+    height: 12,
     borderRadius: 2,
-    overflow: 'visible',
+    overflow: 'hidden',
   },
-  segment: { height: 4, opacity: 0.7 },
-  low: { backgroundColor: '#3B82F6' },
-  normal: { backgroundColor: '#10B981' },
-  high: { backgroundColor: '#EF4444' },
-  divider: {
-    position: 'absolute',
-    top: 0,
-    width: 1,
-    height: 4,
-    backgroundColor: '#000000',
-  },
+  largeBar: { height: 16, borderRadius: 3 },
+  zone: { flexBasis: 0, height: 12, borderTopWidth: 3 },
+  largeZone: { height: 16, borderTopWidth: 4 },
   marker: {
     position: 'absolute',
-    top: -2,
-    width: 8,
-    height: 8,
-    marginLeft: -4,
-    borderRadius: 4,
-    backgroundColor: '#000000',
+    top: 0,
+    width: 0,
+    height: 0,
+    marginLeft: -7,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderTopWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: COLORS.light.foreground,
+  },
+  largeMarker: {
+    marginLeft: -8,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 11,
+    top: -1,
+  },
+  limits: { position: 'relative', height: 16, marginTop: 4 },
+  // Centered on its boundary.
+  limit: {
+    position: 'absolute',
+    width: 48,
+    marginLeft: -24,
+    textAlign: 'center',
+    fontSize: 11,
+    color: COLORS.light.textSecondary,
   },
 });

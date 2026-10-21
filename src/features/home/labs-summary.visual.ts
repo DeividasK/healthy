@@ -34,5 +34,12 @@ test('Labs Summary page - full and filtered latest results', async ({
     .getByRole('combobox', { name: 'Sort', exact: true })
     .selectOption('lowest');
   await takeSnapshot(page, 'Labs Summary - lowest first', testInfo);
+  const search = view.getByRole('textbox', { name: 'Search', exact: true });
+  await search.fill('Hemoglobin');
+  await view.getByTestId('labs-summary-result-718-7').waitFor();
+  await takeSnapshot(page, 'Labs Summary - search match', testInfo);
+  await search.fill('unknown biomarker');
+  await view.getByTestId('labs-summary-no-results').waitFor();
+  await takeSnapshot(page, 'Labs Summary - no search results', testInfo);
   await page.screenshot({ path: testInfo.outputPath('labs-summary-page.png') });
 });

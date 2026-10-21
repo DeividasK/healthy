@@ -81,9 +81,9 @@ test.describe('Biomarker detail', () => {
       low: { value: 135, code: 'g/L' },
       high: { value: 175, code: 'g/L' },
     });
-    await expect(page.getByTestId('biomarker-row-718-7').first()).toContainText(
-      'Normal'
-    );
+    await expect(
+      page.getByTestId('labs-summary-grid-cell-718-7')
+    ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
 
     // Imported observations may omit both interpretation and referenceRange.
     await page.evaluate(async (id) => {
@@ -104,21 +104,25 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
     await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('g/L');
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
-      'Normal'
+      'In range'
     );
+    await expect(page.getByTestId('biomarker-loinc')).toHaveText('718-7');
+    const limits = page.getByTestId('biomarker-latest-range-limit');
+    await expect(limits).toHaveText(['135', '175']);
     const chart = page.getByTestId('biomarker-chart');
     await expect(chart.getByText('135', { exact: true })).toBeVisible();
     await expect(chart.getByText('175', { exact: true })).toBeVisible();
     const history = page.getByTestId('biomarker-history-list');
     await expect(history.getByText('14.5', { exact: true })).toBeVisible();
     await expect(history.getByText('g/dL', { exact: true })).toBeVisible();
-    await expect(history.getByText('Normal', { exact: true })).toHaveCount(2);
     await expect(
       history.locator('[data-testid^="biomarker-history-range-"]')
     ).toHaveCount(2);
-    await page.getByTestId('biomarker-point-0').hover();
-    await expect(page.getByTestId('biomarker-tooltip')).toContainText('145');
-    await expect(page.getByTestId('biomarker-tooltip')).toContainText('g/L');
+    // The older result is plotted in the latest result's unit, labelled at its point.
+    await expect(chart.getByText('145', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('biomarker-point-0')).toHaveAccessibleName(
+      'Sep 1, 2026: 145 g/L'
+    );
     await expect(
       page.getByTestId('learn-toggle-about-this-biomarker')
     ).toBeVisible();
@@ -160,18 +164,16 @@ test.describe('Biomarker detail', () => {
     }, latestObservation.id);
     // Reload: raw SQL emits no change event for the mounted Home to pick up.
     await page.goto('/');
-    await expect(page.getByTestId('biomarker-row-718-7').first()).toContainText(
-      'High'
-    );
+    await expect(
+      page.getByTestId('labs-summary-grid-cell-718-7')
+    ).toHaveAccessibleName('Hemoglobin (Hgb): Out of range');
     await openRoute(page, '/biomarker/718-7');
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
-      'High'
+      'Out of range'
     );
     await expect(chart.getByText('140', { exact: true })).toBeVisible();
     await expect(chart.getByText('149', { exact: true })).toBeVisible();
-    await expect(
-      history.getByTestId(`biomarker-status-${latestObservation.id}`)
-    ).toHaveText('High');
+    await expect(limits).toHaveText(['140', '149']);
 
     // Unsupported stored measurements are excluded from history and trends.
     await page.evaluate(async () => {
@@ -222,8 +224,10 @@ test.describe('Biomarker detail', () => {
       page.getByText('Biomarker not found.', { exact: true })
     ).toBeVisible();
     await openRoute(page, '/');
-    await expect(page.getByTestId(/^report-card-/).first()).toBeVisible();
-    await expect(page.getByTestId('biomarker-row-718-7')).toHaveCount(0);
+    await expect(page.getByTestId('labs-summary-count')).toHaveText('0');
+    await expect(page.getByTestId('labs-summary-grid-cell-718-7')).toHaveCount(
+      0
+    );
     await expect(chart).toBeHidden();
   });
 
@@ -253,9 +257,11 @@ test.describe('Biomarker detail', () => {
     });
 
     await openRoute(page, '/');
-    const row = page.getByTestId('biomarker-row-789-8').first();
-    await expect(row).toBeVisible();
-    await row.click();
+    const square = page.getByTestId('labs-summary-grid-cell-789-8');
+    await expect(square).toHaveAccessibleName(
+      'Red Blood Cells (RBC): Out of range'
+    );
+    await square.click();
 
     await expect(page.getByTestId('biomarker-title')).toHaveText(
       'Red Blood Cells (RBC)'
@@ -275,9 +281,13 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-latest-unit')).toHaveText(
       '10*6/uL'
     );
-    await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
-      'High'
+    await expect(page.getByTestId('biomarker-latest-date')).toHaveText(
+      'Oct 1, 2026'
     );
+    await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
+      'Out of range'
+    );
+    await expect(page.getByTestId('biomarker-loinc')).toHaveText('789-8');
     await expect(page.getByTestId('biomarker-learn')).toBeVisible();
     const whyItMatters = page.getByText(
       /carries oxygen from the lungs to the body’s tissues/
@@ -290,32 +300,44 @@ test.describe('Biomarker detail', () => {
     await expect(whyItMattersToggle).toHaveAttribute('aria-expanded', 'true');
     await whyItMattersToggle.click();
     await expect(whyItMatters).toBeHidden();
-    await expect(page.getByTestId('biomarker-chart')).toBeVisible();
-    const historyList = page.getByTestId('biomarker-history-list');
-    await expect(historyList.getByText('4.8')).toBeVisible();
-    await expect(historyList.getByText('4.5')).toBeVisible();
-    await expect(historyList.getByText('Low', { exact: true })).toBeVisible();
-    await expect(
-      historyList.getByText('Normal', { exact: true }).first()
-    ).toBeVisible();
-    await expect(historyList.getByText('High', { exact: true })).toBeVisible();
+    const chart = page.getByTestId('biomarker-chart');
+    await expect(chart).toBeVisible();
+    await expect(page.getByTestId('biomarker-chart-legend')).toHaveText(
+      'Out of rangeIn range'
+    );
+    // Every value is labelled at its point, oldest first.
+    for (const [index, label] of [
+      'Jul 1, 2026: 3.8 10*6/uL',
+      'Aug 1, 2026: 4.5 10*6/uL',
+      'Sep 1, 2026: 4.8 10*6/uL',
+      'Oct 1, 2026: 6.1 10*6/uL',
+    ].entries())
+      await expect(
+        page.getByTestId(`biomarker-point-${index}`)
+      ).toHaveAccessibleName(label);
+    await expect(chart.getByText('4.8', { exact: true })).toBeVisible();
+
+    // The three most recent results show first, newest first.
+    await expect(page.getByTestId('biomarker-history-count')).toHaveText('4');
+    const results = page
+      .getByTestId('biomarker-history-list')
+      .getByRole('button', { name: /^View lab result:/ });
+    await expect(results).toHaveText([
+      /^Oct 1, 20266\.1/,
+      /^Sep 1, 20264\.8/,
+      /^Aug 1, 20264\.5/,
+    ]);
     await expect(
       page.locator('[data-testid^="biomarker-history-range-"]').first()
     ).toBeVisible();
+    const showAll = page.getByTestId('biomarker-history-list-toggle');
+    await expect(showAll).toHaveText('Show all');
+    await showAll.click();
+    await expect(results).toHaveCount(4);
+    await expect(results.nth(3)).toContainText('Jul 1, 2026');
+    await expect(showAll).toHaveText('Show less');
 
-    const historyListToggle = page.getByTestId('biomarker-history-list-toggle');
-    await expect(historyListToggle).toHaveText('List');
-    await expect(historyListToggle).toHaveAttribute('aria-expanded', 'true');
-    await historyListToggle.click();
-    await expect(historyList).toBeHidden();
-    await expect(historyListToggle).toHaveAttribute('aria-expanded', 'false');
-    await historyListToggle.click();
-    await expect(historyList).toBeVisible();
-
-    await page.getByTestId('biomarker-point-2').hover();
-    const tooltip = page.getByTestId('biomarker-tooltip');
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText('2026');
-    await expect(tooltip).toContainText('4.8');
+    await results.nth(1).click();
+    await expect(page).toHaveURL(/lab-result\/rbc-history-second$/);
   });
 });
