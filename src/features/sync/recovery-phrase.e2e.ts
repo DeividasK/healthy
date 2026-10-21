@@ -49,7 +49,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await mockGoogleAuthRoutes(page, { userEmail: 'alice@gmail.com' });
     await seedTestPatient(page);
     await openRoute(page, '/profile');
-    await page.getByTestId('google-signin-button').click();
+    await page.getByTestId('backup-switch').click();
 
     await expect(page).toHaveURL(/\/sync\/recovery-phrase/);
     const phrase = await readPhrase(page);
@@ -58,7 +58,9 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(page.getByTestId('connected-user-email')).toHaveText(
       'alice@gmail.com'
     );
-    await expect(page.getByTestId('up-to-date-button')).toBeVisible();
+    await expect(page.getByTestId('backup-status-text')).toHaveText(
+      'up to date'
+    );
     const names = [...store.files.values()].map((file) => file.name);
     expect(names).toContain('vault.json');
     expect(names.some((name) => name.startsWith('chunk_'))).toBe(true);
@@ -66,6 +68,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     expect(driveContents(store)).not.toContain('"family":"Doe"');
 
     await page.getByTestId('show-recovery-phrase-button').click();
+    const phraseModal = page.getByTestId('recovery-phrase-modal-card');
+    await expect(phraseModal).toBeVisible();
     expect(await readPhrase(page)).toBe(phrase);
     await page
       .context()
@@ -82,13 +86,15 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const file = await download;
     expect(file.suggestedFilename()).toBe('healthy-recovery-phrase.txt');
     expect(await readFile((await file.path())!, 'utf8')).toContain(phrase);
-    await page.getByTestId('recovery-phrase-confirm-button').click();
+    await page.getByTestId('recovery-phrase-done-button').click();
+    await expect(phraseModal).toHaveCount(0);
 
     // Sync is chosen per profile: a new profile is not synced until connected.
     const chunks = () =>
       [...store.files.values()].filter((f) => f.name.startsWith('chunk_'))
         .length;
     const syncedChunks = chunks();
+    await page.getByTestId('switch-profile-button').click();
     await page.getByTestId('add-new-profile-button').click();
     await page.getByTestId('patient-given-name-input').fill('Bob');
     await page.getByTestId('save-profile-button').click();
@@ -96,23 +102,29 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       'Bob'
     );
     await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
-    await page.getByTestId('google-signin-button').click();
-    await expect(page.getByTestId('up-to-date-button')).toBeVisible();
+    await page.getByTestId('backup-switch').click();
+    await expect(page.getByTestId('backup-status-text')).toHaveText(
+      'up to date'
+    );
     expect(chunks()).toBeGreaterThan(syncedChunks);
 
     // Disconnecting the last synced profile also leaves the account.
     for (const name of ['Bob', 'John Doe']) {
+      await page.getByTestId('switch-profile-button').click();
       await page
         .getByTestId(/^profile-item-/)
         .filter({ hasText: name })
         .first()
         .click();
-      await page.getByTestId('disconnect-sync-button').click();
+      await expect(page.getByTestId('profile-display-name')).toHaveText(name);
+      await page.getByTestId('backup-switch').click();
       const modal = page.getByTestId('disconnect-confirmation-modal');
       await modal.getByTestId('delete-from-cloud-checkbox').click();
       await modal.getByTestId('delete-modal-confirm-button').click();
       await expect(page.getByTestId('google-sync-disconnected')).toBeVisible();
     }
+    // Leaving the account follows once the last profile stops syncing.
+    await expect(page.getByTestId('backup-status-text')).toHaveText(/^Off/);
     expect(
       await page.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
     ).toBeNull();
@@ -205,7 +217,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await mockGoogleAuthRoutes(device);
     await seedTestPatient(device, { id: 'bob', givenName: 'Bob' });
     await openRoute(device, '/profile');
-    await device.getByTestId('google-signin-button').click();
+    await device.getByTestId('backup-switch').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
     await device.clock.install();
     await device.getByTestId('forgot-recovery-phrase-button').click();
@@ -218,7 +230,9 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     const newPhrase = await readPhrase(device);
     expect(newPhrase).not.toBe(phrase);
     await device.getByTestId('recovery-phrase-confirm-button').click();
-    await expect(device.getByTestId('up-to-date-button')).toBeVisible();
+    await expect(device.getByTestId('backup-status-text')).toHaveText(
+      'up to date'
+    );
     // The unreadable records are gone; this device's profile is uploaded again.
     expect(driveContents(store)).not.toContain(phrase);
     const restored = await openSecondDevice(browser, testInfo);
@@ -250,7 +264,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await mockGoogleAuthRoutes(device);
     await seedTestPatient(device);
     await openRoute(device, '/profile');
-    await device.getByTestId('google-signin-button').click();
+    await device.getByTestId('backup-switch').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
     await device.getByTestId('back-button').click();
     await device.getByTestId('disconnect-locked-sync-button').click();
@@ -320,7 +334,9 @@ test.describe('Google Drive sync with a recovery phrase', () => {
 
     // Syncing by hand renews the token and catches up.
     await page.getByTestId('sync-now-button').click();
-    await expect(page.getByTestId('up-to-date-button')).toBeVisible();
+    await expect(page.getByTestId('backup-status-text')).toHaveText(
+      'up to date'
+    );
     const saved = await savedConfig();
     expect(saved.accessToken).toBe('fresh-gis-token');
     expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());

@@ -31,6 +31,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       await test.step('Navigate to Add Profile and create Jane Doe', async () => {
         await page.getByTestId('profile-header-button').click();
         await expect(page).toHaveURL(/.*profile/);
+        await page.getByTestId('switch-profile-button').click();
 
         const addProfileBtn = page.getByTestId('add-new-profile-button');
         await expect(addProfileBtn).toBeVisible();
@@ -74,6 +75,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
 
       await test.step('Switch back to John Doe and verify condition isolation restored', async () => {
         await page.getByTestId('profile-header-button').click();
+        await page.getByTestId('switch-profile-button').click();
         await page
           .getByTestId(/^profile-item-/)
           .filter({ hasText: 'John Doe' })
@@ -96,17 +98,31 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
   }) => {
     await page.getByTestId('profile-header-button').click();
     await expect(page).toHaveURL(/.*profile/);
-    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('active-profile-card')).toBeVisible();
     await expect(page.getByTestId('profile-display-name')).toHaveText(
       'John Doe'
     );
-    // The patient ID tells apart profiles with the same name.
+    // The patient ID tells apart profiles with the same name; it copies whole.
     const [{ id }] = await bridge(page, (b) =>
       b.querySql('SELECT id FROM patients')
     );
-    await expect(page.getByTestId('profile-id-value')).toHaveText(id);
-    await expect(page.getByTestId(`profile-item-id-${id}`)).toHaveText(id);
+    await page
+      .context()
+      .grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByTestId('profile-id-copy-button').click();
+    await expect(
+      page.getByRole('button', { name: 'Patient ID copied' })
+    ).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(id);
+
+    // The switcher opens from the header and lists the profile as active.
+    await page.getByTestId('switch-profile-button').click();
+    await expect(page.getByTestId(`profile-item-${id}`)).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    await expect(page.getByTestId('add-new-profile-button')).toBeVisible();
+    await page.getByTestId('switch-profile-button').click();
+    await expect(page.getByTestId('profile-switcher')).toHaveCount(0);
     // Muted #717973 text (4.48:1) and the Google sign-in button still
     // fall just short of 4.5:1.
     await checkA11y(page, { disableRules: ['color-contrast'] });
@@ -129,7 +145,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       'John Smith'
     );
     await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
-      'May 15, 1990'
+      /^May 15, 1990, \d+ years$/
     );
 
     // Re-open and clear date of birth
@@ -139,9 +155,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
     await dobInputEdit.fill('');
     await page.getByTestId('save-profile-button').click();
 
-    await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
-      'Not specified'
-    );
+    await expect(page.getByTestId('profile-birth-date-value')).toHaveCount(0);
 
     await test.step('Uploads a profile photo, shows it and removes it', async () => {
       await page.getByTestId('edit-profile-button').click();
@@ -161,6 +175,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
         'Change Photo'
       );
       await page.getByTestId('save-profile-button').click();
+      await page.getByTestId('switch-profile-button').click();
 
       for (const avatar of [
         'profile-avatar',

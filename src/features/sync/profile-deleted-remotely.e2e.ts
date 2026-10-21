@@ -171,6 +171,8 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     await modal.getByTestId('profile-deletion-keep-local-button').click();
     await expect(modal).toBeHidden();
     await expect(device.getByTestId('google-sync-disconnected')).toBeVisible();
+    // Leaving the account follows once the last profile stops syncing.
+    await expect(device.getByTestId('backup-status-text')).toHaveText(/^Off/);
     expect(
       await device.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
     ).toBeNull();

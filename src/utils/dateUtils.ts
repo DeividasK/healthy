@@ -92,3 +92,17 @@ export function addDays(date: string, delta: number): string {
   day.setDate(day.getDate() + delta);
   return formatLocalDate(day);
 }
+
+/**
+ * Whole years between a 'YYYY-MM-DD' birth date and `today`, counting a
+ * birthday only once it has been reached.
+ */
+export function getAgeInYears(birthDate: string, today = new Date()): number {
+  const born = parseLocalDate(birthDate);
+  let age = today.getFullYear() - born.getFullYear();
+  const beforeBirthday =
+    today.getMonth() < born.getMonth() ||
+    (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+  if (beforeBirthday) age -= 1;
+  return Math.max(0, age);
+}

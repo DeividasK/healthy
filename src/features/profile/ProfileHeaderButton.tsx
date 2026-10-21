@@ -45,7 +45,7 @@ export function ProfileHeaderButton({
         {initials && initials !== 'S' ? (
           <Text style={styles.initialsText}>{initials}</Text>
         ) : (
-          <User size={18} color={COLORS.light.primary} />
+          <User size={16} color={COLORS.light.primary} />
         )}
       </PatientAvatar>
     </TouchableOpacity>
@@ -53,10 +53,11 @@ export function ProfileHeaderButton({
 }
 
 const styles = StyleSheet.create({
+  // The same size as the app logo beside it.
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: COLORS.light.emptyIconContainer,
     borderWidth: 1,
     borderColor: COLORS.light.card,
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   initialsText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
     color: COLORS.light.primary,
   },

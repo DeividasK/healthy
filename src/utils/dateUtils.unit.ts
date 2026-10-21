@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { formatEnUsDate, formatDisplayDate, parseLocalDate } from './dateUtils';
+import {
+  formatEnUsDate,
+  formatDisplayDate,
+  getAgeInYears,
+  parseLocalDate,
+} from './dateUtils';
 
 test('formats exactly as toLocaleDateString, reusing formatters', () => {
   const options: Intl.DateTimeFormatOptions[] = [
@@ -25,4 +30,12 @@ test('shows unparseable dates as before', () => {
   expect(formatDisplayDate('not-a-date')).toBe(
     new Date(NaN).toLocaleDateString('en-US')
   );
+});
+
+test('counts age in whole years, from the birthday on', () => {
+  const today = parseLocalDate('2026-10-21');
+  expect(getAgeInYears('1988-03-12', today)).toBe(38);
+  expect(getAgeInYears('1988-10-21', today)).toBe(38);
+  expect(getAgeInYears('1988-10-22', today)).toBe(37);
+  expect(getAgeInYears('2026-05-01', today)).toBe(0);
 });

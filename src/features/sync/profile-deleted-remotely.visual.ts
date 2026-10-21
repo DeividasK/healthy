@@ -21,7 +21,10 @@ test('Sync - Profile Deleted From Google Drive', async ({ page }, testInfo) => {
   await page.goto('/profile');
   await page.getByTestId('profile-deleted-remotely-modal-card').waitFor();
   // The sync that runs on load has finished (its checkmark shows for 1 s).
-  await page.getByText('Up to date', { exact: true }).waitFor();
+  await page
+    .getByTestId('backup-status-text')
+    .filter({ hasText: 'up to date' })
+    .waitFor();
 
   await takeSnapshot(
     page,

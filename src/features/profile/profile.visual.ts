@@ -16,7 +16,11 @@ test.describe('Profile Views - Visual Regression', () => {
     await page.goto('/profile');
     await page.getByTestId('profile-avatar-photo').waitFor();
 
-    await takeSnapshot(page, 'Profile View - Details and Switcher', testInfo);
+    await takeSnapshot(page, 'Profile View - Details', testInfo);
+
+    await page.getByTestId('switch-profile-button').click();
+    await page.getByTestId('profile-switcher').waitFor();
+    await takeSnapshot(page, 'Profile View - Switcher Open', testInfo);
   });
 
   test('Profile View - Add Profile Options', async ({ page }, testInfo) => {
@@ -49,7 +53,10 @@ test.describe('Profile Views - Visual Regression', () => {
     await seedTestPatient(page, { id: 'patient-visual' });
     await connectTestSync(page, { userEmail: 'alice@gmail.com' });
     await page.goto('/profile');
-    await page.getByTestId('up-to-date-button').waitFor();
+    await page
+      .getByTestId('backup-status-text')
+      .filter({ hasText: 'up to date' })
+      .waitFor();
     await waitForSyncIdle(page);
 
     await takeSnapshot(
@@ -57,5 +64,12 @@ test.describe('Profile Views - Visual Regression', () => {
       'Profile View - Connected Google Sync State',
       testInfo
     );
+
+    await page.getByTestId('show-recovery-phrase-button').click();
+    await page
+      .getByTestId('recovery-phrase-value')
+      .filter({ hasText: /^(\S+ ){23}\S+$/ })
+      .waitFor();
+    await takeSnapshot(page, 'Profile View - Recovery Phrase Modal', testInfo);
   });
 });
