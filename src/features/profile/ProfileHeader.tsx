@@ -22,22 +22,20 @@ export function shortenPatientId(id: string): string {
   return id.length > 20 ? `${id.slice(0, 12)}…${id.slice(-4)}` : id;
 }
 
-function getSummary(patient: Patient): string {
-  const parts: string[] = [];
-  if (patient.birthDate) {
-    const age = getAgeInYears(patient.birthDate);
-    parts.push(`${age} ${age === 1 ? 'year' : 'years'}`);
-  }
-  if (patient.gender && patient.gender !== 'unknown')
-    parts.push(
-      patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1)
-    );
-  return parts.join(' · ');
+function getGender(patient: Patient): string {
+  if (!patient.gender || patient.gender === 'unknown') return '';
+  return patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1);
+}
+
+/** E.g. "Mar 12, 1988, 38 years". */
+function getBirthDateWithAge(birthDate: string): string {
+  const age = getAgeInYears(birthDate);
+  return `${formatDisplayDate(birthDate)}, ${age} ${age === 1 ? 'year' : 'years'}`;
 }
 
 /**
- * The person at the top of the profile page: photo, name, age, gender,
- * birth date and patient ID, with the button that opens the profile switcher.
+ * The person at the top of the profile page: photo, name, gender, birth
+ * date with age and patient ID, with the button that opens the profile switcher.
  */
 export function ProfileHeader({
   patient,
@@ -51,7 +49,7 @@ export function ProfileHeader({
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initials = getPatientInitials(patient);
-  const summary = getSummary(patient);
+  const gender = getGender(patient);
 
   useEffect(
     () => () => {
@@ -92,14 +90,14 @@ export function ProfileHeader({
         >
           {getPatientDisplayName(patient)}
         </Text>
-        {summary !== '' && (
-          <Text style={styles.line} testID="profile-summary">
-            {summary}
+        {gender !== '' && (
+          <Text style={styles.line} testID="profile-gender-value">
+            {gender}
           </Text>
         )}
         {patient.birthDate && (
           <Text style={styles.line} testID="profile-birth-date-value">
-            {formatDisplayDate(patient.birthDate)}
+            {getBirthDateWithAge(patient.birthDate)}
           </Text>
         )}
         {patient.id && (

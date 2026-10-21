@@ -145,9 +145,8 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       'John Smith'
     );
     await expect(page.getByTestId('profile-birth-date-value')).toHaveText(
-      'May 15, 1990'
+      /^May 15, 1990, \d+ years$/
     );
-    await expect(page.getByTestId('profile-summary')).toHaveText(/^\d+ years/);
 
     // Re-open and clear date of birth
     await page.getByTestId('edit-profile-button').click();
