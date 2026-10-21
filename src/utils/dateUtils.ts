@@ -27,13 +27,34 @@ export function parseLocalDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Same as `date.toLocaleDateString('en-US', options)`, but reuses one
+ * formatter per set of options: building a formatter is slow, and lists
+ * format a date for every row.
+ */
+export function formatEnUsDate(
+  date: Date,
+  options: Intl.DateTimeFormatOptions
+): string {
+  if (Number.isNaN(date.getTime())) return 'Invalid Date';
+  const key = JSON.stringify(options);
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', options);
+    formatters.set(key, formatter);
+  }
+  return formatter.format(date);
+}
+
 /**
  * Formats a date string ('YYYY-MM-DD' or with time) for display (e.g., 'Sep 26, 2026').
  */
 export function formatDisplayDate(dateStr: string): string {
   try {
     const date = parseLocalDate(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return formatEnUsDate(date, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -49,7 +70,7 @@ export function formatDisplayDate(dateStr: string): string {
 export function formatDisplayDateTime(dateStr: string): string {
   try {
     const date = parseLocalDate(dateStr);
-    const datePart = date.toLocaleDateString('en-US', {
+    const datePart = formatEnUsDate(date, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

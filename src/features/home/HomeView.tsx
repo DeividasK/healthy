@@ -12,7 +12,6 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
@@ -28,14 +27,9 @@ import {
 } from '@/src/features/lab-results/diagnosticReportService';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import { getAllConsultations } from '@/src/features/consultations/consultationService';
-import {
-  getAllTreatments,
-  getConsultationIdsLinkingTreatment,
-} from '@/src/features/treatments/treatmentService';
-import {
-  getAllServiceRequests,
-  getConsultationIdsLinkingServiceRequest,
-} from '@/src/features/service-requests/serviceRequestService';
+import { getAllTreatments } from '@/src/features/treatments/treatmentService';
+import { getAllServiceRequests } from '@/src/features/service-requests/serviceRequestService';
+import { countConsultationsReferencingResources } from '@/src/features/consultations/clinicalDocumentsRepository';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ActionWeekStrip } from '@/src/features/actions/ActionWeekStrip';
@@ -72,9 +66,13 @@ import { COLORS } from '@/src/theme/colors';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModal';
+import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
-import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import {
+  subscribeToDatabaseChanges,
+  useDatabaseSubscription,
+} from '@/src/database/dbEvents';
 import { isSupportedCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import { LabsSummary, latestBiomarkers } from './LabsSummary';
 import { BiomarkerResultRow } from './BiomarkerResultRow';
@@ -103,6 +101,86 @@ const countMeta = (
   testID,
 });
 
+interface HomeData {
+  records: DiagnosticReportRecord[];
+  conditions: Condition[];
+  consultations: Encounter[];
+  treatments: MedicationRequest[];
+  consultationTreatmentCounts: Record<string, number>;
+  serviceRequests: ServiceRequest[];
+  consultationServiceRequestCounts: Record<string, number>;
+  actionDays: ActionDay[];
+}
+
+const EMPTY_HOME_DATA: HomeData = {
+  records: [],
+  conditions: [],
+  consultations: [],
+  treatments: [],
+  consultationTreatmentCounts: {},
+  serviceRequests: [],
+  consultationServiceRequestCounts: {},
+  actionDays: [],
+};
+
+/**
+ * The last Home data loaded for each profile, kept in memory only. Returning
+ * to Home or switching back to a profile shows it at once while it refreshes.
+ */
+const homeDataCache = new Map<string, HomeData>();
+// Profiles created, deleted, restored or reset make every entry suspect.
+subscribeToDatabaseChanges((tables) => {
+  if (tables.includes('patients')) homeDataCache.clear();
+});
+
+/** Counts the given resources' links per consultation; a failure only loses the counts. */
+const countConsultationLinks = (
+  resourceType: string,
+  items: { id?: string }[],
+  patientId: string
+) =>
+  countConsultationsReferencingResources(
+    items.flatMap((item) => (item.id ? [`${resourceType}/${item.id}`] : [])),
+    patientId
+  ).catch((error) => {
+    console.warn('Failed to load consultation links:', error);
+    return {} as Record<string, number>;
+  });
+
+/** Loads everything Home shows for one profile. */
+async function fetchHomeData(patientId: string): Promise<HomeData> {
+  const [
+    records,
+    conditions,
+    consultations,
+    treatments,
+    serviceRequests,
+    actionDays,
+  ] = await Promise.all([
+    getAllReports(patientId),
+    getAllConditions(patientId),
+    getAllConsultations(patientId),
+    getAllTreatments(patientId),
+    getAllServiceRequests(patientId),
+    getActionDays(patientId, daysEndingOn(todayKey())),
+  ]);
+  const [consultationTreatmentCounts, consultationServiceRequestCounts] =
+    await Promise.all([
+      countConsultationLinks('MedicationRequest', treatments, patientId),
+      countConsultationLinks('ServiceRequest', serviceRequests, patientId),
+    ]);
+  return {
+    records,
+    conditions,
+    consultations,
+    treatments,
+    consultationTreatmentCounts,
+    serviceRequests,
+    consultationServiceRequestCounts,
+    actionDays,
+  };
+}
+
 /** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
   const router = useRouter();
@@ -113,19 +191,20 @@ export function HomeView() {
     isLoading: isPatientLoading,
     refreshPatients,
   } = useActivePatient();
-  const [records, setRecords] = useState<DiagnosticReportRecord[]>([]);
-  const [conditions, setConditions] = useState<Condition[]>([]);
-  const [consultations, setConsultations] = useState<Encounter[]>([]);
-  const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
-  const [consultationTreatmentCounts, setConsultationTreatmentCounts] =
-    useState<Record<string, number>>({});
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
-  const [
+  // Null until the profile's data first loads; later loads keep it on screen.
+  const [data, setData] = useState<HomeData | null>(
+    () => homeDataCache.get(activePatientId) ?? null
+  );
+  const {
+    records,
+    conditions,
+    consultations,
+    treatments,
+    consultationTreatmentCounts,
+    serviceRequests,
     consultationServiceRequestCounts,
-    setConsultationServiceRequestCounts,
-  ] = useState<Record<string, number>>({});
-  const [actionDays, setActionDays] = useState<ActionDay[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+    actionDays,
+  } = data ?? EMPTY_HOME_DATA;
 
   // If no patients exist in the app (fresh install or all profiles deleted), redirect immediately to /profile/new
   useEffect(() => {
@@ -170,19 +249,12 @@ export function HomeView() {
   const activePatientIdRef = useRef(activePatientId);
   const loadGenerationRef = useRef(0);
 
-  // If activePatientId changed, immediately reset displayed records and loading state
-  // during render (recommended React pattern instead of setState inside useEffect)
+  // If activePatientId changed, immediately show that profile's last data, or
+  // the loading state, during render (recommended React pattern instead of
+  // setState inside useEffect)
   if (loadedPatientId !== activePatientId) {
     setLoadedPatientId(activePatientId);
-    setRecords([]);
-    setConditions([]);
-    setConsultations([]);
-    setTreatments([]);
-    setConsultationTreatmentCounts({});
-    setServiceRequests([]);
-    setConsultationServiceRequestCounts({});
-    setActionDays([]);
-    setIsLoading(true);
+    setData(homeDataCache.get(activePatientId) ?? null);
   }
 
   useEffect(() => {
@@ -191,94 +263,24 @@ export function HomeView() {
 
   const loadData = useCallback(async () => {
     const requestedPatientId = activePatientId;
+    if (!requestedPatientId) return;
     const currentGeneration = ++loadGenerationRef.current;
+    const isCurrent = () =>
+      activePatientIdRef.current === requestedPatientId &&
+      loadGenerationRef.current === currentGeneration;
 
     try {
-      setIsLoading(true);
-      const [
-        reportsData,
-        conditionsData,
-        consultationsData,
-        treatmentsData,
-        serviceRequestsData,
-        actionDaysData,
-      ] = await Promise.all([
-        getAllReports(requestedPatientId),
-        getAllConditions(requestedPatientId),
-        getAllConsultations(requestedPatientId),
-        getAllTreatments(requestedPatientId),
-        getAllServiceRequests(requestedPatientId),
-        getActionDays(requestedPatientId, daysEndingOn(todayKey())),
-      ]);
-
-      // Counts each record once per consultation whose document lists it.
-      const countConsultationLinks = async (
-        items: { id?: string }[],
-        lookup: (id: string, patientId: string) => Promise<string[]>
-      ) => {
-        const linkedIds = await Promise.all(
-          items.map((item) =>
-            item.id
-              ? lookup(item.id, requestedPatientId).catch((error) => {
-                  // A failed link lookup only loses that record's count.
-                  console.warn('Failed to load consultation links:', error);
-                  return [] as string[];
-                })
-              : Promise.resolve([])
-          )
-        );
-        const counts: Record<string, number> = {};
-        for (const consultationIds of linkedIds)
-          for (const consultationId of new Set(consultationIds))
-            counts[consultationId] = (counts[consultationId] || 0) + 1;
-        return counts;
-      };
-      const [treatmentCounts, serviceRequestCounts] = await Promise.all([
-        countConsultationLinks(
-          treatmentsData,
-          getConsultationIdsLinkingTreatment
-        ),
-        countConsultationLinks(
-          serviceRequestsData,
-          getConsultationIdsLinkingServiceRequest
-        ),
-      ]);
-
+      const loaded = await fetchHomeData(requestedPatientId);
       // Only apply results if this request is still the latest generation and for current patient
-      if (
-        activePatientIdRef.current !== requestedPatientId ||
-        loadGenerationRef.current !== currentGeneration
-      ) {
-        return;
-      }
-      setRecords(reportsData);
-      setConditions(conditionsData);
-      setConsultations(consultationsData);
-      setTreatments(treatmentsData);
-      setConsultationTreatmentCounts(treatmentCounts);
-      setServiceRequests(serviceRequestsData);
-      setConsultationServiceRequestCounts(serviceRequestCounts);
-      setActionDays(actionDaysData);
+      if (!isCurrent()) return;
+      homeDataCache.set(requestedPatientId, loaded);
+      setData(loaded);
     } catch (err) {
-      if (
-        activePatientIdRef.current === requestedPatientId &&
-        loadGenerationRef.current === currentGeneration
-      ) {
+      if (isCurrent()) {
         console.error('Failed to load dashboard data:', err);
-        // Keep records cleared on error so previous/stale records are not exposed
-        setRecords([]);
-        setConditions([]);
-        setConsultations([]);
-        setTreatments([]);
-        setServiceRequests([]);
-        setActionDays([]);
-      }
-    } finally {
-      if (
-        activePatientIdRef.current === requestedPatientId &&
-        loadGenerationRef.current === currentGeneration
-      ) {
-        setIsLoading(false);
+        // Clear records on error so previous/stale records are not exposed
+        homeDataCache.delete(requestedPatientId);
+        setData(EMPTY_HOME_DATA);
       }
     }
   }, [activePatientId]);
@@ -382,10 +384,8 @@ export function HomeView() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.container}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.light.primary} />
-          </View>
+        {!data ? (
+          <ResourceSkeleton testID="home-skeleton" />
         ) : !hasAnyData ? (
           /* Empty State when no results or conditions yet */
           <View style={styles.emptyContainer}>
@@ -815,11 +815,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,

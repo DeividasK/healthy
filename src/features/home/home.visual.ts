@@ -175,3 +175,16 @@ test.describe('Home View - Visual Regression', () => {
     await takeSnapshot(page, 'Home View - Expanded sections', testInfo);
   });
 });
+
+test('App - Loading placeholders', async ({ page }, testInfo) => {
+  // Holds the SQLite worker so the database stays closed while capturing.
+  await page.route(/expo-sqlite\/web\/worker|wa-sqlite\.wasm/, () => {});
+
+  await page.goto('/');
+  await page
+    .getByTestId('app-loading-skeleton')
+    .getByTestId('skeleton-row')
+    .first()
+    .waitFor();
+  await takeSnapshot(page, 'App - Loading', testInfo);
+});

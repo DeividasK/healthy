@@ -116,7 +116,7 @@ const schema = `
  * Breaking: the `repair` step drops `pending_clinical_resource_deletions`
  * after converting its entries into change-log tombstones, so older app
  * versions lose their deletion outbox. It also re-creates the capture
- * triggers on every start, because rebuilding a table drops them, and creates
+ * triggers whenever repairs run, because rebuilding a table drops them, and creates
  * the tables if a database marked v12 lacks them. All clinical tables and
  * their data are untouched, and
  * `patients.sync_account` stays but is no longer read.

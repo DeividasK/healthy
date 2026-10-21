@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { FormActionDock } from '@/src/components/FormActionDock';
@@ -16,6 +16,7 @@ import {
   getProfileSettings,
   saveProfileSettings,
 } from './profileSettingsRepository';
+import { LoadingView } from '@/src/components/LoadingView';
 
 /** The active profile's settings: the clock time of each part of the day. */
 export function SettingsView() {
@@ -39,7 +40,7 @@ export function SettingsView() {
   if (isLoading || !settings || loadedFor !== activePatientId) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
+        <LoadingView />
       </SafeAreaView>
     );
   }

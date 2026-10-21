@@ -1,18 +1,20 @@
-import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import '../../../global.css';
 
 import { AppChrome } from '@/src/components/AppChrome';
-import { COLORS } from '@/src/theme/colors';
 import { NAV_THEME } from '@/src/theme';
-import { ActivePatientProvider } from '@/src/features/profile/ActivePatientContext';
+import {
+  ActivePatientProvider,
+  useActivePatient,
+} from '@/src/features/profile/ActivePatientContext';
+import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { SyncProvider } from '@/src/context/SyncContext';
-import { DatabaseProvider } from '@/src/database/db';
+import { DatabaseProvider, preloadDatabase } from '@/src/database/db';
 import { ProfileDeletedRemotelyModal } from '@/src/features/sync/ProfileDeletedRemotelyModal';
 import {
   setupTestBridge,
@@ -20,13 +22,16 @@ import {
 } from '@/src/features/testing/testBridge';
 import { registerPwa } from './registerPwa';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// Keep the splash screen up until the app chrome has rendered, then fade out
+// to it: placeholders show while the database opens and data arrives.
 SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ fade: true });
+preloadDatabase();
 
 function AppReadyHandler() {
   const navigation = useNavigationContainerRef();
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hide();
     setupTestBridge(navigation);
     registerPwa();
   }, [navigation]);
@@ -37,30 +42,6 @@ function AppReadyHandler() {
 export default function RootLayout() {
   // Tests reset the app in place; production never changes it.
   const resetKey = useTestResetKey();
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../../../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  if (!loaded) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: COLORS.light.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
-  }
-
   return (
     <DatabaseProvider>
       <AppReadyHandler />
@@ -92,6 +73,21 @@ function useBlurOnScreenChange() {
   }, [navigation]);
 }
 
+/**
+ * Mounts a screen once the database is open and the active profile is known,
+ * so nothing can be read or saved without it. The header shows meanwhile,
+ * and the navigator stays mounted so navigation works throughout.
+ */
+function ScreenWhenProfileReady({ children }: { children: React.ReactNode }) {
+  const { isLoading } = useActivePatient();
+  if (isLoading) return <ResourceSkeleton testID="app-loading-skeleton" />;
+  return <>{children}</>;
+}
+
+const screenLayout = ({ children }: { children: React.ReactNode }) => (
+  <ScreenWhenProfileReady>{children}</ScreenWhenProfileReady>
+);
+
 function RootLayoutNav() {
   useBlurOnScreenChange();
   return (
@@ -103,6 +99,7 @@ function RootLayoutNav() {
             headerShown: false,
             animation: Platform.OS === 'web' ? 'none' : 'default',
           }}
+          screenLayout={screenLayout}
         />
       </AppChrome>
       <ProfileDeletedRemotelyModal />

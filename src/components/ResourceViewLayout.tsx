@@ -1,16 +1,11 @@
 import React from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { ResourceActionDock } from './ResourceActionDock';
+import { ResourceSkeleton } from './ResourceSkeleton';
 import { ResourceMetaLine, type ResourceMeta } from './ResourceSection';
 import { COLORS } from '@/src/theme/colors';
 
@@ -49,13 +44,11 @@ export function ResourceViewLayout({
     >
       <View style={styles.page}>
         {error && <ResourceActionDock actions={[]} />}
-        {isLoading || error ? (
+        {isLoading ? (
+          <ResourceSkeleton heading />
+        ) : error ? (
           <View style={styles.center}>
-            {isLoading ? (
-              <ActivityIndicator size="large" color={COLORS.light.primary} />
-            ) : (
-              <Text style={styles.errorText}>{error}</Text>
-            )}
+            <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : (
           <>

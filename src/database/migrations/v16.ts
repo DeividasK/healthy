@@ -17,8 +17,8 @@ const NOW = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
  * those treatments stay due. The period starts at the earlier of the first
  * journal answer and `effectiveDosePeriod.start`. Backfilled ids are derived
  * from the treatment, so devices that migrate separately converge. Existing
- * tables and data are untouched. `repair` re-creates the triggers on every
- * start, because rebuilding a table drops them.
+ * tables and data are untouched. `repair` re-creates the triggers whenever
+ * repairs run, because rebuilding a table drops them.
  */
 export const migrationV16: DatabaseMigration = {
   version: 16,

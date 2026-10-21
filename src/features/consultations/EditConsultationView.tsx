@@ -2,7 +2,7 @@ import type { ConsultationInput } from './consultationService';
 import { getServiceProviderName } from '@/src/features/organizations/organizationService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ConsultationForm, ConsultationFormValues } from './ConsultationForm';
 import {
@@ -39,6 +39,7 @@ import {
   SERVICE_REQUEST_ROLE_OPTIONS,
   type ServiceRequestConsultationRole,
 } from '@/src/features/service-requests/serviceRequestService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditConsultationView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -187,11 +188,7 @@ export function EditConsultationView() {
   }, [id, activePatientId, isPatientLoading]);
 
   if (isLoading || isPatientLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (notFound || !initialValues || initialPatientId !== activePatientId) {

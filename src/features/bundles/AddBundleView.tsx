@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AutocompleteItem } from '@/src/components/AutocompleteDropdown';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getTreatmentLinkOptions } from '@/src/features/treatments/treatmentService';
-import { COLORS } from '@/src/theme/colors';
 import { BundleForm } from './BundleForm';
 import { saveBundle } from './bundleService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 /** Creates a bundle, optionally starting with a treatment (`treatmentId`). */
 export function AddBundleView() {
@@ -29,11 +28,7 @@ export function AddBundleView() {
   }, [activePatientId]);
 
   if (isLoading || !treatmentOptions) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   return (
@@ -54,12 +49,3 @@ export function AddBundleView() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.background,
-  },
-});

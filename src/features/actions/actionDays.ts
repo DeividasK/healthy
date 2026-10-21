@@ -6,6 +6,7 @@ import type {
 } from 'fhir/r5';
 import {
   addDays,
+  formatEnUsDate,
   formatLocalDate,
   parseLocalDate,
 } from '@/src/utils/dateUtils';
@@ -259,7 +260,7 @@ export const DAY_STATUS_LABELS: Record<DayStatus, string> = {
 };
 
 const formatDay = (date: string, options: Intl.DateTimeFormatOptions) =>
-  parseLocalDate(date).toLocaleDateString('en-US', options);
+  formatEnUsDate(parseLocalDate(date), options);
 
 /** Short weekday, e.g. "Sat". */
 export const formatWeekday = (date: string) =>
