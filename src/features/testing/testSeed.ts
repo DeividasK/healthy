@@ -265,7 +265,8 @@ export async function seedTestPatient(
       },
       { opts: options, home: freshPage }
     ));
-  if (freshPage) await page.getByTestId('floating-add-button').waitFor();
+  // A new profile's Home is empty: it shows the starter rows, not +.
+  if (freshPage) await page.getByTestId('start-your-record').waitFor();
   return patient;
 }
 

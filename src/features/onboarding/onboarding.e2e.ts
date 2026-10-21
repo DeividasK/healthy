@@ -11,6 +11,8 @@ test.describe('First-run onboarding', () => {
     { tag: ['@critical'] },
     async ({ page }) => {
       await test.step('A device with no profile starts at Welcome', async () => {
+        // Boots the app where a reset leaves it, then opens Home.
+        await openRoute(page, '/profile/new');
         await bridge(page, (b) => b.navigate('/'));
         await expect(page).toHaveURL(/\/welcome$/);
         await expect(page.getByTestId('welcome-title')).toHaveText('Healthy');
@@ -104,6 +106,7 @@ test.describe('First-run onboarding', () => {
     page,
   }) => {
     // The suite runs with Reduce Motion: nothing waits on an animation.
+    await openRoute(page, '/profile/new');
     await openRoute(page, '/welcome');
     await expect(page.getByTestId('welcome-get-started')).toBeVisible({
       timeout: 1000,
