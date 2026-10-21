@@ -436,6 +436,10 @@ test.describe('Treatment form keyboard support', () => {
     await addFrom('p1-d1', 'when');
     await expect(dose(1, 1, 'when-select')).toBeFocused();
     await dose(1, 1, 'when-select').selectOption('MORN');
+    // A part of the day needs no clock time
+    await expect(
+      page.locator('#treatment-regimen-p1-d1-timeOfDay-input')
+    ).toHaveCount(0);
     await addFrom('p1-d1', 'bounds');
     await dose(1, 1, 'boundsValue-input').fill('7');
     // A removed optional field goes back to the menu

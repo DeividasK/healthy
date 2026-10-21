@@ -102,7 +102,7 @@ export function TimingFields({
       </FormField>
     );
   // An exact clock time, chosen as "At a specific time".
-  const times = value.timeOfDay?.split(',') || [];
+  const times = value.timeOfDay ? value.timeOfDay.split(',') : [];
   const time = shown.when && times.length > 0 && (
     <FormField label="Time" nativeID={id('timeOfDay', 'input')} required>
       <NativeTimePicker
