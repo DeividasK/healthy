@@ -22,7 +22,11 @@ import {
 import { AppLogo } from '@/src/components/AppLogo';
 import { IconDisc } from '@/src/components/IconDisc';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { useActionDock } from '@/src/components/AppChrome';
+import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
+
+const NO_ACTIONS: DockAction[] = [];
 import { OnboardingButton } from './OnboardingButton';
 import { setHeroLogoRect } from './logoHandoff';
 import { HEARTBEAT, pop, rise } from './motion';
@@ -97,6 +101,8 @@ export function WelcomeView() {
   const router = useRouter();
   const { patients } = useActivePatient();
   const heartRef = useRef<View>(null);
+  // Clears the previous screen's dock; these screens have their own buttons.
+  useActionDock(NO_ACTIONS);
 
   // Welcome is for a device with no profile yet.
   if (patients.length > 0) return <Redirect href="/" />;

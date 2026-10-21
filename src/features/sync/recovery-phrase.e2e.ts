@@ -98,6 +98,11 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await page.getByTestId('add-new-profile-button').click();
     await page.getByTestId('patient-given-name-input').fill('Bob');
     await page.getByTestId('save-profile-button').click();
+    // A new profile opens on its own empty Home.
+    await expect(page.getByTestId('start-your-record-heading')).toHaveText(
+      "Bob's record"
+    );
+    await openRoute(page, '/profile');
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
       'Bob'
     );

@@ -2,6 +2,7 @@ import {
   test,
   expect,
   openRoute,
+  bootstrapApp,
   evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
 
@@ -12,7 +13,7 @@ test.describe('First-run onboarding', () => {
     async ({ page }) => {
       await test.step('A device with no profile starts at Welcome', async () => {
         // Boots the app where a reset leaves it, then opens Home.
-        await openRoute(page, '/profile/new');
+        await bootstrapApp(page);
         await bridge(page, (b) => b.navigate('/'));
         await expect(page).toHaveURL(/\/welcome$/);
         await expect(page.getByTestId('welcome-title')).toHaveText('Healthy');
@@ -106,7 +107,8 @@ test.describe('First-run onboarding', () => {
     page,
   }) => {
     // The suite runs with Reduce Motion: nothing waits on an animation.
-    await openRoute(page, '/profile/new');
+    await bootstrapApp(page);
+    await page.getByTestId('add-profile-header-title').waitFor();
     await openRoute(page, '/welcome');
     await expect(page.getByTestId('welcome-get-started')).toBeVisible({
       timeout: 1000,

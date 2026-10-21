@@ -14,7 +14,11 @@ import { ArrowLeft, Check } from 'lucide-react-native';
 import { FormField } from '@/src/components/FormField';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { createOrUpdatePatient } from '@/src/features/profile/patientService';
+import { useActionDock } from '@/src/components/AppChrome';
+import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
+
+const NO_ACTIONS: DockAction[] = [];
 import { OnboardingButton } from './OnboardingButton';
 import { requestLogoBeat } from './logoHandoff';
 import { slideIn } from './motion';
@@ -29,6 +33,8 @@ export function NameView() {
   const [givenName, setGivenName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Clears the previous screen's dock; these screens have their own buttons.
+  useActionDock(NO_ACTIONS);
 
   // A profile made elsewhere (or this one, once saved) means setup is done.
   if (patients.length > 0 && !saving) return <Redirect href="/" />;

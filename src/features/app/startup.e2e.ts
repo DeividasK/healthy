@@ -90,7 +90,7 @@ test.describe('App startup', () => {
     const restart = async () => {
       // Restarting is what this test is about.
       await page.reload();
-      await expect(page.getByTestId('floating-add-button')).toBeVisible();
+      await expect(page.getByTestId('start-your-record')).toBeVisible();
     };
 
     expect(await hasTrigger()).toBe(true);

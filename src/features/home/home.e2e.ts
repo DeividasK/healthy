@@ -294,6 +294,8 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
 test.describe('Home add menu keyboard navigation', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
+    // + comes with the first record.
+    await seedTestCondition(page, { title: 'Asthma' });
   });
 
   test('focuses the first option when opened with Cmd/Ctrl+Enter and cycles with arrows and Tab', async ({
