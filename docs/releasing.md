@@ -1,14 +1,12 @@
 # Releasing Healthy
 
-Healthy has two branches with different jobs:
+Publish a stable [GitHub Release](https://github.com/DeividasK/healthy/releases)
+to deploy Healthy. Merging into `main` or pushing a tag alone publishes nothing.
+The release tag selects the exact commit to ship, which must already be on `main`.
 
-| Branch    | What it is for                                | What it publishes                                                    |
-| --------- | --------------------------------------------- | -------------------------------------------------------------------- |
-| `main`    | development; every pull request merges here   | nothing                                                              |
-| `release` | what users get; it only moves when we release | GitHub Release, GitHub Pages, Play **internal testing** (as a draft) |
-
-`release` only ever fast-forwards to a commit already on `main`, except for
-hotfixes (below), so it never drifts from `main`.
+GitHub Actions deploys that tag to GitHub Pages and advances the internal
+`release` branch to the same commit. The branch's push webhook starts the existing
+EAS Android build and submission pipeline. Never advance `release` by hand.
 
 ## Versions
 
@@ -66,26 +64,39 @@ edit `.changes/<version>.md` and run `pnpm changie merge`.
    `pnpm changie merge`), then commit
    (`Release v2026.10.0`), push and merge a pull request into `main`.
 
-2. **Ship it** by fast-forwarding `release` to that commit on `main`:
+2. **Publish it from GitHub Releases:**
+
+   Open **Releases → Draft a new release**, create the tag `v2026.10.0`
+   targeting the prepared commit on `main`, set the title to `v2026.10.0`,
+   and paste the notes from `.changes/2026.10.0.md` (without its first
+   heading). Review the draft, then click **Publish release**.
+
+   The equivalent CLI command is:
 
    ```bash
-   git fetch origin && git push origin origin/main:release
+   git fetch origin
+   tail -n +2 .changes/2026.10.0.md > /tmp/healthy-release-notes.md
+   gh release create v2026.10.0 --target "$(git rev-parse origin/main)" \
+     --title v2026.10.0 --notes-file /tmp/healthy-release-notes.md
    ```
 
-   The push is refused if `release` is not behind `main`; see hotfixes.
+   Drafts and prereleases do not deploy. Creating or pushing a tag alone
+   does not deploy either; publishing its stable GitHub Release does.
 
-3. **Watch it go out.** The push to `release` runs:
-   - GitHub Actions **Release** ([`release.yml`](../.github/workflows/release.yml)):
-     checks the release notes, creates the `v2026.10.0` GitHub Release from
-     `.changes/2026.10.0.md`, then deploys the web app to GitHub Pages.
-   - EAS Workflow **Android release**
-     ([`android-release.yml`](../.eas/workflows/android-release.yml)): checks
-     the release notes, builds a production AAB and submits it to Play
-     internal testing as a draft.
+3. **Watch it go out.** Publishing the release starts GitHub Actions
+   **Release** ([`release.yml`](../.github/workflows/release.yml)), which:
+   - Checks that the tag matches both app versions, its commit is on `main`,
+     its release notes exist, no fragments remain, and `release` can
+     fast-forward to it. Older releases cannot move deployments backwards.
+   - Advances the internal `release` branch, starting EAS Workflow
+     **Android release**
+     ([`android-release.yml`](../.eas/workflows/android-release.yml)) to build
+     a production AAB and submit it to Play internal testing as a draft.
+   - Builds the tagged web app and deploys it to GitHub Pages.
 
-   Both refuse a push whose version (in `app.json`) has no
-   `.changes/<version>.md`, or that still has fragments in
-   `.changes/unreleased/`.
+   EAS also verifies that the release notes exist and no fragments remain.
+   The GitHub Actions token advances the internal branch; no Expo token is
+   needed in GitHub because EAS receives the branch's GitHub App webhook.
 
 4. **Roll it out.** Play Console → **Test and release → Testing → Internal
    testing**: open the draft, paste the GitHub Release notes into "Release
@@ -93,23 +104,16 @@ edit `.changes/<version>.md` and run `pnpm changie merge`.
 
 ## Hotfixes
 
-A fix that can't wait for what's on `main`:
-
-1. Branch from `release`, fix it and add a fragment as usual.
-2. Run `pnpm release:prepare` on that branch, commit, and merge a pull
-   request into `release`.
-3. Merge `release` back into `main` with a pull request using **Create a
-   merge commit** (never squash), so `main` contains `release` again and the
-   next release can fast-forward. Resolve any `CHANGELOG.md` or version
-   conflicts in favour of `release`, then run `pnpm changie merge`.
+Merge the fix into `main`, add its changelog fragment, and prepare the next
+version as above. Publish its GitHub Release to deploy it. Every released
+commit stays on `main`, and the internal `release` branch always fast-forwards.
 
 ## One-time setup
 
-- Create the `release` branch from `main`:
-  `git push origin origin/main:release`.
-- Settings → Environments → **production** → Deployment branches: allow
-  `release` (it previously deployed from `main`).
-- Settings → General → Pull Requests: keep **Allow merge commits** enabled for
-  hotfix merge-backs.
-- Optionally protect `release` (no force pushes, no deletion) but allow the
-  maintainers who ship to push to it.
+- Keep the internal `release` branch: EAS listens for its push webhook.
+- Settings → Environments → **production** → Deployment branches and tags:
+  allow release tags matching `v*` (or allow all branches and tags).
+- Keep the Expo GitHub App connected so it receives pushes to `release`.
+- The Release workflow needs `contents: write` to fast-forward `release`.
+  If protecting that branch, allow GitHub Actions to advance it, and keep
+  force pushes and deletion disabled.
