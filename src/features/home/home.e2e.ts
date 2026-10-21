@@ -278,6 +278,9 @@ test.describe('Home sections: collapsing, counts and chevron navigation', () => 
       .click();
     await expect(page).toHaveURL(/\/condition\/c4$/);
     await page.goBack();
+    // Returning keeps Home's records on screen while they refresh.
+    await expect(page.getByTestId('condition-card-c4')).toBeVisible();
+    await expect(page.getByTestId('home-skeleton')).toHaveCount(0);
     await page
       .getByTestId('consultation-card-k4')
       .getByText('Consultation 4')

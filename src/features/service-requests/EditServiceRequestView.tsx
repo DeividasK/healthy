@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { CodeableConcept, Condition } from 'fhir/r5';
 import { FlaskConical, Stethoscope } from 'lucide-react-native';
@@ -46,12 +40,12 @@ import {
   getLabResultsByServiceRequestId,
   setLabResultServiceRequestLink,
 } from '@/src/features/lab-results/diagnosticReportService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditServiceRequestView() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading } = useActivePatient();
-  if (isLoading)
-    return <ActivityIndicator accessibilityLabel="Loading patient" />;
+  if (isLoading) return <LoadingView />;
   return (
     <EditServiceRequestForPatient
       key={`${activePatientId}:${id}`}
@@ -165,11 +159,7 @@ function EditServiceRequestForPatient({
   }, [id, activePatientId]);
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (notFound || !initialValues) {
@@ -249,12 +239,6 @@ function EditServiceRequestForPatient({
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.background,
-  },
   notFoundContainer: {
     flex: 1,
     alignItems: 'center',

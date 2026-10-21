@@ -336,6 +336,10 @@ test.describe('Sync between devices', () => {
       await b.executeSql(
         'CREATE TABLE pending_clinical_resource_deletions (resource_type TEXT, resource_id TEXT, patient_id TEXT)'
       );
+      // Nor has that lineage ever recorded running this app's repairs.
+      await b.executeSql(
+        "DELETE FROM app_settings WHERE key = 'schema_repairs_applied'"
+      );
     });
     await page.reload();
     await expect(page.getByTestId('floating-add-button')).toBeVisible();

@@ -4,6 +4,7 @@
 import type { DatabaseMigration } from './types';
 
 export * from './types';
+export * from './repairsRevision';
 
 // Every `vN.ts` file in this folder is discovered automatically; each exports
 // one `DatabaseMigration`. Adding a migration only requires adding the file.

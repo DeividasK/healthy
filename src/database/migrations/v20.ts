@@ -11,8 +11,8 @@ const triggers = captureTriggers([['procedures', 'Procedure', 'patient_id']]);
  * Non-breaking and additive: creates a new table, its indexes and sync
  * capture triggers. Existing tables and data are untouched. Logs are removed
  * with their service request or patient by cascade, which the capture
- * triggers record as deletions. `repair` re-creates the triggers on every
- * start, because rebuilding a table drops them.
+ * triggers record as deletions. `repair` re-creates the triggers whenever
+ * repairs run, because rebuilding a table drops them.
  */
 export const migrationV20: DatabaseMigration = {
   version: 20,

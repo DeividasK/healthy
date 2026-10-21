@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AutocompleteItem } from '@/src/components/AutocompleteDropdown';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
@@ -13,6 +13,7 @@ import {
   type BundleValues,
 } from './bundleModel';
 import { getBundleById, saveBundle } from './bundleService';
+import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditBundleView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,11 +47,7 @@ export function EditBundleView() {
   }, [id, activePatientId]);
 
   if (isLoading || !loaded) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.light.primary} />
-      </View>
-    );
+    return <LoadingView />;
   }
   if (!loaded.values) {
     return (

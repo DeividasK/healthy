@@ -13,7 +13,7 @@ const triggers = captureTriggers([
  * capture triggers. Existing tables and data are untouched; `Encounter.basedOn`
  * lives in canonical Encounter JSON and needs no projection. The requisition
  * columns project `ServiceRequest.requisition` for grouped requests. `repair`
- * re-creates the triggers on every start, because rebuilding a table drops them.
+ * re-creates the triggers whenever repairs run, because rebuilding a table drops them.
  */
 export const migrationV14: DatabaseMigration = {
   version: 14,

@@ -179,7 +179,9 @@ for (const scenario of [
     await expect(page).not.toHaveURL(/\/edit$/);
     await reopenRoute(page);
     await expect(
-      page.getByText('Edited after repair', { exact: true }).first()
+      page
+        .getByText('Edited after repair', { exact: true })
+        .filter({ visible: true })
     ).toBeVisible();
   });
 }

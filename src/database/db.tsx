@@ -1,12 +1,14 @@
-import React, { Suspense, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
+import React, { useEffect, useState } from 'react';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { openNativeDatabase } from './sqliteDriver';
-import { DATABASE_MIGRATIONS } from './migrations';
+import {
+  DATABASE_MIGRATIONS,
+  REPAIRS_APPLIED_KEY,
+  REPAIRS_REVISION,
+} from './migrations';
 import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
-import { COLORS } from '@/src/theme/colors';
 
 export * from './migrations';
 
@@ -23,7 +25,6 @@ export function getNativeDb(): SQLiteDatabase | null {
 
 /**
  * Applies PRAGMAs and migrations to a database instance.
- * Used by expo-sqlite's SQLiteProvider onInit callback.
  */
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA foreign_keys = ON;');
@@ -34,19 +35,38 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   )) as { user_version?: number } | null | undefined;
   let currentVersion = verRow?.user_version ?? 0;
 
+  // Repairs only fix the schema, so once they have succeeded for the latest
+  // version and this set of repairs, later starts skip them.
+  const latestVersion = DATABASE_MIGRATIONS.at(-1)?.version ?? 0;
+  const repairsId = `${latestVersion}.${REPAIRS_REVISION}`;
+  const repairsApplied =
+    currentVersion >= latestVersion &&
+    (
+      await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_settings WHERE key = ?;',
+        [REPAIRS_APPLIED_KEY]
+      )
+    )?.value === repairsId;
+
   // Sequentially apply missing migrations
   for (const migration of DATABASE_MIGRATIONS) {
     const pending = currentVersion < migration.version;
-    if (pending || migration.repair) {
+    const repair = repairsApplied ? undefined : migration.repair;
+    if (pending || repair) {
       await db.withTransactionAsync(async () => {
         if (pending) await db.execAsync(migration.sql);
-        await migration.repair?.(db);
+        await repair?.(db);
         if (pending)
           await db.execAsync(`PRAGMA user_version = ${migration.version};`);
       });
       if (pending) currentVersion = migration.version;
     }
   }
+  if (!repairsApplied)
+    await db.runAsync(
+      'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?);',
+      [REPAIRS_APPLIED_KEY, repairsId]
+    );
 
   serializeTransactions(db);
   dbInstance = db;
@@ -76,28 +96,23 @@ export interface DatabaseProviderProps {
   children: React.ReactNode;
 }
 
-function DatabaseLoading() {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.light.background,
-      }}
-    >
-      <ActivityIndicator size="large" color={COLORS.light.primary} />
-    </View>
-  );
+/**
+ * Starts opening the database before the app's first render, so the two
+ * overlap. `DatabaseProvider` reports a failure; calling this again is safe.
+ */
+export function preloadDatabase(): void {
+  void claimDatabaseTab();
+  initializeDatabase().catch(() => {});
 }
 
 /**
- * Configured SQLiteProvider for the Healthy application.
- * Manages the SQLite database connection, PRAGMA setup, and schema migrations.
+ * Opens and migrates the database while the app renders. Screens read through
+ * `getDb()`, which waits for it, and show their own loading states meanwhile.
  * On web, only one tab opens the database; others wait until it closes.
  */
 export function DatabaseProvider({ children }: DatabaseProviderProps) {
   const [owned, setOwned] = useState<boolean | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let active = true;
@@ -107,13 +122,19 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     whenDatabaseTabOwned().then(() => {
       if (active) setOwned(true);
     });
+    initializeDatabase().catch((err) => {
+      if (active) setError(err);
+    });
     return () => {
       active = false;
     };
   }, []);
 
-  if (owned === null) return <DatabaseLoading />;
-  if (!owned) {
+  // Surfaces a failed open or migration through the router's error boundary.
+  if (error) throw error;
+  // The app renders before ownership is known: until this tab owns the
+  // database, everything it reads waits.
+  if (owned === false) {
     return (
       <DatabaseInUseView
         onRetry={async () => {
@@ -123,17 +144,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     );
   }
 
-  return (
-    <Suspense fallback={<DatabaseLoading />}>
-      <SQLiteProvider
-        databaseName={DB_NAME}
-        onInit={migrateDatabase}
-        useSuspense
-      >
-        {children}
-      </SQLiteProvider>
-    </Suspense>
-  );
+  return <>{children}</>;
 }
 
 /**
