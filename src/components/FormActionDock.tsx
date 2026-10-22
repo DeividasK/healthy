@@ -26,6 +26,7 @@ export function FormActionDock({
   deleteTestID = 'delete-button',
   deleteConfirmation,
   hasChanges = false,
+  secondaryActions = [],
 }: {
   onAdd?: () => void;
   addDisabled?: boolean;
@@ -43,6 +44,8 @@ export function FormActionDock({
   deleteConfirmation?: DeleteConfirmation;
   /** Entered values would be lost, so cancelling asks to confirm first. */
   hasChanges?: boolean;
+  /** Form-specific buttons shown after the `+`, disabled while saving. */
+  secondaryActions?: DockAction[];
 }) {
   const router = useRouter();
   const isFocused = useIsFocused();
@@ -91,6 +94,8 @@ export function FormActionDock({
       disabled: isSaving || addDisabled,
       expanded: addExpanded,
     });
+  for (const action of secondaryActions)
+    actions.push({ ...action, disabled: isSaving || action.disabled });
   return (
     <>
       <ResourceActionDock

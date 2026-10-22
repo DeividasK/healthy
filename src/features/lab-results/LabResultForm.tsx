@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Clock, FileText, Hospital } from 'lucide-react-native';
+import { X, Clock, FileText, Hospital, Sparkles } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
@@ -50,6 +50,8 @@ import {
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { convertBiomarkerValue } from './biomarkerMeasurements';
+import { ImportLabResultsModal } from './ImportLabResultsModal';
+import type { ImportedLabResults } from './labResultsAIImport';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -148,6 +150,7 @@ export function LabResultForm({
 
   // Plus menu dropdown
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
@@ -298,6 +301,27 @@ export function LabResultForm({
   }, [searchQuery, activeItems]);
 
   const menuOptions = [...fields.menuOptions, ...links.menuOptions];
+
+  /** Fills the form with results read from the AI's reply, for review before saving. */
+  const handleAIImport = (data: ImportedLabResults) => {
+    const [y, m, d] = data.date.split('-').map(Number);
+    setSelectedDate(new Date(y, m - 1, d));
+    loadFields({
+      ...(data.time && { time: data.time }),
+      ...(data.serviceProvider && { serviceProvider: data.serviceProvider }),
+    });
+    setActiveItems(
+      data.results.map(({ marker, value, unit }) => ({
+        id: marker.id,
+        definition: marker,
+        valueStr: value,
+        selectedUnit: unit.label,
+        selectedUcum: unit.ucum,
+      }))
+    );
+    setSearchQuery('');
+    setShowAIImport(false);
+  };
 
   const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
@@ -706,6 +730,22 @@ export function LabResultForm({
             isSaving={isSaving}
             saveDisabled={activeItems.length === 0}
             hasChanges={hasChanges}
+            // New lab results can be filled in from the user's own AI assistant.
+            secondaryActions={
+              isEdit || reportId
+                ? []
+                : [
+                    {
+                      label: 'Import with AI',
+                      testID: 'import-with-ai-button',
+                      icon: Sparkles,
+                      onPress: () => {
+                        setShowPlusMenu(false);
+                        setShowAIImport(true);
+                      },
+                    },
+                  ]
+            }
             deleteLabel="Delete lab result"
             deleteTestID="delete-report-button"
             deleteConfirmation={
@@ -730,6 +770,13 @@ export function LabResultForm({
             onClose={() => setShowPlusMenu(false)}
             options={menuOptions}
           />
+
+          {showAIImport && (
+            <ImportLabResultsModal
+              onClose={() => setShowAIImport(false)}
+              onImport={handleAIImport}
+            />
+          )}
         </View>
       </SafeAreaView>
     </FieldRevealProvider>
