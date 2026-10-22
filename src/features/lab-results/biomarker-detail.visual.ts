@@ -50,3 +50,24 @@ test('Biomarker detail - Red Blood Cells history', async ({
     testInfo
   );
 });
+
+test('Biomarker detail - Calculated atherogenic index', async ({
+  page,
+}, testInfo) => {
+  await seedTestPatient(page);
+  await seedTestReport(page, {
+    id: 'aip-visual',
+    date: '2026-06-01',
+    biomarkers: [
+      { name: 'Triglycerides', value: 1, unit: 'mmol/L' },
+      { name: 'HDL', value: 2.14, unit: 'mmol/L' },
+    ],
+  });
+  await page.goto('/biomarker/aip');
+  await page.getByTestId('biomarker-title').waitFor();
+  await takeSnapshot(
+    page,
+    'Biomarker detail - Calculated atherogenic index',
+    testInfo
+  );
+});

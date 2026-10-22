@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  Calculator,
   Calendar,
   ChevronDown,
   CircleDot,
@@ -28,7 +29,8 @@ import { BiomarkerValueRow } from '@/src/features/home/BiomarkerResultRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
-import { BIOMARKERS } from '@/src/data/biomarkers';
+import { withCalculatedObservations } from './calculatedBiomarkers';
+import { BIOMARKERS, type BiomarkerCalculation } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
@@ -72,6 +74,14 @@ function getObservationName(observation: Observation) {
     observation.code?.text ||
     'Biomarker'
   );
+}
+
+/** Names a calculated biomarker's inputs and gives its formula. */
+function describeCalculation({ inputs, formula }: BiomarkerCalculation) {
+  const names = inputs.map(
+    ({ id }) => BIOMARKERS.find((marker) => marker.id === id)!.name
+  );
+  return `Worked out from your ${names.join(' and ')} results in the same report: ${formula}.`;
 }
 
 /** Shows patient-scoped biomarker history with compatible units and education. */
@@ -139,7 +149,7 @@ export function BiomarkerDetailView() {
 
   const measurements = useMemo(() => {
     const matches: Measurement[] = [];
-    for (const record of reports) {
+    for (const record of withCalculatedObservations(reports)) {
       const reportDate = record.report.effectiveDateTime || '';
       for (const observation of record.observations) {
         if (!isSupportedObservation(observation)) continue;
@@ -147,7 +157,7 @@ export function BiomarkerDetailView() {
         const displayName = getObservationName(observation);
         const name = displayName.toLowerCase();
         const isMatch = marker
-          ? code === marker.loinc ||
+          ? (marker.loinc !== undefined && code === marker.loinc) ||
             marker.aliases.some((alias) => name === alias.toLowerCase()) ||
             name === marker.name.toLowerCase()
           : (code !== 'custom' && code === id) ||
@@ -242,8 +252,17 @@ export function BiomarkerDetailView() {
               },
             ]
           : []),
-        ...(marker
+        ...(marker?.loinc
           ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
+          : []),
+        ...(marker?.calculation
+          ? [
+              {
+                icon: Calculator,
+                text: 'Calculated',
+                testID: 'biomarker-calculated',
+              },
+            ]
           : []),
       ]}
       actions={
@@ -280,6 +299,14 @@ export function BiomarkerDetailView() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.description}>{marker.description}</Text>
+        </View>
+      )}
+      {marker?.calculation && (
+        <View style={styles.section} testID="biomarker-calculation">
+          <Text style={styles.sectionTitle}>How it’s calculated</Text>
+          <Text style={styles.description}>
+            {describeCalculation(marker.calculation)}
+          </Text>
         </View>
       )}
       <View style={styles.section} testID="biomarker-latest">

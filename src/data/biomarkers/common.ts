@@ -544,6 +544,25 @@ export const COMMON_BIOMARKERS = [
         'Triglycerides divided by HDL, a marker of insulin resistance.',
     },
     {
+      id: 'aip',
+      name: 'Atherogenic Index of Plasma (AIP)',
+      aliases: ['AIP', 'Atherogenic Index'],
+      units: [u('index', 1, '{index}')],
+      range: { high: 0.11 },
+      rangeNote:
+        'Below 0.11 is linked with a low risk of heart and blood vessel disease, 0.11 to 0.21 with a medium risk and above 0.21 with a high risk.',
+      description:
+        'Balance of triglycerides and HDL, a marker of heart and blood vessel risk.',
+      calculation: {
+        inputs: [
+          { id: 'triglycerides', unit: 'mmol/L' },
+          { id: 'hdl', unit: 'mmol/L' },
+        ],
+        formula: 'log₁₀(triglycerides ÷ HDL), both in mmol/L',
+        calculate: ([triglycerides, hdl]) => Math.log10(triglycerides / hdl),
+      },
+    },
+    {
       id: 'apob',
       name: 'Apolipoprotein B (ApoB)',
       aliases: ['ApoB', 'Apo B'],

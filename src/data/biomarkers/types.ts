@@ -40,11 +40,25 @@ export interface DemographicRange {
   high?: number;
 }
 
+/**
+ * How the app works a biomarker out from other results in the same report,
+ * rather than recording it.
+ */
+export interface BiomarkerCalculation {
+  /** Catalog ids of the results it needs, with the unit each is converted to. */
+  inputs: { id: string; unit: string }[];
+  /** The formula, as shown on the biomarker page. */
+  formula: string;
+  /** Works the value out from the inputs' values, in the order given. */
+  calculate: (values: number[]) => number;
+}
+
 export interface BiomarkerDefinition {
   id: string;
   name: string;
   aliases: string[];
-  loinc: string;
+  /** Absent for calculated biomarkers that LOINC has no code for. */
+  loinc?: string;
   category: BiomarkerCategory;
   primaryUnit: string;
   ucumCode: string;
@@ -61,6 +75,7 @@ export interface BiomarkerDefinition {
   rangeNote?: string;
   description: string;
   education: BiomarkerEducation;
+  calculation?: BiomarkerCalculation;
 }
 
 export interface BiomarkerEducation {

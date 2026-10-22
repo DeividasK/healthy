@@ -116,7 +116,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
-import { BIOMARKERS } from '@/src/data/biomarkers';
+import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 
 async function connectedProvider() {
   const config = await loadGoogleDriveConfig();
@@ -419,7 +419,7 @@ export function setupTestBridge(
       const patientId = await resolvePatientId(input.patientId);
       const items = input.biomarkers.map((b) => {
         const query = b.name.toLowerCase().trim();
-        const def = BIOMARKERS.find(
+        const def = RECORDABLE_BIOMARKERS.find(
           (m) =>
             m.name.toLowerCase() === query ||
             m.aliases.some((a) => a.toLowerCase() === query) ||

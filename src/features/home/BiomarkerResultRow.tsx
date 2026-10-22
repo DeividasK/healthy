@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import type { Observation } from 'fhir/r5';
 import { ChevronRight } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getBiomarkerKey } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import {
@@ -11,12 +12,12 @@ import {
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
 
 /**
- * Route id of an observation's biomarker page: its catalog test's code, else
+ * Route id of an observation's biomarker page: its catalog test's key, else
  * its own code, or its name for custom tests.
  */
 export function getBiomarkerRouteId(observation: Observation) {
   const marker = getObservationMarker(observation);
-  if (marker) return marker.loinc;
+  if (marker) return getBiomarkerKey(marker);
   const code = observation.code?.coding?.[0]?.code;
   return code && code !== 'custom' ? code : getBiomarkerName(observation);
 }

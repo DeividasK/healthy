@@ -4,6 +4,7 @@ import { FlaskConical } from 'lucide-react-native';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Observation } from 'fhir/r5';
 import type { DiagnosticReportRecord } from '@/src/database/types';
+import { getBiomarkerKey } from '@/src/data/biomarkers';
 import {
   getMissingDemographics,
   getObservationMarker,
@@ -11,6 +12,7 @@ import {
   isSupportedObservation,
   toRangeStatus,
 } from '@/src/features/lab-results/biomarkerMeasurements';
+import { withCalculatedObservations } from '@/src/features/lab-results/calculatedBiomarkers';
 import type { RangeDemographics } from '@/src/features/lab-results/referenceRanges';
 import { RangeProfileNotice } from '@/src/features/lab-results/RangeProfileNotice';
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
@@ -53,7 +55,10 @@ function periodCutoff(months: number) {
   return cutoff.getTime();
 }
 
-/** Uses clinical measurement dates rather than report creation or import order. */
+/**
+ * Uses clinical measurement dates rather than report creation or import
+ * order. Includes the values calculated from each report's results.
+ */
 export function latestBiomarkers(
   records: DiagnosticReportRecord[],
   cutoff = -Infinity,
@@ -63,7 +68,7 @@ export function latestBiomarkers(
     string,
     { observation: Observation; time: number; date?: string }
   >();
-  for (const { report, observations } of records) {
+  for (const { report, observations } of withCalculatedObservations(records)) {
     for (const observation of observations) {
       if (!isSupportedObservation(observation)) continue;
       const marker = getObservationMarker(observation)!;
@@ -79,10 +84,11 @@ export function latestBiomarkers(
       const parsed = date ? Date.parse(date) : NaN;
       const time = Number.isFinite(parsed) ? parsed : -Infinity;
       if (time < cutoff) continue;
-      const previous = latest.get(marker.loinc);
+      const key = getBiomarkerKey(marker);
+      const previous = latest.get(key);
       // Equal dates keep the first result from the repository's newest-first order.
       if (!previous || time > previous.time) {
-        latest.set(marker.loinc, { observation, time, date });
+        latest.set(key, { observation, time, date });
       }
     }
   }
@@ -155,7 +161,7 @@ export function LabsSummary({
           const marker = getObservationMarker(observation)!;
           return [
             name,
-            marker.loinc,
+            marker.loinc ?? '',
             ...marker.aliases,
             observation.code.text || '',
             ...(observation.code.coding?.map(
