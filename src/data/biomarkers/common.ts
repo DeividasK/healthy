@@ -73,6 +73,15 @@ export const COMMON_BIOMARKERS = [
       range: { low: 0.17, high: 0.35 },
       description: 'Share of blood volume taken up by platelets.',
     },
+    {
+      id: 'cbc_p_lcr',
+      name: 'Platelet Large Cell Ratio (P-LCR)',
+      aliases: ['P-LCR', 'Large Platelet Ratio'],
+      loinc: '48386-7',
+      units: PERCENT,
+      range: { low: 13, high: 43 },
+      description: 'Share of platelets that are larger than usual.',
+    },
   ]),
   ...defineBiomarkers('Metabolic Panel', [
     {
@@ -1232,6 +1241,16 @@ export const COMMON_BIOMARKERS = [
       description: 'How long blood takes to clot (external pathway).',
     },
     {
+      id: 'pt_quick',
+      name: 'Prothrombin Activity (Quick)',
+      aliases: ['Quick', 'Quick Value', 'Prothrombin %', 'PT %', 'SPA'],
+      loinc: '6302-4',
+      units: PERCENT,
+      range: { low: 70, high: 130 },
+      description:
+        'Prothrombin time given as a percentage of normal clotting activity.',
+    },
+    {
       id: 'inr',
       name: 'INR',
       aliases: ['International Normalized Ratio', 'PT INR'],
@@ -1432,6 +1451,19 @@ export const COMMON_BIOMARKERS = [
         { sex: 'female', low: 17, high: 124 },
       ],
       description: 'Protein that carries sex hormones in the blood.',
+    },
+    {
+      id: 'free_androgen_index',
+      name: 'Free Androgen Index (FAI)',
+      aliases: ['FAI', 'Androgen Free Index'],
+      loinc: '24125-7',
+      units: PERCENT,
+      ranges: [
+        { sex: 'male', low: 30, high: 150 },
+        { sex: 'female', high: 5 },
+      ],
+      description:
+        'Total testosterone divided by SHBG, an estimate of active testosterone.',
     },
     {
       id: 'estradiol',

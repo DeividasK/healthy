@@ -12,8 +12,8 @@ function hasValidLoincCheckDigit(loinc: string): boolean {
   return (10 - (sum % 10)) % 10 === Number(match[2]);
 }
 
-test('lists 216 biomarkers with unique ids, codes and names', () => {
-  expect(BIOMARKERS).toHaveLength(216);
+test('lists 219 biomarkers with unique ids, codes and names', () => {
+  expect(BIOMARKERS).toHaveLength(219);
   for (const key of ['id', 'loinc', 'name'] as const)
     expect(new Set(BIOMARKERS.map((marker) => marker[key])).size).toBe(
       BIOMARKERS.length
