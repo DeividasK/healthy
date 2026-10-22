@@ -1,0 +1,3 @@
+kind: Fixed
+body: Restoring a profile from a backup file now shows a spinner and keeps the app locked until the restore finishes, then opens your record.
+time: 2026-10-22T14:08:31.946827839Z

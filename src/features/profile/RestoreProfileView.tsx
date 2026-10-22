@@ -28,7 +28,10 @@ import { useSync } from '@/src/context/SyncContext';
 import { listRestorableProfiles } from '@/src/features/sync/engine';
 import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
+import { useDismissKey } from '@/src/utils/dismissKey';
 import { PatientIdText } from './PatientIdText';
+
+const ignoreDismiss = () => {};
 
 /**
  * Brings profiles to this device from Google Drive or a backup file. Welcome
@@ -47,6 +50,10 @@ export function RestoreProfileView() {
   const [noProfilesEmail, setNoProfilesEmail] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // A file restore rewrites records the whole app reads, so nothing else
+  // can be used, not even Escape or back, until it finishes.
+  const isRestoringFile = actionLoading === 'file';
+  useDismissKey(ignoreDismiss, isRestoringFile);
   // Arriving right after the recovery phrase was entered: choose profiles.
   const { pick } = useLocalSearchParams<{ pick?: string }>();
   const pickShownRef = useRef(false);
@@ -202,27 +209,15 @@ export function RestoreProfileView() {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const zipBytes = new Uint8Array(arrayBuffer);
-      const res = await restoreFromZipBytes(zipBytes);
+      await restoreFromZipBytes(zipBytes);
       await refreshPatients();
 
-      // Refresh patients and switch to first restored if available
-      const updatedPatients = await import('./patientService').then((m) =>
-        m.getAllPatients()
-      );
+      // Switch to the first profile, then open its record.
+      const updatedPatients = await getAllPatients();
       if (updatedPatients.length > 0 && updatedPatients[0].id) {
         await setActivePatientId(updatedPatients[0].id);
       }
-
-      Alert.alert(
-        'Restore Complete',
-        `Restored ${res.patients} profile(s), ${res.reports} report(s), and ${res.conditions} condition(s).`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/'),
-          },
-        ]
-      );
+      router.replace('/');
     } catch (err) {
       console.error('Zip restore failed:', err);
       Alert.alert(
@@ -303,7 +298,7 @@ export function RestoreProfileView() {
             testID="restore-from-file"
           />
         </View>
-        {actionLoading !== null && (
+        {actionLoading !== null && !isRestoringFile && (
           <ActivityIndicator
             style={styles.busy}
             color={COLORS.light.primary}
@@ -312,6 +307,22 @@ export function RestoreProfileView() {
         )}
       </ScrollView>
       <ResourceActionDock showBack />
+
+      <Modal
+        visible={isRestoringFile}
+        transparent
+        animationType="fade"
+        onRequestClose={ignoreDismiss}
+      >
+        <View
+          style={styles.blockingBackdrop}
+          testID="restore-file-busy"
+          accessibilityLabel="Restoring backup"
+          accessibilityViewIsModal
+        >
+          <ActivityIndicator size="large" color={COLORS.light.primary} />
+        </View>
+      </Modal>
 
       {/* Multi-Profile Picker Modal for Google Drive */}
       <Modal
@@ -493,6 +504,12 @@ const styles = StyleSheet.create({
   },
   busy: {
     marginTop: 24,
+  },
+  blockingBackdrop: {
+    flex: 1,
+    backgroundColor: COLORS.light.modalBackdrop,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBackdrop: {
     flex: 1,
