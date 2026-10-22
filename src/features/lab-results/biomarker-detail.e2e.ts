@@ -405,8 +405,8 @@ test.describe('Biomarker detail', () => {
       'Calculated'
     );
     await expect(page.getByTestId('biomarker-loinc')).toHaveCount(0);
-    await expect(page.getByTestId('biomarker-calculation')).toContainText(
-      'Worked out from your Triglycerides and HDL Cholesterol results in the same report: log₁₀(triglycerides ÷ HDL), both in mmol/L.'
+    await expect(page.getByTestId('biomarker-calculation-formula')).toHaveText(
+      'Worked out as log₁₀(triglycerides ÷ HDL), both in mmol/L, from your Triglycerides and HDL Cholesterol results in the same report:'
     );
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('0.21');
     await expect(page.getByTestId('biomarker-latest-date')).toHaveText(
@@ -419,8 +419,34 @@ test.describe('Biomarker detail', () => {
       /^Sep 1, 20260\.21/,
       /^Jun 1, 2026-0\.33/,
     ]);
-    await results.nth(1).click();
-    await expect(page).toHaveURL(/lab-result\/aip-first$/);
+    await expect(
+      page.locator(
+        '[data-testid^="biomarker-history-"][data-testid$="-calculated"]'
+      )
+    ).toHaveCount(2);
+
+    // The latest value links the results it was worked out from.
+    const triglycerides = page.getByTestId('biomarker-source-result-2571-8');
+    await expect(triglycerides).toContainText('150mg/dL');
+    await expect(
+      page.getByTestId('biomarker-source-result-2085-9')
+    ).toContainText('40mg/dL');
+    await triglycerides.click();
+    await expect(page).toHaveURL(/biomarker\/2571-8$/);
+
+    // Each report lists its calculated value, marked, after its results.
+    await openRoute(page, '/lab-result/aip-first');
+    const row = page.getByTestId('lab-result-groups').getByRole('button', {
+      name: 'View biomarker: Atherogenic Index of Plasma (AIP) (calculated)',
+    });
+    await expect(row).toContainText('-0.33index');
+    await expect(
+      page.getByTestId('lab-result-grid-cell-aip-first-aip')
+    ).toBeVisible();
+    await openRoute(page, '/lab-result/aip-without-hdl');
+    await expect(
+      page.getByTestId('lab-result-results-section-count')
+    ).toHaveText('1');
 
     // It can't be recorded: the form only offers tests a report can hold.
     await openRoute(page, '/lab-result/add');
