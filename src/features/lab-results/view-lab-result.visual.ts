@@ -25,6 +25,9 @@ test.describe('View Lab Result - Visual Regression', () => {
         { name: 'Hemoglobin', value: 14.5, unit: 'g/dL' },
         { name: 'White Blood Cells', value: 12.4, unit: '10*3/uL' },
         { name: 'Red Blood Cells', value: 3.9 },
+        // Together they add the calculated atherogenic index.
+        { name: 'Triglycerides', value: 0.9, unit: 'mmol/L' },
+        { name: 'HDL', value: 1.93, unit: 'mmol/L' },
       ],
     });
 

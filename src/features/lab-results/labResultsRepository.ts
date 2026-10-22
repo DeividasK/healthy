@@ -3,7 +3,10 @@ import { DiagnosticReportRecord } from '@/src/database/types';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { assertCatalogObservation } from './biomarkerMeasurements';
+import {
+  assertCatalogObservation,
+  getObservationMarker,
+} from './biomarkerMeasurements';
 import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
 import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
 
@@ -46,6 +49,11 @@ export async function insertDiagnosticReportRecord(
       throw new Error('Observation requires an id to be persisted');
     }
     assertCatalogObservation(obs);
+    // Calculated values without a code are worked out whenever shown.
+    if (!getObservationMarker(obs)?.loinc)
+      throw new Error(
+        `${getObservationMarker(obs)!.name} is calculated and can't be recorded.`
+      );
   }
   const reportId = report.id;
   const db = await getDb();

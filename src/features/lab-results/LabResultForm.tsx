@@ -36,9 +36,9 @@ import {
 } from '@/src/features/organizations/organizationService';
 import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
-  BIOMARKERS,
-  BiomarkerDefinition,
+  RECORDABLE_BIOMARKERS,
   searchBiomarkers,
+  type RecordableBiomarker,
 } from '@/src/data/biomarkers';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -54,7 +54,7 @@ import type { ImportedLabResults } from './labResultsAIImport';
 
 export interface ActiveMarkerItem {
   id: string;
-  definition: BiomarkerDefinition;
+  definition: RecordableBiomarker;
   valueStr: string;
   selectedUnit: string;
   selectedUcum: string;
@@ -230,7 +230,7 @@ export function LabResultForm({
               obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
             const ucum = obs.valueQuantity?.code || unit;
 
-            const def: BiomarkerDefinition = BIOMARKERS.find(
+            const def: RecordableBiomarker = RECORDABLE_BIOMARKERS.find(
               (m) => m.loinc === loinc
             ) || {
               id: `marker_${loinc}`,
@@ -290,7 +290,9 @@ export function LabResultForm({
     const existingLoincs = new Set(
       activeItems.map((item) => item.definition.loinc)
     );
-    const available = BIOMARKERS.filter((m) => !existingLoincs.has(m.loinc));
+    const available = RECORDABLE_BIOMARKERS.filter(
+      (m) => !existingLoincs.has(m.loinc)
+    );
     if (!searchQuery.trim()) {
       return available;
     }
@@ -322,7 +324,7 @@ export function LabResultForm({
     setShowAIImport(false);
   };
 
-  const handleSelectBiomarker = (marker: BiomarkerDefinition) => {
+  const handleSelectBiomarker = (marker: RecordableBiomarker) => {
     const defaultUnit = marker.units[0];
     const newItem: ActiveMarkerItem = {
       id: marker.id,

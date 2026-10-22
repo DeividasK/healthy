@@ -29,9 +29,73 @@ export const test = chromaticTest.extend({
   },
 });
 
+/** Waits two frames, so layout and resize handlers have settled. */
+const nextFrames = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
+
+const PAGE_HEIGHT_STYLE_ID = 'visual-test-page-height';
+
 /**
- * Captures a Chromatic snapshot. Set `VISUAL_PNG_DIR` to also save a local
- * full-page PNG per snapshot, for comparing states without publishing.
+ * Makes the page as tall as its content, never shorter than the viewport.
+ * Screens scroll inside their own containers, so a snapshot would otherwise
+ * show only the first screenful. The viewport keeps its size, so each
+ * snapshot keeps its Chromatic mode (w360h740) and baseline.
+ */
+async function growPageToContent(page: Page) {
+  // A few rounds, as a taller page can render more (e.g. lists).
+  for (let round = 0; round < 5; round++) {
+    const hidden = await page.evaluate(() =>
+      Math.max(
+        0,
+        ...[...document.querySelectorAll<HTMLElement>('*')]
+          .filter(
+            (element) =>
+              element.clientHeight > 0 &&
+              /auto|scroll/.test(getComputedStyle(element).overflowY)
+          )
+          .map((element) => element.scrollHeight - element.clientHeight)
+      )
+    );
+    if (hidden <= 1) return;
+    await page.evaluate(
+      ({ id, hidden }) => {
+        let style = document.getElementById(id);
+        if (!style) {
+          style = document.createElement('style');
+          style.id = id;
+          document.head.appendChild(style);
+        }
+        const height =
+          Number(style.dataset.height || window.innerHeight) +
+          Math.ceil(hidden);
+        style.dataset.height = String(height);
+        style.textContent = `html, body, #root { height: ${height}px !important; }`;
+      },
+      { id: PAGE_HEIGHT_STYLE_ID, hidden }
+    );
+    await nextFrames(page);
+  }
+}
+
+/** Returns the page to the viewport's height for the rest of the test. */
+async function resetPageHeight(page: Page) {
+  await page.evaluate(
+    (id) => document.getElementById(id)?.remove(),
+    PAGE_HEIGHT_STYLE_ID
+  );
+  await nextFrames(page);
+}
+
+/**
+ * Captures a Chromatic snapshot of the whole page: the page grows to fit its
+ * content for the snapshot, then returns to the viewport's height. Set
+ * `VISUAL_PNG_DIR` to also save a local full-page PNG per snapshot, for
+ * comparing states without publishing.
  *
  * Snapshots show no focused or hovered field. Chromatic re-renders the
  * captured page and does not reliably keep focus, so a focus ring would land
@@ -70,12 +134,14 @@ export async function takeSnapshot(
     await page.waitForTimeout(200);
     await blurAll();
   }
+  await growPageToContent(page);
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {
     const file = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     await page.screenshot({ path: `${pngDir}/${file}.png`, fullPage: true });
   }
+  await resetPageHeight(page);
 }
 /**
  * Waits until a dock menu toggle has settled open (x) or closed (+), so a
@@ -92,8 +158,24 @@ export async function waitForMenuToggle(
   );
 }
 
-/** Waits for a sync round to finish and its header checkmark to clear. */
+/**
+ * Waits for the sync the app starts when it loads with a synced profile to
+ * finish, and its header checkmark to clear. Checking only for no indicator
+ * passes before that sync has started, and the checkmark shows for only a
+ * second, so this waits for the time the app saves when a sync finishes.
+ */
 export async function waitForSyncIdle(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        // The bridge installs once the reloaded app mounts.
+        async () =>
+          (await (
+            window as any
+          ).__HEALTHY_TEST_BRIDGE__?.lastSyncTimestamp()) ?? null
+      )
+    )
+    .not.toBeNull();
   await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 }
 

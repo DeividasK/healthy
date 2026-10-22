@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { BIOMARKERS } from '@/src/data/biomarkers';
+import { BIOMARKERS, RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 import {
   buildLabResultsAIInstructions,
   parseLabResultsAIReply,
@@ -7,13 +7,16 @@ import {
 
 const today = new Date(2026, 9, 22);
 
-test('instructions describe the reply format and list every test with its units', () => {
+test('instructions describe the reply format and list every recordable test with its units', () => {
   const instructions = buildLabResultsAIInstructions();
   expect(instructions).toContain('"healthyLabResults": 1');
-  for (const marker of BIOMARKERS) {
+  for (const marker of RECORDABLE_BIOMARKERS) {
     expect(instructions).toContain(`- ${marker.id}: ${marker.name}`);
     for (const unit of marker.units) expect(instructions).toContain(unit.label);
   }
+  // Calculated tests without a code are worked out, never imported.
+  for (const marker of BIOMARKERS.filter(({ loinc }) => !loinc))
+    expect(instructions).not.toContain(`- ${marker.id}:`);
 });
 
 test('reads results from a reply with a note and a fenced code block', () => {

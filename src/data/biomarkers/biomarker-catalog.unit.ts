@@ -12,19 +12,42 @@ function hasValidLoincCheckDigit(loinc: string): boolean {
   return (10 - (sum % 10)) % 10 === Number(match[2]);
 }
 
-test('lists 216 biomarkers with unique ids, codes and names', () => {
-  expect(BIOMARKERS).toHaveLength(216);
-  for (const key of ['id', 'loinc', 'name'] as const)
+test('lists 220 biomarkers with unique ids, codes and names', () => {
+  expect(BIOMARKERS).toHaveLength(220);
+  for (const key of ['id', 'name'] as const)
     expect(new Set(BIOMARKERS.map((marker) => marker[key])).size).toBe(
       BIOMARKERS.length
     );
+  const codes = BIOMARKERS.flatMap(({ loinc }) => loinc ?? []);
+  expect(new Set(codes).size).toBe(codes.length);
+});
+
+test('only calculated biomarkers go without a LOINC code', () => {
+  expect(
+    BIOMARKERS.filter(({ loinc, calculation }) => !loinc && !calculation).map(
+      ({ id }) => id
+    )
+  ).toEqual([]);
+});
+
+test('calculated biomarkers use catalog inputs and their units', () => {
+  for (const { id, calculation } of BIOMARKERS)
+    for (const input of calculation?.inputs ?? [])
+      for (const inputId of [input.id].flat()) {
+        const source = BIOMARKERS.find((marker) => marker.id === inputId);
+        expect(source, `${id}: ${inputId}`).toBeDefined();
+        expect(
+          source!.units.map((unit) => unit.label),
+          `${id}: ${inputId}`
+        ).toContain(input.unit);
+      }
 });
 
 test('every LOINC code has a valid check digit', () => {
   expect(
-    BIOMARKERS.filter(({ loinc }) => !hasValidLoincCheckDigit(loinc)).map(
-      ({ id, loinc }) => `${id}: ${loinc}`
-    )
+    BIOMARKERS.filter(
+      ({ loinc }) => loinc !== undefined && !hasValidLoincCheckDigit(loinc)
+    ).map(({ id, loinc }) => `${id}: ${loinc}`)
   ).toEqual([]);
 });
 

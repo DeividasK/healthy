@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  Calculator,
   Calendar,
   ChevronDown,
   CircleDot,
@@ -24,11 +25,19 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ResourceSection } from '@/src/components/ResourceSection';
-import { BiomarkerValueRow } from '@/src/features/home/BiomarkerResultRow';
+import {
+  BiomarkerResultRow,
+  BiomarkerValueRow,
+  getBiomarkerRouteId,
+} from '@/src/features/home/BiomarkerResultRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
-import { BIOMARKERS } from '@/src/data/biomarkers';
+import {
+  isCalculatedObservation,
+  withCalculatedObservations,
+} from './calculatedBiomarkers';
+import { BIOMARKERS, type BiomarkerCalculation } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
@@ -63,6 +72,7 @@ type Measurement = {
   range?: MeasurementReferenceRange;
   /** Whether the laboratory reported the range, rather than the catalog. */
   reportedRange: boolean;
+  observation: Observation;
 };
 
 /** Resolves a readable name from the observation's coding or text. */
@@ -72,6 +82,16 @@ function getObservationName(observation: Observation) {
     observation.code?.text ||
     'Biomarker'
   );
+}
+
+/** Gives a calculated biomarker's formula and names its inputs. */
+function describeCalculation({ inputs, formula }: BiomarkerCalculation) {
+  const names = inputs.map(({ id }) =>
+    (typeof id === 'string' ? [id] : id)
+      .map((input) => BIOMARKERS.find((marker) => marker.id === input)!.name)
+      .join(' or ')
+  );
+  return `Worked out as ${formula}, from your ${names.join(' and ')} results in the same report:`;
 }
 
 /** Shows patient-scoped biomarker history with compatible units and education. */
@@ -89,7 +109,10 @@ export function BiomarkerDetailView() {
   });
   const loadGeneration = useRef(0);
   const isCurrentPatient = history.patientId === activePatientId;
-  const reports = isCurrentPatient && activePatientId ? history.reports : [];
+  const reports = useMemo(
+    () => (isCurrentPatient && activePatientId ? history.reports : []),
+    [isCurrentPatient, activePatientId, history.reports]
+  );
   const isLoading =
     isPatientLoading ||
     (!!activePatientId && (!isCurrentPatient || history.isLoading));
@@ -139,7 +162,7 @@ export function BiomarkerDetailView() {
 
   const measurements = useMemo(() => {
     const matches: Measurement[] = [];
-    for (const record of reports) {
+    for (const record of withCalculatedObservations(reports)) {
       const reportDate = record.report.effectiveDateTime || '';
       for (const observation of record.observations) {
         if (!isSupportedObservation(observation)) continue;
@@ -147,7 +170,7 @@ export function BiomarkerDetailView() {
         const displayName = getObservationName(observation);
         const name = displayName.toLowerCase();
         const isMatch = marker
-          ? code === marker.loinc ||
+          ? (marker.loinc !== undefined && code === marker.loinc) ||
             marker.aliases.some((alias) => name === alias.toLowerCase()) ||
             name === marker.name.toLowerCase()
           : (code !== 'custom' && code === id) ||
@@ -174,6 +197,7 @@ export function BiomarkerDetailView() {
               demographics
             ),
             reportedRange: Boolean(observation.referenceRange?.length),
+            observation,
           });
         }
       }
@@ -182,6 +206,17 @@ export function BiomarkerDetailView() {
   }, [id, marker, reports, demographics]);
 
   const latestMeasurement = measurements[measurements.length - 1];
+  /** The recorded results the latest calculated value was worked out from. */
+  const latestSources = useMemo(() => {
+    const references = new Set(
+      latestMeasurement?.observation.derivedFrom?.map(
+        ({ reference }) => reference
+      )
+    );
+    return reports
+      .flatMap(({ observations }) => observations)
+      .filter(({ id }) => references.has(`Observation/${id}`));
+  }, [latestMeasurement, reports]);
   const chartMeasurements = useMemo(
     () =>
       latestMeasurement
@@ -242,8 +277,17 @@ export function BiomarkerDetailView() {
               },
             ]
           : []),
-        ...(marker
+        ...(marker?.loinc
           ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
+          : []),
+        ...(isCalculatedObservation(latestMeasurement.observation)
+          ? [
+              {
+                icon: Calculator,
+                text: 'Calculated',
+                testID: 'biomarker-calculated',
+              },
+            ]
           : []),
       ]}
       actions={
@@ -301,6 +345,27 @@ export function BiomarkerDetailView() {
           testID="biomarker-latest-range"
         />
       </View>
+      {marker?.calculation && latestSources.length > 0 && (
+        <ResourceSection
+          icon={Calculator}
+          title="Calculated from"
+          testID="biomarker-calculation"
+        >
+          <Text
+            style={[styles.description, styles.calculationText]}
+            testID="biomarker-calculation-formula"
+          >
+            {describeCalculation(marker.calculation)}
+          </Text>
+          {latestSources.map((source) => (
+            <BiomarkerResultRow
+              key={source.id}
+              observation={source}
+              testID={`biomarker-source-result-${getBiomarkerRouteId(source)}`}
+            />
+          ))}
+        </ResourceSection>
+      )}
       {marker && (
         <View style={styles.section} testID="biomarker-range">
           <Text style={styles.sectionTitle}>Reference range</Text>
@@ -358,6 +423,7 @@ export function BiomarkerDetailView() {
                 unit={measurement.unit}
                 low={measurement.range?.low}
                 high={measurement.range?.high}
+                calculated={isCalculatedObservation(measurement.observation)}
                 accessibilityLabel={`View lab result: ${formatDisplayDate(measurement.date)}`}
                 testID={`biomarker-history-${measurement.id}`}
                 rangeTestID={`biomarker-history-range-${measurement.id}`}
@@ -769,5 +835,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
   },
+  calculationText: { marginBottom: 12 },
   chart: { maxWidth: 600 },
 });

@@ -1,5 +1,6 @@
 import {
   EMPTY_BIOMARKER_EDUCATION,
+  type BiomarkerCalculation,
   type BiomarkerCategory,
   type BiomarkerDefinition,
   type DemographicRange,
@@ -18,7 +19,7 @@ export interface BiomarkerEntry {
   id: string;
   name: string;
   aliases?: string[];
-  loinc: string;
+  loinc?: string;
   /** The first unit is the primary one, in which `range` is given. */
   units: UnitOption[];
   /** The general adult range, used when no `ranges` entry applies. */
@@ -27,6 +28,7 @@ export interface BiomarkerEntry {
   ranges?: DemographicRange[];
   rangeNote?: string;
   description: string;
+  calculation?: BiomarkerCalculation;
 }
 
 function rangeText(
@@ -54,11 +56,12 @@ export function defineBiomarkers(
       ranges,
       rangeNote,
       description,
+      calculation,
     }) => ({
       id,
       name,
       aliases,
-      loinc,
+      ...(loinc && { loinc }),
       category,
       primaryUnit: units[0].label,
       ucumCode: units[0].ucum,
@@ -70,6 +73,7 @@ export function defineBiomarkers(
       ...(rangeNote && { rangeNote }),
       description,
       education: { ...EMPTY_BIOMARKER_EDUCATION },
+      ...(calculation && { calculation }),
     })
   );
 }
