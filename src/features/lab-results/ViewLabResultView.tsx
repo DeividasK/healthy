@@ -28,7 +28,7 @@ import {
 } from './biomarkerMeasurements';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { useRangeDemographics } from './useRangeDemographics';
-import { getLabResultMeta, getLabResultTitle } from './labResultMeta';
+import { getLabResultMeta, LAB_RESULT_TITLE } from './labResultMeta';
 import { goBackOr } from '@/src/utils/navigation';
 
 export function ViewLabResultView() {
@@ -141,7 +141,7 @@ function LabResultForPatient({
   return (
     <ResourceViewLayout
       testID="lab-result-view"
-      title={getLabResultTitle(report)}
+      title={LAB_RESULT_TITLE}
       titleTestID="lab-result-title"
       meta={getLabResultMeta(report, { withTestIDs: true })}
       actions={

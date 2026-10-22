@@ -146,7 +146,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(page).toHaveURL(/lab-result\/[^/]+$/);
         reportId = new URL(page.url()).pathname.split('/').pop()!;
         await expect(page.getByTestId('lab-result-title')).toHaveText(
-          'Complete blood count (hemogram) panel - Blood by Automated count'
+          'Lab report'
         );
         await expect(page.getByTestId('lab-result-date')).toContainText(
           'Sep 20, 2026'

@@ -78,6 +78,33 @@ test('migration v21 corrects stored codes and drops copied default ranges', asyn
     byName['White Blood Cells (WBC)'].resource.referenceRange[0].low.value
   ).toBe(4);
 
+  // New reports are general laboratory reports.
+  const [report] = await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+      "SELECT json_extract(fhir_json, '$.code') AS code FROM diagnostic_reports"
+    )
+  );
+  expect(JSON.parse(report.code)).toEqual({
+    coding: [
+      {
+        system: 'http://loinc.org',
+        code: '11502-2',
+        display: 'Laboratory report',
+      },
+    ],
+    text: 'Lab report',
+  });
+
+  // A report stored as a complete blood count panel is called "Lab report" too.
+  await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
+      `UPDATE diagnostic_reports SET fhir_json = json_set(fhir_json, '$.code',
+         json('{"coding":[{"system":"http://loinc.org","code":"58410-2","display":"Complete blood count (hemogram) panel - Blood by Automated count"}],"text":"Complete blood count (hemogram) panel - Blood by Automated count"}'))`
+    )
+  );
+  await openRoute(page, '/lab-result/legacy-report');
+  await expect(page.getByTestId('lab-result-title')).toHaveText('Lab report');
+
   // The results open under their corrected codes.
   await openRoute(page, '/biomarker/770-8');
   await expect(page.getByTestId('biomarker-title')).toHaveText(

@@ -7,9 +7,7 @@ import { COMMON_BIOMARKERS } from './common';
 import type { BiomarkerDefinition } from './types';
 
 export * from './types';
-export { CBC_MARKERS };
 
-export const CBC_PANEL_LOINC = '58410-2'; // Complete blood count (hemogram) panel - Blood by Automated count
 export const GENERAL_LAB_REPORT_LOINC = '11502-2'; // Laboratory report
 
 export const BIOMARKERS: BiomarkerDefinition[] = [
