@@ -76,6 +76,10 @@ test.describe('View Condition', () => {
       biomarkers: [{ name: 'Hemoglobin', value: 13.9, unit: 'g/dL' }],
     });
 
+    await page.getByTestId('condition-timeline-filter-button').click();
+    await page.getByTestId('condition-timeline-filters-reset').click();
+    await page.getByTestId('condition-timeline-filters-done').click();
+
     // Saved steps appear without leaving the screen, newest first by month;
     // on one day, outcomes sit above the visit that produced them.
     const timeline = page.getByTestId('condition-timeline');
@@ -125,6 +129,9 @@ test.describe('View Condition', () => {
       ['treatment', ibuprofen.id, 'treatment-title', 'Ibuprofen 400mg'],
       ['lab-result', report.report.id, 'lab-result-title', 'Lab report'],
     ]) {
+      await page.getByTestId('condition-timeline-filter-button').click();
+      await page.getByTestId('condition-timeline-filters-reset').click();
+      await page.getByTestId('condition-timeline-filters-done').click();
       await page.getByTestId(`condition-timeline-item-${type}-${id}`).click();
       await expect(page.getByTestId(titleTestID)).toHaveText(title);
       await page.goBack();
@@ -166,8 +173,9 @@ test.describe('View Condition', () => {
     const rows = timeline.getByTestId(/^condition-timeline-item-.*-row$/);
     const count = timeline.getByTestId('condition-timeline-count');
     const button = page.getByTestId('condition-timeline-filter-button');
-    await expect(count).toHaveText('4');
-    await expect(button).toHaveAccessibleName('Filter timeline');
+    await expect(count).toHaveText('2');
+    await expect(rows).toHaveText([/MRI review/, /Knee MRI/]);
+    await expect(button).toHaveAccessibleName('Filter timeline, filters on');
 
     // Status and type chips narrow the steps as they are picked
     await button.click();
@@ -182,8 +190,9 @@ test.describe('View Condition', () => {
       'Service requests',
       'Treatments',
     ]);
-    await page.getByTestId('condition-timeline-filter-tone-planned').click();
-    await page.getByTestId('condition-timeline-filter-tone-active').click();
+    await expect(
+      page.getByTestId('condition-timeline-filter-tone-planned')
+    ).toHaveAttribute('aria-checked', 'true');
     await expect(
       page.getByTestId('condition-timeline-filter-tone-active')
     ).toHaveAttribute('aria-checked', 'true');
@@ -205,6 +214,7 @@ test.describe('View Condition', () => {
     await button.click();
     await page.getByTestId('condition-timeline-filters-reset').click();
     await expect(rows).toHaveCount(4);
+    await expect(button).toHaveAccessibleName('Filter timeline');
     await page
       .getByTestId('condition-timeline-filter-period')
       .selectOption('past3');

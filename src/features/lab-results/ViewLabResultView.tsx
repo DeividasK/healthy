@@ -9,10 +9,7 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { BiomarkerStatusGrid } from '@/src/components/BiomarkerStatusGrid';
-import {
-  getBiomarkerName,
-  getBiomarkerRouteId,
-} from '@/src/features/home/BiomarkerResultRow';
+import { getBiomarkerName } from '@/src/features/home/BiomarkerResultRow';
 import { BiomarkerStatusGroups } from '@/src/features/home/BiomarkerStatusGroups';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
@@ -182,19 +179,7 @@ function LabResultForPatient({
       >
         {results.length > 0 && (
           <>
-            <BiomarkerStatusGrid
-              items={results}
-              testID="lab-result-grid"
-              onPressItem={(observationId) => {
-                const observation = results.find(
-                  (result) => result.id === observationId
-                )!.observation;
-                router.push({
-                  pathname: '/biomarker/[id]',
-                  params: { id: getBiomarkerRouteId(observation) },
-                });
-              }}
-            />
+            <BiomarkerStatusGrid items={results} testID="lab-result-grid" />
             <RangeProfileNotice
               missing={missing}
               testID="lab-result-range-notice"

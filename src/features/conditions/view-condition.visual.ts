@@ -117,8 +117,6 @@ test.describe('View Condition View - Visual Regression', () => {
       testInfo
     );
     await page.getByTestId('condition-timeline-filter-button').click();
-    await page.getByTestId('condition-timeline-filter-tone-planned').click();
-    await page.getByTestId('condition-timeline-filter-tone-active').click();
     await takeSnapshot(page, 'Condition View - Timeline filters', testInfo);
     await page.getByTestId('condition-timeline-filters-done').click();
     await page

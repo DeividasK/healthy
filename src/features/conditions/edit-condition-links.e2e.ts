@@ -71,6 +71,9 @@ test.describe('Edit Condition links', () => {
       { concept: { text: 'Attacks' } },
       { reference: { reference } },
     ]);
+    await page.getByTestId('condition-timeline-filter-button').click();
+    await page.getByTestId('condition-timeline-filters-reset').click();
+    await page.getByTestId('condition-timeline-filters-done').click();
     await expect(
       page.getByTestId(`condition-timeline-item-consultation-${visit.id}`)
     ).toBeVisible();

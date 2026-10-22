@@ -163,7 +163,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
           page.getByTestId('lab-result-results-section-count')
         ).toHaveText('2');
         await expect(
-          results.getByTestId('lab-result-grid-squares').getByRole('button')
+          results.getByTestId('lab-result-grid-squares').getByRole('img')
         ).toHaveCount(2);
         await expect(
           results.getByTestId('lab-result-groups-inRange-count')
