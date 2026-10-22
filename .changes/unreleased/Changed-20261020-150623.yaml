@@ -1,3 +1,0 @@
-kind: Changed
-body: Healthy shows its header the moment it opens, with placeholder rows while your records load, instead of a blank page and spinners.
-time: 2026-10-20T15:06:23.041470792Z
