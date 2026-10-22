@@ -38,19 +38,20 @@ const nextFrames = (page: Page) =>
       )
   );
 
+const PAGE_HEIGHT_STYLE_ID = 'visual-test-page-height';
+
 /**
- * Grows the viewport until no vertical scroll area hides content, and
- * returns the original size. Screens scroll inside their own containers, so
- * Chromatic, which captures at the snapshot's viewport, would otherwise show
- * only the first screenful.
+ * Makes the page as tall as its content, never shorter than the viewport.
+ * Screens scroll inside their own containers, so a snapshot would otherwise
+ * show only the first screenful. The viewport keeps its size, so each
+ * snapshot keeps its Chromatic mode (w360h740) and baseline.
  */
-async function fitViewportToContent(page: Page) {
-  const original = page.viewportSize()!;
-  // A few rounds, as a taller viewport can render more (e.g. lists).
+async function growPageToContent(page: Page) {
+  // A few rounds, as a taller page can render more (e.g. lists).
   for (let round = 0; round < 5; round++) {
     const hidden = await page.evaluate(() =>
       Math.max(
-        document.documentElement.scrollHeight - window.innerHeight,
+        0,
         ...[...document.querySelectorAll<HTMLElement>('*')]
           .filter(
             (element) =>
@@ -60,19 +61,39 @@ async function fitViewportToContent(page: Page) {
           .map((element) => element.scrollHeight - element.clientHeight)
       )
     );
-    if (hidden <= 1) break;
-    await page.setViewportSize({
-      width: original.width,
-      height: page.viewportSize()!.height + Math.ceil(hidden),
-    });
+    if (hidden <= 1) return;
+    await page.evaluate(
+      ({ id, hidden }) => {
+        let style = document.getElementById(id);
+        if (!style) {
+          style = document.createElement('style');
+          style.id = id;
+          document.head.appendChild(style);
+        }
+        const height =
+          Number(style.dataset.height || window.innerHeight) +
+          Math.ceil(hidden);
+        style.dataset.height = String(height);
+        style.textContent = `html, body, #root { height: ${height}px !important; }`;
+      },
+      { id: PAGE_HEIGHT_STYLE_ID, hidden }
+    );
     await nextFrames(page);
   }
-  return original;
+}
+
+/** Returns the page to the viewport's height for the rest of the test. */
+async function resetPageHeight(page: Page) {
+  await page.evaluate(
+    (id) => document.getElementById(id)?.remove(),
+    PAGE_HEIGHT_STYLE_ID
+  );
+  await nextFrames(page);
 }
 
 /**
- * Captures a Chromatic snapshot of the whole page: the viewport grows to fit
- * the content for the snapshot, then returns to its size. Set
+ * Captures a Chromatic snapshot of the whole page: the page grows to fit its
+ * content for the snapshot, then returns to the viewport's height. Set
  * `VISUAL_PNG_DIR` to also save a local full-page PNG per snapshot, for
  * comparing states without publishing.
  *
@@ -113,15 +134,14 @@ export async function takeSnapshot(
     await page.waitForTimeout(200);
     await blurAll();
   }
-  const viewport = await fitViewportToContent(page);
+  await growPageToContent(page);
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {
     const file = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     await page.screenshot({ path: `${pngDir}/${file}.png`, fullPage: true });
   }
-  await page.setViewportSize(viewport);
-  await nextFrames(page);
+  await resetPageHeight(page);
 }
 /**
  * Waits until a dock menu toggle has settled open (x) or closed (+), so a
