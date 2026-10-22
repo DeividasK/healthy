@@ -448,6 +448,38 @@ test.describe('Biomarker detail', () => {
       page.getByTestId('lab-result-results-section-count')
     ).toHaveText('1');
 
+    // A standard value is always worked out from its inputs; recorded, it
+    // still shows for reports without them.
+    await seedTestReport(page, {
+      id: 'ratio-with-inputs',
+      date: '2026-08-01',
+      biomarkers: [
+        { name: 'Total Cholesterol', value: 200, unit: 'mg/dL' },
+        { name: 'HDL', value: 50, unit: 'mg/dL' },
+        { name: 'Cholesterol/HDL Ratio', value: 9, unit: 'ratio' },
+      ],
+    });
+    await seedTestReport(page, {
+      id: 'ratio-alone',
+      date: '2026-07-01',
+      biomarkers: [
+        { name: 'Cholesterol/HDL Ratio', value: 3.5, unit: 'ratio' },
+      ],
+    });
+    await openRoute(page, '/biomarker/9830-1');
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('4');
+    await expect(page.getByTestId('biomarker-calculated')).toHaveText(
+      'Calculated'
+    );
+    await expect(page.getByTestId('biomarker-loinc')).toHaveText('9830-1');
+    await expect(results).toHaveText([/^Aug 1, 20264/, /^Jul 1, 20263\.5/]);
+    // Only the worked-out value is marked as calculated.
+    await expect(
+      page
+        .getByTestId('biomarker-history-list')
+        .locator('[data-testid$="-calculated"]')
+    ).toHaveCount(1);
+
     // It can't be recorded: the form only offers tests a report can hold.
     await openRoute(page, '/lab-result/add');
     await page.getByTestId('test-search-input').fill('Atherogenic');

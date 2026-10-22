@@ -10,6 +10,7 @@ import {
   getObservationReferenceRange,
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import { isCalculatedObservation } from '@/src/features/lab-results/calculatedBiomarkers';
 
 /**
  * Route id of an observation's biomarker page: its catalog test's key, else
@@ -115,7 +116,7 @@ export function BiomarkerResultRow({
   return (
     <BiomarkerValueRow
       title={name}
-      calculated={Boolean(getObservationMarker(observation)?.calculation)}
+      calculated={isCalculatedObservation(observation)}
       value={observation.valueQuantity?.value}
       unit={
         observation.valueQuantity?.unit || observation.valueQuantity?.code || ''

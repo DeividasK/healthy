@@ -33,7 +33,10 @@ import {
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
-import { withCalculatedObservations } from './calculatedBiomarkers';
+import {
+  isCalculatedObservation,
+  withCalculatedObservations,
+} from './calculatedBiomarkers';
 import { BIOMARKERS, type BiomarkerCalculation } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
@@ -83,8 +86,10 @@ function getObservationName(observation: Observation) {
 
 /** Gives a calculated biomarker's formula and names its inputs. */
 function describeCalculation({ inputs, formula }: BiomarkerCalculation) {
-  const names = inputs.map(
-    ({ id }) => BIOMARKERS.find((marker) => marker.id === id)!.name
+  const names = inputs.map(({ id }) =>
+    (typeof id === 'string' ? [id] : id)
+      .map((input) => BIOMARKERS.find((marker) => marker.id === input)!.name)
+      .join(' or ')
   );
   return `Worked out as ${formula}, from your ${names.join(' and ')} results in the same report:`;
 }
@@ -275,7 +280,7 @@ export function BiomarkerDetailView() {
         ...(marker?.loinc
           ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
           : []),
-        ...(marker?.calculation
+        ...(isCalculatedObservation(latestMeasurement.observation)
           ? [
               {
                 icon: Calculator,
@@ -340,7 +345,7 @@ export function BiomarkerDetailView() {
           testID="biomarker-latest-range"
         />
       </View>
-      {marker?.calculation && (
+      {marker?.calculation && latestSources.length > 0 && (
         <ResourceSection
           icon={Calculator}
           title="Calculated from"
@@ -418,7 +423,7 @@ export function BiomarkerDetailView() {
                 unit={measurement.unit}
                 low={measurement.range?.low}
                 high={measurement.range?.high}
-                calculated={Boolean(marker?.calculation)}
+                calculated={isCalculatedObservation(measurement.observation)}
                 accessibilityLabel={`View lab result: ${formatDisplayDate(measurement.date)}`}
                 testID={`biomarker-history-${measurement.id}`}
                 rangeTestID={`biomarker-history-range-${measurement.id}`}

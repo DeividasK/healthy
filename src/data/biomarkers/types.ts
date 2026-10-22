@@ -41,15 +41,20 @@ export interface DemographicRange {
 }
 
 /**
- * How the app works a biomarker out from other results in the same report,
- * rather than recording it.
+ * How the app works a biomarker out from other results in the same report
+ * with a standard formula. Whenever a report has the inputs, the calculated
+ * value replaces any recorded one; a recorded value without its inputs is
+ * still shown.
  */
 export interface BiomarkerCalculation {
-  /** Catalog ids of the results it needs, with the unit each is converted to. */
-  inputs: { id: string; unit: string }[];
+  /**
+   * The results it needs, each with the unit it is converted to. A list of
+   * ids takes the first the report has, e.g. direct LDL before calculated.
+   */
+  inputs: { id: string | string[]; unit: string }[];
   /** The formula, as shown on the biomarker page. */
   formula: string;
-  /** Works the value out from the inputs' values, in the order given. */
+  /** Works the value out, in the primary unit, from the inputs' values in the order given. */
   calculate: (values: number[]) => number;
 }
 

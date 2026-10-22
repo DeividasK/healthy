@@ -49,8 +49,8 @@ export async function insertDiagnosticReportRecord(
       throw new Error('Observation requires an id to be persisted');
     }
     assertCatalogObservation(obs);
-    // Calculated values are worked out from other results whenever shown.
-    if (getObservationMarker(obs)?.calculation)
+    // Calculated values without a code are worked out whenever shown.
+    if (!getObservationMarker(obs)?.loinc)
       throw new Error(
         `${getObservationMarker(obs)!.name} is calculated and can't be recorded.`
       );

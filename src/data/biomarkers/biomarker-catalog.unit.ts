@@ -32,14 +32,15 @@ test('only calculated biomarkers go without a LOINC code', () => {
 
 test('calculated biomarkers use catalog inputs and their units', () => {
   for (const { id, calculation } of BIOMARKERS)
-    for (const input of calculation?.inputs ?? []) {
-      const source = BIOMARKERS.find((marker) => marker.id === input.id);
-      expect(source, `${id}: ${input.id}`).toBeDefined();
-      expect(
-        source!.units.map((unit) => unit.label),
-        `${id}: ${input.id}`
-      ).toContain(input.unit);
-    }
+    for (const input of calculation?.inputs ?? [])
+      for (const inputId of [input.id].flat()) {
+        const source = BIOMARKERS.find((marker) => marker.id === inputId);
+        expect(source, `${id}: ${inputId}`).toBeDefined();
+        expect(
+          source!.units.map((unit) => unit.label),
+          `${id}: ${inputId}`
+        ).toContain(input.unit);
+      }
 });
 
 test('every LOINC code has a valid check digit', () => {

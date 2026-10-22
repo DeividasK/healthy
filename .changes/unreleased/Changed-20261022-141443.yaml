@@ -1,0 +1,3 @@
+kind: Changed
+body: Values with a standard formula, such as cholesterol ratios, non-HDL cholesterol, globulin, transferrin saturation, HOMA-IR and the Free Androgen Index, are now worked out from the results in the same report so they always agree with them. A value your lab reported without those results still shows.
+time: 2026-10-22T14:14:43.457190126Z

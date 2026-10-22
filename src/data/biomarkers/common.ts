@@ -140,6 +140,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       range: { low: 10, high: 20 },
       description: 'Compares urea nitrogen with creatinine.',
+      calculation: {
+        inputs: [
+          { id: 'bun', unit: 'mg/dL' },
+          { id: 'creatinine', unit: 'mg/dL' },
+        ],
+        formula: 'BUN ÷ creatinine, both in mg/dL',
+        calculate: ([bun, creatinine]) => bun / creatinine,
+      },
     },
     {
       id: 'sodium',
@@ -268,6 +276,14 @@ export const COMMON_BIOMARKERS = [
       units: [u('g/dL'), u('g/L', 10)],
       range: { low: 2.0, high: 3.5 },
       description: 'Proteins including antibodies and carriers.',
+      calculation: {
+        inputs: [
+          { id: 'total_protein', unit: 'g/dL' },
+          { id: 'albumin', unit: 'g/dL' },
+        ],
+        formula: 'total protein − albumin',
+        calculate: ([protein, albumin]) => protein - albumin,
+      },
     },
     {
       id: 'albumin_globulin_ratio',
@@ -277,6 +293,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       range: { low: 1.1, high: 2.5 },
       description: 'Compares albumin with globulins.',
+      calculation: {
+        inputs: [
+          { id: 'total_protein', unit: 'g/dL' },
+          { id: 'albumin', unit: 'g/dL' },
+        ],
+        formula: 'albumin ÷ (total protein − albumin)',
+        calculate: ([protein, albumin]) => albumin / (protein - albumin),
+      },
     },
     {
       id: 'uric_acid',
@@ -411,6 +435,14 @@ export const COMMON_BIOMARKERS = [
       units: [u('mg/dL'), u('umol/L', 17.1)],
       range: { low: 0.2, high: 0.8 },
       description: 'Bilirubin not yet processed by the liver.',
+      calculation: {
+        inputs: [
+          { id: 'bilirubin_total', unit: 'mg/dL' },
+          { id: 'bilirubin_direct', unit: 'mg/dL' },
+        ],
+        formula: 'total bilirubin − direct bilirubin',
+        calculate: ([total, direct]) => total - direct,
+      },
     },
     {
       id: 'ldh',
@@ -507,6 +539,14 @@ export const COMMON_BIOMARKERS = [
       units: CHOLESTEROL,
       range: { high: 130 },
       description: 'Total cholesterol minus HDL.',
+      calculation: {
+        inputs: [
+          { id: 'cholesterol_total', unit: 'mg/dL' },
+          { id: 'hdl', unit: 'mg/dL' },
+        ],
+        formula: 'total cholesterol − HDL',
+        calculate: ([total, hdl]) => total - hdl,
+      },
     },
     {
       id: 'cholesterol_hdl_ratio',
@@ -521,6 +561,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       range: { high: 5 },
       description: 'Total cholesterol divided by HDL.',
+      calculation: {
+        inputs: [
+          { id: 'cholesterol_total', unit: 'mg/dL' },
+          { id: 'hdl', unit: 'mg/dL' },
+        ],
+        formula: 'total cholesterol ÷ HDL',
+        calculate: ([total, hdl]) => total / hdl,
+      },
     },
     {
       id: 'ldl_hdl_ratio',
@@ -530,6 +578,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       range: { high: 3.5 },
       description: 'LDL cholesterol divided by HDL cholesterol.',
+      calculation: {
+        inputs: [
+          { id: ['ldl_direct', 'ldl_calculated'], unit: 'mg/dL' },
+          { id: 'hdl', unit: 'mg/dL' },
+        ],
+        formula: 'LDL ÷ HDL',
+        calculate: ([ldl, hdl]) => ldl / hdl,
+      },
     },
     {
       id: 'tg_hdl_ratio',
@@ -542,6 +598,14 @@ export const COMMON_BIOMARKERS = [
         'This range is for both values in mg/dL; with mmol/L the ratio is smaller.',
       description:
         'Triglycerides divided by HDL, a marker of insulin resistance.',
+      calculation: {
+        inputs: [
+          { id: 'triglycerides', unit: 'mg/dL' },
+          { id: 'hdl', unit: 'mg/dL' },
+        ],
+        formula: 'triglycerides ÷ HDL, both in mg/dL',
+        calculate: ([triglycerides, hdl]) => triglycerides / hdl,
+      },
     },
     {
       id: 'aip',
@@ -597,6 +661,14 @@ export const COMMON_BIOMARKERS = [
       ],
       description:
         'Balance of particles that clog arteries against protective ones.',
+      calculation: {
+        inputs: [
+          { id: 'apob', unit: 'mg/dL' },
+          { id: 'apoa1', unit: 'mg/dL' },
+        ],
+        formula: 'ApoB ÷ ApoA1',
+        calculate: ([apob, apoa1]) => apob / apoa1,
+      },
     },
     {
       id: 'lpa_mass',
@@ -679,6 +751,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       description:
         'Balance between inflammatory and anti-inflammatory fatty acids.',
+      calculation: {
+        inputs: [
+          { id: 'arachidonic_acid', unit: '%' },
+          { id: 'epa', unit: '%' },
+        ],
+        formula: 'arachidonic acid ÷ EPA',
+        calculate: ([aa, epa]) => aa / epa,
+      },
     },
   ]),
   ...defineBiomarkers('Diabetes', [
@@ -713,6 +793,11 @@ export const COMMON_BIOMARKERS = [
       loinc: '27353-2',
       units: [u('mg/dL'), u('mmol/L', 0.0555)],
       description: 'Average blood sugar estimated from HbA1c.',
+      calculation: {
+        inputs: [{ id: 'hba1c', unit: '%' }],
+        formula: '28.7 × HbA1c (%) − 46.7, in mg/dL',
+        calculate: ([hba1c]) => 28.7 * hba1c - 46.7,
+      },
     },
     {
       id: 'insulin',
@@ -745,6 +830,14 @@ export const COMMON_BIOMARKERS = [
       range: { high: 2 },
       description:
         'Insulin resistance worked out from fasting glucose and insulin.',
+      calculation: {
+        inputs: [
+          { id: 'glucose', unit: 'mmol/L' },
+          { id: 'insulin', unit: 'uIU/mL' },
+        ],
+        formula: 'fasting glucose (mmol/L) × fasting insulin (µIU/mL) ÷ 22.5',
+        calculate: ([glucose, insulin]) => (glucose * insulin) / 22.5,
+      },
     },
     {
       id: 'anhydroglucitol',
@@ -926,6 +1019,14 @@ export const COMMON_BIOMARKERS = [
       units: [u('ug/dL'), u('umol/L', 0.1791)],
       range: { low: 111, high: 343 },
       description: 'Spare iron-carrying capacity in the blood.',
+      calculation: {
+        inputs: [
+          { id: 'tibc', unit: 'ug/dL' },
+          { id: 'iron', unit: 'ug/dL' },
+        ],
+        formula: 'TIBC − iron',
+        calculate: ([tibc, iron]) => tibc - iron,
+      },
     },
     {
       id: 'transferrin_saturation',
@@ -939,6 +1040,14 @@ export const COMMON_BIOMARKERS = [
         { sex: 'female', low: 15, high: 50 },
       ],
       description: 'Share of transferrin carrying iron.',
+      calculation: {
+        inputs: [
+          { id: 'iron', unit: 'ug/dL' },
+          { id: 'tibc', unit: 'ug/dL' },
+        ],
+        formula: '100 × iron ÷ TIBC',
+        calculate: ([iron, tibc]) => (100 * iron) / tibc,
+      },
     },
     {
       id: 'soluble_transferrin_receptor',
@@ -1247,6 +1356,14 @@ export const COMMON_BIOMARKERS = [
       units: RATIO,
       range: { low: 0.26, high: 1.65 },
       description: 'Balance between free kappa and lambda light chains.',
+      calculation: {
+        inputs: [
+          { id: 'free_kappa', unit: 'mg/L' },
+          { id: 'free_lambda', unit: 'mg/L' },
+        ],
+        formula: 'free kappa ÷ free lambda',
+        calculate: ([kappa, lambda]) => kappa / lambda,
+      },
     },
   ]),
   ...defineBiomarkers('Coagulation', [
@@ -1483,6 +1600,14 @@ export const COMMON_BIOMARKERS = [
       ],
       description:
         'Total testosterone divided by SHBG, an estimate of active testosterone.',
+      calculation: {
+        inputs: [
+          { id: 'testosterone_total', unit: 'nmol/L' },
+          { id: 'shbg', unit: 'nmol/L' },
+        ],
+        formula: '100 × total testosterone ÷ SHBG, both in nmol/L',
+        calculate: ([testosterone, shbg]) => (100 * testosterone) / shbg,
+      },
     },
     {
       id: 'estradiol',
@@ -1716,6 +1841,14 @@ export const COMMON_BIOMARKERS = [
       units: PERCENT,
       range: { low: 25 },
       description: 'Share of PSA that is free.',
+      calculation: {
+        inputs: [
+          { id: 'psa_free', unit: 'ng/mL' },
+          { id: 'psa_total', unit: 'ng/mL' },
+        ],
+        formula: '100 × free PSA ÷ total PSA',
+        calculate: ([free, total]) => (100 * free) / total,
+      },
     },
     {
       id: 'cea',

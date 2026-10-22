@@ -14,8 +14,8 @@ test('instructions describe the reply format and list every recordable test with
     expect(instructions).toContain(`- ${marker.id}: ${marker.name}`);
     for (const unit of marker.units) expect(instructions).toContain(unit.label);
   }
-  // Calculated tests are worked out from others, never imported.
-  for (const marker of BIOMARKERS.filter(({ calculation }) => calculation))
+  // Calculated tests without a code are worked out, never imported.
+  for (const marker of BIOMARKERS.filter(({ loinc }) => !loinc))
     expect(instructions).not.toContain(`- ${marker.id}:`);
 });
 

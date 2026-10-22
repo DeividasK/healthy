@@ -15,12 +15,14 @@ export const BIOMARKERS: BiomarkerDefinition[] = [
   ...COMMON_BIOMARKERS,
 ];
 
-/** A biomarker results can record: one with a LOINC code, not calculated. */
+/**
+ * A biomarker results can record: one with a LOINC code. Calculated ones
+ * with a code are recorded for reports that lack their inputs.
+ */
 export type RecordableBiomarker = BiomarkerDefinition & { loinc: string };
 
 export const RECORDABLE_BIOMARKERS = BIOMARKERS.filter(
-  (marker): marker is RecordableBiomarker =>
-    Boolean(marker.loinc) && !marker.calculation
+  (marker): marker is RecordableBiomarker => Boolean(marker.loinc)
 );
 
 /** Route id of a biomarker's page: its LOINC code, else its catalog id. */
