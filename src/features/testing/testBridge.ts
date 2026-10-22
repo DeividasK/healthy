@@ -116,7 +116,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
-import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { BIOMARKERS } from '@/src/data/biomarkers';
 import { convertBiomarkerValue } from '@/src/features/lab-results/biomarkerMeasurements';
 
 async function connectedProvider() {
@@ -417,7 +417,7 @@ export function setupTestBridge(
       const patientId = await resolvePatientId(input.patientId);
       const items = input.biomarkers.map((b) => {
         const query = b.name.toLowerCase().trim();
-        const def = CBC_MARKERS.find(
+        const def = BIOMARKERS.find(
           (m) =>
             m.name.toLowerCase() === query ||
             m.aliases.some((a) => a.toLowerCase() === query) ||
@@ -460,7 +460,9 @@ export function setupTestBridge(
                   ),
           };
         }
-        throw new Error(`Biomarker "${b.name}" is not in the CBC catalog.`);
+        throw new Error(
+          `Biomarker "${b.name}" is not in the biomarker catalog.`
+        );
       });
 
       return await createAndSaveDiagnosticReport({

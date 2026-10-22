@@ -1,8 +1,5 @@
 import type { Observation } from 'fhir/r5';
-import {
-  CBC_MARKERS,
-  type CBCBiomarkerDefinition,
-} from '@/src/data/cbcMarkers';
+import { BIOMARKERS, type BiomarkerDefinition } from '@/src/data/biomarkers';
 
 export type MeasurementStatus = 'Low' | 'Normal' | 'High';
 export type MeasurementReferenceRange = { low?: number; high?: number };
@@ -30,11 +27,11 @@ export function toRangeStatus(
   return status === 'Normal' ? 'inRange' : 'outOfRange';
 }
 
-/** Matches an observation to its CBC catalog definition by code or name. */
+/** Matches an observation to its biomarker catalog definition by code or name. */
 export function getObservationMarker(observation: Observation) {
   const coding = observation.code.coding?.[0];
   const name = (coding?.display || observation.code.text || '').toLowerCase();
-  return CBC_MARKERS.find(
+  return BIOMARKERS.find(
     (marker) =>
       marker.loinc === coding?.code ||
       marker.name.toLowerCase() === name ||
@@ -49,8 +46,8 @@ export function getObservationUnitCode(observation: Observation) {
   );
 }
 
-/** Rejects observations outside the CBC catalog or with unsupported/mismatched units. */
-export function assertCBCObservation(observation: Observation) {
+/** Rejects observations outside the biomarker catalog or with unsupported/mismatched units. */
+export function assertCatalogObservation(observation: Observation) {
   const marker = getObservationMarker(observation);
   if (!marker) {
     const name =
@@ -58,7 +55,7 @@ export function assertCBCObservation(observation: Observation) {
       observation.code.coding?.[0]?.display ||
       observation.code.coding?.[0]?.code ||
       'Unknown';
-    throw new Error(`Biomarker "${name}" is not in the CBC catalog.`);
+    throw new Error(`Biomarker "${name}" is not in the biomarker catalog.`);
   }
   const quantity = observation.valueQuantity;
   const codeUnit = marker.units.find((unit) => unit.ucum === quantity?.code);
@@ -83,10 +80,10 @@ export function assertCBCObservation(observation: Observation) {
   }
 }
 
-/** Checks whether an existing result can be displayed under the CBC-only policy. */
-export function isSupportedCBCObservation(observation: Observation) {
+/** Checks whether an existing result is in the catalog with a supported unit, so it can be displayed. */
+export function isSupportedObservation(observation: Observation) {
   try {
-    assertCBCObservation(observation);
+    assertCatalogObservation(observation);
     return true;
   } catch {
     return false;
@@ -98,7 +95,7 @@ export function convertBiomarkerValue(
   value: number,
   fromUnit: string,
   toUnit: string,
-  marker?: CBCBiomarkerDefinition
+  marker?: BiomarkerDefinition
 ) {
   if (!Number.isFinite(value)) return undefined;
   if (!marker && fromUnit === toUnit) return value;
@@ -110,7 +107,10 @@ export function convertBiomarkerValue(
   );
   if (!from || !to) return undefined;
   if (fromUnit === toUnit) return value;
-  return (value / (from.factor ?? 1)) * (to.factor ?? 1);
+  // Rounded to 10 significant digits to drop floating point noise.
+  return Number(
+    ((value / (from.factor ?? 1)) * (to.factor ?? 1)).toPrecision(10)
+  );
 }
 
 /** Returns the reference bounds in the observation's reported unit. */

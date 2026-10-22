@@ -4,7 +4,7 @@ import {
   GENERAL_LAB_REPORT_LOINC,
   CBC_PANEL_LOINC,
   CBC_MARKERS,
-} from '@/src/data/cbcMarkers';
+} from '@/src/data/biomarkers';
 import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,

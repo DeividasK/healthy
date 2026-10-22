@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { BIOMARKERS } from '@/src/data/biomarkers';
 import {
   buildLabResultsAIInstructions,
   parseLabResultsAIReply,
@@ -10,14 +10,14 @@ const today = new Date(2026, 9, 22);
 test('instructions describe the reply format and list every test with its units', () => {
   const instructions = buildLabResultsAIInstructions();
   expect(instructions).toContain('"healthyLabResults": 1');
-  for (const marker of CBC_MARKERS) {
+  for (const marker of BIOMARKERS) {
     expect(instructions).toContain(`- ${marker.id}: ${marker.name}`);
     for (const unit of marker.units) expect(instructions).toContain(unit.label);
   }
 });
 
 test('reads results from a reply with a note and a fenced code block', () => {
-  const reply = `I left out Ferritin: it isn't in your list.
+  const reply = `I left out Unicorn Factor: it isn't in your list.
 
 \`\`\`json
 {
@@ -68,7 +68,7 @@ test('lists every problem in the reply', () => {
       date: '2026-11-01',
       time: '25:00',
       results: [
-        { test: 'Ferritin', value: 40, unit: 'ng/mL' },
+        { test: 'Unicorn Factor', value: 40, unit: 'ng/mL' },
         { test: 'cbc_hemoglobin', value: 'high', unit: 'g/dL' },
         { test: 'cbc_mcv', value: 90, unit: 'um3' },
         { test: 'cbc_rbc', value: 4.8, unit: '10*6/uL' },
@@ -82,7 +82,7 @@ test('lists every problem in the reply', () => {
     errors: [
       'The date is in the future.',
       'The time is not in HH:MM format.',
-      '"Ferritin" is not a supported test.',
+      '"Unicorn Factor" is not a supported test.',
       'Hemoglobin (Hgb) has no valid value.',
       'Mean Corpuscular Volume (MCV) has an unsupported unit "um3". Supported units: fL.',
       'Red Blood Cells (RBC) is listed more than once.',

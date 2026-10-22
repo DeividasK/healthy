@@ -36,10 +36,10 @@ import {
 } from '@/src/features/organizations/organizationService';
 import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
-  CBC_MARKERS,
-  CBCBiomarkerDefinition,
-  searchCBCMarkers,
-} from '@/src/data/cbcMarkers';
+  BIOMARKERS,
+  BiomarkerDefinition,
+  searchBiomarkers,
+} from '@/src/data/biomarkers';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import {
@@ -55,7 +55,7 @@ import type { ImportedLabResults } from './labResultsAIImport';
 
 export interface ActiveMarkerItem {
   id: string;
-  definition: CBCBiomarkerDefinition;
+  definition: BiomarkerDefinition;
   valueStr: string;
   selectedUnit: string;
   selectedUcum: string;
@@ -231,14 +231,14 @@ export function LabResultForm({
               obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
             const ucum = obs.valueQuantity?.code || unit;
 
-            const def: CBCBiomarkerDefinition = CBC_MARKERS.find(
+            const def: BiomarkerDefinition = BIOMARKERS.find(
               (m) => m.loinc === loinc
             ) || {
               id: `marker_${loinc}`,
               name,
               aliases: [name],
               loinc,
-              category: 'Complete Blood Count',
+              category: 'Other',
               primaryUnit: unit,
               ucumCode: ucum,
               units: [{ label: unit, ucum }],
@@ -291,11 +291,11 @@ export function LabResultForm({
     const existingLoincs = new Set(
       activeItems.map((item) => item.definition.loinc)
     );
-    const available = CBC_MARKERS.filter((m) => !existingLoincs.has(m.loinc));
+    const available = BIOMARKERS.filter((m) => !existingLoincs.has(m.loinc));
     if (!searchQuery.trim()) {
       return available;
     }
-    return searchCBCMarkers(searchQuery).filter(
+    return searchBiomarkers(searchQuery).filter(
       (m) => !existingLoincs.has(m.loinc)
     );
   }, [searchQuery, activeItems]);
@@ -323,7 +323,7 @@ export function LabResultForm({
     setShowAIImport(false);
   };
 
-  const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
+  const handleSelectBiomarker = (marker: BiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
     const newItem: ActiveMarkerItem = {
       id: marker.id,

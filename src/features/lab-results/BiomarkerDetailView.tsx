@@ -28,7 +28,7 @@ import { BiomarkerValueRow } from '@/src/features/home/BiomarkerResultRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
-import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { BIOMARKERS } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
@@ -37,7 +37,7 @@ import {
   getObservationReferenceRange,
   getObservationStatus,
   getObservationUnitCode,
-  isSupportedCBCObservation,
+  isSupportedObservation,
   RANGE_STATUS_LABELS,
   RANGE_STATUSES,
   toRangeStatus,
@@ -118,7 +118,7 @@ export function BiomarkerDetailView() {
   );
   useDatabaseSubscription(['diagnostic_reports', 'observations'], load);
 
-  const marker = CBC_MARKERS.find(
+  const marker = BIOMARKERS.find(
     (candidate) =>
       candidate.id === id ||
       candidate.loinc === id ||
@@ -133,7 +133,7 @@ export function BiomarkerDetailView() {
     for (const record of reports) {
       const reportDate = record.report.effectiveDateTime || '';
       for (const observation of record.observations) {
-        if (!isSupportedCBCObservation(observation)) continue;
+        if (!isSupportedObservation(observation)) continue;
         const code = observation.code?.coding?.[0]?.code;
         const displayName = getObservationName(observation);
         const name = displayName.toLowerCase();
@@ -343,7 +343,7 @@ export function BiomarkerDetailView() {
         </LearnItem>
         <LearnItem title="Why it matters">
           {marker?.education?.whyItMatters ||
-            'This result adds information about this part of your blood health. It is interpreted together with related test results and your health history.'}
+            'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'}
         </LearnItem>
         <LearnItem title="What it may affect">
           {marker?.education?.whatItMayAffect || ''}

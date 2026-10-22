@@ -7,7 +7,7 @@ import {
 } from '@/src/features/testing/testSeed';
 
 test.describe('Biomarker detail', () => {
-  test('rejects seed biomarkers and units outside the CBC catalog', async ({
+  test('rejects seed biomarkers and units outside the biomarker catalog', async ({
     page,
   }) => {
     await seedTestPatient(page);
@@ -30,7 +30,7 @@ test.describe('Biomarker detail', () => {
       seedTestReport(page, {
         biomarkers: [{ name: 'Custom Marker', value: 42, unit: 'custom-unit' }],
       })
-    ).rejects.toThrow('is not in the CBC catalog');
+    ).rejects.toThrow('is not in the biomarker catalog');
     const rejectedReports = await page.evaluate(async () =>
       (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
         'SELECT id FROM diagnostic_reports WHERE id = ?',

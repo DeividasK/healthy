@@ -291,17 +291,16 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     await test.step('Problems in the reply are listed', async () => {
       const reply = page.getByTestId('ai-import-reply-input');
       await reply.fill(
-        '```json\n{"date": "2026-09-20", "results": [{"test": "Ferritin", "value": 40, "unit": "ng/mL"}]}\n```'
+        '```json\n{"date": "2026-09-20", "results": [{"test": "Unicorn Factor", "value": 40, "unit": "ng/mL"}]}\n```'
       );
       await page.getByTestId('ai-import-submit-button').click();
       await expect(page.getByTestId('ai-import-errors')).toHaveText(
-        '"Ferritin" is not a supported test.'
+        '"Unicorn Factor" is not a supported test.'
       );
     });
 
-    await test.step('A valid reply fills the form for review', async () => {
-      await page.getByTestId('ai-import-reply-input').fill(
-        `Ferritin isn't in your list, so I left it out.
+    await test.step('A pasted reply fills the form for review', async () => {
+      const reply = `Unicorn Factor isn't in your list, so I left it out.
 \`\`\`json
 {
   "healthyLabResults": 1,
@@ -310,10 +309,16 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   "serviceProvider": "City Laboratory",
   "results": [
     { "test": "cbc_hemoglobin", "value": 14.5, "unit": "g/dL" },
-    { "test": "cbc_wbc", "value": 6.8, "unit": "10^9/L" }
+    { "test": "cbc_wbc", "value": 6.8, "unit": "10^9/L" },
+    { "test": "ferritin", "value": 85, "unit": "ng/mL" },
+    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L" }
   ]
 }
-\`\`\``
+\`\`\``;
+      await page.evaluate((text) => navigator.clipboard.writeText(text), reply);
+      await page.getByRole('button', { name: 'Paste AI reply' }).click();
+      await expect(page.getByTestId('ai-import-reply-input')).toHaveValue(
+        reply
       );
       await page.getByTestId('ai-import-submit-button').click();
       await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
@@ -326,7 +331,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(
         page.getByTestId('lab-result-service-provider-input')
       ).toHaveValue('City Laboratory');
-      await expect(page.getByTestId(/^marker-card-/)).toHaveCount(2);
+      await expect(page.getByTestId(/^marker-card-/)).toHaveCount(4);
       await expect(page.getByTestId('marker-card-0')).toContainText(
         'Hemoglobin (Hgb)'
       );
@@ -337,15 +342,27 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         page.getByTestId('unit-picker-button-1').locator('select')
       ).toHaveValue('10*9/L');
       await expect(page.getByTestId('marker-value-input-1')).toHaveValue('6.8');
+      await expect(page.getByTestId('marker-card-3')).toContainText(
+        'LDL Cholesterol'
+      );
+      await expect(
+        page.getByTestId('unit-picker-button-3').locator('select')
+      ).toHaveValue('mmol/L');
     });
 
     await test.step('Saving stores the imported results', async () => {
       await page.getByTestId('save-button').click();
       const home = page.getByTestId('results-scroll-view');
-      await expect(home.getByTestId('labs-summary-count')).toHaveText('2');
+      await expect(home.getByTestId('labs-summary-count')).toHaveText('4');
       await expect(
         home.getByTestId('labs-summary-grid-cell-6690-2')
       ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-2276-4')
+      ).toHaveAccessibleName('Ferritin: In range');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-13457-7')
+      ).toHaveAccessibleName('LDL Cholesterol: In range');
     });
   });
 

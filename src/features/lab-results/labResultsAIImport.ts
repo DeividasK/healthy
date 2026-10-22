@@ -1,8 +1,8 @@
 import {
-  CBC_MARKERS,
-  type CBCBiomarkerDefinition,
+  BIOMARKERS,
+  type BiomarkerDefinition,
   type UnitOption,
-} from '@/src/data/cbcMarkers';
+} from '@/src/data/biomarkers';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 
 /** Version marker the AI puts in its reply, so other JSON is not mistaken for it. */
@@ -10,7 +10,7 @@ export const LAB_RESULTS_AI_FORMAT_KEY = 'healthyLabResults';
 export const LAB_RESULTS_AI_FORMAT_VERSION = 1;
 
 export interface ImportedLabResultItem {
-  marker: CBCBiomarkerDefinition;
+  marker: BiomarkerDefinition;
   /** The value as the form's input shows it. */
   value: string;
   unit: UnitOption;
@@ -32,7 +32,7 @@ export type LabResultsAIParseResult =
  * reads. Lists every test the app supports with its accepted units.
  */
 export function buildLabResultsAIInstructions(): string {
-  const tests = CBC_MARKERS.map((marker) => {
+  const tests = BIOMARKERS.map((marker) => {
     const names = [marker.name, ...marker.aliases].join(', ');
     const units = marker.units.map((unit) => unit.label).join(', ');
     return `- ${marker.id}: ${names}. Units: ${units}`;
@@ -80,9 +80,9 @@ function normalizeUnit(unit: string): string {
 }
 
 /** Finds a catalog test by its id, LOINC code, name or alias. */
-function findMarker(test: string): CBCBiomarkerDefinition | undefined {
+function findMarker(test: string): BiomarkerDefinition | undefined {
   const clean = test.trim().toLowerCase();
-  return CBC_MARKERS.find(
+  return BIOMARKERS.find(
     (marker) =>
       marker.id === clean ||
       marker.loinc === clean ||

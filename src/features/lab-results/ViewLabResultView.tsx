@@ -22,7 +22,7 @@ import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { deleteReport, getReportById } from './diagnosticReportService';
 import {
   getObservationStatus,
-  isSupportedCBCObservation,
+  isSupportedObservation,
   toRangeStatus,
 } from './biomarkerMeasurements';
 import { getLabResultMeta, getLabResultTitle } from './labResultMeta';
@@ -120,7 +120,7 @@ function LabResultForPatient({
     .filter(Boolean)
     .join('\n');
   const results = record.observations
-    .filter(isSupportedCBCObservation)
+    .filter(isSupportedObservation)
     .map((observation, index) => ({
       id: observation.id || String(index),
       name: getBiomarkerName(observation),

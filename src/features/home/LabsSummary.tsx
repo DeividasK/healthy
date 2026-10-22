@@ -7,7 +7,7 @@ import type { DiagnosticReportRecord } from '@/src/database/types';
 import {
   getObservationMarker,
   getObservationStatus,
-  isSupportedCBCObservation,
+  isSupportedObservation,
   toRangeStatus,
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { COLORS } from '@/src/theme/colors';
@@ -60,7 +60,7 @@ export function latestBiomarkers(
   >();
   for (const { report, observations } of records) {
     for (const observation of observations) {
-      if (!isSupportedCBCObservation(observation)) continue;
+      if (!isSupportedObservation(observation)) continue;
       const marker = getObservationMarker(observation)!;
       const date =
         observation.effectiveDateTime ||

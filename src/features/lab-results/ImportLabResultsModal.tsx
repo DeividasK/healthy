@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Sparkles } from 'lucide-react-native';
+import { ClipboardPaste, Sparkles } from 'lucide-react-native';
 import {
   CenteredModal,
   ModalActions,
@@ -9,7 +9,7 @@ import {
 } from '@/src/components/CenteredModal';
 import { FieldRevealProvider } from '@/src/components/FieldReveal';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
-import { FormField } from '@/src/components/FormField';
+import { FormField, FormTextInput } from '@/src/components/FormField';
 import { COLORS } from '@/src/theme/colors';
 import {
   buildLabResultsAIInstructions,
@@ -53,6 +53,11 @@ export function ImportLabResultsModal({
     );
   };
 
+  const handlePaste = async () => {
+    const text = await Clipboard.getStringAsync();
+    if (text) setReply(text);
+  };
+
   const handleImport = () => {
     const result = parseLabResultsAIReply(reply);
     if (!result.ok) {
@@ -89,25 +94,34 @@ export function ImportLabResultsModal({
             message={errors.join('\n')}
           />
         )}
-        <FormField
-          label="AI reply"
-          nativeID="ai-import-reply"
-          required
-          inputProps={{
-            testID: 'ai-import-reply-input',
-            id: 'ai-import-reply',
-            nativeID: 'ai-import-reply',
-            name: 'aiReply',
-            placeholder: "Paste the AI's reply here",
-            multiline: true,
-            numberOfLines: 6,
-            autoCapitalize: 'none',
-            autoCorrect: false,
-            value: reply,
-            onChangeText: setReply,
-            style: styles.reply,
-          }}
-        />
+        <FormField label="AI reply" nativeID="ai-import-reply" required>
+          <View>
+            <FormTextInput
+              testID="ai-import-reply-input"
+              id="ai-import-reply"
+              nativeID="ai-import-reply"
+              name="aiReply"
+              placeholder="Paste the AI's reply here"
+              multiline
+              numberOfLines={6}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={reply}
+              onChangeText={setReply}
+              style={styles.reply}
+            />
+            <TouchableOpacity
+              testID="ai-import-paste-button"
+              style={styles.pasteButton}
+              onPress={handlePaste}
+              accessibilityRole="button"
+              accessibilityLabel="Paste AI reply"
+              activeOpacity={0.7}
+            >
+              <ClipboardPaste size={18} color={COLORS.light.foreground} />
+            </TouchableOpacity>
+          </View>
+        </FormField>
         <ModalActions>
           <ModalButton
             label="Cancel"
@@ -141,5 +155,18 @@ const styles = StyleSheet.create({
   reply: {
     maxHeight: 200,
     fontSize: 14,
+    // Leaves room for the paste button in the top-right corner.
+    paddingRight: 52,
+  },
+  pasteButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.light.pillBackground,
   },
 });

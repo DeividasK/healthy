@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 import type { Observation } from 'fhir/r5';
-import { CBC_MARKERS } from '@/src/data/cbcMarkers';
+import { BIOMARKERS, getBiomarker } from '@/src/data/biomarkers';
 import {
-  assertCBCObservation,
+  assertCatalogObservation,
   convertBiomarkerValue,
   getObservationReferenceRange,
   getObservationStatus,
-  isSupportedCBCObservation,
+  isSupportedObservation,
   toRangeStatus,
 } from './biomarkerMeasurements';
 
-const hemoglobin = CBC_MARKERS.find((marker) => marker.loinc === '718-7')!;
+const hemoglobin = BIOMARKERS.find((marker) => marker.loinc === '718-7')!;
 const observation = (extra: Partial<Observation> = {}): Observation => ({
   resourceType: 'Observation',
   status: 'final',
@@ -23,6 +23,10 @@ test('normalizes mixed units and rejects unsupported or non-finite conversions',
   expect(convertBiomarkerValue(14.5, 'g/dL', 'g/L', hemoglobin)).toBe(145);
   expect(convertBiomarkerValue(150, 'g/L', 'g/dL', hemoglobin)).toBe(15);
   expect(convertBiomarkerValue(150, 'g/L', 'g/L', hemoglobin)).toBe(150);
+  // Without floating point noise (100 * 0.02586 is 2.5860000000000003).
+  expect(
+    convertBiomarkerValue(100, 'mg/dL', 'mmol/L', getBiomarker('2093-3'))
+  ).toBe(2.586);
   for (const [from, to] of [
     ['unknown', 'g/L'],
     ['g/L', 'unknown'],
@@ -43,16 +47,16 @@ test('normalizes mixed units and rejects unsupported or non-finite conversions',
 });
 
 test('validates catalog identity, missing units, and mismatched labels/codes', () => {
-  expect(() => assertCBCObservation(observation())).not.toThrow();
+  expect(() => assertCatalogObservation(observation())).not.toThrow();
   expect(() =>
-    assertCBCObservation(
+    assertCatalogObservation(
       observation({ valueQuantity: { value: 15, unit: 'g/dL' } })
     )
   ).not.toThrow();
   const invalid: [Observation, string][] = [
     [
       observation({ code: { text: 'Unknown Marker' } }),
-      'is not in the CBC catalog',
+      'is not in the biomarker catalog',
     ],
     [
       observation({
@@ -67,8 +71,8 @@ test('validates catalog identity, missing units, and mismatched labels/codes', (
     ],
   ];
   for (const [value, message] of invalid) {
-    expect(() => assertCBCObservation(value)).toThrow(message);
-    expect(isSupportedCBCObservation(value)).toBe(false);
+    expect(() => assertCatalogObservation(value)).toThrow(message);
+    expect(isSupportedObservation(value)).toBe(false);
   }
 });
 

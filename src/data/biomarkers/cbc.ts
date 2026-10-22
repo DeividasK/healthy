@@ -1,51 +1,11 @@
 /**
- * Complete Blood Count (CBC) Standard Biomarkers Catalog
- * Curated with official LOINC (Logical Observation Identifiers Names and Codes)
- * and UCUM (Unified Code for Units of Measure) standards.
+ * Complete Blood Count (CBC) biomarkers, curated with official LOINC
+ * (Logical Observation Identifiers Names and Codes) and UCUM (Unified Code
+ * for Units of Measure) standards.
  */
+import { EMPTY_BIOMARKER_EDUCATION, type BiomarkerDefinition } from './types';
 
-export interface UnitOption {
-  label: string;
-  ucum: string;
-  factor?: number; // relative to primary unit
-}
-
-export interface CBCBiomarkerDefinition {
-  id: string;
-  name: string;
-  aliases: string[];
-  loinc: string;
-  category: 'Complete Blood Count';
-  primaryUnit: string;
-  ucumCode: string;
-  units: UnitOption[];
-  referenceRange?: {
-    low?: number;
-    high?: number;
-    text?: string;
-  };
-  description: string;
-  education: CBCBiomarkerEducation;
-}
-
-export interface CBCBiomarkerEducation {
-  about: string;
-  whyItMatters: string;
-  whatItMayAffect: string;
-  whatMayBeRelatedToAChange: string;
-}
-
-const EMPTY_BIOMARKER_EDUCATION: CBCBiomarkerEducation = {
-  about: '',
-  whyItMatters: '',
-  whatItMayAffect: '',
-  whatMayBeRelatedToAChange: '',
-};
-
-export const CBC_PANEL_LOINC = '58410-2'; // Complete blood count (hemogram) panel - Blood by Automated count
-export const GENERAL_LAB_REPORT_LOINC = '11502-2'; // Laboratory report
-
-export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
+export const CBC_MARKERS: BiomarkerDefinition[] = [
   {
     id: 'cbc_wbc',
     name: 'White Blood Cells (WBC)',
@@ -466,26 +426,3 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
 ];
-
-/**
- * Searches CBC markers by name, alias, or LOINC code.
- */
-export function searchCBCMarkers(query: string): CBCBiomarkerDefinition[] {
-  const clean = query.trim().toLowerCase();
-  if (!clean) return CBC_MARKERS;
-
-  return CBC_MARKERS.filter((marker) => {
-    if (marker.name.toLowerCase().includes(clean)) return true;
-    if (marker.loinc.includes(clean)) return true;
-    return marker.aliases.some((alias) => alias.toLowerCase().includes(clean));
-  });
-}
-
-/**
- * Finds a CBC biomarker by its canonical key or LOINC code.
- */
-export function getCBCMarker(
-  idOrLoinc: string
-): CBCBiomarkerDefinition | undefined {
-  return CBC_MARKERS.find((m) => m.id === idOrLoinc || m.loinc === idOrLoinc);
-}

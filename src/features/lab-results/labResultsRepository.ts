@@ -3,7 +3,7 @@ import { DiagnosticReportRecord } from '@/src/database/types';
 import { getDb } from '@/src/database/db';
 import { DEFAULT_PATIENT_ID } from '@/src/features/profile/patientRepository';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
-import { assertCBCObservation } from './biomarkerMeasurements';
+import { assertCatalogObservation } from './biomarkerMeasurements';
 import { assertOrganizationReferences } from '@/src/features/organizations/organizationsRepository';
 import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
 
@@ -45,7 +45,7 @@ export async function insertDiagnosticReportRecord(
     if (!obs.id) {
       throw new Error('Observation requires an id to be persisted');
     }
-    assertCBCObservation(obs);
+    assertCatalogObservation(obs);
   }
   const reportId = report.id;
   const db = await getDb();
