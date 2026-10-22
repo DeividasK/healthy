@@ -4,7 +4,9 @@ import {
   expect,
   seedTestPatient,
   seedTestReport,
+  seedTestCondition,
   seedEveryResource,
+  openRoute,
   snapshotClinicalTables,
   exportTestArchive,
   connectTestSync,
@@ -67,6 +69,58 @@ test('a ZIP backup restores every resource exactly', async ({ page }) => {
     clinicalDocuments: 1,
   });
   expect(await snapshotClinicalTables(page)).toEqual(original);
+});
+
+test('a backup file restore blocks the app, then opens the record', async ({
+  page,
+}) => {
+  await seedTestPatient(page, { id: 'file-restore-patient' });
+  await seedTestCondition(page, {
+    id: 'file-restore-condition',
+    patientId: 'file-restore-patient',
+    title: 'Asthma',
+  });
+  const archive = await exportTestArchive(page);
+  await bridge(page, (b) => b.clearDatabase());
+  await openRoute(page, '/profile/restore');
+
+  // Hold the file read so the restore stays in progress until released.
+  await page.evaluate(() => {
+    const gate = new Promise<void>(
+      (resolve) => ((window as any).__releaseFileRead = resolve)
+    );
+    const read = Blob.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = async function (this: File) {
+      delete (File.prototype as any).arrayBuffer;
+      await gate;
+      return read.call(this);
+    };
+  });
+  try {
+    await page.locator('#profile-restore-zip-file-input').setInputFiles({
+      name: 'healthy-backup.zip',
+      mimeType: 'application/zip',
+      buffer: Buffer.from(archive),
+    });
+    await expect(page.getByTestId('restore-file-busy')).toBeVisible();
+    // The spinner covers the screen: its back button cannot be reached.
+    const backCovered = await page
+      .getByTestId('back-button')
+      .evaluate((button) => {
+        const { x, y, width, height } = button.getBoundingClientRect();
+        const top = document.elementFromPoint(x + width / 2, y + height / 2);
+        return !button.contains(top);
+      });
+    expect(backCovered).toBe(true);
+  } finally {
+    await page.evaluate(() => (window as any).__releaseFileRead?.());
+  }
+
+  await page.waitForURL((url) => url.pathname === '/');
+  await expect(page.getByTestId('restore-file-busy')).toHaveCount(0);
+  await expect(
+    page.getByTestId('condition-card-file-restore-condition')
+  ).toContainText('Asthma');
 });
 
 test('a ZIP restore rejects an unsupported unit before writing anything', async ({
