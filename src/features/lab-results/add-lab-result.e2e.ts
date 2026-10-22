@@ -285,6 +285,13 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       );
       expect(instructions).toContain('"healthyLabResults": 1');
       expect(instructions).toContain('- cbc_hemoglobin: Hemoglobin (Hgb)');
+      // The modal takes its dialog role once it has faded in; auditing before
+      // that flags its aria-modal.
+      await expect(
+        page
+          .getByRole('dialog')
+          .getByRole('heading', { name: 'Import with AI' })
+      ).toBeVisible();
       await checkA11y(page);
     });
 
