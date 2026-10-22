@@ -29,9 +29,52 @@ export const test = chromaticTest.extend({
   },
 });
 
+/** Waits two frames, so layout and resize handlers have settled. */
+const nextFrames = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
+
 /**
- * Captures a Chromatic snapshot. Set `VISUAL_PNG_DIR` to also save a local
- * full-page PNG per snapshot, for comparing states without publishing.
+ * Grows the viewport until no vertical scroll area hides content, and
+ * returns the original size. Screens scroll inside their own containers, so
+ * Chromatic, which captures at the snapshot's viewport, would otherwise show
+ * only the first screenful.
+ */
+async function fitViewportToContent(page: Page) {
+  const original = page.viewportSize()!;
+  // A few rounds, as a taller viewport can render more (e.g. lists).
+  for (let round = 0; round < 5; round++) {
+    const hidden = await page.evaluate(() =>
+      Math.max(
+        document.documentElement.scrollHeight - window.innerHeight,
+        ...[...document.querySelectorAll<HTMLElement>('*')]
+          .filter(
+            (element) =>
+              element.clientHeight > 0 &&
+              /auto|scroll/.test(getComputedStyle(element).overflowY)
+          )
+          .map((element) => element.scrollHeight - element.clientHeight)
+      )
+    );
+    if (hidden <= 1) break;
+    await page.setViewportSize({
+      width: original.width,
+      height: page.viewportSize()!.height + Math.ceil(hidden),
+    });
+    await nextFrames(page);
+  }
+  return original;
+}
+
+/**
+ * Captures a Chromatic snapshot of the whole page: the viewport grows to fit
+ * the content for the snapshot, then returns to its size. Set
+ * `VISUAL_PNG_DIR` to also save a local full-page PNG per snapshot, for
+ * comparing states without publishing.
  *
  * Snapshots show no focused or hovered field. Chromatic re-renders the
  * captured page and does not reliably keep focus, so a focus ring would land
@@ -70,12 +113,15 @@ export async function takeSnapshot(
     await page.waitForTimeout(200);
     await blurAll();
   }
+  const viewport = await fitViewportToContent(page);
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {
     const file = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     await page.screenshot({ path: `${pngDir}/${file}.png`, fullPage: true });
   }
+  await page.setViewportSize(viewport);
+  await nextFrames(page);
 }
 /**
  * Waits until a dock menu toggle has settled open (x) or closed (+), so a
