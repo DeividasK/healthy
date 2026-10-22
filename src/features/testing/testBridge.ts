@@ -300,6 +300,9 @@ export function setupTestBridge(
       return phrase;
     },
     syncNow: async () => syncOnce(await connectedProvider(), await vaultKeys()),
+    /** When the app last finished a sync; the bridge's own syncs don't set it. */
+    lastSyncTimestamp: async () =>
+      (await loadGoogleDriveConfig())?.lastSyncTimestamp ?? null,
     compactNow: async () =>
       compactNow(await connectedProvider(), await vaultKeys()),
     deleteCloudData: async () => deleteCloudData(await connectedProvider()),

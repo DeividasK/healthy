@@ -161,10 +161,21 @@ export async function waitForMenuToggle(
 /**
  * Waits for the sync the app starts when it loads with a synced profile to
  * finish, and its header checkmark to clear. Checking only for no indicator
- * passes before that sync has started.
+ * passes before that sync has started, and the checkmark shows for only a
+ * second, so this waits for the time the app saves when a sync finishes.
  */
 export async function waitForSyncIdle(page: Page): Promise<void> {
-  await expect(page.getByTestId('sync-checkmark')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        // The bridge installs once the reloaded app mounts.
+        async () =>
+          (await (
+            window as any
+          ).__HEALTHY_TEST_BRIDGE__?.lastSyncTimestamp()) ?? null
+      )
+    )
+    .not.toBeNull();
   await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 }
 
