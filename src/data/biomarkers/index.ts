@@ -39,3 +39,26 @@ export function getBiomarker(
 ): BiomarkerDefinition | undefined {
   return BIOMARKERS.find((m) => m.id === idOrLoinc || m.loinc === idOrLoinc);
 }
+
+const matchesName = (marker: BiomarkerDefinition, name: string) =>
+  marker.name.toLowerCase() === name ||
+  marker.aliases.some((alias) => alias.toLowerCase() === name);
+
+/**
+ * Finds a biomarker by the name a report or AI gives it: its name or an
+ * alias, ignoring case; else that name without a bracketed part (e.g.
+ * "Thyroid-stimulating hormone (TSH)"), or the bracketed abbreviation.
+ */
+export function findBiomarkerByName(
+  name: string
+): BiomarkerDefinition | undefined {
+  const clean = name.trim().toLowerCase();
+  const exact = BIOMARKERS.find((marker) => matchesName(marker, clean));
+  if (exact) return exact;
+  const bracketed = clean.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (!bracketed) return undefined;
+  return (
+    BIOMARKERS.find((marker) => matchesName(marker, bracketed[1])) ??
+    BIOMARKERS.find((marker) => matchesName(marker, bracketed[2]))
+  );
+}

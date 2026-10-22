@@ -24,7 +24,10 @@ import {
   getObservationStatus,
   isSupportedObservation,
   toRangeStatus,
+  getMissingDemographics,
 } from './biomarkerMeasurements';
+import { RangeProfileNotice } from './RangeProfileNotice';
+import { useRangeDemographics } from './useRangeDemographics';
 import { getLabResultMeta, getLabResultTitle } from './labResultMeta';
 import { goBackOr } from '@/src/utils/navigation';
 
@@ -50,6 +53,7 @@ function LabResultForPatient({
   activePatientId: string;
 }) {
   const router = useRouter();
+  const demographics = useRangeDemographics();
   const [record, setRecord] = useState<DiagnosticReportRecord | null>(null);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
@@ -125,8 +129,14 @@ function LabResultForPatient({
       id: observation.id || String(index),
       name: getBiomarkerName(observation),
       observation,
-      status: toRangeStatus(getObservationStatus(observation)),
+      status: toRangeStatus(
+        getObservationStatus(observation, undefined, demographics)
+      ),
     }));
+  const missing = getMissingDemographics(
+    results.map(({ observation }) => observation),
+    demographics
+  );
 
   return (
     <ResourceViewLayout
@@ -185,6 +195,11 @@ function LabResultForPatient({
                 });
               }}
             />
+            <RangeProfileNotice
+              missing={missing}
+              testID="lab-result-range-notice"
+              style={styles.notice}
+            />
             <BiomarkerStatusGroups
               biomarkers={results}
               testID="lab-result-groups"
@@ -216,5 +231,8 @@ const styles = StyleSheet.create({
   details: {
     gap: 16,
     marginBottom: 28,
+  },
+  notice: {
+    marginTop: 16,
   },
 });

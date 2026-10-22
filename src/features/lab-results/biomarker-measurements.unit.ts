@@ -77,10 +77,17 @@ test('validates catalog identity, missing units, and mismatched labels/codes', (
 });
 
 test('uses unit-aligned catalog ranges and gives laboratory bounds precedence', () => {
+  // The general adult range, then the range for the patient's sex.
   expect(getObservationReferenceRange(observation())).toEqual({
-    low: 135,
-    high: 175,
+    low: 116,
+    high: 166,
   });
+  expect(
+    getObservationReferenceRange(observation(), undefined, { sex: 'male' })
+  ).toEqual({ low: 132, high: 166 });
+  expect(
+    getObservationReferenceRange(observation(), undefined, { sex: 'female' })
+  ).toEqual({ low: 116, high: 150 });
   const laboratory = observation({
     referenceRange: [
       {
@@ -124,14 +131,16 @@ test('uses unit-aligned catalog ranges and gives laboratory bounds precedence', 
 
 test('classifies boundary values and honors explicit FHIR interpretations', () => {
   for (const [value, status] of [
-    [134, 'Low'],
-    [135, 'Normal'],
-    [175, 'Normal'],
-    [176, 'High'],
+    [131, 'Low'],
+    [132, 'Normal'],
+    [166, 'Normal'],
+    [167, 'High'],
   ] as const) {
     expect(
       getObservationStatus(
-        observation({ valueQuantity: { value, code: 'g/L' } })
+        observation({ valueQuantity: { value, code: 'g/L' } }),
+        undefined,
+        { sex: 'male' }
       )
     ).toBe(status);
   }

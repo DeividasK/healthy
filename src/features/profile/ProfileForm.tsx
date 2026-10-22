@@ -33,6 +33,8 @@ type Gender = NonNullable<PatientInput['gender']>;
 
 export interface ProfileFormProps {
   initialValues?: Partial<PatientInput>;
+  /** Optional fields to show from the start, e.g. ones a notice asked for. */
+  showFields?: ('birthDate' | 'gender')[];
   isEdit?: boolean;
   showBackButton?: boolean;
   /** Replaces the default screen heading, e.g. a heading with a subline. */
@@ -71,6 +73,7 @@ function parseBirthDate(value?: string): Date | undefined {
  */
 export function ProfileForm({
   initialValues,
+  showFields = [],
   isEdit = false,
   showBackButton = true,
   heading,
@@ -100,6 +103,7 @@ export function ProfileForm({
       testID: 'menu-add-birth-date',
       empty: undefined,
       initial: parseBirthDate(initialValues?.birthDate),
+      ...(showFields.includes('birthDate') && { shown: true }),
     },
     gender: {
       label: 'Gender',
@@ -108,6 +112,7 @@ export function ProfileForm({
       empty: undefined,
       initial: initialValues?.gender,
       added: (gender) => gender ?? 'unknown',
+      ...(showFields.includes('gender') && { shown: true }),
     },
     photo: {
       label: 'Photo',

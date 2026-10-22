@@ -4,10 +4,19 @@ import { ChevronRight } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '@/src/theme/colors';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
-import { getObservationReferenceRange } from '@/src/features/lab-results/biomarkerMeasurements';
+import {
+  getObservationMarker,
+  getObservationReferenceRange,
+} from '@/src/features/lab-results/biomarkerMeasurements';
+import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
 
-/** Route id of an observation's biomarker page: its code, or its name for custom tests. */
+/**
+ * Route id of an observation's biomarker page: its catalog test's code, else
+ * its own code, or its name for custom tests.
+ */
 export function getBiomarkerRouteId(observation: Observation) {
+  const marker = getObservationMarker(observation);
+  if (marker) return marker.loinc;
   const code = observation.code?.coding?.[0]?.code;
   return code && code !== 'custom' ? code : getBiomarkerName(observation);
 }
@@ -86,6 +95,7 @@ export function BiomarkerResultRow({
   testID?: string;
 }) {
   const router = useRouter();
+  const demographics = useRangeDemographics();
   const name = getBiomarkerName(observation);
   const code = observation.code?.coding?.[0]?.code;
   return (
@@ -95,7 +105,7 @@ export function BiomarkerResultRow({
       unit={
         observation.valueQuantity?.unit || observation.valueQuantity?.code || ''
       }
-      {...getObservationReferenceRange(observation)}
+      {...getObservationReferenceRange(observation, undefined, demographics)}
       testID={testID || `biomarker-row-${code || observation.id}`}
       rangeTestID={
         testID

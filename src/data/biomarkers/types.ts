@@ -23,6 +23,23 @@ export type BiomarkerCategory =
   | 'Blood Gas'
   | 'Other';
 
+/** Sex a reference range applies to; FHIR administrative gender values. */
+export type BiomarkerSex = 'male' | 'female';
+
+/**
+ * A reference range for part of the population, in the primary unit. Ages
+ * are whole years: `minAge` inclusive, `maxAge` exclusive. Without `low` and
+ * `high` it records that no single range applies (e.g. hormones that follow
+ * the menstrual cycle).
+ */
+export interface DemographicRange {
+  sex?: BiomarkerSex;
+  minAge?: number;
+  maxAge?: number;
+  low?: number;
+  high?: number;
+}
+
 export interface BiomarkerDefinition {
   id: string;
   name: string;
@@ -32,11 +49,16 @@ export interface BiomarkerDefinition {
   primaryUnit: string;
   ucumCode: string;
   units: UnitOption[];
+  /** The adult range used when no `demographicRanges` entry applies. */
   referenceRange?: {
     low?: number;
     high?: number;
     text?: string;
   };
+  /** Ranges by sex and age, most specific first; the first match applies. */
+  demographicRanges?: DemographicRange[];
+  /** Explains what else a range depends on, shown on the biomarker page. */
+  rangeNote?: string;
   description: string;
   education: BiomarkerEducation;
 }

@@ -1,5 +1,6 @@
 import {
   BIOMARKERS,
+  findBiomarkerByName,
   type BiomarkerDefinition,
   type UnitOption,
 } from '@/src/data/biomarkers';
@@ -82,12 +83,10 @@ function normalizeUnit(unit: string): string {
 /** Finds a catalog test by its id, LOINC code, name or alias. */
 function findMarker(test: string): BiomarkerDefinition | undefined {
   const clean = test.trim().toLowerCase();
-  return BIOMARKERS.find(
-    (marker) =>
-      marker.id === clean ||
-      marker.loinc === clean ||
-      marker.name.toLowerCase() === clean ||
-      marker.aliases.some((alias) => alias.toLowerCase() === clean)
+  return (
+    BIOMARKERS.find(
+      (marker) => marker.id === clean || marker.loinc === clean
+    ) ?? findBiomarkerByName(test)
   );
 }
 

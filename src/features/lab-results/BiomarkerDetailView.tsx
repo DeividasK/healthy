@@ -44,6 +44,12 @@ import {
   type MeasurementReferenceRange,
   type RangeStatus,
 } from './biomarkerMeasurements';
+import {
+  explainReferenceRange,
+  resolveReferenceRange,
+} from './referenceRanges';
+import { RangeProfileNotice } from './RangeProfileNotice';
+import { useRangeDemographics } from './useRangeDemographics';
 
 type Measurement = {
   date: string;
@@ -55,6 +61,8 @@ type Measurement = {
   reportId: string;
   unitCode: string;
   range?: MeasurementReferenceRange;
+  /** Whether the laboratory reported the range, rather than the catalog. */
+  reportedRange: boolean;
 };
 
 /** Resolves a readable name from the observation's coding or text. */
@@ -71,6 +79,7 @@ export function BiomarkerDetailView() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
+  const demographics = useRangeDemographics();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [history, setHistory] = useState({
     patientId: '',
@@ -154,16 +163,23 @@ export function BiomarkerDetailView() {
               '',
             id: observation.id || `${record.report.id}-${matches.length}`,
             name: displayName,
-            status: toRangeStatus(getObservationStatus(observation, marker)),
+            status: toRangeStatus(
+              getObservationStatus(observation, marker, demographics)
+            ),
             reportId: record.report.id || '',
             unitCode: getObservationUnitCode(observation),
-            range: getObservationReferenceRange(observation, marker),
+            range: getObservationReferenceRange(
+              observation,
+              marker,
+              demographics
+            ),
+            reportedRange: Boolean(observation.referenceRange?.length),
           });
         }
       }
     }
     return matches.sort((a, b) => a.date.localeCompare(b.date));
-  }, [id, marker, reports]);
+  }, [id, marker, reports, demographics]);
 
   const latestMeasurement = measurements[measurements.length - 1];
   const chartMeasurements = useMemo(
@@ -202,6 +218,10 @@ export function BiomarkerDetailView() {
     );
 
   const title = marker?.name || measurements[0].name;
+  const latestRange =
+    marker && !latestMeasurement.reportedRange
+      ? resolveReferenceRange(marker, demographics, latestMeasurement.date)
+      : undefined;
   return (
     <ResourceViewLayout
       testID="biomarker-view"
@@ -281,6 +301,21 @@ export function BiomarkerDetailView() {
           testID="biomarker-latest-range"
         />
       </View>
+      {marker && (
+        <View style={styles.section} testID="biomarker-range">
+          <Text style={styles.sectionTitle}>Reference range</Text>
+          <Text style={styles.description} testID="biomarker-range-explanation">
+            {latestRange
+              ? explainReferenceRange(marker, latestRange)
+              : 'This range comes from your laboratory report.'}
+          </Text>
+          <RangeProfileNotice
+            missing={latestRange?.missing ?? []}
+            testID="biomarker-range-notice"
+            style={styles.notice}
+          />
+        </View>
+      )}
       {chartMeasurements.length > 1 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Value history</Text>
@@ -722,6 +757,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   section: { marginBottom: 28 },
+  notice: { marginTop: 16 },
   sectionTitle: {
     color: COLORS.light.foreground,
     fontSize: 18,

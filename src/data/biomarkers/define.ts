@@ -2,6 +2,7 @@ import {
   EMPTY_BIOMARKER_EDUCATION,
   type BiomarkerCategory,
   type BiomarkerDefinition,
+  type DemographicRange,
   type UnitOption,
 } from './types';
 
@@ -20,7 +21,11 @@ export interface BiomarkerEntry {
   loinc: string;
   /** The first unit is the primary one, in which `range` is given. */
   units: UnitOption[];
+  /** The general adult range, used when no `ranges` entry applies. */
   range?: { low?: number; high?: number };
+  /** Ranges by sex and age, most specific first. */
+  ranges?: DemographicRange[];
+  rangeNote?: string;
   description: string;
 }
 
@@ -39,7 +44,17 @@ export function defineBiomarkers(
   entries: BiomarkerEntry[]
 ): BiomarkerDefinition[] {
   return entries.map(
-    ({ id, name, aliases = [], loinc, units, range, description }) => ({
+    ({
+      id,
+      name,
+      aliases = [],
+      loinc,
+      units,
+      range,
+      ranges,
+      rangeNote,
+      description,
+    }) => ({
       id,
       name,
       aliases,
@@ -51,6 +66,8 @@ export function defineBiomarkers(
       ...(range && {
         referenceRange: { ...range, text: rangeText(range, units[0].label) },
       }),
+      ...(ranges && { demographicRanges: ranges }),
+      ...(rangeNote && { rangeNote }),
       description,
       education: { ...EMPTY_BIOMARKER_EDUCATION },
     })

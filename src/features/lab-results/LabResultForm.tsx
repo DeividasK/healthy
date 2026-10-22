@@ -49,7 +49,6 @@ import {
   deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { convertBiomarkerValue } from './biomarkerMeasurements';
 import { ImportLabResultsModal } from './ImportLabResultsModal';
 import type { ImportedLabResults } from './labResultsAIImport';
 
@@ -397,24 +396,6 @@ export function LabResultForm({
         value: parseFloat(item.valueStr),
         unit: item.selectedUnit,
         ucumCode: item.selectedUcum,
-        referenceLow:
-          item.definition.referenceRange?.low === undefined
-            ? undefined
-            : convertBiomarkerValue(
-                item.definition.referenceRange.low,
-                item.definition.ucumCode,
-                item.selectedUcum,
-                item.definition
-              ),
-        referenceHigh:
-          item.definition.referenceRange?.high === undefined
-            ? undefined
-            : convertBiomarkerValue(
-                item.definition.referenceRange.high,
-                item.definition.ucumCode,
-                item.selectedUcum,
-                item.definition
-              ),
       }));
 
       await createAndSaveDiagnosticReport({

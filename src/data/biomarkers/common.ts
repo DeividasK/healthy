@@ -99,7 +99,13 @@ export const COMMON_BIOMARKERS = [
       aliases: ['CREA', 'Serum Creatinine', 'Cr'],
       loinc: '2160-0',
       units: [u('mg/dL'), u('umol/L', 88.42)],
-      range: { low: 0.7, high: 1.3 },
+      range: { low: 0.59, high: 1.35 },
+      ranges: [
+        { sex: 'male', low: 0.74, high: 1.35 },
+        { sex: 'female', low: 0.59, high: 1.04 },
+      ],
+      rangeNote:
+        'Creatinine comes from muscle, so typical levels are higher in men.',
       description: 'Muscle waste product used to check kidney function.',
     },
     {
@@ -108,7 +114,13 @@ export const COMMON_BIOMARKERS = [
       aliases: ['Estimated Glomerular Filtration Rate', 'GFR', 'eGFR CKD-EPI'],
       loinc: '98979-8',
       units: [u('mL/min/1.73m2', 1, 'mL/min/{1.73_m2}')],
-      range: { low: 90 },
+      range: { low: 60 },
+      ranges: [
+        { maxAge: 60, low: 90 },
+        { minAge: 60, low: 60 },
+      ],
+      rangeNote:
+        'Kidney filtering slows naturally with age. From 60, values of 60 to 89 are common without kidney disease.',
       description: 'Estimate of how well the kidneys filter blood.',
     },
     {
@@ -150,7 +162,14 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'bicarbonate',
       name: 'Bicarbonate (Total CO2)',
-      aliases: ['CO2', 'Total CO2', 'HCO3', 'Bicarbonate'],
+      aliases: [
+        'CO2',
+        'Total CO2',
+        'HCO3',
+        'Bicarbonate',
+        'Carbon Dioxide',
+        'Carbon Dioxide (CO2)',
+      ],
       loinc: '2028-9',
       units: ELECTROLYTE,
       range: { low: 22, high: 29 },
@@ -182,6 +201,19 @@ export const COMMON_BIOMARKERS = [
       units: [u('mmol/L'), u('mg/dL', 4.008)],
       range: { low: 1.12, high: 1.32 },
       description: 'Active, unbound calcium in the blood.',
+    },
+    {
+      id: 'calcium_corrected',
+      name: 'Calcium, Corrected',
+      aliases: [
+        'Corrected Calcium',
+        'Adjusted Calcium',
+        'Albumin-Adjusted Calcium',
+      ],
+      loinc: '46099-8',
+      units: [u('mg/dL'), u('mmol/L', 0.2495)],
+      range: { low: 8.6, high: 10.3 },
+      description: 'Calcium adjusted for albumin, the protein that carries it.',
     },
     {
       id: 'magnesium',
@@ -222,7 +254,7 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'globulin',
       name: 'Globulin',
-      aliases: ['GLOB', 'Total Globulin'],
+      aliases: ['GLOB', 'Total Globulin', 'Globulin, Calculated'],
       loinc: '10834-0',
       units: [u('g/dL'), u('g/L', 10)],
       range: { low: 2.0, high: 3.5 },
@@ -243,7 +275,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['Urate', 'UA'],
       loinc: '3084-1',
       units: [u('mg/dL'), u('umol/L', 59.48)],
-      range: { low: 3.5, high: 7.2 },
+      range: { low: 2.7, high: 8.0 },
+      ranges: [
+        { sex: 'male', low: 3.7, high: 8.0 },
+        { sex: 'female', low: 2.7, high: 6.1 },
+      ],
       description: 'Waste product of purine breakdown, linked to gout.',
     },
     {
@@ -279,7 +315,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['CysC'],
       loinc: '33863-2',
       units: [u('mg/L')],
-      range: { low: 0.6, high: 1.0 },
+      range: { low: 0.6, high: 1.15 },
+      ranges: [
+        { maxAge: 50, low: 0.6, high: 1.0 },
+        { minAge: 50, low: 0.62, high: 1.15 },
+      ],
       description: 'Protein used as another check of kidney function.',
     },
   ]),
@@ -291,6 +331,10 @@ export const COMMON_BIOMARKERS = [
       loinc: '1742-6',
       units: ENZYME,
       range: { low: 7, high: 55 },
+      ranges: [
+        { sex: 'male', low: 7, high: 55 },
+        { sex: 'female', low: 7, high: 45 },
+      ],
       description: 'Liver enzyme that rises when liver cells are damaged.',
     },
     {
@@ -300,6 +344,10 @@ export const COMMON_BIOMARKERS = [
       loinc: '1920-8',
       units: ENZYME,
       range: { low: 8, high: 48 },
+      ranges: [
+        { sex: 'male', low: 8, high: 48 },
+        { sex: 'female', low: 8, high: 43 },
+      ],
       description: 'Enzyme found in the liver, heart and muscles.',
     },
     {
@@ -308,7 +356,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['ALP', 'Alk Phos'],
       loinc: '6768-6',
       units: ENZYME,
-      range: { low: 40, high: 129 },
+      range: { low: 35, high: 129 },
+      ranges: [
+        { sex: 'male', low: 40, high: 129 },
+        { sex: 'female', low: 35, high: 104 },
+      ],
       description: 'Enzyme from the liver, bile ducts and bones.',
     },
     {
@@ -317,7 +369,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['GGT', 'Gamma GT', 'GGTP'],
       loinc: '2324-2',
       units: ENZYME,
-      range: { low: 8, high: 61 },
+      range: { low: 5, high: 61 },
+      ranges: [
+        { sex: 'male', low: 8, high: 61 },
+        { sex: 'female', low: 5, high: 36 },
+      ],
       description: 'Liver and bile duct enzyme, sensitive to alcohol.',
     },
     {
@@ -410,6 +466,10 @@ export const COMMON_BIOMARKERS = [
       loinc: '2085-9',
       units: CHOLESTEROL,
       range: { low: 40 },
+      ranges: [
+        { sex: 'male', low: 40 },
+        { sex: 'female', low: 50 },
+      ],
       description: 'Cholesterol carried back to the liver for removal.',
     },
     {
@@ -442,11 +502,37 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'cholesterol_hdl_ratio',
       name: 'Cholesterol/HDL Ratio',
-      aliases: ['TC/HDL Ratio', 'Cholesterol Ratio'],
+      aliases: [
+        'TC/HDL Ratio',
+        'Cholesterol Ratio',
+        'Cholesterol / HDL Ratio',
+        'Total Cholesterol/HDL Ratio',
+      ],
       loinc: '9830-1',
       units: RATIO,
       range: { high: 5 },
       description: 'Total cholesterol divided by HDL.',
+    },
+    {
+      id: 'ldl_hdl_ratio',
+      name: 'LDL/HDL Ratio',
+      aliases: ['LDL/HDL', 'LDL-C/HDL-C Ratio'],
+      loinc: '11054-4',
+      units: RATIO,
+      range: { high: 3.5 },
+      description: 'LDL cholesterol divided by HDL cholesterol.',
+    },
+    {
+      id: 'tg_hdl_ratio',
+      name: 'Triglycerides/HDL Ratio',
+      aliases: ['TG/HDL Ratio', 'Triglyceride/HDL Ratio', 'Triglycerides/HDL'],
+      loinc: '44733-4',
+      units: RATIO,
+      range: { high: 2 },
+      rangeNote:
+        'This range is for both values in mg/dL; with mmol/L the ratio is smaller.',
+      description:
+        'Triglycerides divided by HDL, a marker of insulin resistance.',
     },
     {
       id: 'apob',
@@ -460,16 +546,34 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'apoa1',
       name: 'Apolipoprotein A1 (ApoA1)',
-      aliases: ['ApoA1', 'Apo A-I'],
+      aliases: ['ApoA1', 'Apo A-I', 'Apolipoprotein A1'],
       loinc: '1869-7',
       units: PROTEIN_MG_DL,
       range: { low: 120 },
+      ranges: [
+        { sex: 'male', low: 120 },
+        { sex: 'female', low: 140 },
+      ],
       description: 'Main protein of HDL particles.',
+    },
+    {
+      id: 'apob_apoa1_ratio',
+      name: 'ApoB/ApoA1 Ratio',
+      aliases: ['ApoB/ApoA1', 'Apo B/Apo A1 Ratio'],
+      loinc: '1874-7',
+      units: RATIO,
+      range: { high: 0.9 },
+      ranges: [
+        { sex: 'male', high: 0.9 },
+        { sex: 'female', high: 0.8 },
+      ],
+      description:
+        'Balance of particles that clog arteries against protective ones.',
     },
     {
       id: 'lpa_mass',
       name: 'Lipoprotein(a)',
-      aliases: ['Lp(a)', 'Lipoprotein a', 'Lp(a) mass'],
+      aliases: ['Lp(a)', 'Lipoprotein a', 'Lp(a) mass', 'Lipoprotein (a)'],
       loinc: '10835-7',
       units: [u('mg/dL'), u('mg/L', 10)],
       range: { high: 30 },
@@ -484,12 +588,82 @@ export const COMMON_BIOMARKERS = [
       range: { high: 75 },
       description: 'Lipoprotein(a) reported as particle count.',
     },
+    {
+      id: 'omega_3_total',
+      name: 'Omega-3 Total',
+      aliases: ['Total Omega-3', 'Omega-3 Fatty Acids', 'EPA+DPA+DHA'],
+      loinc: '90911-9',
+      units: PERCENT,
+      range: { low: 5.5 },
+      description:
+        'All long-chain omega-3 fatty acids as a share of fatty acids.',
+    },
+    {
+      id: 'omega_3_index',
+      name: 'Omega-3 Index',
+      aliases: ['Omega-3 Index (EPA+DHA)', 'O3 Index'],
+      loinc: '88998-0',
+      units: PERCENT,
+      range: { low: 8 },
+      description:
+        'EPA and DHA as a share of fatty acids; 8% or more is linked to lower heart risk.',
+    },
+    {
+      id: 'epa',
+      name: 'EPA (Eicosapentaenoic Acid)',
+      aliases: ['EPA', 'Eicosapentaenoic Acid'],
+      loinc: '88997-2',
+      units: PERCENT,
+      description:
+        'Omega-3 fatty acid from oily fish, as a share of fatty acids.',
+    },
+    {
+      id: 'dha',
+      name: 'DHA (Docosahexaenoic Acid)',
+      aliases: ['DHA', 'Docosahexaenoic Acid'],
+      loinc: '88995-6',
+      units: PERCENT,
+      description:
+        'Omega-3 fatty acid for the brain and eyes, as a share of fatty acids.',
+    },
+    {
+      id: 'arachidonic_acid',
+      name: 'Arachidonic Acid (AA)',
+      aliases: ['AA', 'Arachidonic Acid'],
+      loinc: '88994-9',
+      units: PERCENT,
+      description:
+        'Omega-6 fatty acid involved in inflammation, as a share of fatty acids.',
+    },
+    {
+      id: 'omega_6_omega_3_ratio',
+      name: 'Omega-6/Omega-3 Ratio',
+      aliases: ['Omega-6/Omega-3', 'n-6/n-3 Ratio'],
+      loinc: '48382-6',
+      units: RATIO,
+      description: 'Balance between omega-6 and omega-3 fatty acids.',
+    },
+    {
+      id: 'aa_epa_ratio',
+      name: 'Arachidonic Acid/EPA Ratio',
+      aliases: ['AA/EPA Ratio', 'AA/EPA'],
+      loinc: '90909-3',
+      units: RATIO,
+      description:
+        'Balance between inflammatory and anti-inflammatory fatty acids.',
+    },
   ]),
   ...defineBiomarkers('Diabetes', [
     {
       id: 'hba1c',
       name: 'Hemoglobin A1c (HbA1c)',
-      aliases: ['HbA1c', 'A1c', 'Glycated Hemoglobin', 'Glycohemoglobin'],
+      aliases: [
+        'HbA1c',
+        'A1c',
+        'Glycated Hemoglobin',
+        'Glycohemoglobin',
+        'Hemoglobin A1c',
+      ],
       loinc: '4548-4',
       units: PERCENT,
       range: { low: 4.0, high: 5.6 },
@@ -498,7 +672,7 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'hba1c_ifcc',
       name: 'Hemoglobin A1c (IFCC)',
-      aliases: ['HbA1c mmol/mol', 'HbA1c IFCC'],
+      aliases: ['HbA1c mmol/mol', 'HbA1c IFCC', 'HbA1c (IFCC)'],
       loinc: '59261-8',
       units: [u('mmol/mol')],
       range: { low: 20, high: 38 },
@@ -535,6 +709,49 @@ export const COMMON_BIOMARKERS = [
       description: 'Released with insulin; shows how much the body makes.',
     },
     {
+      id: 'homa_ir',
+      name: 'HOMA-IR',
+      aliases: ['HOMA-IR Score', 'HOMA', 'Homeostasis Model Assessment'],
+      loinc: '47214-2',
+      units: [u('score', 1, '{score}')],
+      range: { high: 2 },
+      description:
+        'Insulin resistance worked out from fasting glucose and insulin.',
+    },
+    {
+      id: 'anhydroglucitol',
+      name: '1,5-Anhydroglucitol (1,5-AG)',
+      aliases: ['1,5-AG', '1,5-Anhydroglucitol', 'GlycoMark'],
+      loinc: '53835-5',
+      units: [u('ug/mL'), u('mg/L')],
+      range: { low: 6.8, high: 32 },
+      ranges: [
+        { sex: 'male', low: 10.7, high: 32 },
+        { sex: 'female', low: 6.8, high: 29.3 },
+      ],
+      description: 'Falls after blood sugar spikes over the past 1–2 weeks.',
+    },
+    {
+      id: 'leptin',
+      name: 'Leptin',
+      aliases: ['Serum Leptin'],
+      loinc: '21365-2',
+      units: [u('ng/mL'), u('ug/L')],
+      rangeNote:
+        'Leptin depends on body fat and sex, so use the range on your laboratory report.',
+      description: 'Hormone from fat tissue that signals fullness.',
+    },
+    {
+      id: 'adiponectin',
+      name: 'Adiponectin',
+      aliases: ['Serum Adiponectin'],
+      loinc: '47828-9',
+      units: [u('ug/mL'), u('mg/L')],
+      rangeNote:
+        'Adiponectin depends on body fat and sex, so use the range on your laboratory report.',
+      description: 'Hormone from fat tissue that improves insulin sensitivity.',
+    },
+    {
       id: 'fructosamine',
       name: 'Fructosamine',
       aliases: ['Glycated Protein'],
@@ -557,7 +774,7 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'free_t4',
       name: 'Free T4 (Thyroxine)',
-      aliases: ['FT4', 'Free Thyroxine', 'fT4'],
+      aliases: ['FT4', 'Free Thyroxine', 'fT4', 'Free T4'],
       loinc: '3024-7',
       units: [u('ng/dL'), u('pmol/L', 12.87)],
       range: { low: 0.8, high: 1.8 },
@@ -566,7 +783,7 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'free_t3',
       name: 'Free T3 (Triiodothyronine)',
-      aliases: ['FT3', 'Free Triiodothyronine', 'fT3'],
+      aliases: ['FT3', 'Free Triiodothyronine', 'fT3', 'Free T3'],
       loinc: '3051-0',
       units: [u('pg/mL'), u('pmol/L', 1.536)],
       range: { low: 2.3, high: 4.2 },
@@ -635,7 +852,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['Fe', 'Serum Iron'],
       loinc: '2498-4',
       units: [u('ug/dL'), u('umol/L', 0.1791)],
-      range: { low: 60, high: 170 },
+      range: { low: 35, high: 150 },
+      ranges: [
+        { sex: 'male', low: 50, high: 150 },
+        { sex: 'female', low: 35, high: 145 },
+      ],
       description: 'Iron carried in the blood.',
     },
     {
@@ -644,7 +865,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['FERR', 'Serum Ferritin'],
       loinc: '2276-4',
       units: [u('ng/mL'), u('ug/L'), u('pmol/L', 2.247)],
-      range: { low: 24, high: 336 },
+      range: { low: 11, high: 336 },
+      ranges: [
+        { sex: 'male', low: 24, high: 336 },
+        { sex: 'female', low: 11, high: 307 },
+      ],
       description: 'Protein that stores iron; reflects iron reserves.',
     },
     {
@@ -677,10 +902,14 @@ export const COMMON_BIOMARKERS = [
     {
       id: 'transferrin_saturation',
       name: 'Transferrin Saturation',
-      aliases: ['TSAT', 'Iron Saturation', '% Saturation'],
+      aliases: ['TSAT', 'Iron Saturation', '% Saturation', 'Iron % Saturation'],
       loinc: '2502-3',
       units: PERCENT,
-      range: { low: 20, high: 50 },
+      range: { low: 15, high: 50 },
+      ranges: [
+        { sex: 'male', low: 20, high: 50 },
+        { sex: 'female', low: 15, high: 50 },
+      ],
       description: 'Share of transferrin carrying iron.',
     },
     {
@@ -698,7 +927,7 @@ export const COMMON_BIOMARKERS = [
       id: 'vitamin_d',
       name: 'Vitamin D, 25-Hydroxy',
       aliases: ['25-OH Vitamin D', 'Vitamin D', '25(OH)D', 'Calcidiol'],
-      loinc: '1989-3',
+      loinc: '62292-8',
       units: [u('ng/mL'), u('nmol/L', 2.496)],
       range: { low: 30, high: 100 },
       description: 'Main stored form of vitamin D.',
@@ -734,7 +963,7 @@ export const COMMON_BIOMARKERS = [
       id: 'folate_rbc',
       name: 'Folate, Red Blood Cell',
       aliases: ['RBC Folate'],
-      loinc: '2286-3',
+      loinc: '2283-0',
       units: [u('ng/mL'), u('nmol/L', 2.266)],
       range: { low: 140 },
       description: 'Folate stored in red blood cells over months.',
@@ -783,6 +1012,15 @@ export const COMMON_BIOMARKERS = [
       units: [u('umol/L')],
       range: { low: 5, high: 15 },
       description: 'Amino acid linked to B vitamins and heart health.',
+    },
+    {
+      id: 'iodine',
+      name: 'Iodine',
+      aliases: ['Serum Iodine', 'I'],
+      loinc: '2494-3',
+      units: [u('ug/L')],
+      range: { low: 40, high: 92 },
+      description: 'Mineral the thyroid needs to make its hormones.',
     },
     {
       id: 'zinc',
@@ -846,7 +1084,13 @@ export const COMMON_BIOMARKERS = [
       aliases: ['ESR', 'Sed Rate', 'BSG'],
       loinc: '30341-2',
       units: [u('mm/h')],
-      range: { high: 20 },
+      range: { high: 30 },
+      ranges: [
+        { sex: 'male', maxAge: 50, high: 15 },
+        { sex: 'male', minAge: 50, high: 20 },
+        { sex: 'female', maxAge: 50, high: 20 },
+        { sex: 'female', minAge: 50, high: 30 },
+      ],
       description: 'How fast red cells settle; rises with inflammation.',
     },
     {
@@ -1081,6 +1325,10 @@ export const COMMON_BIOMARKERS = [
       loinc: '89579-7',
       units: TROPONIN_HS,
       range: { high: 26 },
+      ranges: [
+        { sex: 'male', high: 34 },
+        { sex: 'female', high: 16 },
+      ],
       description: 'Heart muscle protein released with heart damage.',
     },
     {
@@ -1108,15 +1356,25 @@ export const COMMON_BIOMARKERS = [
       loinc: '33762-6',
       units: [u('pg/mL'), u('ng/L')],
       range: { high: 125 },
+      ranges: [
+        { maxAge: 75, high: 125 },
+        { minAge: 75, high: 450 },
+      ],
       description: 'Released when the heart is under strain.',
     },
     {
       id: 'ck',
       name: 'Creatine Kinase (CK)',
-      aliases: ['CK', 'CPK', 'Creatine Phosphokinase'],
+      aliases: ['CK', 'CPK', 'Creatine Phosphokinase', 'Creatine Kinase'],
       loinc: '2157-6',
       units: ENZYME,
-      range: { low: 39, high: 308 },
+      range: { low: 26, high: 308 },
+      ranges: [
+        { sex: 'male', low: 39, high: 308 },
+        { sex: 'female', low: 26, high: 192 },
+      ],
+      rangeNote:
+        'Creatine kinase also rises for a few days after hard exercise.',
       description: 'Muscle enzyme that rises with muscle damage.',
     },
     {
@@ -1145,7 +1403,10 @@ export const COMMON_BIOMARKERS = [
       aliases: ['Testosterone', 'Total Testosterone'],
       loinc: '2986-8',
       units: [u('ng/dL'), u('nmol/L', 0.03467)],
-      range: { low: 264, high: 916 },
+      ranges: [
+        { sex: 'male', low: 264, high: 916 },
+        { sex: 'female', low: 8, high: 60 },
+      ],
       description: 'Main male sex hormone, also present in women.',
     },
     {
@@ -1154,7 +1415,10 @@ export const COMMON_BIOMARKERS = [
       aliases: ['Free Testosterone', 'FT'],
       loinc: '2991-8',
       units: [u('pg/mL'), u('pmol/L', 3.467)],
-      range: { low: 46, high: 224 },
+      ranges: [
+        { sex: 'male', low: 46, high: 224 },
+        { sex: 'female', low: 0.2, high: 5 },
+      ],
       description: 'Unbound, active testosterone.',
     },
     {
@@ -1163,15 +1427,21 @@ export const COMMON_BIOMARKERS = [
       aliases: ['SHBG'],
       loinc: '13967-5',
       units: [u('nmol/L')],
-      range: { low: 16.5, high: 55.9 },
+      ranges: [
+        { sex: 'male', low: 10, high: 50 },
+        { sex: 'female', low: 17, high: 124 },
+      ],
       description: 'Protein that carries sex hormones in the blood.',
     },
     {
       id: 'estradiol',
       name: 'Estradiol (E2)',
-      aliases: ['E2', 'Oestradiol', 'Estrogen'],
+      aliases: ['E2', 'Oestradiol', 'Estrogen', 'Estradiol'],
       loinc: '2243-4',
       units: [u('pg/mL'), u('pmol/L', 3.671)],
+      ranges: [{ sex: 'male', high: 39 }, { sex: 'female' }],
+      rangeNote:
+        'For women it follows the menstrual cycle, pregnancy and menopause, so no single range applies: use the range on your laboratory report.',
       description: 'Main female sex hormone; varies with the cycle.',
     },
     {
@@ -1180,6 +1450,9 @@ export const COMMON_BIOMARKERS = [
       aliases: ['P4', 'PROG'],
       loinc: '2839-9',
       units: [u('ng/mL'), u('nmol/L', 3.18)],
+      ranges: [{ sex: 'female' }],
+      rangeNote:
+        'For women it follows the menstrual cycle, pregnancy and menopause, so no single range applies: use the range on your laboratory report.',
       description: 'Hormone that prepares the womb; varies with the cycle.',
     },
     {
@@ -1188,6 +1461,9 @@ export const COMMON_BIOMARKERS = [
       aliases: ['LH', 'Lutropin'],
       loinc: '10501-5',
       units: MIU_PER_ML,
+      ranges: [{ sex: 'male', low: 1.5, high: 9.3 }, { sex: 'female' }],
+      rangeNote:
+        'For women it follows the menstrual cycle, pregnancy and menopause, so no single range applies: use the range on your laboratory report.',
       description: 'Pituitary hormone that controls the ovaries and testes.',
     },
     {
@@ -1196,6 +1472,9 @@ export const COMMON_BIOMARKERS = [
       aliases: ['FSH', 'Follitropin'],
       loinc: '15067-2',
       units: MIU_PER_ML,
+      ranges: [{ sex: 'male', low: 1.4, high: 12.8 }, { sex: 'female' }],
+      rangeNote:
+        'For women it follows the menstrual cycle, pregnancy and menopause, so no single range applies: use the range on your laboratory report.',
       description: 'Pituitary hormone for egg and sperm production.',
     },
     {
@@ -1204,15 +1483,41 @@ export const COMMON_BIOMARKERS = [
       aliases: ['PRL'],
       loinc: '2842-3',
       units: [u('ng/mL'), u('ug/L'), u('mIU/L', 21.2, 'm[IU]/L')],
-      range: { low: 4, high: 23 },
+      range: { low: 2, high: 30 },
+      ranges: [
+        { sex: 'male', low: 2, high: 18 },
+        { sex: 'female', low: 3, high: 30 },
+      ],
+      rangeNote: 'Prolactin is much higher during pregnancy and breastfeeding.',
       description: 'Pituitary hormone for milk production.',
     },
     {
       id: 'dhea_s',
       name: 'DHEA Sulfate (DHEA-S)',
-      aliases: ['DHEA-S', 'DHEAS', 'Dehydroepiandrosterone Sulfate'],
+      aliases: [
+        'DHEA-S',
+        'DHEAS',
+        'Dehydroepiandrosterone Sulfate',
+        'DHEA-Sulfate',
+      ],
       loinc: '2191-5',
       units: [u('ug/dL'), u('umol/L', 0.02714)],
+      ranges: [
+        { sex: 'male', minAge: 20, maxAge: 25, low: 211, high: 492 },
+        { sex: 'male', minAge: 25, maxAge: 35, low: 160, high: 449 },
+        { sex: 'male', minAge: 35, maxAge: 45, low: 89.2, high: 427 },
+        { sex: 'male', minAge: 45, maxAge: 55, low: 44.3, high: 331 },
+        { sex: 'male', minAge: 55, maxAge: 65, low: 51.7, high: 295 },
+        { sex: 'male', minAge: 65, maxAge: 75, low: 33.6, high: 249 },
+        { sex: 'male', minAge: 75, low: 16.2, high: 123 },
+        { sex: 'female', minAge: 20, maxAge: 25, low: 110, high: 431.7 },
+        { sex: 'female', minAge: 25, maxAge: 35, low: 84.8, high: 378 },
+        { sex: 'female', minAge: 35, maxAge: 45, low: 57.3, high: 279 },
+        { sex: 'female', minAge: 45, maxAge: 55, low: 31.9, high: 240 },
+        { sex: 'female', minAge: 55, maxAge: 65, low: 26.6, high: 200 },
+        { sex: 'female', minAge: 65, low: 13.6, high: 147 },
+      ],
+      rangeNote: 'DHEA-S peaks in your twenties and falls steadily with age.',
       description: 'Adrenal hormone that the body turns into sex hormones.',
     },
     {
@@ -1222,6 +1527,8 @@ export const COMMON_BIOMARKERS = [
       loinc: '2143-6',
       units: [u('ug/dL'), u('nmol/L', 27.59)],
       range: { low: 6.2, high: 19.4 },
+      rangeNote:
+        'Cortisol is highest in the morning; this range is for a morning sample.',
       description:
         'Stress hormone from the adrenal glands; highest in the morning.',
     },
@@ -1249,6 +1556,8 @@ export const COMMON_BIOMARKERS = [
       aliases: ['IGF-1', 'IGF1', 'Somatomedin C'],
       loinc: '2484-4',
       units: [u('ng/mL'), u('nmol/L', 0.1307)],
+      rangeNote:
+        'IGF-1 falls steadily with age, so use the age-specific range on your laboratory report.',
       description: 'Reflects growth hormone activity; varies with age.',
     },
     {
@@ -1265,6 +1574,8 @@ export const COMMON_BIOMARKERS = [
       aliases: ['AMH', 'Anti-Mullerian Hormone', 'MIS'],
       loinc: '38476-8',
       units: [u('ng/mL'), u('pmol/L', 7.14)],
+      rangeNote:
+        'AMH falls with age as the egg reserve declines, so use the age-specific range on your laboratory report.',
       description: 'Reflects the ovarian egg reserve.',
     },
     {
@@ -1327,6 +1638,14 @@ export const COMMON_BIOMARKERS = [
       loinc: '2857-1',
       units: [u('ng/mL'), u('ug/L')],
       range: { high: 4 },
+      ranges: [
+        { sex: 'male', maxAge: 50, high: 2.5 },
+        { sex: 'male', minAge: 50, maxAge: 60, high: 3.5 },
+        { sex: 'male', minAge: 60, maxAge: 70, high: 4.5 },
+        { sex: 'male', minAge: 70, high: 6.5 },
+      ],
+      rangeNote:
+        'PSA rises with age as the prostate grows, so older men have a higher upper limit.',
       description:
         'Prostate protein used to screen and follow prostate health.',
     },
@@ -1499,7 +1818,11 @@ export const COMMON_BIOMARKERS = [
       aliases: ['CrCl', 'Creatinine Clearance'],
       loinc: '2164-2',
       units: [u('mL/min'), u('mL/s', 0.01667)],
-      range: { low: 90, high: 139 },
+      range: { low: 88, high: 137 },
+      ranges: [
+        { sex: 'male', low: 97, high: 137 },
+        { sex: 'female', low: 88, high: 128 },
+      ],
       description: 'Kidney filtering measured from blood and a day of urine.',
     },
     {

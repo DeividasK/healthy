@@ -5,11 +5,15 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Observation } from 'fhir/r5';
 import type { DiagnosticReportRecord } from '@/src/database/types';
 import {
+  getMissingDemographics,
   getObservationMarker,
   getObservationStatus,
   isSupportedObservation,
   toRangeStatus,
 } from '@/src/features/lab-results/biomarkerMeasurements';
+import type { RangeDemographics } from '@/src/features/lab-results/referenceRanges';
+import { RangeProfileNotice } from '@/src/features/lab-results/RangeProfileNotice';
+import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
 import { COLORS } from '@/src/theme/colors';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { CountBadge } from '@/src/components/CountBadge';
@@ -52,7 +56,8 @@ function periodCutoff(months: number) {
 /** Uses clinical measurement dates rather than report creation or import order. */
 export function latestBiomarkers(
   records: DiagnosticReportRecord[],
-  cutoff = -Infinity
+  cutoff = -Infinity,
+  demographics?: RangeDemographics
 ) {
   const latest = new Map<
     string,
@@ -88,7 +93,9 @@ export function latestBiomarkers(
       time,
       date,
       name: getObservationMarker(observation)!.name,
-      status: toRangeStatus(getObservationStatus(observation)),
+      status: toRangeStatus(
+        getObservationStatus(observation, undefined, demographics)
+      ),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -108,6 +115,7 @@ export function LabsSummary({
   initialPeriod?: string;
 }) {
   const router = useRouter();
+  const demographics = useRangeDemographics();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SummarySort>('deviation');
   const [period, setPeriod] = useState(() =>
@@ -119,9 +127,25 @@ export function LabsSummary({
     () =>
       latestBiomarkers(
         records,
-        periodCutoff(PERIODS.find((option) => option.id === period)!.months)
+        periodCutoff(PERIODS.find((option) => option.id === period)!.months),
+        demographics
       ),
-    [records, period]
+    [records, period, demographics]
+  );
+  const missing = useMemo(
+    () =>
+      getMissingDemographics(
+        biomarkers.map(({ observation }) => observation),
+        demographics
+      ),
+    [biomarkers, demographics]
+  );
+  const notice = (
+    <RangeProfileNotice
+      missing={missing}
+      testID="labs-summary-range-notice"
+      style={styles.notice}
+    />
   );
   const query = search.trim().toLowerCase();
   const listed = useMemo(() => {
@@ -140,8 +164,8 @@ export function LabsSummary({
           ].some((value) => value.toLowerCase().includes(query));
         })
       : biomarkers;
-    return sortSummaryBiomarkers(matches, sort);
-  }, [biomarkers, query, showAll, sort]);
+    return sortSummaryBiomarkers(matches, sort, demographics);
+  }, [biomarkers, query, showAll, sort, demographics]);
 
   const periodPicker = (
     <NativeSelect
@@ -180,6 +204,7 @@ export function LabsSummary({
         <View style={styles.homeBody}>
           <View style={styles.homePeriod}>{periodPicker}</View>
           {grid}
+          {notice}
         </View>
       </ResourceSection>
     );
@@ -198,6 +223,7 @@ export function LabsSummary({
         />
       </View>
       {grid}
+      {notice}
       <View style={styles.controlsRow}>
         <View style={styles.periodControl}>
           <Text style={styles.controlLabel}>Period</Text>
@@ -248,6 +274,7 @@ export function LabsSummary({
 const styles = StyleSheet.create({
   homeBody: { paddingBottom: 20 },
   homePeriod: { width: 100, marginBottom: 12 },
+  notice: { marginTop: 16 },
   heading: {
     flexDirection: 'row',
     alignItems: 'center',

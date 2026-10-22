@@ -117,7 +117,6 @@ import { createOrUpdateConsultation } from '@/src/features/consultations/consult
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
 import { BIOMARKERS } from '@/src/data/biomarkers';
-import { convertBiomarkerValue } from '@/src/features/lab-results/biomarkerMeasurements';
 
 async function connectedProvider() {
   const config = await loadGoogleDriveConfig();
@@ -412,6 +411,9 @@ export function setupTestBridge(
         name: string;
         value: number | string;
         unit?: string;
+        /** A laboratory-reported range, in `unit`. */
+        referenceLow?: number;
+        referenceHigh?: number;
       }[];
     }) => {
       const patientId = await resolvePatientId(input.patientId);
@@ -440,24 +442,9 @@ export function setupTestBridge(
             value: val,
             unit: b.unit || def.primaryUnit,
             ucumCode,
-            referenceLow:
-              def.referenceRange?.low === undefined
-                ? undefined
-                : convertBiomarkerValue(
-                    def.referenceRange.low,
-                    def.ucumCode,
-                    ucumCode,
-                    def
-                  ),
-            referenceHigh:
-              def.referenceRange?.high === undefined
-                ? undefined
-                : convertBiomarkerValue(
-                    def.referenceRange.high,
-                    def.ucumCode,
-                    ucumCode,
-                    def
-                  ),
+            // Saved results carry no range unless a laboratory reported one.
+            referenceLow: b.referenceLow,
+            referenceHigh: b.referenceHigh,
           };
         }
         throw new Error(

@@ -24,7 +24,8 @@ test.describe('Biomarker detail', () => {
       ],
     });
     expect(record.observations[0].valueQuantity.code).toBe('g/L');
-    expect(record.observations[0].referenceRange[0].low.value).toBe(135);
+    // Saved results carry no range: it follows the profile when shown.
+    expect(record.observations[0].referenceRange).toBeUndefined();
     expect(record.observations[1].valueQuantity.code).toBe('10*6/uL');
     await expect(
       seedTestReport(page, {
@@ -43,7 +44,7 @@ test.describe('Biomarker detail', () => {
   test('uses matching reference units and normalizes mixed-unit history', async ({
     page,
   }) => {
-    await seedTestPatient(page);
+    await seedTestPatient(page, { gender: 'male', birthDate: '1990-01-01' });
     await seedTestReport(page, {
       date: '2026-09-01',
       biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
@@ -77,29 +78,14 @@ test.describe('Biomarker detail', () => {
       );
       return JSON.parse(row.fhir_json);
     });
-    expect(latestObservation.referenceRange[0]).toMatchObject({
-      low: { value: 135, code: 'g/L' },
-      high: { value: 175, code: 'g/L' },
-    });
+    expect(latestObservation.referenceRange).toBeUndefined();
+    expect(latestObservation.interpretation).toBeUndefined();
     await expect(
       page.getByTestId('labs-summary-grid-cell-718-7')
     ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
+    // The profile has a gender, so nothing is asked for.
+    await expect(page.getByTestId('labs-summary-range-notice')).toHaveCount(0);
 
-    // Imported observations may omit both interpretation and referenceRange.
-    await page.evaluate(async (id) => {
-      const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
-      const [row] = await bridge.querySql(
-        'SELECT fhir_json FROM observations WHERE id = ?',
-        [id]
-      );
-      const observation = JSON.parse(row.fhir_json);
-      delete observation.referenceRange;
-      delete observation.interpretation;
-      await bridge.executeSql(
-        'UPDATE observations SET fhir_json = ? WHERE id = ?',
-        [JSON.stringify(observation), id]
-      );
-    }, latestObservation.id);
     await openRoute(page, '/biomarker/718-7');
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
     await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('g/L');
@@ -107,11 +93,16 @@ test.describe('Biomarker detail', () => {
       'In range'
     );
     await expect(page.getByTestId('biomarker-loinc')).toHaveText('718-7');
+    // The range for men, in the result's unit, and why it applies.
     const limits = page.getByTestId('biomarker-latest-range-limit');
-    await expect(limits).toHaveText(['135', '175']);
+    await expect(limits).toHaveText(['132', '166']);
+    await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
+      'Typical Hemoglobin (Hgb) levels differ by sex. This range is for men. Laboratories set their own ranges, so yours may differ a little.'
+    );
+    await expect(page.getByTestId('biomarker-range-notice')).toHaveCount(0);
     const chart = page.getByTestId('biomarker-chart');
-    await expect(chart.getByText('135', { exact: true })).toBeVisible();
-    await expect(chart.getByText('175', { exact: true })).toBeVisible();
+    await expect(chart.getByText('132', { exact: true })).toBeVisible();
+    await expect(chart.getByText('166', { exact: true })).toBeVisible();
     const history = page.getByTestId('biomarker-history-list');
     await expect(history.getByText('14.5', { exact: true })).toBeVisible();
     await expect(history.getByText('g/dL', { exact: true })).toBeVisible();
@@ -174,6 +165,9 @@ test.describe('Biomarker detail', () => {
     await expect(chart.getByText('140', { exact: true })).toBeVisible();
     await expect(chart.getByText('149', { exact: true })).toBeVisible();
     await expect(limits).toHaveText(['140', '149']);
+    await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
+      'This range comes from your laboratory report.'
+    );
 
     // Unsupported stored measurements are excluded from history and trends.
     await page.evaluate(async () => {
@@ -337,7 +331,37 @@ test.describe('Biomarker detail', () => {
     await expect(results.nth(3)).toContainText('Jul 1, 2026');
     await expect(showAll).toHaveText('Show less');
 
+    // Red blood cell ranges depend on sex, which the profile doesn't say.
+    const explanation = page.getByTestId('biomarker-range-explanation');
+    await expect(explanation).toHaveText(
+      'Typical Red Blood Cells (RBC) levels differ by sex. Your profile doesn’t have your gender, so a general adult range is shown. Laboratories set their own ranges, so yours may differ a little.'
+    );
+    const limits = page.getByTestId('biomarker-latest-range-limit');
+    await expect(limits).toHaveText(['3.92', '5.65']);
+    await expect(page.getByTestId('biomarker-range-notice')).toBeVisible();
+
     await results.nth(1).click();
     await expect(page).toHaveURL(/lab-result\/rbc-history-second$/);
+
+    // The lab result asks for the gender too, and opens the profile with it.
+    const notice = page.getByTestId('lab-result-range-notice');
+    await expect(notice).toContainText(
+      'Typical ranges for some results depend on your gender.'
+    );
+    await page.getByRole('button', { name: 'Add gender' }).click();
+    await expect(page).toHaveURL(/profile\/[^/]+\/edit\?show=gender$/);
+    await expect(page.getByTestId('patient-birth-date-picker')).toHaveCount(0);
+    await page.getByTestId('patient-gender-select').selectOption('female');
+    await page.getByTestId('save-profile-button').click();
+    await expect(page).toHaveURL(/lab-result\/rbc-history-second$/);
+    await expect(notice).toHaveCount(0);
+
+    // The biomarker now shows, and explains, the range for women.
+    await openRoute(page, '/biomarker/789-8');
+    await expect(explanation).toHaveText(
+      'Typical Red Blood Cells (RBC) levels differ by sex. This range is for women. Laboratories set their own ranges, so yours may differ a little.'
+    );
+    await expect(limits).toHaveText(['3.92', '5.13']);
+    await expect(page.getByTestId('biomarker-range-notice')).toHaveCount(0);
   });
 });
