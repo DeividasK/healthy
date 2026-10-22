@@ -418,6 +418,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // An account with no synced profile has nothing to sync in the
     // background; manual syncs (e.g. restoring profiles) still run.
     if (vaultState !== 'unlocked' || !hasSyncedProfiles) return;
+    // The window gaining focus as the app loads needs no second sync.
+    lastFocusSyncRef.current = Date.now();
     runSync();
 
     const interval = setInterval(() => {

@@ -6,7 +6,10 @@ import {
   seedTestPatient,
 } from '@/src/features/testing/visualTest';
 import { TEST_PHOTO_PNG } from '@/src/features/testing/testRecords';
-import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
+import {
+  connectTestSync,
+  FIXED_TEST_SYNC_SECRET_HEX,
+} from '@/src/features/testing/mockGoogleDrive';
 
 test.describe('Profile Views - Visual Regression', () => {
   test('Profile View - Details & Switcher', async ({ page }, testInfo) => {
@@ -60,13 +63,16 @@ test.describe('Profile Views - Visual Regression', () => {
     page,
   }, testInfo) => {
     await seedTestPatient(page, { id: 'patient-visual' });
-    await connectTestSync(page, { userEmail: 'alice@gmail.com' });
+    await connectTestSync(page, {
+      userEmail: 'alice@gmail.com',
+      secretHex: FIXED_TEST_SYNC_SECRET_HEX,
+    });
     await page.goto('/profile');
+    await waitForSyncIdle(page);
     await page
       .getByTestId('backup-status-text')
       .filter({ hasText: 'up to date' })
       .waitFor();
-    await waitForSyncIdle(page);
 
     await takeSnapshot(
       page,

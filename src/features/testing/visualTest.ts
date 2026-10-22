@@ -92,8 +92,13 @@ export async function waitForMenuToggle(
   );
 }
 
-/** Waits for a sync round to finish and its header checkmark to clear. */
+/**
+ * Waits for the sync the app starts when it loads with a synced profile to
+ * finish, and its header checkmark to clear. Checking only for no indicator
+ * passes before that sync has started.
+ */
 export async function waitForSyncIdle(page: Page): Promise<void> {
+  await expect(page.getByTestId('sync-checkmark')).toBeVisible();
   await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 }
 
