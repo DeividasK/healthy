@@ -91,7 +91,7 @@ test.describe('View Condition', () => {
     const rows = timeline.getByTestId(/^condition-timeline-item-.*-row$/);
     await expect(rows).toHaveText([
       /MRI review/,
-      /Complete blood count/,
+      /^Lab report/,
       /Ibuprofen 400mg/,
       /Knee MRI/,
       /Orthopaedic review/,
@@ -123,12 +123,7 @@ test.describe('View Condition', () => {
       ['consultation', visit.id, 'consultation-title', 'Orthopaedic review'],
       ['service-request', mri.id, 'service-request-title', 'Knee MRI'],
       ['treatment', ibuprofen.id, 'treatment-title', 'Ibuprofen 400mg'],
-      [
-        'lab-result',
-        report.report.id,
-        'lab-result-title',
-        'Complete blood count (hemogram) panel - Blood by Automated count',
-      ],
+      ['lab-result', report.report.id, 'lab-result-title', 'Lab report'],
     ]) {
       await page.getByTestId(`condition-timeline-item-${type}-${id}`).click();
       await expect(page.getByTestId(titleTestID)).toHaveText(title);

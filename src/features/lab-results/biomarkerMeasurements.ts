@@ -1,8 +1,10 @@
 import type { Observation } from 'fhir/r5';
+import { BIOMARKERS, type BiomarkerDefinition } from '@/src/data/biomarkers';
 import {
-  CBC_MARKERS,
-  type CBCBiomarkerDefinition,
-} from '@/src/data/cbcMarkers';
+  resolveReferenceRange,
+  type MissingDemographic,
+  type RangeDemographics,
+} from './referenceRanges';
 
 export type MeasurementStatus = 'Low' | 'Normal' | 'High';
 export type MeasurementReferenceRange = { low?: number; high?: number };
@@ -30,15 +32,24 @@ export function toRangeStatus(
   return status === 'Normal' ? 'inRange' : 'outOfRange';
 }
 
-/** Matches an observation to its CBC catalog definition by code or name. */
+/**
+ * Matches an observation to its biomarker catalog definition: by code and
+ * name together, then by name, then by code. Name first keeps results the
+ * app once saved under another test's code (see migration v21) with their
+ * own test.
+ */
 export function getObservationMarker(observation: Observation) {
   const coding = observation.code.coding?.[0];
   const name = (coding?.display || observation.code.text || '').toLowerCase();
-  return CBC_MARKERS.find(
-    (marker) =>
-      marker.loinc === coding?.code ||
-      marker.name.toLowerCase() === name ||
-      marker.aliases.some((alias) => alias.toLowerCase() === name)
+  const byName = (marker: BiomarkerDefinition) =>
+    marker.name.toLowerCase() === name ||
+    marker.aliases.some((alias) => alias.toLowerCase() === name);
+  const byCode = (marker: BiomarkerDefinition) =>
+    Boolean(coding?.code) && marker.loinc === coding?.code;
+  return (
+    BIOMARKERS.find((marker) => byCode(marker) && byName(marker)) ??
+    BIOMARKERS.find(byName) ??
+    BIOMARKERS.find(byCode)
   );
 }
 
@@ -49,8 +60,8 @@ export function getObservationUnitCode(observation: Observation) {
   );
 }
 
-/** Rejects observations outside the CBC catalog or with unsupported/mismatched units. */
-export function assertCBCObservation(observation: Observation) {
+/** Rejects observations outside the biomarker catalog or with unsupported/mismatched units. */
+export function assertCatalogObservation(observation: Observation) {
   const marker = getObservationMarker(observation);
   if (!marker) {
     const name =
@@ -58,7 +69,7 @@ export function assertCBCObservation(observation: Observation) {
       observation.code.coding?.[0]?.display ||
       observation.code.coding?.[0]?.code ||
       'Unknown';
-    throw new Error(`Biomarker "${name}" is not in the CBC catalog.`);
+    throw new Error(`Biomarker "${name}" is not in the biomarker catalog.`);
   }
   const quantity = observation.valueQuantity;
   const codeUnit = marker.units.find((unit) => unit.ucum === quantity?.code);
@@ -83,10 +94,10 @@ export function assertCBCObservation(observation: Observation) {
   }
 }
 
-/** Checks whether an existing result can be displayed under the CBC-only policy. */
-export function isSupportedCBCObservation(observation: Observation) {
+/** Checks whether an existing result is in the catalog with a supported unit, so it can be displayed. */
+export function isSupportedObservation(observation: Observation) {
   try {
-    assertCBCObservation(observation);
+    assertCatalogObservation(observation);
     return true;
   } catch {
     return false;
@@ -98,7 +109,7 @@ export function convertBiomarkerValue(
   value: number,
   fromUnit: string,
   toUnit: string,
-  marker?: CBCBiomarkerDefinition
+  marker?: BiomarkerDefinition
 ) {
   if (!Number.isFinite(value)) return undefined;
   if (!marker && fromUnit === toUnit) return value;
@@ -110,13 +121,21 @@ export function convertBiomarkerValue(
   );
   if (!from || !to) return undefined;
   if (fromUnit === toUnit) return value;
-  return (value / (from.factor ?? 1)) * (to.factor ?? 1);
+  // Rounded to 10 significant digits to drop floating point noise.
+  return Number(
+    ((value / (from.factor ?? 1)) * (to.factor ?? 1)).toPrecision(10)
+  );
 }
 
-/** Returns the reference bounds in the observation's reported unit. */
+/**
+ * Returns the reference bounds in the observation's reported unit: the range
+ * the laboratory reported, else the catalog's range for the patient's sex
+ * and age on the test date.
+ */
 export function getObservationReferenceRange(
   observation: Observation,
-  marker = getObservationMarker(observation)
+  marker = getObservationMarker(observation),
+  demographics?: RangeDemographics
 ): MeasurementReferenceRange | undefined {
   const unitCode = getObservationUnitCode(observation);
   const reportedRange = observation.referenceRange?.find(
@@ -134,26 +153,25 @@ export function getObservationReferenceRange(
           unitCode,
           marker
         );
+  const catalog =
+    reportedRange || !marker
+      ? undefined
+      : resolveReferenceRange(
+          marker,
+          demographics,
+          observation.effectiveDateTime
+        );
+  /** Converts a catalog bound from the marker's primary unit. */
+  const convertCatalog = (bound: number | undefined) =>
+    bound === undefined || !marker
+      ? undefined
+      : convertBiomarkerValue(bound, marker.ucumCode, unitCode, marker);
   const low = reportedRange
     ? convertBound(reportedRange.low)
-    : marker?.referenceRange?.low === undefined
-      ? undefined
-      : convertBiomarkerValue(
-          marker.referenceRange.low,
-          marker.ucumCode,
-          unitCode,
-          marker
-        );
+    : convertCatalog(catalog?.low);
   const high = reportedRange
     ? convertBound(reportedRange.high)
-    : marker?.referenceRange?.high === undefined
-      ? undefined
-      : convertBiomarkerValue(
-          marker.referenceRange.high,
-          marker.ucumCode,
-          unitCode,
-          marker
-        );
+    : convertCatalog(catalog?.high);
   if (low === undefined && high === undefined) return undefined;
   if (low !== undefined && high !== undefined && high <= low) return undefined;
   return { low, high };
@@ -162,7 +180,8 @@ export function getObservationReferenceRange(
 /** Prefers recognized FHIR interpretations, then compares unit-aligned bounds. */
 export function getObservationStatus(
   observation: Observation,
-  marker = getObservationMarker(observation)
+  marker = getObservationMarker(observation),
+  demographics?: RangeDemographics
 ): MeasurementStatus | undefined {
   const codes = observation.interpretation?.flatMap(
     (interpretation) =>
@@ -175,10 +194,33 @@ export function getObservationStatus(
   if (code === 'H' || code === 'HH') return 'High';
   if (code === 'N') return 'Normal';
   const value = observation.valueQuantity?.value;
-  const range = getObservationReferenceRange(observation, marker);
+  const range = getObservationReferenceRange(observation, marker, demographics);
   if (value === undefined || !Number.isFinite(value) || !range)
     return undefined;
   if (range.low !== undefined && value < range.low) return 'Low';
   if (range.high !== undefined && value > range.high) return 'High';
   return 'Normal';
+}
+
+/**
+ * What the profile lacks for the observations' catalog ranges: their gender
+ * or date of birth, in that order. Ranges a laboratory reported need neither.
+ */
+export function getMissingDemographics(
+  observations: Observation[],
+  demographics: RangeDemographics
+): MissingDemographic[] {
+  const missing = new Set<MissingDemographic>();
+  for (const observation of observations) {
+    if (observation.referenceRange?.length) continue;
+    const marker = getObservationMarker(observation);
+    if (!marker) continue;
+    for (const field of resolveReferenceRange(
+      marker,
+      demographics,
+      observation.effectiveDateTime
+    ).missing)
+      missing.add(field);
+  }
+  return (['sex', 'age'] as const).filter((field) => missing.has(field));
 }

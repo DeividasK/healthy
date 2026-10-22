@@ -91,9 +91,7 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     const view = page.getByTestId('labs-summary-view');
     await expect(view.getByTestId('lab-results-section-count')).toHaveText('1');
     const row = view.getByTestId(`lab-result-open-${report.id}`);
-    await expect(row).toContainText(
-      'Complete blood count (hemogram) panel - Blood by Automated count'
-    );
+    await expect(row).toContainText('Lab report');
     await expect(row).toContainText('Oct 2, 2026');
     await expect(row).toContainText('Final');
     // The reports follow the grouped biomarkers.

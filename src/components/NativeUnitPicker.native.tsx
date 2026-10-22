@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { ChevronDown } from 'lucide-react-native';
-import { UnitOption } from '@/src/data/cbcMarkers';
+import { UnitOption } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 
 export interface NativeUnitPickerProps {

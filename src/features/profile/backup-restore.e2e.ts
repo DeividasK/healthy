@@ -120,5 +120,7 @@ test('a Drive restore defers an unknown biomarker and restores the rest', async 
   expect(restored).toMatchObject({ reports: [], observations: [] });
   expect(restored.patients).toHaveLength(1);
   expect(restored.deferred).toHaveLength(1);
-  expect(restored.deferred[0].error).toContain('is not in the CBC catalog');
+  expect(restored.deferred[0].error).toContain(
+    'is not in the biomarker catalog'
+  );
 });

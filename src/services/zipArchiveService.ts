@@ -16,7 +16,7 @@ import type {
   ServiceRequest,
 } from 'fhir/r5';
 import { deriveKeyFromPassphrase, decryptText } from './cryptoService';
-import { assertCBCObservation } from '@/src/features/lab-results/biomarkerMeasurements';
+import { assertCatalogObservation } from '@/src/features/lab-results/biomarkerMeasurements';
 import {
   fetchAllPatients,
   insertPatientRecord,
@@ -503,7 +503,7 @@ export async function restoreFromZipBytes(
 
   // Validate every lab result before writing any archive resources.
   for (const { observations } of reportResources) {
-    observations.forEach(assertCBCObservation);
+    observations.forEach(assertCatalogObservation);
   }
 
   // Restore in dependency order: Patients -> ProfileSettings -> Organizations -> Conditions -> DiagnosticReports -> Encounters -> MedicationRequests -> MedicationStatements -> MedicationAdministrations -> ServiceRequests -> Procedures -> RequestOrchestrations -> Compositions

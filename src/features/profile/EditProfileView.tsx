@@ -17,7 +17,12 @@ import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditProfileView() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, show } = useLocalSearchParams<{ id: string; show?: string }>();
+  // Fields a notice asked the user to fill in, e.g. for lab result ranges.
+  const showFields = (show?.split(',') ?? []).filter(
+    (field): field is 'birthDate' | 'gender' =>
+      field === 'birthDate' || field === 'gender'
+  );
   const { refreshPatients, setActivePatientId } = useActivePatient();
   const { vaultState, syncedProfileIds, syncNow } = useSync();
   const [initialValues, setInitialValues] = useState<PatientInput | null>(null);
@@ -120,6 +125,7 @@ export function EditProfileView() {
       <ProfileForm
         isEdit
         initialValues={initialValues}
+        showFields={showFields}
         onSave={handleSave}
         onDelete={() => setShowDeleteModal(true)}
       />

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Clock, FileText, Hospital } from 'lucide-react-native';
+import { X, Clock, FileText, Hospital, Sparkles } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
@@ -36,10 +36,10 @@ import {
 } from '@/src/features/organizations/organizationService';
 import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
-  CBC_MARKERS,
-  CBCBiomarkerDefinition,
-  searchCBCMarkers,
-} from '@/src/data/cbcMarkers';
+  BIOMARKERS,
+  BiomarkerDefinition,
+  searchBiomarkers,
+} from '@/src/data/biomarkers';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import {
@@ -49,11 +49,12 @@ import {
   deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { convertBiomarkerValue } from './biomarkerMeasurements';
+import { ImportLabResultsModal } from './ImportLabResultsModal';
+import type { ImportedLabResults } from './labResultsAIImport';
 
 export interface ActiveMarkerItem {
   id: string;
-  definition: CBCBiomarkerDefinition;
+  definition: BiomarkerDefinition;
   valueStr: string;
   selectedUnit: string;
   selectedUcum: string;
@@ -148,6 +149,7 @@ export function LabResultForm({
 
   // Plus menu dropdown
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   // Active tests
   const [activeItems, setActiveItems] = useState<ActiveMarkerItem[]>([]);
@@ -228,14 +230,14 @@ export function LabResultForm({
               obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
             const ucum = obs.valueQuantity?.code || unit;
 
-            const def: CBCBiomarkerDefinition = CBC_MARKERS.find(
+            const def: BiomarkerDefinition = BIOMARKERS.find(
               (m) => m.loinc === loinc
             ) || {
               id: `marker_${loinc}`,
               name,
               aliases: [name],
               loinc,
-              category: 'Complete Blood Count',
+              category: 'Other',
               primaryUnit: unit,
               ucumCode: ucum,
               units: [{ label: unit, ucum }],
@@ -288,18 +290,39 @@ export function LabResultForm({
     const existingLoincs = new Set(
       activeItems.map((item) => item.definition.loinc)
     );
-    const available = CBC_MARKERS.filter((m) => !existingLoincs.has(m.loinc));
+    const available = BIOMARKERS.filter((m) => !existingLoincs.has(m.loinc));
     if (!searchQuery.trim()) {
       return available;
     }
-    return searchCBCMarkers(searchQuery).filter(
+    return searchBiomarkers(searchQuery).filter(
       (m) => !existingLoincs.has(m.loinc)
     );
   }, [searchQuery, activeItems]);
 
   const menuOptions = [...fields.menuOptions, ...links.menuOptions];
 
-  const handleSelectBiomarker = (marker: CBCBiomarkerDefinition) => {
+  /** Fills the form with results read from the AI's reply, for review before saving. */
+  const handleAIImport = (data: ImportedLabResults) => {
+    const [y, m, d] = data.date.split('-').map(Number);
+    setSelectedDate(new Date(y, m - 1, d));
+    loadFields({
+      ...(data.time && { time: data.time }),
+      ...(data.serviceProvider && { serviceProvider: data.serviceProvider }),
+    });
+    setActiveItems(
+      data.results.map(({ marker, value, unit }) => ({
+        id: marker.id,
+        definition: marker,
+        valueStr: value,
+        selectedUnit: unit.label,
+        selectedUcum: unit.ucum,
+      }))
+    );
+    setSearchQuery('');
+    setShowAIImport(false);
+  };
+
+  const handleSelectBiomarker = (marker: BiomarkerDefinition) => {
     const defaultUnit = marker.units[0];
     const newItem: ActiveMarkerItem = {
       id: marker.id,
@@ -373,24 +396,6 @@ export function LabResultForm({
         value: parseFloat(item.valueStr),
         unit: item.selectedUnit,
         ucumCode: item.selectedUcum,
-        referenceLow:
-          item.definition.referenceRange?.low === undefined
-            ? undefined
-            : convertBiomarkerValue(
-                item.definition.referenceRange.low,
-                item.definition.ucumCode,
-                item.selectedUcum,
-                item.definition
-              ),
-        referenceHigh:
-          item.definition.referenceRange?.high === undefined
-            ? undefined
-            : convertBiomarkerValue(
-                item.definition.referenceRange.high,
-                item.definition.ucumCode,
-                item.selectedUcum,
-                item.definition
-              ),
       }));
 
       await createAndSaveDiagnosticReport({
@@ -706,6 +711,22 @@ export function LabResultForm({
             isSaving={isSaving}
             saveDisabled={activeItems.length === 0}
             hasChanges={hasChanges}
+            // New lab results can be filled in from the user's own AI assistant.
+            secondaryActions={
+              isEdit || reportId
+                ? []
+                : [
+                    {
+                      label: 'Import with AI',
+                      testID: 'import-with-ai-button',
+                      icon: Sparkles,
+                      onPress: () => {
+                        setShowPlusMenu(false);
+                        setShowAIImport(true);
+                      },
+                    },
+                  ]
+            }
             deleteLabel="Delete lab result"
             deleteTestID="delete-report-button"
             deleteConfirmation={
@@ -730,6 +751,13 @@ export function LabResultForm({
             onClose={() => setShowPlusMenu(false)}
             options={menuOptions}
           />
+
+          {showAIImport && (
+            <ImportLabResultsModal
+              onClose={() => setShowAIImport(false)}
+              onImport={handleAIImport}
+            />
+          )}
         </View>
       </SafeAreaView>
     </FieldRevealProvider>

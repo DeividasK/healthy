@@ -38,6 +38,9 @@ export interface SeedReportOptions {
     name: string;
     value: number | string;
     unit?: string;
+    /** A laboratory-reported range, in `unit`. */
+    referenceLow?: number;
+    referenceHigh?: number;
   }[];
 }
 

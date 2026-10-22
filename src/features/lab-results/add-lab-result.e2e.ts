@@ -146,7 +146,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(page).toHaveURL(/lab-result\/[^/]+$/);
         reportId = new URL(page.url()).pathname.split('/').pop()!;
         await expect(page.getByTestId('lab-result-title')).toHaveText(
-          'Complete blood count (hemogram) panel - Blood by Automated count'
+          'Lab report'
         );
         await expect(page.getByTestId('lab-result-date')).toContainText(
           'Sep 20, 2026'
@@ -198,6 +198,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await page.getByTestId('edit-lab-result-button').click();
         await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
         await expect(page.getByText('Edit Lab Results')).toBeVisible();
+        // Importing with AI only fills in new lab results.
+        await expect(page.getByTestId('import-with-ai-button')).toHaveCount(0);
         await expect(page.getByTestId('marker-card-0')).toContainText(
           'Hemoglobin (Hgb)'
         );
@@ -255,6 +257,121 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       });
     }
   );
+
+  test('fills the form from an AI reply to the copied instructions', async ({
+    page,
+  }) => {
+    await page.getByTestId('start-lab-result').click();
+    // An earlier test is replaced by the imported ones.
+    await page.getByTestId('test-search-input').fill('MCV');
+    await page.getByTestId('autocomplete-item-cbc_mcv').click();
+
+    await test.step('Copy the instructions for the AI', async () => {
+      await page.getByTestId('import-with-ai-button').click();
+      const modal = page.getByTestId('ai-import-modal-card');
+      await expect(
+        modal.getByRole('heading', { name: 'Import with AI' })
+      ).toBeVisible();
+      await expect(page.getByTestId('ai-import-submit-button')).toBeDisabled();
+      await page
+        .context()
+        .grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.getByTestId('ai-import-copy-button').click();
+      await expect(
+        page.getByRole('button', { name: 'Instructions copied' })
+      ).toBeVisible();
+      const instructions = await page.evaluate(() =>
+        navigator.clipboard.readText()
+      );
+      expect(instructions).toContain('"healthyLabResults": 1');
+      expect(instructions).toContain('- cbc_hemoglobin: Hemoglobin (Hgb)');
+      // The modal takes its dialog role once it has faded in; auditing before
+      // that flags its aria-modal.
+      await expect(
+        page
+          .getByRole('dialog')
+          .getByRole('heading', { name: 'Import with AI' })
+      ).toBeVisible();
+      await checkA11y(page);
+    });
+
+    await test.step('Problems in the reply are listed', async () => {
+      const reply = page.getByTestId('ai-import-reply-input');
+      await reply.fill(
+        '```json\n{"date": "2026-09-20", "results": [{"test": "Unicorn Factor", "value": 40, "unit": "ng/mL"}]}\n```'
+      );
+      await page.getByTestId('ai-import-submit-button').click();
+      await expect(page.getByTestId('ai-import-errors')).toHaveText(
+        '"Unicorn Factor" is not a supported test.'
+      );
+    });
+
+    await test.step('A pasted reply fills the form for review', async () => {
+      const reply = `Unicorn Factor isn't in your list, so I left it out.
+\`\`\`json
+{
+  "healthyLabResults": 1,
+  "date": "2026-09-20",
+  "time": "08:15",
+  "serviceProvider": "City Laboratory",
+  "results": [
+    { "test": "cbc_hemoglobin", "value": 14.5, "unit": "g/dL" },
+    { "test": "cbc_wbc", "value": 6.8, "unit": "10^9/L" },
+    { "test": "ferritin", "value": 85, "unit": "ng/mL" },
+    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L" }
+  ]
+}
+\`\`\``;
+      await page.evaluate((text) => navigator.clipboard.writeText(text), reply);
+      await page.getByRole('button', { name: 'Paste AI reply' }).click();
+      await expect(page.getByTestId('ai-import-reply-input')).toHaveValue(
+        reply
+      );
+      await page.getByTestId('ai-import-submit-button').click();
+      await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
+      await expect(page.getByTestId('date-picker-button')).toContainText(
+        'Sep 20'
+      );
+      await expect(page.getByTestId('time-picker-button')).toContainText(
+        '08:15'
+      );
+      await expect(
+        page.getByTestId('lab-result-service-provider-input')
+      ).toHaveValue('City Laboratory');
+      await expect(page.getByTestId(/^marker-card-/)).toHaveCount(4);
+      await expect(page.getByTestId('marker-card-0')).toContainText(
+        'Hemoglobin (Hgb)'
+      );
+      await expect(page.getByTestId('marker-value-input-0')).toHaveValue(
+        '14.5'
+      );
+      await expect(
+        page.getByTestId('unit-picker-button-1').locator('select')
+      ).toHaveValue('10*9/L');
+      await expect(page.getByTestId('marker-value-input-1')).toHaveValue('6.8');
+      await expect(page.getByTestId('marker-card-3')).toContainText(
+        'LDL Cholesterol'
+      );
+      await expect(
+        page.getByTestId('unit-picker-button-3').locator('select')
+      ).toHaveValue('mmol/L');
+    });
+
+    await test.step('Saving stores the imported results', async () => {
+      await page.getByTestId('save-button').click();
+      const home = page.getByTestId('results-scroll-view');
+      await expect(home.getByTestId('labs-summary-count')).toHaveText('4');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-6690-2')
+      ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-2276-4')
+      ).toHaveAccessibleName('Ferritin: In range');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-13457-7')
+      ).toHaveAccessibleName('LDL Cholesterol: In range');
+    });
+  });
 
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,

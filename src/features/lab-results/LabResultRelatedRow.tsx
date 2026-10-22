@@ -5,7 +5,7 @@ import {
   type ResourceMeta,
   type ResourceRowAppearance,
 } from '@/src/components/ResourceSection';
-import { getLabResultMeta, getLabResultTitle } from './labResultMeta';
+import { getLabResultMeta, LAB_RESULT_TITLE } from './labResultMeta';
 
 /** A lab result listed on another resource's view page. */
 export function LabResultRelatedRow({
@@ -23,7 +23,7 @@ export function LabResultRelatedRow({
   /** Timeline node, status wash or fading. */
   appearance?: ResourceRowAppearance;
 }) {
-  const title = getLabResultTitle(report);
+  const title = LAB_RESULT_TITLE;
   return (
     <ResourceRow
       testID={testID}

@@ -4,10 +4,11 @@ import type { ResourceMeta } from '@/src/components/ResourceSection';
 import { formatDisplayDateTime } from '@/src/utils/dateUtils';
 import { isOrganizationReference } from '@/src/utils/fhirUtils';
 
-/** Display title of a lab result: its DiagnosticReport code. */
-export function getLabResultTitle(report: DiagnosticReport) {
-  return report.code?.text || report.code?.coding?.[0]?.display || 'Lab result';
-}
+/**
+ * Title every lab result shows, also those stored with a panel code (e.g. a
+ * complete blood count panel).
+ */
+export const LAB_RESULT_TITLE = 'Lab report';
 
 /** Display label of a lab result's FHIR DiagnosticReport status. */
 export function getLabResultStatusLabel(report: DiagnosticReport) {

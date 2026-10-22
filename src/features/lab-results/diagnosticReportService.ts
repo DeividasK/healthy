@@ -1,10 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import type { DiagnosticReport, Observation } from 'fhir/r5';
-import {
-  GENERAL_LAB_REPORT_LOINC,
-  CBC_PANEL_LOINC,
-  CBC_MARKERS,
-} from '@/src/data/cbcMarkers';
+import { GENERAL_LAB_REPORT_LOINC } from '@/src/data/biomarkers';
 import {
   insertDiagnosticReportRecord,
   fetchAllDiagnosticReportRecords,
@@ -23,7 +19,7 @@ import {
   withBasedOnServiceRequests,
 } from '@/src/utils/fhirUtils';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
-import { getLabResultTitle } from './labResultMeta';
+import { LAB_RESULT_TITLE } from './labResultMeta';
 
 export interface DiagnosticReportBundle {
   report: DiagnosticReport;
@@ -189,16 +185,6 @@ export async function createAndSaveDiagnosticReport(
     buildFHIRObservation(item, effectiveDateTime, patientId)
   );
 
-  // Check if all markers are CBC markers to provide specialized panel LOINC if applicable,
-  // else general laboratory report LOINC 11502-2
-  const allAreCbc = options.items.every((it) =>
-    CBC_MARKERS.some((cbc) => cbc.loinc === it.loinc)
-  );
-  const panelCode = allAreCbc ? CBC_PANEL_LOINC : GENERAL_LAB_REPORT_LOINC;
-  const panelDisplay = allAreCbc
-    ? 'Complete blood count (hemogram) panel - Blood by Automated count'
-    : 'Laboratory report';
-
   // Elements the form edits; everything else comes from the stored report.
   const fields: DiagnosticReport = {
     resourceType: 'DiagnosticReport',
@@ -215,15 +201,16 @@ export async function createAndSaveDiagnosticReport(
         ],
       },
     ],
+    // Every report is a general laboratory report, named "Lab report".
     code: {
       coding: [
         {
           system: 'http://loinc.org',
-          code: panelCode,
-          display: panelDisplay,
+          code: GENERAL_LAB_REPORT_LOINC,
+          display: 'Laboratory report',
         },
       ],
-      text: panelDisplay,
+      text: LAB_RESULT_TITLE,
     },
     subject: {
       reference: `Patient/${patientId}`,
@@ -347,7 +334,7 @@ export async function getLabResultLinkOptions(
   return (await getAllReports(patientId)).flatMap(({ report }) => {
     if (!report.id) return [];
     const date = report.effectiveDateTime || report.effectivePeriod?.start;
-    const title = getLabResultTitle(report);
+    const title = LAB_RESULT_TITLE;
     return [
       {
         id: report.id,

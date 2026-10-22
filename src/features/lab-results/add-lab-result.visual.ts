@@ -92,5 +92,14 @@ test.describe('Add Lab Result View - Visual Regression', () => {
       'Add Report View - Expanded Optional Fields',
       testInfo
     );
+
+    await page.getByTestId('import-with-ai-button').click();
+    await page
+      .getByTestId('ai-import-reply-input')
+      .fill('{"date": "2026-09-20", "results": []}');
+    await page.getByTestId('ai-import-submit-button').click();
+    await page.getByTestId('ai-import-errors').waitFor();
+
+    await takeSnapshot(page, 'Add Report View - Import with AI', testInfo);
   });
 });

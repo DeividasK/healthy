@@ -1,51 +1,11 @@
 /**
- * Complete Blood Count (CBC) Standard Biomarkers Catalog
- * Curated with official LOINC (Logical Observation Identifiers Names and Codes)
- * and UCUM (Unified Code for Units of Measure) standards.
+ * Complete Blood Count (CBC) biomarkers, curated with official LOINC
+ * (Logical Observation Identifiers Names and Codes) and UCUM (Unified Code
+ * for Units of Measure) standards.
  */
+import { EMPTY_BIOMARKER_EDUCATION, type BiomarkerDefinition } from './types';
 
-export interface UnitOption {
-  label: string;
-  ucum: string;
-  factor?: number; // relative to primary unit
-}
-
-export interface CBCBiomarkerDefinition {
-  id: string;
-  name: string;
-  aliases: string[];
-  loinc: string;
-  category: 'Complete Blood Count';
-  primaryUnit: string;
-  ucumCode: string;
-  units: UnitOption[];
-  referenceRange?: {
-    low?: number;
-    high?: number;
-    text?: string;
-  };
-  description: string;
-  education: CBCBiomarkerEducation;
-}
-
-export interface CBCBiomarkerEducation {
-  about: string;
-  whyItMatters: string;
-  whatItMayAffect: string;
-  whatMayBeRelatedToAChange: string;
-}
-
-const EMPTY_BIOMARKER_EDUCATION: CBCBiomarkerEducation = {
-  about: '',
-  whyItMatters: '',
-  whatItMayAffect: '',
-  whatMayBeRelatedToAChange: '',
-};
-
-export const CBC_PANEL_LOINC = '58410-2'; // Complete blood count (hemogram) panel - Blood by Automated count
-export const GENERAL_LAB_REPORT_LOINC = '11502-2'; // Laboratory report
-
-export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
+export const CBC_MARKERS: BiomarkerDefinition[] = [
   {
     id: 'cbc_wbc',
     name: 'White Blood Cells (WBC)',
@@ -81,10 +41,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       { label: '10*12/L', ucum: '10*12/L', factor: 1 },
     ],
     referenceRange: {
-      low: 4.2,
-      high: 5.9,
-      text: '4.2 - 5.9 10*6/uL',
+      low: 3.92,
+      high: 5.65,
+      text: '3.92 - 5.65 10*6/uL',
     },
+    demographicRanges: [
+      { sex: 'male', low: 4.35, high: 5.65 },
+      { sex: 'female', low: 3.92, high: 5.13 },
+    ],
     description:
       'Number of oxygen-carrying red blood cells per volume of blood.',
     education: {
@@ -112,10 +76,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       { label: 'mmol/L', ucum: 'mmol/L', factor: 0.6206 },
     ],
     referenceRange: {
-      low: 13.5,
-      high: 17.5,
-      text: '13.5 - 17.5 g/dL',
+      low: 11.6,
+      high: 16.6,
+      text: '11.6 - 16.6 g/dL',
     },
+    demographicRanges: [
+      { sex: 'male', low: 13.2, high: 16.6 },
+      { sex: 'female', low: 11.6, high: 15.0 },
+    ],
     description:
       'Iron-containing oxygen transport metalloprotein in red blood cells.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -133,10 +101,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
       { label: 'L/L', ucum: 'L/L', factor: 0.01 },
     ],
     referenceRange: {
-      low: 38.8,
-      high: 50.0,
-      text: '38.8 - 50.0 %',
+      low: 35.5,
+      high: 48.6,
+      text: '35.5 - 48.6 %',
     },
+    demographicRanges: [
+      { sex: 'male', low: 38.3, high: 48.6 },
+      { sex: 'female', low: 35.5, high: 44.9 },
+    ],
     description:
       'Percentage proportion of blood volume that is occupied by red blood cells.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -278,8 +250,15 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_neutrophils_pct',
     name: 'Neutrophils (%)',
-    aliases: ['Neutrophils %', 'Neutrophil Percentage', 'Polys %', 'Segs %'],
-    loinc: '751-8',
+    aliases: [
+      'Neutrophils %',
+      'Neutrophil Percentage',
+      'Polys %',
+      'Segs %',
+      'Neutrophil %',
+      'Neutrophils %',
+    ],
+    loinc: '770-8',
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
@@ -296,8 +275,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_neutrophils_abs',
     name: 'Neutrophils (Absolute)',
-    aliases: ['ANC', 'Absolute Neutrophil Count', 'Absolute Neutrophils'],
-    loinc: '753-4',
+    aliases: [
+      'ANC',
+      'Absolute Neutrophil Count',
+      'Absolute Neutrophils',
+      'Neutrophils',
+      'Neutrophil Count',
+    ],
+    loinc: '751-8',
     category: 'Complete Blood Count',
     primaryUnit: '10*3/uL',
     ucumCode: '10*3/uL',
@@ -316,7 +301,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_lymphocytes_pct',
     name: 'Lymphocytes (%)',
-    aliases: ['Lymphocytes %', 'Lymphs %'],
+    aliases: ['Lymphocytes %', 'Lymphs %', 'Lymphocyte %', 'Lymphocytes %'],
     loinc: '736-9',
     category: 'Complete Blood Count',
     primaryUnit: '%',
@@ -334,7 +319,13 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_lymphocytes_abs',
     name: 'Lymphocytes (Absolute)',
-    aliases: ['ALC', 'Absolute Lymphocyte Count', 'Absolute Lymphs'],
+    aliases: [
+      'ALC',
+      'Absolute Lymphocyte Count',
+      'Absolute Lymphs',
+      'Lymphocytes',
+      'Lymphocyte Count',
+    ],
     loinc: '731-0',
     category: 'Complete Blood Count',
     primaryUnit: '10*3/uL',
@@ -354,7 +345,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_monocytes_pct',
     name: 'Monocytes (%)',
-    aliases: ['Monocytes %', 'Monos %'],
+    aliases: ['Monocytes %', 'Monos %', 'Monocyte %', 'Monocytes %'],
     loinc: '5905-5',
     category: 'Complete Blood Count',
     primaryUnit: '%',
@@ -372,7 +363,13 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_monocytes_abs',
     name: 'Monocytes (Absolute)',
-    aliases: ['AMC', 'Absolute Monocyte Count', 'Absolute Monos'],
+    aliases: [
+      'AMC',
+      'Absolute Monocyte Count',
+      'Absolute Monos',
+      'Monocytes',
+      'Monocyte Count',
+    ],
     loinc: '742-7',
     category: 'Complete Blood Count',
     primaryUnit: '10*3/uL',
@@ -392,8 +389,8 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_eosinophils_pct',
     name: 'Eosinophils (%)',
-    aliases: ['Eosinophils %', 'Eos %'],
-    loinc: '711-2',
+    aliases: ['Eosinophils %', 'Eos %', 'Eosinophil %', 'Eosinophils %'],
+    loinc: '713-8',
     category: 'Complete Blood Count',
     primaryUnit: '%',
     ucumCode: '%',
@@ -410,8 +407,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_eosinophils_abs',
     name: 'Eosinophils (Absolute)',
-    aliases: ['AEC', 'Absolute Eosinophil Count', 'Absolute Eos'],
-    loinc: '704-7',
+    aliases: [
+      'AEC',
+      'Absolute Eosinophil Count',
+      'Absolute Eos',
+      'Eosinophils',
+      'Eosinophil Count',
+    ],
+    loinc: '711-2',
     category: 'Complete Blood Count',
     primaryUnit: '10*3/uL',
     ucumCode: '10*3/uL',
@@ -430,7 +433,7 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_basophils_pct',
     name: 'Basophils (%)',
-    aliases: ['Basophils %', 'Basos %'],
+    aliases: ['Basophils %', 'Basos %', 'Basophil %', 'Basophils %'],
     loinc: '706-2',
     category: 'Complete Blood Count',
     primaryUnit: '%',
@@ -448,8 +451,14 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
   {
     id: 'cbc_basophils_abs',
     name: 'Basophils (Absolute)',
-    aliases: ['ABC', 'Absolute Basophil Count', 'Absolute Basos'],
-    loinc: '702-1',
+    aliases: [
+      'ABC',
+      'Absolute Basophil Count',
+      'Absolute Basos',
+      'Basophils',
+      'Basophil Count',
+    ],
+    loinc: '704-7',
     category: 'Complete Blood Count',
     primaryUnit: '10*3/uL',
     ucumCode: '10*3/uL',
@@ -466,26 +475,3 @@ export const CBC_MARKERS: CBCBiomarkerDefinition[] = [
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
 ];
-
-/**
- * Searches CBC markers by name, alias, or LOINC code.
- */
-export function searchCBCMarkers(query: string): CBCBiomarkerDefinition[] {
-  const clean = query.trim().toLowerCase();
-  if (!clean) return CBC_MARKERS;
-
-  return CBC_MARKERS.filter((marker) => {
-    if (marker.name.toLowerCase().includes(clean)) return true;
-    if (marker.loinc.includes(clean)) return true;
-    return marker.aliases.some((alias) => alias.toLowerCase().includes(clean));
-  });
-}
-
-/**
- * Finds a CBC biomarker by its canonical key or LOINC code.
- */
-export function getCBCMarker(
-  idOrLoinc: string
-): CBCBiomarkerDefinition | undefined {
-  return CBC_MARKERS.find((m) => m.id === idOrLoinc || m.loinc === idOrLoinc);
-}
