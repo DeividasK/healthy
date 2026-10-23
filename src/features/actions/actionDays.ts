@@ -14,7 +14,12 @@ import {
   formatDose,
   getScheduledDoses,
 } from '@/src/features/treatments/regimen';
-import { getRegimenOn, getUsagePeriods, isTakingOn } from './treatmentUsage';
+import {
+  getRegimenOn,
+  getUsagePeriods,
+  getUsageStateOn,
+  isTakingOn,
+} from './treatmentUsage';
 import type { ProcedureItem } from './procedureDays';
 
 /** How many days the homepage and the actions view show at once. */
@@ -185,7 +190,10 @@ export function buildActionDay(
       }
     }
     // Answers no longer matching what is due still show, flagged while the
-    // treatment is still due that day (its regimen changed).
+    // treatment is still due that day (its regimen changed) or on hold.
+    const isOnHold =
+      treatment.status === 'on-hold' ||
+      getUsageStateOn(periods, date) === 'on-hold';
     for (const log of unused) {
       items.push({
         key: log.id!,
@@ -194,7 +202,7 @@ export function buildActionDay(
         dose: log.dosage?.text ? { text: log.dosage.text } : undefined,
         answer: getAnswer(log),
         log,
-        ...(isDue && { mismatch: true }),
+        ...((isDue || isOnHold) && { mismatch: true }),
       });
     }
   }

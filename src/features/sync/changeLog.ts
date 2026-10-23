@@ -285,12 +285,32 @@ export async function applyRemoteChanges(
   let applied = 0;
   let deferred = 0;
   const tables = new Set<DatabaseTable>();
+  const deletedHere = new Set(
+    winners.filter((change) => change.op === 'delete').map(changeKey)
+  );
+  // A child whose owner is deleted (e.g. a dose logged on one device while
+  // another deleted the treatment) can never be stored. It goes the way the
+  // owner's local deletion would have taken it, on every device alike.
+  const isOrphaned = async (change: SyncChange) => {
+    const owner =
+      change.op === 'put' && change.resource
+        ? RESOURCE_REGISTRY[change.resourceType].owner?.(change.resource)
+        : null;
+    if (!owner) return false;
+    if (deletedHere.has(changeKey(owner))) return true;
+    const version = await db.getFirstAsync<{ deleted: number }>(
+      'SELECT deleted FROM sync_row_versions WHERE resource_type = ? AND resource_id = ?;',
+      [owner.resourceType, owner.id]
+    );
+    return version?.deleted === 1;
+  };
   await withCaptureSuppressed(db, async () => {
     for (const change of orderForApply(candidates)) {
       const entry = RESOURCE_REGISTRY[change.resourceType];
       await db.execAsync('SAVEPOINT sync_apply_change;');
       try {
-        if (change.op === 'put') {
+        const orphaned = await isOrphaned(change);
+        if (change.op === 'put' && !orphaned) {
           if (!change.resource || !change.patientId)
             throw new Error(`Invalid change ${changeKey(change)}`);
           await entry.put(change.resource, change.patientId);
@@ -304,7 +324,7 @@ export async function applyRemoteChanges(
           id: change.id,
           patientId: change.patientId,
           hlc: change.hlc,
-          deleted: change.op === 'delete',
+          deleted: change.op === 'delete' || orphaned,
         });
         await db.execAsync('RELEASE sync_apply_change;');
         await db.runAsync('DELETE FROM sync_pending_apply WHERE hlc = ?;', [

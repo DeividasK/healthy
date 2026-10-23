@@ -1,0 +1,3 @@
+kind: Fixed
+body: The offline icon now also shows on the web when your device is connected to a network that can't reach the internet, and disappears once the connection is back
+time: 2026-10-23T07:24:07.992035091Z

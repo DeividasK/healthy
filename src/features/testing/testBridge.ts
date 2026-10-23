@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { reportReachable } from '@/src/services/reachability';
 import { verifyDiagnosisMigration } from '@/src/features/consultations/multipleDiagnosesMigrationFixture';
 import {
   fetchConsultationById,
@@ -231,6 +232,8 @@ export function setupTestBridge(
         require('@expo/log-box/src/LogBox').default.clearAllLogs();
       localStorage.clear();
       sessionStorage.clear();
+      // A failed request's offline status would outlive the test.
+      reportReachable();
       // The sync vault's key; it opens the database only per operation.
       for (const { name } of await indexedDB.databases())
         if (name)

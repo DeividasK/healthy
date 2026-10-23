@@ -198,11 +198,14 @@ export function ProfileBackupRows() {
     vaultState === 'disconnected' ? (
       <Text testID="backup-status-text">{status}</Text>
     ) : (
-      <>
-        <Text testID="connected-user-email">{email}</Text>
-        {' · '}
-        <Text testID="backup-status-text">{status}</Text>
-      </>
+      [
+        <Text key="email" testID="connected-user-email">
+          {email}
+        </Text>,
+        <Text key="status" testID="backup-status-text">
+          {status}
+        </Text>,
+      ]
     );
 
   return (
