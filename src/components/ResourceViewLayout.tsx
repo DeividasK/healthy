@@ -53,6 +53,9 @@ export function ResourceViewLayout({
         ) : (
           <>
             <ScrollView
+              // Lets keyboard users focus and scroll the page on web even
+              // when it has no focusable content of its own.
+              tabIndex={0}
               style={styles.scroll}
               contentContainerStyle={[
                 styles.content,
