@@ -187,6 +187,7 @@ export function parseTreatmentAIReply(
   };
 
   let regimen: RegimenDraft | null = null;
+  const errorsBeforeRegimen = errors.length;
   if (!isAbsent(reply.regimen)) {
     if (!Array.isArray(reply.regimen) || reply.regimen.length === 0)
       errors.push('The regimen must be a list of phases.');
@@ -266,7 +267,8 @@ export function parseTreatmentAIReply(
         }),
       };
       // The form's own checks, once each dose's fields could be read.
-      const problem = errors.length === 0 && validateRegimen(regimen);
+      const problem =
+        errors.length === errorsBeforeRegimen && validateRegimen(regimen);
       if (problem) errors.push(`${problem}.`);
     }
   }
@@ -278,7 +280,11 @@ export function parseTreatmentAIReply(
     ) as Record<string, unknown>;
     const unit = matchAmountUnit(quantity.unit);
     if (!unit)
-      errors.push(`"${quantity.unit ?? ''}" is not a supported quantity unit.`);
+      errors.push(
+        isAbsent(quantity.unit)
+          ? 'The quantity has no unit.'
+          : `"${quantity.unit}" is not a supported quantity unit.`
+      );
     dispenseQuantity = {
       value: numberText(quantity.value, 'The quantity'),
       unit: unit?.id ?? '',

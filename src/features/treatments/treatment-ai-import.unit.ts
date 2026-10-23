@@ -183,12 +183,21 @@ test('lists every problem in the reply', () => {
     ],
   });
   // The form's own regimen checks run once each field could be read.
+  // They also run alongside problems elsewhere in the reply.
   expect(
     parseTreatmentAIReply(
-      '{"name":"Ibuprofen","regimen":[{"doses":[{"amount":2,"unit":"tablet"}]}]}',
+      '{"date":"2026-12-01","regimen":[{"doses":[{"amount":2,"unit":"tablet"}]}],"quantity":{"value":30}}',
       today
     )
-  ).toEqual({ ok: false, errors: ['Enter min times.'] });
+  ).toEqual({
+    ok: false,
+    errors: [
+      'The treatment name is missing.',
+      'The date is in the future.',
+      'Enter min times.',
+      'The quantity has no unit.',
+    ],
+  });
   expect(
     parseTreatmentAIReply('{"name":"Ibuprofen","regimen":[{}]}', today)
   ).toEqual({ ok: false, errors: ['The regimen has no doses.'] });
