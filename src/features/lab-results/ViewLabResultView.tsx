@@ -23,6 +23,7 @@ import {
   toRangeStatus,
   getMissingDemographics,
 } from './biomarkerMeasurements';
+import { withCalculatedObservations } from './calculatedBiomarkers';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { useRangeDemographics } from './useRangeDemographics';
 import { getLabResultMeta, LAB_RESULT_TITLE } from './labResultMeta';
@@ -120,7 +121,9 @@ function LabResultForPatient({
     ?.map((note) => note.text)
     .filter(Boolean)
     .join('\n');
-  const results = record.observations
+  // The report's results, then the values calculated from them.
+  const [{ observations }] = withCalculatedObservations([record]);
+  const results = observations
     .filter(isSupportedObservation)
     .map((observation, index) => ({
       id: observation.id || String(index),

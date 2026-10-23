@@ -1,17 +1,24 @@
 import {
-  BIOMARKERS,
   findBiomarkerByName,
-  type BiomarkerDefinition,
+  RECORDABLE_BIOMARKERS,
+  type RecordableBiomarker,
   type UnitOption,
 } from '@/src/data/biomarkers';
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import {
+  parseAIValue,
+  readAIDate,
+  readAIReply,
+  readAITime,
+  readText,
+  type AIImportResult,
+} from '@/src/utils/aiImport';
 
 /** Version marker the AI puts in its reply, so other JSON is not mistaken for it. */
 export const LAB_RESULTS_AI_FORMAT_KEY = 'healthyLabResults';
 export const LAB_RESULTS_AI_FORMAT_VERSION = 1;
 
 export interface ImportedLabResultItem {
-  marker: BiomarkerDefinition;
+  marker: RecordableBiomarker;
   /** The value as the form's input shows it. */
   value: string;
   unit: UnitOption;
@@ -24,8 +31,7 @@ export interface ImportedLabResults {
   results: ImportedLabResultItem[];
 }
 
-export type LabResultsAIParseResult =
-  { ok: true; data: ImportedLabResults } | { ok: false; errors: string[] };
+export type LabResultsAIParseResult = AIImportResult<ImportedLabResults>;
 
 /**
  * Instructions the user gives their own AI assistant together with a lab
@@ -33,7 +39,7 @@ export type LabResultsAIParseResult =
  * reads. Lists every test the app supports with its accepted units.
  */
 export function buildLabResultsAIInstructions(): string {
-  const tests = BIOMARKERS.map((marker) => {
+  const tests = RECORDABLE_BIOMARKERS.map((marker) => {
     const names = [marker.name, ...marker.aliases].join(', ');
     const units = marker.units.map((unit) => unit.label).join(', ');
     return `- ${marker.id}: ${names}. Units: ${units}`;
@@ -80,51 +86,14 @@ function normalizeUnit(unit: string): string {
     .replace(/\^/g, '*');
 }
 
-/** Finds a catalog test by its id, LOINC code, name or alias. */
-function findMarker(test: string): BiomarkerDefinition | undefined {
+/** Finds a recordable catalog test by its id, LOINC code, name or alias. */
+function findMarker(test: string): RecordableBiomarker | undefined {
   const clean = test.trim().toLowerCase();
   return (
-    BIOMARKERS.find(
+    RECORDABLE_BIOMARKERS.find(
       (marker) => marker.id === clean || marker.loinc === clean
-    ) ?? findBiomarkerByName(test)
+    ) ?? findBiomarkerByName(test, RECORDABLE_BIOMARKERS)
   );
-}
-
-/** Takes the JSON out of an AI reply: a fenced code block, else the outermost braces. */
-function extractJson(text: string): string | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced && fenced[1].includes('{')) return fenced[1].trim();
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  return start >= 0 && end > start ? text.slice(start, end + 1) : null;
-}
-
-function isValidDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [y, m, d] = value.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return (
-    date.getFullYear() === y &&
-    date.getMonth() === m - 1 &&
-    date.getDate() === d
-  );
-}
-
-/** Accepts "8:05" or "08:05"; returns HH:MM or null. */
-function normalizeTime(value: string): string | null {
-  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const [h, m] = [Number(match[1]), Number(match[2])];
-  if (h > 23 || m > 59) return null;
-  return `${String(h).padStart(2, '0')}:${match[2]}`;
-}
-
-/** Reads a number, or a numeric string with a dot or comma decimal separator. */
-function parseValue(value: unknown): number | undefined {
-  if (typeof value === 'number') return value;
-  if (typeof value !== 'string') return undefined;
-  const clean = value.trim().replace(',', '.');
-  return /^\d+(\.\d+)?$/.test(clean) ? Number(clean) : undefined;
 }
 
 /**
@@ -135,48 +104,15 @@ export function parseLabResultsAIReply(
   text: string,
   today: Date = new Date()
 ): LabResultsAIParseResult {
-  const json = extractJson(text);
-  if (!json)
-    return {
-      ok: false,
-      errors: ["The pasted text doesn't contain lab results in JSON format."],
-    };
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return {
-      ok: false,
-      errors: [
-        "The lab results couldn't be read. Paste the AI's whole reply, including the code block.",
-      ],
-    };
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-    return {
-      ok: false,
-      errors: ["The pasted text doesn't contain lab results in JSON format."],
-    };
-
-  const reply = parsed as Record<string, unknown>;
+  const read = readAIReply(text, 'lab results');
+  if (!read.ok) return read;
+  const { reply } = read;
   const errors: string[] = [];
 
-  const date = typeof reply.date === 'string' ? reply.date.trim() : '';
-  if (!isValidDate(date))
-    errors.push('The date is missing or not in YYYY-MM-DD format.');
-  else if (date > formatLocalDate(today))
-    errors.push('The date is in the future.');
+  const date = readAIDate(reply.date, errors, { today }) ?? '';
+  const time = readAITime(reply.time, errors);
 
-  let time: string | null = null;
-  if (reply.time !== undefined && reply.time !== null && reply.time !== '') {
-    time = typeof reply.time === 'string' ? normalizeTime(reply.time) : null;
-    if (!time) errors.push('The time is not in HH:MM format.');
-  }
-
-  let serviceProvider: string | null = null;
-  if (typeof reply.serviceProvider === 'string')
-    serviceProvider = reply.serviceProvider.trim() || null;
+  const serviceProvider = readText(reply.serviceProvider);
 
   const results: ImportedLabResultItem[] = [];
   if (!Array.isArray(reply.results) || reply.results.length === 0) {
@@ -201,7 +137,7 @@ export function parseLabResultsAIReply(
       }
       seen.add(marker.id);
 
-      const value = parseValue(item.value);
+      const value = parseAIValue(item.value);
       if (value === undefined || !Number.isFinite(value) || value < 0) {
         errors.push(`${marker.name} has no valid value.`);
         return;

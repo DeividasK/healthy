@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import type { Observation } from 'fhir/r5';
-import { ChevronRight } from 'lucide-react-native';
+import { Calculator, ChevronRight } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getBiomarkerKey } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import {
@@ -9,14 +10,15 @@ import {
   getObservationReferenceRange,
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import { isCalculatedObservation } from '@/src/features/lab-results/calculatedBiomarkers';
 
 /**
- * Route id of an observation's biomarker page: its catalog test's code, else
+ * Route id of an observation's biomarker page: its catalog test's key, else
  * its own code, or its name for custom tests.
  */
 export function getBiomarkerRouteId(observation: Observation) {
   const marker = getObservationMarker(observation);
-  if (marker) return marker.loinc;
+  if (marker) return getBiomarkerKey(marker);
   const code = observation.code?.coding?.[0]?.code;
   return code && code !== 'custom' ? code : getBiomarkerName(observation);
 }
@@ -32,7 +34,8 @@ export function getBiomarkerName(observation: Observation) {
 
 /**
  * A full-width row: title, value and unit, then the range bar and a chevron.
- * The status is left to the grid and group headings around it.
+ * The status is left to the grid and group headings around it. A calculator
+ * after the unit marks a value the app calculated from other results.
  */
 export function BiomarkerValueRow({
   title,
@@ -40,6 +43,7 @@ export function BiomarkerValueRow({
   unit,
   low,
   high,
+  calculated = false,
   onPress,
   accessibilityLabel,
   testID,
@@ -50,6 +54,7 @@ export function BiomarkerValueRow({
   unit: string;
   low?: number;
   high?: number;
+  calculated?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
   testID?: string;
@@ -60,7 +65,9 @@ export function BiomarkerValueRow({
       style={styles.row}
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={
+        calculated ? `${accessibilityLabel} (calculated)` : accessibilityLabel
+      }
       onPress={onPress}
       activeOpacity={0.6}
     >
@@ -69,6 +76,14 @@ export function BiomarkerValueRow({
         <View style={styles.valueGroup}>
           <Text style={styles.value}>{value ?? '-'}</Text>
           <Text style={styles.unit}>{unit}</Text>
+          {calculated && (
+            <Calculator
+              size={13}
+              color={COLORS.light.muted}
+              style={styles.calculated}
+              testID={testID ? `${testID}-calculated` : undefined}
+            />
+          )}
         </View>
       </View>
       {typeof value === 'number' && (
@@ -101,6 +116,7 @@ export function BiomarkerResultRow({
   return (
     <BiomarkerValueRow
       title={name}
+      calculated={isCalculatedObservation(observation)}
       value={observation.valueQuantity?.value}
       unit={
         observation.valueQuantity?.unit || observation.valueQuantity?.code || ''
@@ -149,6 +165,7 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
   },
   unit: { fontSize: 13, color: COLORS.light.muted },
+  calculated: { alignSelf: 'center', marginLeft: 2 },
   // Lines up with the chevrons of resource rows.
   chevron: {
     width: 48,

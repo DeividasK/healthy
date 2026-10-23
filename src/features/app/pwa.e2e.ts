@@ -1,8 +1,10 @@
+import type { Route } from '@playwright/test';
 import {
   test,
   expect,
   createPatientViaUI,
 } from '@/src/features/testing/testStorage';
+import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
 // Loading the app is what these tests are about.
 test.use({ freshApp: true });
@@ -35,6 +37,7 @@ test.describe('Installable web app', () => {
   test('shows the offline status in place of the sync indicator', async ({
     page,
     context,
+    consoleMonitor,
   }) => {
     await createPatientViaUI(page);
     await expect(page.getByTestId('offline-header-indicator')).toHaveCount(0);
@@ -47,5 +50,22 @@ test.describe('Installable web app', () => {
 
     await context.setOffline(false);
     await expect(indicator).toHaveCount(0);
+
+    await test.step('while connected but Google cannot be reached', async () => {
+      await connectTestSync(page);
+      const google = 'https://www.googleapis.com/**';
+      const failLookup = (route: Route) => route.abort('namenotresolved');
+      await page.route(google, failLookup);
+      // The browser logs each request that cannot reach Google.
+      consoleMonitor.ignore('net::ERR_NAME_NOT_RESOLVED');
+      // Reload so the app's sync on start runs with the bridge's connection.
+      await page.goto('/profile');
+      await expect(indicator).toBeVisible();
+      await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
+
+      // The app checks again on its own and clears the status once through.
+      await page.unroute(google, failLookup);
+      await expect(indicator).toHaveCount(0, { timeout: 15000 });
+    });
   });
 });

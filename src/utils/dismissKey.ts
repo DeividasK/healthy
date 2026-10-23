@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { BackHandler, Platform } from 'react-native';
 
 // Escape (web) and the back button or gesture (Android) go only to the most
@@ -28,7 +28,9 @@ export function useDismissKey(handler: () => void, enabled = true) {
     handlerRef.current = handler;
   }, [handler]);
 
-  useEffect(() => {
+  // Registered before the screen paints, so a key pressed as soon as it
+  // shows is not lost.
+  useLayoutEffect(() => {
     if (!enabled) return;
     if (Platform.OS === 'android') {
       handlers.push(handlerRef);

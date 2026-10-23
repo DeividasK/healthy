@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { reportReachable } from '@/src/services/reachability';
 import { verifyDiagnosisMigration } from '@/src/features/consultations/multipleDiagnosesMigrationFixture';
 import {
   fetchConsultationById,
@@ -116,7 +117,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
-import { BIOMARKERS } from '@/src/data/biomarkers';
+import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 
 async function connectedProvider() {
   const config = await loadGoogleDriveConfig();
@@ -231,6 +232,8 @@ export function setupTestBridge(
         require('@expo/log-box/src/LogBox').default.clearAllLogs();
       localStorage.clear();
       sessionStorage.clear();
+      // A failed request's offline status would outlive the test.
+      reportReachable();
       // The sync vault's key; it opens the database only per operation.
       for (const { name } of await indexedDB.databases())
         if (name)
@@ -300,6 +303,9 @@ export function setupTestBridge(
       return phrase;
     },
     syncNow: async () => syncOnce(await connectedProvider(), await vaultKeys()),
+    /** When the app last finished a sync; the bridge's own syncs don't set it. */
+    lastSyncTimestamp: async () =>
+      (await loadGoogleDriveConfig())?.lastSyncTimestamp ?? null,
     compactNow: async () =>
       compactNow(await connectedProvider(), await vaultKeys()),
     deleteCloudData: async () => deleteCloudData(await connectedProvider()),
@@ -419,7 +425,7 @@ export function setupTestBridge(
       const patientId = await resolvePatientId(input.patientId);
       const items = input.biomarkers.map((b) => {
         const query = b.name.toLowerCase().trim();
-        const def = BIOMARKERS.find(
+        const def = RECORDABLE_BIOMARKERS.find(
           (m) =>
             m.name.toLowerCase() === query ||
             m.aliases.some((a) => a.toLowerCase() === query) ||

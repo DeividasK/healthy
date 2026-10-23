@@ -249,6 +249,11 @@ export async function mockGoogleDrive(
   return store;
 }
 
+/** A fixed vault secret, so snapshots show the same 24 words every run. */
+export const FIXED_TEST_SYNC_SECRET_HEX = Array.from({ length: 32 }, (_, i) =>
+  (i * 7).toString(16).padStart(2, '0')
+).join('');
+
 /**
  * Attaches the shared in-memory Drive and connects this page's device to it
  * through the test bridge: creates the vault, or unlocks it with `phrase`.

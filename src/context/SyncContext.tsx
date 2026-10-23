@@ -8,9 +8,15 @@ import React, {
 } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
+  GoogleIdentityUnavailableError,
   loadGisScript,
   silentRefreshWebAccessToken,
 } from '@/src/services/googleAuthWebService';
+import {
+  isNetworkError,
+  reportReachable,
+  reportUnreachable,
+} from '@/src/services/reachability';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
   type GoogleDriveConfig,
@@ -277,7 +283,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const refreshed = await refreshAccessToken(active!, {
           interactive,
         }).catch((err) => {
-          console.warn('Google token refresh failed:', err);
+          // Google's script failing to load was already reported.
+          if (!(err instanceof GoogleIdentityUnavailableError))
+            console.warn('Google token refresh failed:', err);
           return null;
         });
         if (!refreshed) {
@@ -329,6 +337,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           await withProvider((provider) => syncOnce(provider, keys), {
             interactive: manual,
           });
+          reportReachable();
           const now = new Date();
           if (configRef.current)
             await updateConfig({
@@ -344,6 +353,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             // Automatic syncs pause until the user syncs or reconnects; the
             // sync card shows it, so this expected state is not logged.
             markAuthExpired(true);
+            setSyncState('idle');
+            setIsUpToDate(false);
+            return;
+          }
+          if (isNetworkError(err)) {
+            // The header shows the device offline in the sync status's place.
+            reportUnreachable();
             setSyncState('idle');
             setIsUpToDate(false);
             return;
@@ -418,6 +434,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // An account with no synced profile has nothing to sync in the
     // background; manual syncs (e.g. restoring profiles) still run.
     if (vaultState !== 'unlocked' || !hasSyncedProfiles) return;
+    // The window gaining focus as the app loads needs no second sync.
+    lastFocusSyncRef.current = Date.now();
     runSync();
 
     const interval = setInterval(() => {

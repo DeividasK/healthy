@@ -101,6 +101,85 @@ test.describe('Add Treatment Flow', () => {
     expect(stored.text.div).toContain('Amoxicillin 500mg Capsule');
   });
 
+  test('fills a new treatment from an AI reply', async ({ page }) => {
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('import-with-ai-button').click();
+    await page.getByTestId('ai-import-reply-input').fill(
+      JSON.stringify({
+        healthyTreatment: 1,
+        name: 'Prednisolone 5 mg tablets',
+        intent: 'order',
+        status: 'active',
+        date: '2025-03-10',
+        requester: 'Dr. Sarah Adams',
+        regimen: [
+          {
+            doses: [
+              {
+                amount: 2,
+                unit: 'tablet',
+                route: 'Oral',
+                times: 1,
+                timeOfDay: 'MORN',
+                courseLength: 5,
+                courseUnit: 'd',
+                instructions: 'Take with food',
+              },
+            ],
+          },
+          { doses: [{ amount: 1, unit: 'tablet', times: 1, timesMax: 2 }] },
+        ],
+        quantity: { value: 30, unit: 'tablets' },
+        reason: 'Asthma flare-up',
+      })
+    );
+    await page.getByTestId('ai-import-submit-button').click();
+    await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
+
+    await expect(page.getByTestId('treatment-title-input')).toHaveValue(
+      'Prednisolone 5 mg tablets'
+    );
+    await expect(page.getByTestId('treatment-intent-select')).toHaveValue(
+      'order'
+    );
+    await expect(
+      page.getByTestId('treatment-date-picker').locator('input')
+    ).toHaveValue('2025-03-10');
+    await expect(page.getByTestId('treatment-requester-input')).toHaveValue(
+      'Dr. Sarah Adams'
+    );
+    await expect(
+      page.getByTestId('treatment-regimen-p1-d1-amount-input')
+    ).toHaveValue('2');
+    await expect(
+      page.getByTestId('treatment-regimen-p2-d1-frequency-input')
+    ).toHaveValue('1');
+    await expect(
+      page.getByTestId('treatment-dispenseQuantity-input')
+    ).toHaveValue('30');
+    await expect(page.getByTestId('treatment-reason-input')).toHaveValue(
+      'Asthma flare-up'
+    );
+
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page).toHaveURL(/\/treatment\/[^/]+$/);
+    await expect(page.getByTestId('treatment-dosage')).toHaveText(
+      [
+        'Phase 1: 2 tablets oral in the morning, for 5 days. Take with food',
+        'Phase 2: 1 tablet, 1–2 times a day',
+      ].join('\n')
+    );
+    const stored = await getTestTreatment(page, page.url().split('/').pop()!);
+    expect(stored.authoredOn.slice(0, 10)).toBe('2025-03-10');
+    expect(stored.dosageInstruction[0].patientInstruction).toBe(
+      'Take with food'
+    );
+    expect(stored.dispenseRequest.quantity).toMatchObject({
+      value: 30,
+      code: '{tablet}',
+    });
+  });
+
   test('creates a treatment from a consultation, then edits and deletes it', async ({
     page,
   }) => {
@@ -185,6 +264,8 @@ test.describe('Add Treatment Flow', () => {
       await openRoute(page, `/treatment/${created.id}`);
       await page.getByTestId('edit-treatment-button').click();
       await expect(page).toHaveURL(new RegExp(`treatment/${created.id}/edit$`));
+      // Importing with AI only fills in new treatments.
+      await expect(page.getByTestId('import-with-ai-button')).toHaveCount(0);
       await expect(
         page.getByTestId(`treatment-selected-condition-${migraine.id}`)
       ).toBeVisible();

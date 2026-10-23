@@ -364,4 +364,125 @@ test.describe('Biomarker detail', () => {
     await expect(limits).toHaveText(['3.92', '5.13']);
     await expect(page.getByTestId('biomarker-range-notice')).toHaveCount(0);
   });
+
+  test('calculates the atherogenic index from triglycerides and HDL', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    await seedTestReport(page, {
+      id: 'aip-first',
+      date: '2026-06-01',
+      biomarkers: [
+        { name: 'Triglycerides', value: 1, unit: 'mmol/L' },
+        { name: 'HDL', value: 2.14, unit: 'mmol/L' },
+      ],
+    });
+    await seedTestReport(page, {
+      id: 'aip-second',
+      date: '2026-09-01',
+      biomarkers: [
+        { name: 'Triglycerides', value: 150, unit: 'mg/dL' },
+        { name: 'HDL', value: 40, unit: 'mg/dL' },
+      ],
+    });
+    await seedTestReport(page, {
+      id: 'aip-without-hdl',
+      date: '2026-10-01',
+      biomarkers: [{ name: 'Triglycerides', value: 1, unit: 'mmol/L' }],
+    });
+
+    await openRoute(page, '/');
+    const square = page.getByTestId('labs-summary-grid-cell-aip');
+    await expect(square).toHaveAccessibleName(
+      'Atherogenic Index of Plasma (AIP): Out of range'
+    );
+    await square.click();
+
+    await expect(page.getByTestId('biomarker-title')).toHaveText(
+      'Atherogenic Index of Plasma (AIP)'
+    );
+    await expect(page.getByTestId('biomarker-calculated')).toHaveText(
+      'Calculated'
+    );
+    await expect(page.getByTestId('biomarker-loinc')).toHaveCount(0);
+    await expect(page.getByTestId('biomarker-calculation-formula')).toHaveText(
+      'Worked out as log₁₀(triglycerides ÷ HDL), both in mmol/L, from your Triglycerides and HDL Cholesterol results in the same report:'
+    );
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('0.21');
+    await expect(page.getByTestId('biomarker-latest-date')).toHaveText(
+      'Sep 1, 2026'
+    );
+    const results = page
+      .getByTestId('biomarker-history-list')
+      .getByRole('button', { name: /^View lab result:/ });
+    await expect(results).toHaveText([
+      /^Sep 1, 20260\.21/,
+      /^Jun 1, 2026-0\.33/,
+    ]);
+    await expect(
+      page.locator(
+        '[data-testid^="biomarker-history-"][data-testid$="-calculated"]'
+      )
+    ).toHaveCount(2);
+
+    // The latest value links the results it was worked out from.
+    const triglycerides = page.getByTestId('biomarker-source-result-2571-8');
+    await expect(triglycerides).toContainText('150mg/dL');
+    await expect(
+      page.getByTestId('biomarker-source-result-2085-9')
+    ).toContainText('40mg/dL');
+    await triglycerides.click();
+    await expect(page).toHaveURL(/biomarker\/2571-8$/);
+
+    // Each report lists its calculated value, marked, after its results.
+    await openRoute(page, '/lab-result/aip-first');
+    const row = page.getByTestId('lab-result-groups').getByRole('button', {
+      name: 'View biomarker: Atherogenic Index of Plasma (AIP) (calculated)',
+    });
+    await expect(row).toContainText('-0.33index');
+    await expect(
+      page.getByTestId('lab-result-grid-cell-aip-first-aip')
+    ).toBeVisible();
+    await openRoute(page, '/lab-result/aip-without-hdl');
+    await expect(
+      page.getByTestId('lab-result-results-section-count')
+    ).toHaveText('1');
+
+    // A standard value is always worked out from its inputs; recorded, it
+    // still shows for reports without them.
+    await seedTestReport(page, {
+      id: 'ratio-with-inputs',
+      date: '2026-08-01',
+      biomarkers: [
+        { name: 'Total Cholesterol', value: 200, unit: 'mg/dL' },
+        { name: 'HDL', value: 50, unit: 'mg/dL' },
+        { name: 'Cholesterol/HDL Ratio', value: 9, unit: 'ratio' },
+      ],
+    });
+    await seedTestReport(page, {
+      id: 'ratio-alone',
+      date: '2026-07-01',
+      biomarkers: [
+        { name: 'Cholesterol/HDL Ratio', value: 3.5, unit: 'ratio' },
+      ],
+    });
+    await openRoute(page, '/biomarker/9830-1');
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('4');
+    await expect(page.getByTestId('biomarker-calculated')).toHaveText(
+      'Calculated'
+    );
+    await expect(page.getByTestId('biomarker-loinc')).toHaveText('9830-1');
+    await expect(results).toHaveText([/^Aug 1, 20264/, /^Jul 1, 20263\.5/]);
+    // Only the worked-out value is marked as calculated.
+    await expect(
+      page
+        .getByTestId('biomarker-history-list')
+        .locator('[data-testid$="-calculated"]')
+    ).toHaveCount(1);
+
+    // It can't be recorded: the form only offers tests a report can hold.
+    await openRoute(page, '/lab-result/add');
+    await page.getByTestId('test-search-input').fill('Atherogenic');
+    await expect(page.getByTestId('autocomplete-item-aip')).toHaveCount(0);
+  });
 });

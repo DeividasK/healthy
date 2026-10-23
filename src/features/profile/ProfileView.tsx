@@ -2,7 +2,7 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useActivePatient } from './ActivePatientContext';
 import { getAllPatients } from './patientService';
 import { COLORS } from '@/src/theme/colors';
@@ -13,6 +13,7 @@ import { ProfileBackupRows } from './ProfileBackupRows';
 
 export function ProfileView() {
   const router = useRouter();
+  const pathname = usePathname();
   const {
     activePatient,
     activePatientId,
@@ -24,6 +25,9 @@ export function ProfileView() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   React.useEffect(() => {
+    // Only while shown: under another screen (e.g. after the last profile was
+    // deleted from its edit screen) it would replace whatever is on top.
+    if (pathname !== '/profile') return;
     if (!isLoading && patients.length === 0) {
       let isMounted = true;
       getAllPatients().then((actualPatients) => {
@@ -38,7 +42,7 @@ export function ProfileView() {
         isMounted = false;
       };
     }
-  }, [isLoading, patients.length, refreshPatients, router]);
+  }, [isLoading, patients.length, pathname, refreshPatients, router]);
 
   const targetId =
     activePatient?.id ||

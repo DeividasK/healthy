@@ -16,13 +16,28 @@ export const BIOMARKERS: BiomarkerDefinition[] = [
 ];
 
 /**
- * Searches biomarkers by name, alias, or LOINC code.
+ * A biomarker results can record: one with a LOINC code. Calculated ones
+ * with a code are recorded for reports that lack their inputs.
  */
-export function searchBiomarkers(query: string): BiomarkerDefinition[] {
-  const clean = query.trim().toLowerCase();
-  if (!clean) return BIOMARKERS;
+export type RecordableBiomarker = BiomarkerDefinition & { loinc: string };
 
-  return BIOMARKERS.filter((marker) => {
+export const RECORDABLE_BIOMARKERS = BIOMARKERS.filter(
+  (marker): marker is RecordableBiomarker => Boolean(marker.loinc)
+);
+
+/** Route id of a biomarker's page: its LOINC code, else its catalog id. */
+export function getBiomarkerKey(marker: BiomarkerDefinition): string {
+  return marker.loinc ?? marker.id;
+}
+
+/**
+ * Searches recordable biomarkers by name, alias, or LOINC code.
+ */
+export function searchBiomarkers(query: string): RecordableBiomarker[] {
+  const clean = query.trim().toLowerCase();
+  if (!clean) return RECORDABLE_BIOMARKERS;
+
+  return RECORDABLE_BIOMARKERS.filter((marker) => {
     if (marker.name.toLowerCase().includes(clean)) return true;
     if (marker.loinc.includes(clean)) return true;
     return marker.aliases.some((alias) => alias.toLowerCase().includes(clean));
@@ -47,16 +62,17 @@ const matchesName = (marker: BiomarkerDefinition, name: string) =>
  * alias, ignoring case; else that name without a bracketed part (e.g.
  * "Thyroid-stimulating hormone (TSH)"), or the bracketed abbreviation.
  */
-export function findBiomarkerByName(
-  name: string
-): BiomarkerDefinition | undefined {
+export function findBiomarkerByName<T extends BiomarkerDefinition>(
+  name: string,
+  markers: T[] = BIOMARKERS as T[]
+): T | undefined {
   const clean = name.trim().toLowerCase();
-  const exact = BIOMARKERS.find((marker) => matchesName(marker, clean));
+  const exact = markers.find((marker) => matchesName(marker, clean));
   if (exact) return exact;
   const bracketed = clean.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   if (!bracketed) return undefined;
   return (
-    BIOMARKERS.find((marker) => matchesName(marker, bracketed[1])) ??
-    BIOMARKERS.find((marker) => matchesName(marker, bracketed[2]))
+    markers.find((marker) => matchesName(marker, bracketed[1])) ??
+    markers.find((marker) => matchesName(marker, bracketed[2]))
   );
 }
