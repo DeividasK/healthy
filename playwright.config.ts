@@ -28,7 +28,7 @@ export default defineConfig<ChromaticConfig>({
     },
     {
       name: 'mobile-chrome',
-      use: { ...devices['Pixel 7'] },
+      use: { ...devices['Pixel 7'], reducedMotion: 'reduce' },
       testMatch: /.*\.e2e\.ts/,
     },
     {
