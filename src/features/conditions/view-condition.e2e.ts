@@ -8,6 +8,7 @@ import {
   seedTestServiceRequest,
   seedTestTreatment,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Condition', () => {
@@ -76,9 +77,7 @@ test.describe('View Condition', () => {
       biomarkers: [{ name: 'Hemoglobin', value: 13.9, unit: 'g/dL' }],
     });
 
-    await page.getByTestId('condition-timeline-filter-button').click();
-    await page.getByTestId('condition-timeline-filters-reset').click();
-    await page.getByTestId('condition-timeline-filters-done').click();
+    await showAllTimelineSteps(page);
 
     // Saved steps appear without leaving the screen, newest first by month;
     // on one day, outcomes sit above the visit that produced them.
@@ -129,9 +128,7 @@ test.describe('View Condition', () => {
       ['treatment', ibuprofen.id, 'treatment-title', 'Ibuprofen 400mg'],
       ['lab-result', report.report.id, 'lab-result-title', 'Lab report'],
     ]) {
-      await page.getByTestId('condition-timeline-filter-button').click();
-      await page.getByTestId('condition-timeline-filters-reset').click();
-      await page.getByTestId('condition-timeline-filters-done').click();
+      await showAllTimelineSteps(page);
       await page.getByTestId(`condition-timeline-item-${type}-${id}`).click();
       await expect(page.getByTestId(titleTestID)).toHaveText(title);
       await page.goBack();

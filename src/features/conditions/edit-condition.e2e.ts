@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
@@ -402,6 +403,7 @@ test.describe('Condition add menu motion', () => {
     await expect(view.getByTestId('condition-title')).toHaveText(
       'Initial Condition'
     );
+    await showAllTimelineSteps(page);
     await expect(
       view
         .getByTestId('condition-timeline')

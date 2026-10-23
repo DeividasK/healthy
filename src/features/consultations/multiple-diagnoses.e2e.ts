@@ -8,6 +8,7 @@ import {
   checkA11y,
   openRoute,
   reopenRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Multiple consultation diagnoses', () => {
@@ -60,6 +61,7 @@ test.describe('Multiple consultation diagnoses', () => {
     await expect(page.getByTestId(`consultation-card-${id}`)).toHaveCount(1);
     for (const conditionId of ['first', 'third']) {
       await openRoute(page, `/condition/${conditionId}`);
+      await showAllTimelineSteps(page);
       await expect(
         page.getByTestId(`condition-timeline-item-consultation-${id}`)
       ).toHaveCount(1);

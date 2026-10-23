@@ -11,6 +11,7 @@ import {
   checkA11y,
   evaluateBridge,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Service Request Flow', () => {
@@ -499,6 +500,7 @@ test.describe('Add Service Request Flow', () => {
     await page.getByTestId('save-service-request-button').click();
 
     await expect(page).toHaveURL(new RegExp(`.*condition\\/${condition.id}$`));
+    await showAllTimelineSteps(page);
     await expect(
       page
         .getByTestId('condition-timeline')

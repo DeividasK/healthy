@@ -9,6 +9,7 @@ import {
   getTestClinicalDocument,
   findTreatmentsSection,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Consultation Flow', () => {
@@ -32,6 +33,7 @@ test.describe('View Consultation Flow', () => {
       notes: 'Consultation notes remain available.',
     });
     await page.getByTestId(`condition-open-${condition.id}`).click();
+    await showAllTimelineSteps(page);
     await expect(
       page.getByTestId(
         `condition-timeline-item-consultation-${consultation.id}`

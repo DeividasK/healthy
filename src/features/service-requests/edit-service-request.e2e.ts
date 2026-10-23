@@ -11,6 +11,7 @@ import {
   findServiceRequestSection,
   evaluateBridge as bridge,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Service Request', () => {
@@ -218,6 +219,7 @@ test.describe('Edit Service Request', () => {
       page.getByTestId(`condition-service-request-count-${condition.id}`)
     ).toBeVisible();
     await openRoute(page, `/condition/${condition.id}`);
+    await showAllTimelineSteps(page);
     await expect(
       page.getByTestId(`condition-timeline-item-service-request-${request.id}`)
     ).toBeVisible();
@@ -289,6 +291,7 @@ test.describe('Edit Service Request', () => {
 
     // The request's condition shows the result on its timeline
     await openRoute(page, `/condition/${condition.id}`);
+    await showAllTimelineSteps(page);
     await expect(
       page.getByTestId(`condition-timeline-item-lab-result-${report.id}`)
     ).toBeVisible();
