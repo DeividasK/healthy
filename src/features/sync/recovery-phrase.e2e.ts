@@ -18,10 +18,14 @@ import type { Page } from '@playwright/test';
 const CONFIG_KEY = '@healthy_device_google_sync_config';
 // A valid 24-word phrase that belongs to no vault in these tests.
 const OTHER_PHRASE = `${'abandon '.repeat(23)}art`;
+// Waits on screens that follow a whole sync round (vault, merge, upload):
+// encryption and the Drive round trips take several seconds when the full
+// suite loads the CPU.
+const syncExpect = expect.configure({ timeout: 15_000 });
 
 async function readPhrase(page: Page): Promise<string> {
   const field = page.getByTestId('recovery-phrase-value');
-  await expect(field).toHaveText(/^(\S+ ){23}\S+$/);
+  await syncExpect(field).toHaveText(/^(\S+ ){23}\S+$/);
   return (await field.textContent())!;
 }
 
@@ -142,6 +146,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     page,
     browser,
   }, testInfo) => {
+    // Boots a second device and restores to it twice.
+    test.slow();
     await seedTestPatient(page, { id: 'alice', givenName: 'Alice' });
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);
@@ -171,12 +177,12 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await restore.click();
     // The new device chooses which cloud profiles to sync.
     const firstPicker = device.getByTestId('google-profile-picker-modal');
-    await expect(
+    await syncExpect(
       firstPicker.getByTestId('remote-profile-item-alice')
     ).toContainText('Alice Doe');
     await firstPicker.getByTestId('restore-selected-profiles-button').click();
-    await expect(device.getByTestId('start-your-record')).toBeVisible();
-    await device.goto('/profile');
+    await syncExpect(device.getByTestId('start-your-record')).toBeVisible();
+    await openRoute(device, '/profile');
     await expect(device.getByTestId('profile-display-name').first()).toHaveText(
       'Alice Doe'
     );
@@ -194,11 +200,11 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await device.getByTestId('welcome-restore').click();
     await device.getByTestId('restore-from-google-drive').click();
     const picker = device.getByTestId('google-profile-picker-modal');
-    await expect(picker.getByTestId('remote-profile-item-alice')).toContainText(
-      'Alice Doe'
-    );
+    await syncExpect(
+      picker.getByTestId('remote-profile-item-alice')
+    ).toContainText('Alice Doe');
     await picker.getByTestId('restore-selected-profiles-button').click();
-    await expect(device.getByTestId('start-your-record')).toBeVisible();
+    await syncExpect(device.getByTestId('start-your-record')).toBeVisible();
     expect(
       await device.evaluate(() =>
         (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
@@ -213,6 +219,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     page,
     browser,
   }, testInfo) => {
+    // Boots two more devices.
+    test.slow();
     await seedTestPatient(page, { id: 'alice', givenName: 'Alice' });
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);

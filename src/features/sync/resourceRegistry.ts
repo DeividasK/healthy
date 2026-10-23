@@ -31,6 +31,9 @@ import {
   insertProfileSettingsRecord,
   type ProfileSettingsRecord,
 } from '@/src/features/settings/profileSettingsRepository';
+import { getAdministrationRequestId } from '@/src/features/actions/actionDays';
+import { getProcedureRequestId } from '@/src/features/actions/procedureDays';
+import { getStatementRequestId } from '@/src/features/actions/treatmentUsage';
 import type { SyncResourceType } from './types';
 
 type Resource = Record<string, unknown>;
@@ -43,7 +46,22 @@ interface ResourceEntry {
   read(db: SQLiteDatabase, id: string): Promise<Resource | null>;
   /** Writes a replicated resource through the repository (validations included). */
   put(resource: Resource, patientId: string): Promise<void>;
+  /**
+   * The resource this one is deleted with (its table's `ON DELETE CASCADE`
+   * parent), e.g. the treatment a dose log belongs to.
+   */
+  owner?(resource: Resource): ResourceKey | null;
 }
+
+interface ResourceKey {
+  resourceType: SyncResourceType;
+  id: string;
+}
+
+const ownedBy = (
+  resourceType: SyncResourceType,
+  id: string | null | undefined
+): ResourceKey | null => (id ? { resourceType, id } : null);
 
 async function readJson(
   db: SQLiteDatabase,
@@ -164,6 +182,11 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     table: 'medication_statements',
     tables: ['medication_statements'],
     read: (db, id) => readJson(db, 'medication_statements', id),
+    owner: (resource) =>
+      ownedBy(
+        'MedicationRequest',
+        getStatementRequestId(resource as unknown as MedicationStatement)
+      ),
     put: (resource, patientId) =>
       insertMedicationStatementRecord(
         resource as unknown as MedicationStatement,
@@ -175,6 +198,13 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     table: 'medication_administrations',
     tables: ['medication_administrations'],
     read: (db, id) => readJson(db, 'medication_administrations', id),
+    owner: (resource) =>
+      ownedBy(
+        'MedicationRequest',
+        getAdministrationRequestId(
+          resource as unknown as MedicationAdministration
+        )
+      ),
     put: (resource, patientId) =>
       insertMedicationAdministrationRecord(
         resource as unknown as MedicationAdministration,
@@ -198,6 +228,11 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     table: 'procedures',
     tables: ['procedures'],
     read: (db, id) => readJson(db, 'procedures', id),
+    owner: (resource) =>
+      ownedBy(
+        'ServiceRequest',
+        getProcedureRequestId(resource as unknown as Procedure)
+      ),
     put: (resource, patientId) =>
       insertProcedureRecord(resource as unknown as Procedure, patientId, true),
   },
@@ -216,6 +251,13 @@ export const RESOURCE_REGISTRY: Record<SyncResourceType, ResourceEntry> = {
     table: 'clinical_documents',
     tables: ['clinical_documents'],
     read: (db, id) => readJson(db, 'clinical_documents', id),
+    owner: (resource) => {
+      const reference = (resource as unknown as Composition).encounter
+        ?.reference;
+      return reference?.startsWith('Encounter/')
+        ? ownedBy('Encounter', reference.slice(10))
+        : null;
+    },
     put: (resource, patientId) =>
       insertClinicalDocumentRecord(
         resource as unknown as Composition,

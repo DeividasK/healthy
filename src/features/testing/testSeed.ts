@@ -219,10 +219,9 @@ export async function bootstrapApp(page: Page): Promise<void> {
  * clock never finishes the animations a navigation starts.
  */
 export async function openRoute(page: Page, path: string): Promise<void> {
-  if (page.url() === 'about:blank') {
-    await page.goto(path);
-    return;
-  }
+  // Boot at Home first: loading the route itself would leave the blank page
+  // behind it in the browser history, where Cancel and back would land.
+  if (page.url() === 'about:blank') await page.goto('/');
   await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   await page.evaluate(
     (href) => (window as any).__HEALTHY_TEST_BRIDGE__.navigate(href),

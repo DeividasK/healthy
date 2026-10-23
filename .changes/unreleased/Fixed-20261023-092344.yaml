@@ -1,0 +1,3 @@
+kind: Fixed
+body: After deleting your last profile, choosing to restore from a backup no longer sometimes jumps back to the welcome screen
+time: 2026-10-23T09:23:44.021127573Z

@@ -1,0 +1,3 @@
+kind: Fixed
+body: Doses or sessions logged on one device for a treatment or schedule deleted on another no longer get stuck in sync and fill the console with warnings
+time: 2026-10-23T08:23:29.87748356Z
