@@ -5,8 +5,8 @@ import { COLORS } from '@/src/theme/colors';
 
 /**
  * One full-width line on the profile page: an icon, a title with an
- * optional subtitle, and a control or action icon at the end. With
- * `onPress` the whole row is the button.
+ * optional subtitle (one line each when given several), and a control or
+ * action icon at the end. With `onPress` the whole row is the button.
  */
 export function ProfileRow({
   icon: Icon,
@@ -20,7 +20,7 @@ export function ProfileRow({
 }: {
   icon: LucideIcon;
   title: string;
-  subtitle?: React.ReactNode;
+  subtitle?: React.ReactNode | React.ReactNode[];
   trailing?: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
@@ -32,11 +32,12 @@ export function ProfileRow({
       <Icon size={20} color={COLORS.light.primary} />
       <View style={styles.text}>
         <Text style={styles.title}>{title}</Text>
-        {subtitle !== undefined && (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        )}
+        {subtitle !== undefined &&
+          (Array.isArray(subtitle) ? subtitle : [subtitle]).map((line, i) => (
+            <Text key={i} style={styles.subtitle} numberOfLines={1}>
+              {line}
+            </Text>
+          ))}
       </View>
       {trailing && <View style={styles.trailing}>{trailing}</View>}
     </>

@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
+  GoogleIdentityUnavailableError,
   loadGisScript,
   silentRefreshWebAccessToken,
 } from '@/src/services/googleAuthWebService';
@@ -277,7 +278,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const refreshed = await refreshAccessToken(active!, {
           interactive,
         }).catch((err) => {
-          console.warn('Google token refresh failed:', err);
+          // Google's script failing to load was already reported.
+          if (!(err instanceof GoogleIdentityUnavailableError))
+            console.warn('Google token refresh failed:', err);
           return null;
         });
         if (!refreshed) {
