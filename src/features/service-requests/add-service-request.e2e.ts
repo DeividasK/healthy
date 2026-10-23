@@ -245,6 +245,8 @@ test.describe('Add Service Request Flow', () => {
     await expect(page.getByTestId('service-request-count-input')).toHaveValue(
       '3'
     );
+    // Importing with AI only fills in new service requests.
+    await expect(page.getByTestId('import-with-ai-button')).toHaveCount(0);
     await page.getByTestId('service-request-count-input').fill('4');
     await page.getByTestId('remove-service-request-duration-button').click();
     await page.getByTestId('save-service-request-button').click();
@@ -269,10 +271,105 @@ test.describe('Add Service Request Flow', () => {
     ).toBeVisible();
     await page.getByTestId('form-add-menu').press('Escape');
     await page.getByTestId('save-service-request-button').click();
+    // The edit form has no schedule either, so wait for the saved view.
+    await expect(page).not.toHaveURL(/\/edit$/);
     await expect(page.getByTestId('service-request-schedule')).toHaveCount(0);
     expect(
       (await getTestServiceRequest(page, id)).occurrenceTiming
     ).toBeUndefined();
+  });
+
+  test('fills a new service request from an AI reply', async ({ page }) => {
+    await openRoute(page, '/service-request/add');
+    // A planned date in the form gives way to the imported schedule.
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-service-request-plannedDate').click();
+    await expect(
+      page.getByTestId('service-request-planned-date-picker')
+    ).toBeVisible();
+
+    await page.getByTestId('import-with-ai-button').click();
+    await page.getByTestId('ai-import-reply-input').fill(
+      JSON.stringify({
+        healthyServiceRequest: 1,
+        service: 'PRP injection',
+        category: 'Procedure',
+        intent: 'order',
+        status: 'active',
+        date: '2025-03-10',
+        repeats: {
+          every: 4,
+          upToEvery: 6,
+          unit: 'wk',
+          sessions: 3,
+          minutes: 30,
+          timeOfDay: '07:30',
+        },
+        requester: 'Dr. Leonard McCoy',
+        instructions: 'Avoid anti-inflammatories for a week before.',
+        reason: 'Knee pain',
+      })
+    );
+    await page.getByTestId('ai-import-submit-button').click();
+    await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
+
+    await expect(page.getByTestId('service-request-title-input')).toHaveValue(
+      'PRP injection'
+    );
+    await expect(
+      page.getByTestId('service-request-category-select')
+    ).toHaveValue('71388002');
+    await expect(page.getByTestId('service-request-intent-select')).toHaveValue(
+      'order'
+    );
+    await expect(page.getByTestId('service-request-status-select')).toHaveValue(
+      'active'
+    );
+    await expect(
+      page.getByTestId('service-request-date-picker').locator('input')
+    ).toHaveValue('2025-03-10');
+    await expect(
+      page.getByTestId('service-request-planned-date-picker')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('service-request-period-input')).toHaveValue(
+      '4'
+    );
+    await expect(
+      page.getByTestId('service-request-period-unit-select')
+    ).toHaveValue('wk');
+    await expect(
+      page.getByTestId('service-request-time-of-day-select')
+    ).toHaveValue('time');
+    await expect(
+      page.getByTestId('service-request-requester-input')
+    ).toHaveValue('Dr. Leonard McCoy');
+
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('home-actions-section')).toBeVisible();
+    const [{ id }] = await evaluateBridge(page, (b) =>
+      b.querySql('SELECT id FROM service_requests')
+    );
+    const created = await getTestServiceRequest(page, id);
+    expect(created.code).toEqual({ concept: { text: 'PRP injection' } });
+    expect(created.intent).toBe('order');
+    expect(created.authoredOn?.slice(0, 10)).toBe('2025-03-10');
+    expect(created.occurrenceDateTime).toBeUndefined();
+    expect(created.occurrenceTiming).toEqual({
+      repeat: {
+        frequency: 1,
+        period: 4,
+        periodMax: 6,
+        periodUnit: 'wk',
+        count: 3,
+        duration: 30,
+        durationUnit: 'min',
+        timeOfDay: ['07:30:00'],
+      },
+    });
+    expect(created.patientInstruction).toEqual([
+      { instructionMarkdown: 'Avoid anti-inflammatories for a week before.' },
+    ]);
+    expect(created.reason).toEqual([{ concept: { text: 'Knee pain' } }]);
   });
 
   test('creates a service request from a consultation, then deletes it with its references', async ({

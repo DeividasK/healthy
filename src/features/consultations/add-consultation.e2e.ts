@@ -163,6 +163,8 @@ test.describe('Add Consultation Flow', () => {
           new RegExp(`consultation/${consultationId}/edit$`)
         );
         await expect(page.getByText('Edit Consultation')).toBeVisible();
+        // Importing with AI only fills in new consultations.
+        await expect(page.getByTestId('import-with-ai-button')).toHaveCount(0);
         const titleInput = page.getByTestId('consultation-title-input');
         await expect(titleInput).toHaveValue('General Cardiology Review');
         const doctorInput = page.getByTestId('consultation-doctor-input');
@@ -674,4 +676,76 @@ test('scrolls a field added from the + menu into view and focuses it', async ({
   // Non-text controls are focused too.
   await addField('menu-add-time');
   await expectRevealed(page.getByTestId('time-picker-button').locator('input'));
+});
+
+test('fills a new consultation from an AI reply', async ({ page }) => {
+  await seedTestPatient(page);
+  await openRoute(page, '/consultation/add');
+  await page.getByTestId('import-with-ai-button').click();
+  await expect(page.getByTestId('ai-import-modal-card')).toContainText(
+    'together with your consultation document'
+  );
+  await page.getByTestId('ai-import-reply-input').fill(`Here it is:
+\`\`\`json
+{
+  "healthyConsultation": 1,
+  "title": "Cardiology follow-up",
+  "status": "completed",
+  "date": "2025-03-10",
+  "time": "09:30",
+  "specialist": "Dr. Sarah Adams",
+  "serviceProvider": "City Hospital",
+  "serviceType": "Cardiology",
+  "diagnoses": [{ "name": "Essential hypertension", "icd10": "I10" }],
+  "notes": "Blood pressure well controlled."
+}
+\`\`\``);
+  await page.getByTestId('ai-import-submit-button').click();
+  await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
+
+  await expect(page.getByTestId('consultation-title-input')).toHaveValue(
+    'Cardiology follow-up'
+  );
+  await expect(page.getByTestId('status-picker-select')).toHaveValue(
+    'completed'
+  );
+  await expect(
+    page.getByTestId('date-picker-button').locator('input')
+  ).toHaveValue('2025-03-10');
+  await expect(page.getByTestId('time-picker-button')).toContainText('09:30');
+  await expect(page.getByTestId('consultation-doctor-input')).toHaveValue(
+    'Dr. Sarah Adams'
+  );
+  await expect(
+    page.getByTestId('consultation-service-provider-input')
+  ).toHaveValue('City Hospital');
+  await expect(page.getByTestId('consultation-service-type-input')).toHaveValue(
+    'Cardiology'
+  );
+  await expect(page.getByTestId('diagnosis-0-title-input')).toHaveValue(
+    'Essential hypertension'
+  );
+  await expect(page.getByTestId('diagnosis-0-system-input')).toHaveValue(
+    'http://hl7.org/fhir/sid/icd-10'
+  );
+  await expect(page.getByTestId('diagnosis-0-code-input')).toHaveValue('I10');
+  await expect(page.getByTestId('consultation-notes-input')).toHaveValue(
+    'Blood pressure well controlled.'
+  );
+
+  await page.getByTestId('save-button').click();
+  await expect(page).not.toHaveURL(/consultation\/add/);
+  const [{ id }] = await evaluateBridge(page, (b) =>
+    b.querySql('SELECT id FROM consultations')
+  );
+  await openRoute(page, `/consultation/${id}`);
+  await expect(page.getByTestId('consultation-view')).toContainText(
+    'Cardiology follow-up'
+  );
+  await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+    'Essential hypertension'
+  );
+  await expect(page.getByTestId('consultation-notes')).toContainText(
+    'Blood pressure well controlled.'
+  );
 });

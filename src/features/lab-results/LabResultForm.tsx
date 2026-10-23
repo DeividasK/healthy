@@ -49,8 +49,12 @@ import {
   deleteReport,
 } from './diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { ImportLabResultsModal } from './ImportLabResultsModal';
-import type { ImportedLabResults } from './labResultsAIImport';
+import { AIImportModal } from '@/src/components/AIImportModal';
+import {
+  buildLabResultsAIInstructions,
+  parseLabResultsAIReply,
+  type ImportedLabResults,
+} from './labResultsAIImport';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -755,7 +759,10 @@ export function LabResultForm({
           />
 
           {showAIImport && (
-            <ImportLabResultsModal
+            <AIImportModal
+              document="lab report"
+              instructions={buildLabResultsAIInstructions}
+              parse={parseLabResultsAIReply}
               onClose={() => setShowAIImport(false)}
               onImport={handleAIImport}
             />

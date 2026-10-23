@@ -16,6 +16,7 @@ import {
   Package,
   Play,
   Repeat,
+  Sparkles,
   Tablets,
   User,
 } from 'lucide-react-native';
@@ -32,7 +33,7 @@ import {
   type LinkSelection,
 } from '@/src/components/useLinkFields';
 import { useOptionalFields } from '@/src/components/useOptionalFields';
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { DosingField } from './DosingField';
@@ -55,6 +56,12 @@ import {
   getTreatmentIntentOptions,
   getTreatmentStatusOptions,
 } from './treatmentLabels';
+import { AIImportModal } from '@/src/components/AIImportModal';
+import {
+  buildTreatmentAIInstructions,
+  parseTreatmentAIReply,
+  type ImportedTreatment,
+} from './treatmentAIImport';
 
 export interface TreatmentFormValues {
   id?: string;
@@ -215,6 +222,7 @@ export function TreatmentForm({
   });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
   // Fields a regimen phase or dose can add, shown in a centered menu.
   const [regimenOptions, setRegimenOptions] = useState<AddOptionItem[] | null>(
     null
@@ -222,6 +230,30 @@ export function TreatmentForm({
   const options = [...fields.menuOptions, ...links.menuOptions];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  /** Fills the form with the treatment read from the AI's reply, for review before saving. */
+  const handleAIImport = (data: ImportedTreatment) => {
+    setTitle(data.title);
+    if (data.intent) setIntent(data.intent);
+    if (data.status) setStatus(data.status);
+    if (data.authoredDate) setAuthoredDate(parseLocalDate(data.authoredDate));
+    fields.load({
+      ...(data.requester && { requester: data.requester }),
+      // Dosing is either a regimen or text instructions, never both.
+      ...(data.regimen && { regimen: data.regimen, instructions: '' }),
+      ...(data.dosage && {
+        instructions: data.dosage,
+        regimen: { phases: [] },
+      }),
+      ...(data.dispenseQuantity && {
+        dispenseQuantity: data.dispenseQuantity,
+      }),
+      ...(data.reason && { reason: data.reason }),
+      ...(data.notes && { notes: data.notes }),
+    });
+    setErrorMessage(null);
+    setShowAIImport(false);
+  };
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -522,6 +554,22 @@ export function TreatmentForm({
           isSaving={isSubmitting}
           hasChanges={hasChanges}
           saveTestID="save-treatment-button"
+          // New treatments can be filled in from the user's own AI assistant.
+          secondaryActions={
+            isEditing
+              ? []
+              : [
+                  {
+                    label: 'Import with AI',
+                    testID: 'import-with-ai-button',
+                    icon: Sparkles,
+                    onPress: () => {
+                      setShowPlusMenu(false);
+                      setShowAIImport(true);
+                    },
+                  },
+                ]
+          }
         />
         <AddOptionsModal
           visible={Boolean(regimenOptions)}
@@ -530,6 +578,15 @@ export function TreatmentForm({
           overlayTestID="regimen-options-overlay"
           cardTestID="regimen-options-menu"
         />
+        {showAIImport && (
+          <AIImportModal
+            document="prescription"
+            instructions={buildTreatmentAIInstructions}
+            parse={parseTreatmentAIReply}
+            onClose={() => setShowAIImport(false)}
+            onImport={handleAIImport}
+          />
+        )}
       </SafeAreaView>
     </FieldRevealProvider>
   );

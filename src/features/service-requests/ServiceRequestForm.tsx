@@ -18,6 +18,7 @@ import {
   MessageSquareText,
   Repeat2,
   ScrollText,
+  Sparkles,
   Timer,
   User,
 } from 'lucide-react-native';
@@ -45,7 +46,7 @@ import {
   type LinkSelection,
 } from '@/src/components/useLinkFields';
 import { useOptionalFields } from '@/src/components/useOptionalFields';
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import { formatLocalDate, parseLocalDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import {
@@ -59,6 +60,12 @@ import {
   type ScheduleDraft,
   type ServiceRequestSchedule,
 } from './serviceRequestSchedule';
+import { AIImportModal } from '@/src/components/AIImportModal';
+import {
+  buildServiceRequestAIInstructions,
+  parseServiceRequestAIReply,
+  type ImportedServiceRequest,
+} from './serviceRequestAIImport';
 
 /** Fields that only apply to a request that repeats. */
 const SCHEDULE_DETAILS = ['periodMax', 'count', 'duration', 'timeOfDay'];
@@ -244,6 +251,7 @@ export function ServiceRequestForm({
   });
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
   // Schedule details are offered once the request repeats.
   const options = [
     ...fields.menuOptions.filter(
@@ -258,6 +266,41 @@ export function ServiceRequestForm({
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  /** Fills the form with the request read from the AI's reply, for review before saving. */
+  const handleAIImport = (data: ImportedServiceRequest) => {
+    setTitle(data.title);
+    if (data.category) setCategory(data.category);
+    if (data.intent) setIntent(data.intent);
+    if (data.status) setStatus(data.status);
+    if (data.authoredDate) setAuthoredDate(parseLocalDate(data.authoredDate));
+    const { schedule } = data;
+    fields.load({
+      // A one-off date and a schedule replace each other.
+      ...(data.plannedDate && {
+        plannedDate: parseLocalDate(data.plannedDate),
+        repeats: { period: '', periodUnit: 'd' },
+        periodMax: '',
+        count: '',
+        duration: '',
+        timeOfDay: { choice: '', time: '08:00' },
+      }),
+      ...(schedule && {
+        plannedDate: null,
+        repeats: { period: schedule.period, periodUnit: schedule.periodUnit },
+        periodMax: schedule.periodMax,
+        count: schedule.count,
+        duration: schedule.duration,
+        timeOfDay: { choice: schedule.timeChoice, time: schedule.time },
+      }),
+      ...(data.requester && { requester: data.requester }),
+      ...(data.instructions && { instructions: data.instructions }),
+      ...(data.reason && { reason: data.reason }),
+      ...(data.notes && { notes: data.notes }),
+    });
+    setErrorMessage(null);
+    setShowAIImport(false);
+  };
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -623,7 +666,32 @@ export function ServiceRequestForm({
           isSaving={isSubmitting}
           hasChanges={hasChanges}
           saveTestID="save-service-request-button"
+          // New requests can be filled in from the user's own AI assistant.
+          secondaryActions={
+            isEditing
+              ? []
+              : [
+                  {
+                    label: 'Import with AI',
+                    testID: 'import-with-ai-button',
+                    icon: Sparkles,
+                    onPress: () => {
+                      setShowPlusMenu(false);
+                      setShowAIImport(true);
+                    },
+                  },
+                ]
+          }
         />
+        {showAIImport && (
+          <AIImportModal
+            document="referral or order"
+            instructions={buildServiceRequestAIInstructions}
+            parse={parseServiceRequestAIReply}
+            onClose={() => setShowAIImport(false)}
+            onImport={handleAIImport}
+          />
+        )}
       </SafeAreaView>
     </FieldRevealProvider>
   );
