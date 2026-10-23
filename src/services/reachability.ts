@@ -20,13 +20,22 @@ function setUnreachable(next: boolean): void {
 
 async function probe(): Promise<void> {
   probeTimer = null;
+  // A request left hanging would otherwise stop the checks for good.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROBE_INTERVAL_MS);
   try {
     // Any response, even an opaque one, means the network got through.
-    await fetch(PROBE_URL, { mode: 'no-cors', cache: 'no-store' });
+    await fetch(PROBE_URL, {
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
     setUnreachable(false);
   } catch {
     if (unreachable && !probeTimer)
       probeTimer = setTimeout(probe, PROBE_INTERVAL_MS);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
