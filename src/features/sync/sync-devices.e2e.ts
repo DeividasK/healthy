@@ -195,6 +195,15 @@ test.describe('Sync between devices', () => {
     });
 
     await test.step('Propagates deletions with their cascades', async () => {
+      // Meanwhile the second device logs a session of a request deleted here.
+      await bridge(second.page, (b) =>
+        b.seedProcedureLog({
+          serviceRequestId: 'meditation',
+          date: '2026-10-09',
+          answer: 'taken',
+          patientId: 'shared-patient',
+        })
+      );
       await bridge(page, async (b) => {
         await b.deleteCondition('eczema');
         await b.deleteServiceRequest('referral', 'shared-patient');
@@ -205,6 +214,15 @@ test.describe('Sync between devices', () => {
         await b.syncNow();
       });
       await syncTestDevice(second.page);
+      // The session reaches this device after its request was deleted: it
+      // goes with the request instead of waiting forever for it.
+      await syncTestDevice(page);
+      for (const device of [page, second.page])
+        expect(
+          await bridge(device, (b) =>
+            b.querySql('SELECT hlc FROM sync_pending_apply;')
+          )
+        ).toEqual([]);
       const afterDelete = await snapshot(second.page);
       expect(afterDelete).toEqual(await snapshot(page));
       expect(afterDelete.conditions).toHaveLength(1);
