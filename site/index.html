@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Healthy – Your private health record</title>
+    <meta
+      name="description"
+      content="Keep lab results, conditions, doctor visits and medications in one place, stored on your own device. Free, open source, no account, no ads, no tracking."
+    />
+    <link rel="canonical" href="https://usehealthy.app/" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#f9faf6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Healthy" />
+    <meta property="og:url" content="https://usehealthy.app/" />
+    <meta property="og:title" content="Healthy – Your private health record" />
+    <meta
+      property="og:description"
+      content="Lab results, conditions, doctor visits and medications in one place, stored on your own device. Free and open source."
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Healthy",
+        "url": "https://usehealthy.app/",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web",
+        "description": "A free, open-source personal health record that keeps lab results, conditions, doctor visits and medications on your own device.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+    <style>
+      :root {
+        --surface: #f9faf6;
+        --surface-low: #f3f4f0;
+        --on-surface: #1a1c1a;
+        --muted: #414844;
+        --outline: #c1c8c2;
+        --primary: #3d6450;
+        --on-primary: #ffffff;
+        --primary-fixed: #c1ecd3;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--surface);
+        color: var(--on-surface);
+        font:
+          17px/1.6 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      main,
+      footer {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      header {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1.25rem;
+      }
+      header img {
+        width: 28px;
+        height: 28px;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+      .hero {
+        padding: 56px 0 72px;
+        max-width: 720px;
+      }
+      .hero h1 {
+        font-size: clamp(2.25rem, 6vw, 3.5rem);
+        margin: 0 0 20px;
+      }
+      .hero p {
+        font-size: 1.2rem;
+        color: var(--muted);
+        margin: 0 0 32px;
+      }
+      .button {
+        display: inline-block;
+        background: var(--primary);
+        color: var(--on-primary);
+        text-decoration: none;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 9999px;
+      }
+      .button:hover {
+        filter: brightness(1.1);
+      }
+      .note {
+        display: block;
+        margin-top: 12px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      section {
+        padding: 48px 0;
+        border-top: 1px solid var(--outline);
+      }
+      section h2 {
+        font-size: clamp(1.6rem, 4vw, 2.25rem);
+        margin: 0 0 24px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+      .card {
+        background: var(--surface-low);
+        border-radius: 16px;
+        padding: 24px;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 1.15rem;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+      }
+      ul.checks {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 12px;
+      }
+      ul.checks li {
+        padding-left: 32px;
+        position: relative;
+      }
+      ul.checks li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--primary-fixed);
+        color: var(--primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        margin-top: 3px;
+      }
+      a {
+        color: var(--primary);
+      }
+      .cta {
+        text-align: center;
+      }
+      footer {
+        padding-top: 32px;
+        padding-bottom: 48px;
+        border-top: 1px solid var(--outline);
+        font-size: 0.9rem;
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        justify-content: space-between;
+      }
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="favicon.svg" alt="" />
+      Healthy
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>Your health history, in one private place.</h1>
+        <p>
+          Keep lab results, conditions, doctor visits and medications together
+          on your own device. No account, no ads, no tracking.
+        </p>
+        <a class="button" href="https://deividask.github.io/healthy/"
+          >Open Healthy, it's free</a
+        >
+        <span class="note">Works in your browser. Nothing to install.</span>
+      </div>
+
+      <section aria-labelledby="features">
+        <h2 id="features">Everything in one place</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Lab results that make sense</h3>
+            <p>
+              200+ common tests with their units and reference ranges, matched
+              to your age and gender. See what's out of range and how it changes
+              over time.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Import with your own AI</h3>
+            <p>
+              Paste your lab report into the AI assistant you already use.
+              Healthy fills in the results for you to check.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Everything connected</h3>
+            <p>
+              Link conditions, doctor visits, treatments and referrals, and
+              follow each condition on its own timeline.
+            </p>
+          </div>
+          <div class="card">
+            <h3>A journal for medications</h3>
+            <p>
+              Log the medications and supplements you take, morning to bedtime,
+              in a tap.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Records for the whole family</h3>
+            <p>Keep a separate profile for each person you care for.</p>
+          </div>
+          <div class="card">
+            <h3>Backed up your way</h3>
+            <p>
+              Export everything to a file, or sync encrypted between devices
+              through your own Google Drive.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="privacy">
+        <h2 id="privacy">Private by design</h2>
+        <ul class="checks">
+          <li>
+            Your records live on your device. Healthy has no server, no ads and
+            no analytics.
+          </li>
+          <li>
+            Sync is optional and encrypted on your device before it reaches your
+            Google Drive. Google can't read it.
+          </li>
+          <li>
+            Built on the medical standards hospitals use (HL7 FHIR, LOINC,
+            UCUM), so your data stays portable.
+          </li>
+          <li>Open source, so anyone can check these claims in the code.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="open-source">
+        <h2 id="open-source">Open source. Built in the open.</h2>
+        <p>
+          Every line of Healthy is on GitHub. Check how your data is handled,
+          fork it, adapt it, or help build it. Bug reports, ideas and pull
+          requests are all welcome.
+        </p>
+        <p>
+          <a href="https://github.com/DeividasK/healthy"
+            >View the code on GitHub</a
+          >
+        </p>
+      </section>
+
+      <section class="cta" aria-labelledby="start">
+        <h2 id="start">Start your health record in a minute.</h2>
+        <a class="button" href="https://deividask.github.io/healthy/"
+          >Open Healthy</a
+        >
+      </section>
+    </main>
+
+    <footer>
+      <span>Made with ❤️ in 🇱🇹</span>
+      <nav aria-label="Footer">
+        <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>
+        <a href="https://deividask.github.io/healthy/privacy.html"
+          >Privacy policy</a
+        >
+        <a href="https://github.com/DeividasK/healthy/blob/main/CHANGELOG.md"
+          >What's new</a
+        >
+        <a href="https://github.com/DeividasK/healthy">GitHub</a>
+      </nav>
+    </footer>
+  </body>
+</html>
