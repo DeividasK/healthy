@@ -130,12 +130,19 @@ export function getUsagePeriods(
  * overlap, e.g. a pause recorded while the earlier period of taking is still
  * open, the one that started last decides, so on-hold days are not taking.
  */
-export const isTakingOn = (periods: UsagePeriod[], date: string) => {
+/** How a treatment was used on a day, or undefined outside every period. */
+export const getUsageStateOn = (
+  periods: UsagePeriod[],
+  date: string
+): UsageState | undefined => {
   const covering = periods.filter(
     (period) => period.start <= date && (!period.end || date <= period.end)
   );
-  return covering[covering.length - 1]?.state === 'taking';
+  return covering[covering.length - 1]?.state;
 };
+
+export const isTakingOn = (periods: UsagePeriod[], date: string) =>
+  getUsageStateOn(periods, date) === 'taking';
 
 /** The first day the treatment was taken, if ever. */
 export const getFirstTakingDay = (periods: UsagePeriod[]) =>
