@@ -11,7 +11,7 @@
     <link rel="canonical" href="https://usehealthy.app/" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <meta name="theme-color" content="#f9faf6" />
+    <meta name="theme-color" content="#ffffff" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Healthy" />
     <meta property="og:url" content="https://usehealthy.app/" />
@@ -34,22 +34,26 @@
     </script>
     <style>
       :root {
-        --surface: #f9faf6;
-        --surface-low: #f3f4f0;
-        --on-surface: #1a1c1a;
-        --muted: #414844;
-        --outline: #c1c8c2;
+        /* Tokens from the Healthy design system (src/theme/colors.ts) */
+        --background: #ffffff;
+        --foreground: #1a1c1a;
+        --text-secondary: #414844;
+        --card: #ffffff;
+        --card-border: #e2e3df;
         --primary: #3d6450;
-        --on-primary: #ffffff;
-        --primary-fixed: #c1ecd3;
+        --primary-foreground: #ffffff;
+        --empty-icon-container: #d1e9cd;
+        --link: #2e78b7;
+        --shadow-card: 0 2px 6px rgba(15, 23, 42, 0.04);
+        --shadow-primary-button: 0 4px 14px rgba(61, 100, 80, 0.35);
       }
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
-        background: var(--surface);
-        color: var(--on-surface);
+        background: var(--background);
+        color: var(--foreground);
         font:
           17px/1.6 system-ui,
           -apple-system,
@@ -93,13 +97,14 @@
       }
       .hero p {
         font-size: 1.2rem;
-        color: var(--muted);
+        color: var(--text-secondary);
         margin: 0 0 32px;
       }
       .button {
         display: inline-block;
         background: var(--primary);
-        color: var(--on-primary);
+        color: var(--primary-foreground);
+        box-shadow: var(--shadow-primary-button);
         text-decoration: none;
         font-weight: 600;
         padding: 14px 28px;
@@ -112,11 +117,11 @@
         display: block;
         margin-top: 12px;
         font-size: 0.9rem;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       section {
         padding: 48px 0;
-        border-top: 1px solid var(--outline);
+        border-top: 1px solid var(--card-border);
       }
       section h2 {
         font-size: clamp(1.6rem, 4vw, 2.25rem);
@@ -128,7 +133,9 @@
         gap: 20px;
       }
       .card {
-        background: var(--surface-low);
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--shadow-card);
         border-radius: 16px;
         padding: 24px;
       }
@@ -138,7 +145,7 @@
       }
       .card p {
         margin: 0;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       ul.checks {
         list-style: none;
@@ -159,7 +166,7 @@
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        background: var(--primary-fixed);
+        background: var(--empty-icon-container);
         color: var(--primary);
         font-size: 0.8rem;
         font-weight: 700;
@@ -168,7 +175,7 @@
         margin-top: 3px;
       }
       a {
-        color: var(--primary);
+        color: var(--link);
       }
       .cta {
         text-align: center;
@@ -176,9 +183,9 @@
       footer {
         padding-top: 32px;
         padding-bottom: 48px;
-        border-top: 1px solid var(--outline);
+        border-top: 1px solid var(--card-border);
         font-size: 0.9rem;
-        color: var(--muted);
+        color: var(--text-secondary);
         display: flex;
         flex-wrap: wrap;
         gap: 8px 24px;
