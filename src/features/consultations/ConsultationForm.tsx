@@ -26,6 +26,7 @@ import {
   Hash,
   User,
   Hospital,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react-native';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
@@ -62,6 +63,12 @@ import {
 import { getConditionTitle } from '@/src/utils/fhirUtils';
 import type { Condition } from 'fhir/r5';
 import { goBackOr } from '@/src/utils/navigation';
+import { AIImportModal } from '@/src/components/AIImportModal';
+import {
+  buildConsultationAIInstructions,
+  parseConsultationAIReply,
+  type ImportedConsultation,
+} from './consultationAIImport';
 
 export interface ConsultationStatusOption {
   id: string;
@@ -401,6 +408,7 @@ export function ConsultationForm({
     };
   };
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load patient conditions, doctors, and service types
@@ -435,6 +443,31 @@ export function ConsultationForm({
     () => Array.from(new Set([...knownServiceTypes, ...COMMON_SERVICE_TYPES])),
     [knownServiceTypes]
   );
+
+  /** Fills the form with the consultation read from the AI's reply, for review before saving. */
+  const handleAIImport = (data: ImportedConsultation) => {
+    setTitle(data.title);
+    const status = statusOptions.find(
+      (option) => option.status === data.status
+    );
+    if (status) setSelectedStatus(status);
+    const [y, m, d] = data.date.split('-').map(Number);
+    setDate(new Date(y, m - 1, d));
+    fields.load({
+      ...(data.time && { time: data.time }),
+      ...(data.specialist && { doctor: data.specialist }),
+      ...(data.serviceProvider && { serviceProvider: data.serviceProvider }),
+      ...(data.serviceType && { serviceType: data.serviceType }),
+      ...(data.notes && { notes: data.notes }),
+    });
+    if (data.diagnoses.length > 0) {
+      setDiagnoses(data.diagnoses);
+      setShownDiagnosisFields({});
+      setDiagnosisQueries({});
+      setFocusedDiagnosis(null);
+    }
+    setShowAIImport(false);
+  };
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -870,6 +903,22 @@ export function ConsultationForm({
             onSave={handleSubmit}
             isSaving={isSaving}
             hasChanges={hasChanges}
+            // New consultations can be filled in from the user's own AI assistant.
+            secondaryActions={
+              isEdit
+                ? []
+                : [
+                    {
+                      label: 'Import with AI',
+                      testID: 'import-with-ai-button',
+                      icon: Sparkles,
+                      onPress: () => {
+                        setShowPlusMenu(false);
+                        setShowAIImport(true);
+                      },
+                    },
+                  ]
+            }
           />
 
           {/* Plus Menu Modal for adding optional fields */}
@@ -887,6 +936,16 @@ export function ConsultationForm({
             overlayTestID="diagnosis-options-overlay"
             cardTestID="diagnosis-options-menu"
           />
+
+          {showAIImport && (
+            <AIImportModal
+              document="consultation document"
+              instructions={buildConsultationAIInstructions}
+              parse={parseConsultationAIReply}
+              onClose={() => setShowAIImport(false)}
+              onImport={handleAIImport}
+            />
+          )}
         </View>
       </SafeAreaView>
     </FieldRevealProvider>

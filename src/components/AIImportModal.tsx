@@ -11,25 +11,29 @@ import { FieldRevealProvider } from '@/src/components/FieldReveal';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField, FormTextInput } from '@/src/components/FormField';
 import { COLORS } from '@/src/theme/colors';
-import {
-  buildLabResultsAIInstructions,
-  parseLabResultsAIReply,
-  type ImportedLabResults,
-} from './labResultsAIImport';
+import type { AIImportResult } from '@/src/utils/aiImport';
 
 const COPIED_FEEDBACK_MS = 2000;
 
 /**
  * Lets the user copy instructions for their own AI assistant, then paste its
- * reply to fill in the lab results form. Mount it while open, so each opening
- * starts empty.
+ * reply to fill in a form. Mount it while open, so each opening starts empty.
  */
-export function ImportLabResultsModal({
+export function AIImportModal<T>({
+  document,
+  instructions,
+  parse,
   onClose,
   onImport,
 }: {
+  /** What the user shares with the AI, e.g. "lab report". */
+  document: string;
+  /** Builds the instructions copied for the AI. */
+  instructions: () => string;
+  /** Reads the AI's reply, or lists its problems. */
+  parse: (reply: string) => AIImportResult<T>;
   onClose: () => void;
-  onImport: (data: ImportedLabResults) => void;
+  onImport: (data: T) => void;
 }) {
   const [reply, setReply] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -44,7 +48,7 @@ export function ImportLabResultsModal({
   );
 
   const handleCopy = async () => {
-    await Clipboard.setStringAsync(buildLabResultsAIInstructions());
+    await Clipboard.setStringAsync(instructions());
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(
@@ -59,7 +63,7 @@ export function ImportLabResultsModal({
   };
 
   const handleImport = () => {
-    const result = parseLabResultsAIReply(reply);
+    const result = parse(reply);
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -79,7 +83,7 @@ export function ImportLabResultsModal({
       <FieldRevealProvider value={null}>
         <Text style={styles.description}>
           Copy the instructions and send them to your AI assistant together with
-          your lab report. Then paste its reply below to fill in the form.
+          your {document}. Then paste its reply below to fill in the form.
         </Text>
         <View style={styles.copy}>
           <ModalButton
