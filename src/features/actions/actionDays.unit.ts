@@ -302,6 +302,33 @@ test('days follow the regimen recorded for them and flag answers given under ano
   ).toEqual(['1 tablet in the evening', undefined, false]);
 });
 
+test('an answer given while a treatment is on hold is flagged', () => {
+  const onHold = buildUsageStatement(
+    treatment('paused', 'active'),
+    'p1',
+    'on-hold',
+    '2026-10-05',
+    'use-paused-hold'
+  );
+  const flags = (treatments: MedicationRequest[], statements = [onHold]) =>
+    buildActionDay(
+      '2026-10-05',
+      treatments,
+      [log(treatments[0].id!, '2026-10-05', 'completed')],
+      statements
+    ).items.map((item) => item.mismatch ?? false);
+  // Paused in its usage, or the whole prescription put on hold.
+  expect(
+    flags(
+      [treatment('paused', 'active')],
+      [taking('paused', '2026-10-01', '2026-10-04'), onHold]
+    )
+  ).toEqual([true]);
+  expect(flags([treatment('held', 'on-hold')], [])).toEqual([true]);
+  // A stopped treatment's answers are history, not a mismatch.
+  expect(flags([treatment('stopped', 'stopped')], [])).toEqual([false]);
+});
+
 test('free-text dosing is copied for new answers and compared with the day text', () => {
   const vitamin: MedicationRequest = {
     ...treatment('vitamin', 'active'),

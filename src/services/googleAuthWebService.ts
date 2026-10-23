@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { reportUnreachable } from './reachability';
 
 export interface GoogleTokenResponse {
   access_token: string;
@@ -44,6 +45,8 @@ declare global {
   }
 }
 
+const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
+
 let gisScriptLoadingPromise: Promise<boolean> | null = null;
 
 /**
@@ -64,32 +67,35 @@ export async function loadGisScript(): Promise<boolean> {
   }
 
   gisScriptLoadingPromise = new Promise<boolean>((resolve) => {
-    const existing = document.querySelector(
-      'script[src="https://accounts.google.com/gsi/client"]'
-    );
-    if (existing) {
-      if (window.google?.accounts?.oauth2) {
-        resolve(true);
-      } else {
-        existing.addEventListener('load', () => resolve(true));
-        existing.addEventListener('error', () => resolve(false));
-      }
-      return;
-    }
+    // A script that failed to load (e.g. offline) never fires again, so it
+    // is replaced rather than awaited.
+    document.querySelector(`script[src="${GIS_SCRIPT_URL}"]`)?.remove();
 
     const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
+    script.src = GIS_SCRIPT_URL;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve(true);
     script.onerror = () => {
       console.warn('Failed to load Google Identity Services script.');
+      reportUnreachable();
+      script.remove();
+      // Let the next request try again, e.g. once the device is back online.
+      gisScriptLoadingPromise = null;
       resolve(false);
     };
     document.head.appendChild(script);
   });
 
   return gisScriptLoadingPromise;
+}
+
+/** Google's sign-in script could not be loaded, e.g. while offline. */
+export class GoogleIdentityUnavailableError extends Error {
+  constructor() {
+    super('Google Identity Services not available');
+    this.name = 'GoogleIdentityUnavailableError';
+  }
 }
 
 /**
@@ -102,7 +108,7 @@ export async function requestWebAccessToken(options?: {
   const loaded = await loadGisScript();
   const oauth2 = window.google?.accounts?.oauth2;
   if (!loaded || !oauth2) {
-    throw new Error('Google Identity Services not available');
+    throw new GoogleIdentityUnavailableError();
   }
 
   const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';

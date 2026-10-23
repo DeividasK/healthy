@@ -2,13 +2,20 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNetworkState } from 'expo-network';
 import { WifiOff } from 'lucide-react-native';
+import { useIsInternetUnreachable } from '@/src/services/reachability';
 import { COLORS } from '@/src/theme/colors';
 
-/** Whether the device has no network connection. */
+/**
+ * Whether the device has no network connection, or a request just failed to
+ * reach the internet through the one it has.
+ */
 export function useIsOffline(): boolean {
   const { isConnected, isInternetReachable } = useNetworkState();
+  const isUnreachable = useIsInternetUnreachable();
   // Unknown (undefined/null) counts as online so the header never flashes offline on launch.
-  return isConnected === false || isInternetReachable === false;
+  return (
+    isConnected === false || isInternetReachable === false || isUnreachable
+  );
 }
 
 /** Offline icon, shown in the sync indicator's place while offline. */

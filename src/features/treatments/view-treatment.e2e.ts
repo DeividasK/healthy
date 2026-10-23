@@ -83,8 +83,6 @@ test('the island centers Start taking and keeps Edit available beside it', async
 test('unstarted treatment scroll region supports keyboard access', async ({
   page,
 }) => {
-  // Keep this known accessibility defect visible without changing app behavior
-  // in this coverage-only handoff. An unexpected pass asks us to remove fail().
   await page.setViewportSize({ width: 1280, height: 720 });
   await seedTestPatient(page);
   const treatment = await seedTestTreatment(page, {
@@ -101,9 +99,5 @@ test('unstarted treatment scroll region supports keyboard access', async ({
     'Unstarted treatment'
   );
   await expect(page.getByTestId('treatment-usage-start')).toBeVisible();
-  test.fail(
-    true,
-    'Existing scrollable-region-focusable violation when there are no taking days or related links. Application changes are outside this coverage-only task.'
-  );
   await checkA11y(page, { include: '[data-testid="treatment-view"]' });
 });
