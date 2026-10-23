@@ -12,6 +12,11 @@ import {
   loadGisScript,
   silentRefreshWebAccessToken,
 } from '@/src/services/googleAuthWebService';
+import {
+  isNetworkError,
+  reportReachable,
+  reportUnreachable,
+} from '@/src/services/reachability';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
   type GoogleDriveConfig,
@@ -332,6 +337,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           await withProvider((provider) => syncOnce(provider, keys), {
             interactive: manual,
           });
+          reportReachable();
           const now = new Date();
           if (configRef.current)
             await updateConfig({
@@ -347,6 +353,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             // Automatic syncs pause until the user syncs or reconnects; the
             // sync card shows it, so this expected state is not logged.
             markAuthExpired(true);
+            setSyncState('idle');
+            setIsUpToDate(false);
+            return;
+          }
+          if (isNetworkError(err)) {
+            // The header shows the device offline in the sync status's place.
+            reportUnreachable();
             setSyncState('idle');
             setIsUpToDate(false);
             return;

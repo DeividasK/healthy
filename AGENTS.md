@@ -46,6 +46,7 @@ pnpm expo install --fix      # fix incompatible package versions
   - Implementation plans **MUST** describe new E2E tests that will be written.
   - Run when modifying user flows, interactions, or data persistence. Do not re-run for comment/type-only changes.
   - Keep the suite fast; it is CPU-bound and each worker boots the app once and resets it in place before every test. Seed with the seed helpers, navigate with `openRoute`, and never `page.goto`/`page.reload` unless loading or restarting is what the test checks. Extend a feature's add → view → edit → delete journey with `test.step` instead of adding tests that seed the same record. Test behaviour owned by a shared component once. Wait for state, never for time. Opt out of the shared app (`freshApp`) only for tests about loading, other tabs or legacy schemas. Details: `.agents/skills/testing-workflow/SKILL.md` ("Keeping the E2E Suite Fast").
+- **Fix Failing and Flaky Tests as You Meet Them**: Every failing test you encounter is yours to fix in the current change, including ones unrelated to it (lint, typecheck, E2E or visual). Never settle for a rerun that passes, and never skip, disable, quarantine or loosen a test to get green. "Flaky" is not a root cause: reproduce the failure (rerun it repeatedly, under the full suite's load if it only fails there), find why it fails, and fix the test or the app code so it passes reliably. If you cannot reproduce or fix it, say so in your summary with the failing output and what you tried.
 
 ## Navigation & Routing
 

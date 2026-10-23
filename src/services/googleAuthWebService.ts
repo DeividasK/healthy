@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { reportUnreachable } from './reachability';
 
 export interface GoogleTokenResponse {
   access_token: string;
@@ -77,6 +78,7 @@ export async function loadGisScript(): Promise<boolean> {
     script.onload = () => resolve(true);
     script.onerror = () => {
       console.warn('Failed to load Google Identity Services script.');
+      reportUnreachable();
       script.remove();
       // Let the next request try again, e.g. once the device is back online.
       gisScriptLoadingPromise = null;
