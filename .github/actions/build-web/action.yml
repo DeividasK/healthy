@@ -3,7 +3,7 @@ description: 'Build Expo web static export with caching across CI checks'
 
 inputs:
   base-url:
-    description: 'Base URL prefix for Expo export (e.g. /app)'
+    description: 'Base URL prefix for Expo export (e.g. /a)'
     required: false
     default: ''
 

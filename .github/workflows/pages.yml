@@ -1,7 +1,7 @@
 name: Pages
 
 # usehealthy.app is one GitHub Pages site: the landing page in site/ at the
-# root, and the web app under /app. The landing page deploys from main whenever
+# root, and the web app under /a. The landing page deploys from main whenever
 # site/ changes; the app is always built from the latest release, so a landing
 # page change never ships unreleased app code.
 on:
@@ -70,16 +70,16 @@ jobs:
       - name: Build App
         uses: ./.pages/.github/actions/build-web
         with:
-          base-url: ${{ steps.pages.outputs.base_path }}/app
+          base-url: ${{ steps.pages.outputs.base_path }}/a
 
       - name: Assemble Site
         run: |
           mkdir _site
           cp -R .pages/site/. _site/
-          cp -R dist _site/app
+          cp -R dist _site/a
           cp public/privacy.html _site/privacy.html
           # Unknown paths fall back to the app so its deep links load.
-          cp _site/app/index.html _site/404.html
+          cp _site/a/index.html _site/404.html
           touch _site/.nojekyll
 
       - name: Upload Pages Artifact
