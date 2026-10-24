@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Healthy – Your health, in one place</title>
+    <meta
+      name="description"
+      content="One home for your blood tests, supplements and medical history. Track 200+ biomarkers, see the big picture and spot what needs attention. Free, open source and private."
+    />
+    <link rel="canonical" href="https://usehealthy.app/" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Healthy" />
+    <meta property="og:url" content="https://usehealthy.app/" />
+    <meta property="og:title" content="Healthy – Your health, in one place" />
+    <meta
+      property="og:description"
+      content="Track 200+ biomarkers across every blood test, see your trends and log your supplements. Free, open source and private."
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Healthy",
+        "url": "https://usehealthy.app/",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web",
+        "description": "A free, open-source health dashboard that brings blood test biomarkers, supplements and medical history into one view, with your data stored on your own device.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+    <style>
+      :root {
+        /* Tokens from the Healthy design system (src/theme/colors.ts) */
+        --background: #ffffff;
+        --foreground: #1a1c1a;
+        --text-secondary: #414844;
+        --card: #ffffff;
+        --card-border: #e2e3df;
+        --primary: #3d6450;
+        --primary-foreground: #ffffff;
+        --empty-icon-container: #d1e9cd;
+        --link: #2e78b7;
+        --shadow-card: 0 2px 6px rgba(15, 23, 42, 0.04);
+        --shadow-primary-button: 0 4px 14px rgba(61, 100, 80, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          17px/1.6 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      main,
+      footer {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      header {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1.25rem;
+      }
+      header .github {
+        margin-left: auto;
+        color: var(--foreground);
+        display: flex;
+        padding: 10px;
+        margin-right: -10px;
+      }
+      header .github:hover {
+        color: var(--primary);
+      }
+      header img {
+        width: 28px;
+        height: 28px;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+      .hero {
+        padding: 56px 0 72px;
+        max-width: 720px;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .hero h1 {
+        font-size: clamp(2.25rem, 6vw, 3.5rem);
+        margin: 0 0 20px;
+      }
+      .hero p {
+        font-size: 1.2rem;
+        color: var(--text-secondary);
+        margin: 0 0 32px;
+      }
+      .button {
+        display: inline-block;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: var(--shadow-primary-button);
+        text-decoration: none;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 9999px;
+      }
+      .button:hover {
+        filter: brightness(1.1);
+      }
+      .note {
+        display: block;
+        margin-top: 12px;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
+      section {
+        padding: 48px 0;
+        border-top: 1px solid var(--card-border);
+      }
+      section h2 {
+        font-size: clamp(1.6rem, 4vw, 2.25rem);
+        margin: 0 0 24px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        box-shadow: var(--shadow-card);
+        border-radius: 16px;
+        padding: 24px;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 1.15rem;
+      }
+      .card p {
+        margin: 0;
+        color: var(--text-secondary);
+      }
+      ul.checks {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 12px;
+      }
+      ul.checks li {
+        padding-left: 32px;
+        position: relative;
+      }
+      ul.checks li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--empty-icon-container);
+        color: var(--primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        margin-top: 3px;
+      }
+      a {
+        color: var(--link);
+      }
+      .cta {
+        text-align: center;
+      }
+      footer {
+        padding-top: 32px;
+        padding-bottom: 48px;
+        border-top: 1px solid var(--card-border);
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        justify-content: space-between;
+      }
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="favicon.svg" alt="" />
+      Healthy
+      <a
+        class="github"
+        href="https://github.com/DeividasK/healthy"
+        aria-label="Healthy on GitHub"
+        title="Healthy on GitHub"
+      >
+        <svg viewBox="0 0 16 16" width="24" height="24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+          />
+        </svg>
+      </a>
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>Your health, <span class="nowrap">in one place.</span></h1>
+        <p>
+          Your blood tests, supplements, medications, and medical history in one
+          convenient place so you can see the big picture.
+        </p>
+        <a class="button" href="app/">Open Healthy</a>
+        <span class="note"
+          >Free, forever. Private, on your device. Works in your browser.</span
+        >
+      </div>
+
+      <section aria-labelledby="features">
+        <h2 id="features">Everything in one view</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Your biomarkers</h3>
+            <p>
+              200+ biomarkers across all your blood tests. See what's changing
+              and what's out of range.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Your protocol</h3>
+            <p>
+              Log supplements and medications in a tap, and keep a record of
+              every regimen.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Your AI</h3>
+            <p>
+              Paste a lab report into your own AI assistant. Healthy fills in
+              the results.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="privacy">
+        <h2 id="privacy">Free, private and yours</h2>
+        <ul class="checks">
+          <li>Free, forever. No account, no subscription.</li>
+          <li>
+            Your data lives on your device. Healthy has no server, no ads and no
+            analytics.
+          </li>
+          <li>
+            Sync between your devices through your own Google Drive, encrypted
+            on your device first. Google can't read it.
+          </li>
+          <li>Open source, so anyone can check these claims in the code.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="open-source">
+        <h2 id="open-source">Shaped by the people who use it.</h2>
+        <p>
+          Lab results are where Healthy starts. Next: making sense of the bigger
+          picture and preparing what to discuss with your doctor or your AI.
+          Tell us what you need most at
+          <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>.
+        </p>
+      </section>
+
+      <section class="cta" aria-labelledby="start">
+        <h2 id="start">Add your first blood test in a minute.</h2>
+        <a class="button" href="app/">Open Healthy</a>
+      </section>
+    </main>
+
+    <footer>
+      <span>Made with ❤️ in 🇱🇹</span>
+      <nav aria-label="Footer">
+        <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="https://github.com/DeividasK/healthy/blob/main/CHANGELOG.md"
+          >What's new</a
+        >
+      </nav>
+    </footer>
+  </body>
+</html>
