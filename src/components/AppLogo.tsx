@@ -12,7 +12,7 @@ export const APP_LOGO_PATH =
 
 export function AppLogo({
   size = 36,
-  color = COLORS.light.primaryLogo,
+  color = COLORS.light.primary,
   style,
   ...props
 }: AppLogoProps) {
