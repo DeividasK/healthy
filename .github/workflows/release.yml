@@ -97,7 +97,7 @@ jobs:
             --notes-file "$RUNNER_TEMP/release-notes.md"
 
       # EAS listens for this branch's push webhook. GitHub Pages is deployed
-      # below from the same tag; a branch push no longer starts this workflow.
+      # below from the same tag by pages.yml; a branch push no longer starts this workflow.
       - name: Start Android Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -106,40 +106,12 @@ jobs:
             -f sha="$(git rev-parse HEAD)" -F force=false
 
   deploy-to-github-pages:
-    name: Build & Deploy to GitHub Pages
+    name: Deploy to GitHub Pages
     needs: [resolve-release, verify-release]
     permissions:
       contents: read
       pages: write
       id-token: write
-    environment:
-      name: production
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-26.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.resolve-release.outputs.ref }}
-          persist-credentials: false
-      - uses: pnpm/setup@v3
-        with:
-          cache: true
-
-      - name: Build for GitHub Pages
-        uses: ./.github/actions/build-web
-        with:
-          base-url: /healthy
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
-          include-hidden-files: true
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ needs.resolve-release.outputs.tag }}
