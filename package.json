@@ -87,7 +87,7 @@
     "web": "expo start",
     "web:dist": "pnpm build:web && pnpm serve -s dist -l 8081",
     "build:web": "expo export --platform web",
-    "build:pages": "EXPO_BASE_URL=/app expo export --platform web && touch dist/.nojekyll && cp dist/index.html dist/404.html",
+    "build:pages": "EXPO_BASE_URL=/u expo export --platform web && touch dist/.nojekyll && cp dist/index.html dist/404.html",
     "test:unit": "playwright test --config playwright.unit.config.ts",
     "changelog:new": "changie new",
     "release:prepare": "ym=$(date -u +%Y).$(expr $(date -u +%m) + 0); v=$(changie latest 2>/dev/null); case \"$v\" in \"$ym\".*) n=$(( ${v##*.} + 1 ));; *) n=0;; esac; changie batch \"$ym.$n\" && changie merge",
