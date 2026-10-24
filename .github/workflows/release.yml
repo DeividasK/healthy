@@ -1,8 +1,14 @@
 name: Release
 
-# Publish a stable GitHub Release to ship its tagged commit. The internal
-# release branch advances to that commit to trigger the existing EAS pipeline.
+# Merging a prepared release into main ships it: as changie suggests, a push to
+# main that changes CHANGELOG.md starts a release, which ships when its version
+# has no `v<version>` tag yet. Publishing a stable GitHub Release by hand ships
+# its tagged commit too. The internal release branch advances to that commit to
+# trigger the existing EAS pipeline.
 on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
   release:
     types: [published]
 
@@ -11,22 +17,61 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve-release:
+    name: Resolve Release
+    if: ${{ github.event_name == 'push' || !github.event.release.prerelease }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-26.04
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      create: ${{ steps.resolve.outputs.create }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A push releases only a version that is not tagged yet, so changelog
+      # edits after a release publish nothing.
+      - name: Resolve Release
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT_NAME" = release ]; then
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "ref=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="v$(node -p "require('./package.json').version")"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>&1; then
+            echo "$tag is already released."
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "create=true" >> "$GITHUB_OUTPUT"
+
   verify-release:
     name: Verify & Dispatch Release
-    if: ${{ !github.event.release.prerelease }}
+    needs: [resolve-release]
+    if: ${{ needs.resolve-release.outputs.tag != '' }}
     permissions:
       contents: write
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ needs.resolve-release.outputs.ref }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Verify Release
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
         run: |
           version=$(node -p "require('./app.json').expo.version")
           test "$RELEASE_TAG" = "v$version" || { echo "::error::Release tag must match app.json version v$version."; exit 1; }
@@ -39,6 +84,18 @@ jobs:
           fi
           test -f ".changes/$version.md" || { echo "::error::No release notes for $version in .changes/"; exit 1; }
 
+      # Created with the Actions token, so it starts no further workflow runs.
+      - name: Publish GitHub Release
+        if: ${{ needs.resolve-release.outputs.create == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: |
+          tail -n +2 ".changes/${RELEASE_TAG#v}.md" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" --title "$RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
       # EAS listens for this branch's push webhook. GitHub Pages is deployed
       # below from the same tag; a branch push no longer starts this workflow.
       - name: Start Android Release
@@ -50,7 +107,7 @@ jobs:
 
   deploy-to-github-pages:
     name: Build & Deploy to GitHub Pages
-    needs: [verify-release]
+    needs: [resolve-release, verify-release]
     permissions:
       contents: read
       pages: write
@@ -63,7 +120,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ needs.resolve-release.outputs.ref }}
           persist-credentials: false
       - uses: pnpm/setup@v3
         with:
