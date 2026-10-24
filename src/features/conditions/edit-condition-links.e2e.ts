@@ -7,6 +7,7 @@ import {
   seedTestTreatment,
   getTestTreatment,
   openRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 const getConsultation = (page: any, id: string) =>
@@ -71,6 +72,7 @@ test.describe('Edit Condition links', () => {
       { concept: { text: 'Attacks' } },
       { reference: { reference } },
     ]);
+    await showAllTimelineSteps(page);
     await expect(
       page.getByTestId(`condition-timeline-item-consultation-${visit.id}`)
     ).toBeVisible();

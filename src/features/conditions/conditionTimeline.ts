@@ -121,6 +121,12 @@ export const NO_TIMELINE_FILTERS: TimelineFilters = {
   period: 'all',
 };
 
+export const DEFAULT_TIMELINE_FILTERS: TimelineFilters = {
+  tones: ['active', 'planned'],
+  types: [],
+  period: 'all',
+};
+
 export function hasTimelineFilters(filters: TimelineFilters) {
   return (
     filters.tones.length > 0 ||

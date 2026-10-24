@@ -185,13 +185,7 @@ export function LabsSummary({
     />
   );
   const grid = (
-    <BiomarkerStatusGrid
-      items={biomarkers}
-      testID="labs-summary-grid"
-      onPressItem={(id) =>
-        router.push({ pathname: '/biomarker/[id]', params: { id } })
-      }
-    />
+    <BiomarkerStatusGrid items={biomarkers} testID="labs-summary-grid" />
   );
 
   if (!showAll) {

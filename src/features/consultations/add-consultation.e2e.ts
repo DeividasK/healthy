@@ -9,6 +9,7 @@ import {
   evaluateBridge,
   openRoute,
   reopenRoute,
+  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Consultation Flow', () => {
@@ -98,6 +99,7 @@ test.describe('Add Consultation Flow', () => {
         await expect(page).toHaveURL(
           new RegExp(`.*condition\\/${conditionId}$`)
         );
+        await showAllTimelineSteps(page);
         const timeline = page.getByTestId('condition-timeline');
         await expect(
           timeline.getByText('General Cardiology Review')
@@ -135,6 +137,7 @@ test.describe('Add Consultation Flow', () => {
 
       await test.step('View its details and open the condition it was for', async () => {
         await openRoute(page, `/condition/${conditionId}`);
+        await showAllTimelineSteps(page);
         await page
           .getByTestId(`condition-timeline-item-consultation-${consultationId}`)
           .click();

@@ -255,7 +255,9 @@ test.describe('Biomarker detail', () => {
     await expect(square).toHaveAccessibleName(
       'Red Blood Cells (RBC): Out of range'
     );
-    await square.click();
+    // The grid is visual only; result rows on the summary open details.
+    await page.getByTestId('labs-summary-open').click();
+    await page.getByTestId('labs-summary-result-789-8').click();
 
     await expect(page.getByTestId('biomarker-title')).toHaveText(
       'Red Blood Cells (RBC)'
@@ -396,7 +398,9 @@ test.describe('Biomarker detail', () => {
     await expect(square).toHaveAccessibleName(
       'Atherogenic Index of Plasma (AIP): Out of range'
     );
-    await square.click();
+    // The grid is visual only; result rows on the summary open details.
+    await page.getByTestId('labs-summary-open').click();
+    await page.getByTestId('labs-summary-result-aip').click();
 
     await expect(page.getByTestId('biomarker-title')).toHaveText(
       'Atherogenic Index of Plasma (AIP)'

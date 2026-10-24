@@ -354,6 +354,8 @@ test.describe('Shared header and island motion', () => {
     const consultation = await seedTestConsultation(page, {
       conditionIds: [condition.id],
       title: 'Dock navigation',
+      // Planned steps show on the timeline without clearing its filters.
+      status: 'planned',
     });
     await openRoute(page, '/');
     const header = page.getByTestId('app-header');

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/src/theme/colors';
 import {
   orderByRangeStatus,
@@ -39,32 +39,28 @@ const KEY_ENTRIES = [
  */
 export function BiomarkerStatusGrid({
   items,
-  onPressItem,
   testID,
 }: {
   items: BiomarkerGridItem[];
-  onPressItem: (id: string) => void;
   testID: string;
 }) {
   return (
     <View testID={testID}>
       <View style={styles.grid} testID={`${testID}-squares`}>
         {orderByRangeStatus(items).map(({ id, name, status }) => (
-          <Pressable
+          <View
             key={id}
             testID={`${testID}-cell-${id}`}
-            accessibilityRole="button"
+            accessible
+            accessibilityRole="image"
             accessibilityLabel={`${name}: ${status ? RANGE_STATUS_LABELS[status] : 'No range'}`}
-            hitSlop={2}
-            onPress={() => onPressItem(id)}
-            style={({ pressed }) => [
+            style={[
               styles.square,
               {
                 backgroundColor: status
                   ? SQUARE_COLORS[status]
                   : COLORS.light.noRange,
               },
-              pressed && styles.pressed,
             ]}
           />
         ))}
@@ -97,7 +93,6 @@ export function BiomarkerStatusGrid({
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   square: { width: 16, height: 16, borderRadius: 3 },
-  pressed: { opacity: 0.6 },
   key: {
     flexDirection: 'row',
     flexWrap: 'wrap',

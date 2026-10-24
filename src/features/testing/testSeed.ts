@@ -1,4 +1,4 @@
-import { test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import type { Attachment, MedicationRequest, ServiceRequest } from 'fhir/r5';
 import type {
   QuantityDraft,
@@ -228,6 +228,19 @@ export async function openRoute(page: Page, path: string): Promise<void> {
     path
   );
   await page.waitForURL((url) => url.pathname + url.search === path);
+}
+
+/**
+ * Clears a condition timeline's default Active and Planned filters, so
+ * done, paused and cancelled steps show too.
+ */
+export async function showAllTimelineSteps(page: Page): Promise<void> {
+  await page.getByTestId('condition-timeline-filter-button').click();
+  await page.getByTestId('condition-timeline-filters-reset').click();
+  await page.getByTestId('condition-timeline-filters-done').click();
+  await expect(
+    page.getByTestId('condition-timeline-filter-button')
+  ).toHaveAccessibleName('Filter timeline');
 }
 
 /** Remounts the current screen so it reads the database again. */

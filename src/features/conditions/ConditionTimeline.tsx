@@ -12,7 +12,7 @@ import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedR
 import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelatedRow';
 import { COLORS } from '@/src/theme/colors';
 import {
-  NO_TIMELINE_FILTERS,
+  DEFAULT_TIMELINE_FILTERS,
   filterTimelineItems,
   groupTimelineItems,
   hasTimelineFilters,
@@ -29,7 +29,7 @@ import { TimelineFilterModal } from './TimelineFilterModal';
  */
 export function ConditionTimeline({ items }: { items: TimelineItem[] }) {
   const router = useRouter();
-  const [filters, setFilters] = useState(NO_TIMELINE_FILTERS);
+  const [filters, setFilters] = useState(DEFAULT_TIMELINE_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtered = hasTimelineFilters(filters);
   const groups = useMemo(

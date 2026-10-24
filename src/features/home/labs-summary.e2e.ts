@@ -55,7 +55,7 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   // Low and high results are both out of range, and come first.
   const squares = home
     .getByTestId('labs-summary-grid-squares')
-    .getByRole('button');
+    .getByRole('img');
   for (const [index, name] of [
     'Platelets (PLT): Out of range',
     'White Blood Cells (WBC): Out of range',
@@ -121,6 +121,11 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await expect(
     summary.getByTestId('labs-summary-groups-inRange-count')
   ).toHaveText('1');
+  await summary.getByTestId('labs-summary-grid-cell-718-7').click();
+  await expect(page).toHaveURL(/labs-summary\?period=1$/);
+  await expect(
+    summary.getByTestId('labs-summary-grid-squares').getByRole('button')
+  ).toHaveCount(0);
   const outOfRange = summary.getByTestId('labs-summary-groups-outOfRange');
   await expect(
     outOfRange.getByRole('heading', { name: 'Out of range' })
@@ -147,10 +152,10 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await page.getByTestId('back-button').click();
   await expect(page).toHaveURL(/\/$/);
   await home.getByTestId('labs-summary-grid-cell-6690-2').click();
-  await expect(page).toHaveURL(/biomarker\/6690-2/);
-  await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
-    'Out of range'
-  );
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    home.getByTestId('labs-summary-grid-squares').getByRole('button')
+  ).toHaveCount(0);
 });
 
 test('the key and groups list only statuses with results; empty periods and invalid parameters are safe', async ({
@@ -209,7 +214,7 @@ test('the key and groups list only statuses with results; empty periods and inva
   await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
   await expect(view.getByTestId('labs-summary-total')).toHaveText('0');
   await expect(
-    view.getByTestId('labs-summary-grid-squares').getByRole('button')
+    view.getByTestId('labs-summary-grid-squares').getByRole('img')
   ).toHaveCount(0);
   await expect(view.getByTestId('labs-summary-grid-status-counts')).toHaveText(
     ''
