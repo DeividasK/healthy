@@ -1,0 +1,3 @@
+kind: Fixed
+body: Condition severity is now shown with an empty, half-filled or full marker instead of green, amber and red, so it reads clearly for colour-blind people.
+time: 2026-10-24T15:17:16.937694802Z

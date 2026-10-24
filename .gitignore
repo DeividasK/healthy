@@ -61,3 +61,4 @@ chromatic.log
 
 # Local scratch files (never commit)
 /.agents/tmp/
+.site-screens/
