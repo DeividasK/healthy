@@ -74,7 +74,6 @@ export interface ConsultationStatusOption {
   id: string;
   label: string;
   status: string;
-  dotColor: string;
 }
 
 export const CONSULTATION_STATUS_OPTIONS: ConsultationStatusOption[] = [
@@ -82,13 +81,11 @@ export const CONSULTATION_STATUS_OPTIONS: ConsultationStatusOption[] = [
     id: 'completed',
     label: 'Completed',
     status: 'completed',
-    dotColor: '#10B981',
   },
   {
     id: 'planned',
     label: 'Planned',
     status: 'planned',
-    dotColor: '#3B82F6',
   },
 ];
 
@@ -202,7 +199,6 @@ export function ConsultationForm({
         id: existingStatus,
         label: existingStatus.charAt(0).toUpperCase() + existingStatus.slice(1),
         status: existingStatus,
-        dotColor: COLORS.light.muted,
       },
     ];
   }, [initialValues?.status]);

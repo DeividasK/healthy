@@ -45,7 +45,6 @@ export interface ConditionStatusOption {
   id: string;
   label: string;
   clinicalStatus: string;
-  dotColor: string;
 }
 
 export const CONDITION_STATUS_OPTIONS: ConditionStatusOption[] = [
@@ -53,43 +52,36 @@ export const CONDITION_STATUS_OPTIONS: ConditionStatusOption[] = [
     id: 'active',
     label: 'Active',
     clinicalStatus: 'active',
-    dotColor: '#10B981',
   },
   {
     id: 'recurrence',
     label: 'Recurrence',
     clinicalStatus: 'recurrence',
-    dotColor: '#F59E0B',
   },
   {
     id: 'relapse',
     label: 'Relapse',
     clinicalStatus: 'relapse',
-    dotColor: '#F59E0B',
   },
   {
     id: 'inactive',
     label: 'Inactive',
     clinicalStatus: 'inactive',
-    dotColor: '#6B7280',
   },
   {
     id: 'remission',
     label: 'Remission',
     clinicalStatus: 'remission',
-    dotColor: '#8B5CF6',
   },
   {
     id: 'resolved',
     label: 'Resolved',
     clinicalStatus: 'resolved',
-    dotColor: '#717973',
   },
   {
     id: 'unknown',
     label: 'Unknown',
     clinicalStatus: 'unknown',
-    dotColor: '#6B7280',
   },
 ];
 export const VERIFICATION_OPTIONS = [
@@ -105,13 +97,14 @@ export const VERIFICATION_OPTIONS = [
 export interface SeverityOption {
   value: 'mild' | 'moderate' | 'severe';
   label: string;
-  dotColor: string;
+  /** How much of the marker is filled. Shape, not colour, carries the level. */
+  fill: 'none' | 'half' | 'full';
 }
 
 export const SEVERITY_OPTIONS: SeverityOption[] = [
-  { value: 'mild', label: 'Mild', dotColor: '#10B981' },
-  { value: 'moderate', label: 'Moderate', dotColor: '#F59E0B' },
-  { value: 'severe', label: 'Severe', dotColor: '#EF4444' },
+  { value: 'mild', label: 'Mild', fill: 'none' },
+  { value: 'moderate', label: 'Moderate', fill: 'half' },
+  { value: 'severe', label: 'Severe', fill: 'full' },
 ];
 
 export interface ConditionFormValues {
@@ -443,10 +436,14 @@ export function ConditionForm({
                     >
                       <View
                         style={[
-                          styles.statusDot,
-                          { backgroundColor: opt.dotColor },
+                          styles.severityMarker,
+                          opt.fill === 'full' && styles.severityMarkerFull,
                         ]}
-                      />
+                      >
+                        {opt.fill === 'half' && (
+                          <View style={styles.severityMarkerHalf} />
+                        )}
+                      </View>
                       <Text
                         style={[
                           styles.severityPillText,
@@ -566,11 +563,25 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 132,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  severityMarker: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: COLORS.light.severityMarker,
+    overflow: 'hidden',
     marginRight: 6,
+  },
+  severityMarkerFull: {
+    backgroundColor: COLORS.light.severityMarker,
+  },
+  severityMarkerHalf: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '50%',
+    backgroundColor: COLORS.light.severityMarker,
   },
   severityRow: {
     flexDirection: 'row',

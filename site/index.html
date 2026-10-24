@@ -32,50 +32,99 @@
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
       }
     </script>
+    <link
+      rel="preload"
+      href="fonts/literata.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <style>
+      /* Field Notebook: the marketing site's identity. Brand colours from the
+         Healthy design system; fonts are self-hosted (SIL OFL, see fonts/). */
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata-italic.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: italic;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Kalam';
+        src: url('fonts/kalam.woff2') format('woff2');
+        font-weight: 400;
+        font-display: swap;
+      }
       :root {
-        /* Tokens from the Healthy design system (src/theme/colors.ts) */
-        --background: #ffffff;
+        --paper: #fffdf9;
+        --grid: #e6efe8;
         --foreground: #1a1c1a;
         --text-secondary: #414844;
-        --card: #ffffff;
         --card-border: #e2e3df;
         --primary: #3d6450;
         --primary-foreground: #ffffff;
-        --empty-icon-container: #d1e9cd;
-        --link: #2e78b7;
-        --shadow-card: 0 2px 6px rgba(15, 23, 42, 0.04);
-        --shadow-primary-button: 0 4px 14px rgba(61, 100, 80, 0.35);
+        --primary-logo: #5a8669;
+        --range: #d1e9cd;
+        /* Plum is the handwriting ink (5.6:1 on paper). */
+        --hand: #7a5c7e;
+        --apricot: #c77c4e;
+        --serif: 'Literata', Georgia, 'Times New Roman', serif;
+        --script: 'Kalam', 'Segoe Print', 'Bradley Hand', cursive;
       }
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
-        background: var(--background);
         color: var(--foreground);
-        font:
-          17px/1.6 system-ui,
-          -apple-system,
-          'Segoe UI',
-          Roboto,
-          sans-serif;
+        background-color: var(--paper);
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 22px 22px;
+        font: 17px/1.6 var(--serif);
       }
-      main,
+      header,
+      main > section,
+      .hero,
       footer {
-        max-width: 960px;
+        position: relative;
+        max-width: 1000px;
         margin: 0 auto;
-        padding: 0 20px;
+        padding-left: max(28px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+      }
+      /* The notebook's margin rule. */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: max(12px, calc(50% - 520px));
+        width: 1.5px;
+        background: var(--apricot);
+        opacity: 0.5;
+        pointer-events: none;
       }
       header {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 20px;
         display: flex;
         align-items: center;
         gap: 10px;
-        font-weight: 700;
-        font-size: 1.25rem;
+        padding-top: 20px;
+        padding-bottom: 20px;
+        font-weight: 600;
+        font-size: 1.2rem;
+      }
+      header img {
+        width: 28px;
+        height: 28px;
       }
       header .github {
         margin-left: auto;
@@ -87,131 +136,280 @@
       header .github:hover {
         color: var(--primary);
       }
-      header img {
-        width: 28px;
-        height: 28px;
-      }
       h1,
       h2,
       h3 {
-        line-height: 1.2;
+        font-weight: 500;
+        line-height: 1.12;
         letter-spacing: -0.02em;
-      }
-      .hero {
-        padding: 56px 0 72px;
-        max-width: 720px;
+        text-wrap: balance;
       }
       .nowrap {
         white-space: nowrap;
       }
+      .hero {
+        display: grid;
+        gap: 40px;
+        align-items: center;
+        padding-top: 40px;
+        padding-bottom: 72px;
+      }
+      @media (min-width: 820px) {
+        .hero {
+          grid-template-columns: 1.05fr 0.95fr;
+        }
+      }
       .hero h1 {
-        font-size: clamp(2.25rem, 6vw, 3.5rem);
+        font-size: clamp(2.4rem, 6vw, 3.7rem);
         margin: 0 0 20px;
       }
+      .hero h1 em {
+        color: var(--primary);
+      }
       .hero p {
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         color: var(--text-secondary);
-        margin: 0 0 32px;
+        margin: 0 0 28px;
+        max-width: 34em;
       }
       .button {
         display: inline-block;
         background: var(--primary);
         color: var(--primary-foreground);
-        box-shadow: var(--shadow-primary-button);
         text-decoration: none;
         font-weight: 600;
-        padding: 14px 28px;
-        border-radius: 9999px;
+        padding: 14px 24px;
+        border-radius: 4px;
+        box-shadow: 3px 3px 0 var(--foreground);
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease;
       }
       .button:hover {
-        filter: brightness(1.1);
+        transform: translate(-1px, -1px);
+        box-shadow: 4px 4px 0 var(--foreground);
+      }
+      .button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--primary);
+        outline-offset: 3px;
+      }
+      .hand {
+        font-family: var(--script);
+        color: var(--hand);
+        font-size: 1.2rem;
+        line-height: 1.3;
       }
       .note {
         display: block;
-        margin-top: 12px;
-        font-size: 0.9rem;
+        margin-top: 16px;
+      }
+      .page {
+        position: relative;
+        background: var(--paper);
+        border: 1px solid var(--card-border);
+        border-radius: 2px;
+        box-shadow: 0 12px 28px rgba(26, 28, 26, 0.08);
+        padding: 20px;
+      }
+      .tape {
+        position: absolute;
+        top: -11px;
+        left: 40%;
+        width: 88px;
+        height: 22px;
+        background: rgba(209, 233, 205, 0.85);
+        transform: rotate(3deg);
+      }
+      .hero .page {
+        transform: rotate(-1.4deg);
+      }
+      .page svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .page .label {
+        font-family: var(--script);
+        font-size: 0.85rem;
         color: var(--text-secondary);
+        letter-spacing: 0.04em;
       }
-      section {
-        padding: 48px 0;
-        border-top: 1px solid var(--card-border);
+      main > section {
+        padding-top: 56px;
+        padding-bottom: 56px;
+        border-top: 1px solid var(--grid);
       }
-      section h2 {
-        font-size: clamp(1.6rem, 4vw, 2.25rem);
-        margin: 0 0 24px;
+      main > section h2 {
+        font-size: clamp(1.7rem, 4vw, 2.3rem);
+        margin: 0 0 28px;
       }
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 28px;
       }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--card-border);
-        box-shadow: var(--shadow-card);
-        border-radius: 16px;
-        padding: 24px;
+      .grid .page:nth-child(1) {
+        transform: rotate(-1.2deg);
       }
-      .card h3 {
-        margin: 0 0 8px;
-        font-size: 1.15rem;
+      .grid .page:nth-child(2) {
+        transform: rotate(0.8deg);
       }
-      .card p {
+      .grid .page:nth-child(3) {
+        transform: rotate(-0.5deg);
+      }
+      .grid h3 {
+        font-size: 1.25rem;
+        margin: 0 0 6px;
+      }
+      .grid p {
         margin: 0;
         color: var(--text-secondary);
+        font-size: 1rem;
+      }
+      .doodle {
+        margin-bottom: 12px;
+      }
+      .split {
+        display: grid;
+        gap: 28px;
+        align-items: center;
+      }
+      @media (min-width: 820px) {
+        .split {
+          grid-template-columns: 1.4fr 0.6fr;
+        }
       }
       ul.checks {
         list-style: none;
         padding: 0;
         margin: 0;
         display: grid;
-        gap: 12px;
+        gap: 14px;
+        max-width: 36em;
       }
       ul.checks li {
-        padding-left: 32px;
-        position: relative;
-      }
-      ul.checks li::before {
-        content: '✓';
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: var(--empty-icon-container);
-        color: var(--primary);
-        font-size: 0.8rem;
-        font-weight: 700;
         display: grid;
-        place-items: center;
-        margin-top: 3px;
+        grid-template-columns: 30px 1fr;
+        gap: 10px;
+        color: var(--text-secondary);
+      }
+      ul.checks svg {
+        width: 28px;
+        height: 26px;
+      }
+      .aside {
+        font-size: 1.4rem;
+        transform: rotate(-3deg);
+      }
+      p {
+        max-width: 36em;
       }
       a {
-        color: var(--link);
+        color: var(--primary);
       }
-      .cta {
-        text-align: center;
+      .sticky {
+        position: relative;
+        justify-self: center;
+        max-width: 290px;
+        padding: 22px 20px;
+        background: var(--range);
+        box-shadow: 0 10px 20px rgba(26, 28, 26, 0.1);
+        transform: rotate(2deg);
+      }
+      .sticky .hand {
+        color: var(--foreground);
+        font-size: 1.35rem;
+      }
+      .sticky a {
+        display: inline-block;
+        margin-top: 8px;
+        font-weight: 600;
+      }
+      .cta .hand {
+        margin-left: 14px;
       }
       footer {
-        padding-top: 32px;
+        padding-top: 28px;
         padding-bottom: 48px;
-        border-top: 1px solid var(--card-border);
-        font-size: 0.9rem;
+        border-top: 1px solid var(--grid);
+        font-size: 0.95rem;
         color: var(--text-secondary);
         display: flex;
         flex-wrap: wrap;
         gap: 8px 24px;
         justify-content: space-between;
       }
+      footer a {
+        color: var(--text-secondary);
+      }
       footer nav {
         display: flex;
         flex-wrap: wrap;
         gap: 8px 20px;
       }
+      @media (prefers-reduced-motion: reduce) {
+        .button {
+          transition: none;
+        }
+        .button:hover {
+          transform: none;
+        }
+      }
     </style>
   </head>
   <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="pen">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.04"
+            numOctaves="2"
+            seed="5"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="2.6" />
+        </filter>
+        <symbol id="tick" viewBox="0 0 28 26">
+          <path
+            d="M4 14 C 7 16, 9 19, 11 22 C 14 14, 19 8, 25 3"
+            fill="none"
+            stroke="#3d6450"
+            stroke-width="2.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="done" viewBox="0 0 28 28">
+          <path
+            d="M14 3 C 21 2.5, 25.5 8, 25 14.5 C 24.5 21, 19.5 25.5, 13.5 25 C 7 24.5, 2.8 19.5, 3.2 13.6 C 3.6 7.6, 8.5 3.4, 15 3.6"
+            fill="#e6efe8"
+            stroke="#3d6450"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+          <path
+            d="M8.5 14.5 C 10 15.5, 11.5 17.5, 12.5 19.5 C 14.5 14, 17.5 10.5, 21 8"
+            fill="none"
+            stroke="#3d6450"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="open" viewBox="0 0 28 28">
+          <path
+            d="M14 3 C 21 2.5, 25.5 8, 25 14.5 C 24.5 21, 19.5 25.5, 13.5 25 C 7 24.5, 2.8 19.5, 3.2 13.6 C 3.6 7.6, 8.5 3.4, 15 3.6"
+            fill="none"
+            stroke="#717973"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-dasharray="3 3"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
     <header>
       <img src="favicon.svg" alt="" />
       Healthy
@@ -232,35 +430,254 @@
 
     <main>
       <div class="hero">
-        <h1>Your health, <span class="nowrap">in one place.</span></h1>
-        <p>
-          Your blood tests, supplements, medications, and medical history in one
-          convenient place so you can see the big picture.
-        </p>
-        <a class="button" href="a/">Open Healthy</a>
-        <span class="note"
-          >Free, forever. Private, on your device. Works in your browser.</span
-        >
+        <div>
+          <h1>Your health, <em class="nowrap">in one place.</em></h1>
+          <p>
+            Your blood tests, supplements, medications, and medical history in
+            one convenient place so you can see the big picture.
+          </p>
+          <a class="button" href="a/">Open Healthy</a>
+          <span class="hand note"
+            >Free, forever. Private, on your device. Works in your
+            browser.</span
+          >
+        </div>
+        <figure class="page" style="margin: 0">
+          <div class="tape" aria-hidden="true"></div>
+          <div class="label" aria-hidden="true">FERRITIN · ng/mL</div>
+          <svg
+            viewBox="0 0 320 190"
+            role="img"
+            aria-label="Example chart: ferritin rising into the normal range over a year"
+          >
+            <rect
+              x="14"
+              y="44"
+              width="300"
+              height="70"
+              fill="#d1e9cd"
+              opacity="0.6"
+            />
+            <text
+              x="22"
+              y="60"
+              font-family="Kalam, cursive"
+              font-size="13"
+              fill="#3d6450"
+            >
+              normal range
+            </text>
+            <g
+              filter="url(#pen)"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline
+                points="24,160 84,150 144,132 204,96 274,70"
+                stroke="#3d6450"
+                stroke-width="3"
+              />
+              <circle
+                cx="274"
+                cy="70"
+                r="14"
+                stroke="#c77c4e"
+                stroke-width="2.2"
+              />
+              <path
+                d="M218 24 C 242 16, 264 28, 270 52"
+                stroke="#7a5c7e"
+                stroke-width="2"
+              />
+              <path
+                d="M262 44 L 270 54 L 276 42"
+                stroke="#7a5c7e"
+                stroke-width="2"
+              />
+              <line
+                x1="14"
+                y1="174"
+                x2="314"
+                y2="174"
+                stroke="#1a1c1a"
+                stroke-width="1.3"
+              />
+            </g>
+            <g fill="#1a1c1a">
+              <circle cx="24" cy="160" r="3.5" />
+              <circle cx="84" cy="150" r="3.5" />
+              <circle cx="144" cy="132" r="3.5" />
+              <circle cx="204" cy="96" r="3.5" />
+              <circle cx="274" cy="70" r="3.5" />
+            </g>
+            <g
+              font-family="Kalam, cursive"
+              font-size="12"
+              fill="#414844"
+              text-anchor="middle"
+            >
+              <text x="24" y="188">Jan</text>
+              <text x="84" y="188">Apr</text>
+              <text x="144" y="188">Jul</text>
+              <text x="204" y="188">Oct</text>
+              <text x="274" y="188">Jan</text>
+            </g>
+            <text
+              x="96"
+              y="30"
+              font-family="Kalam, cursive"
+              font-size="17"
+              fill="#7a5c7e"
+            >
+              finally in range!
+            </text>
+          </svg>
+        </figure>
       </div>
 
       <section aria-labelledby="features">
         <h2 id="features">Everything in one view</h2>
         <div class="grid">
-          <div class="card">
+          <div class="page">
+            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
+              <g filter="url(#pen)">
+                <rect
+                  x="10"
+                  y="22"
+                  width="200"
+                  height="10"
+                  rx="5"
+                  fill="#e2e3df"
+                />
+                <rect
+                  x="60"
+                  y="22"
+                  width="90"
+                  height="10"
+                  rx="5"
+                  fill="#b9cfc0"
+                />
+                <rect
+                  x="10"
+                  y="56"
+                  width="200"
+                  height="10"
+                  rx="5"
+                  fill="#e2e3df"
+                />
+                <rect
+                  x="50"
+                  y="56"
+                  width="110"
+                  height="10"
+                  rx="5"
+                  fill="#b9cfc0"
+                />
+                <circle cx="118" cy="27" r="6" fill="#1a1c1a" />
+                <circle cx="34" cy="61" r="6" fill="#1a1c1a" />
+                <circle
+                  cx="34"
+                  cy="61"
+                  r="14"
+                  fill="none"
+                  stroke="#c77c4e"
+                  stroke-width="2"
+                />
+              </g>
+              <text
+                x="54"
+                y="84"
+                font-family="Kalam, cursive"
+                font-size="13"
+                fill="#7a5c7e"
+              >
+                low, retest
+              </text>
+            </svg>
             <h3>Your biomarkers</h3>
             <p>
               200+ biomarkers across all your blood tests. See what's changing
               and what's out of range.
             </p>
           </div>
-          <div class="card">
+          <div class="page">
+            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
+              <use href="#done" x="6" y="4" width="22" height="22" />
+              <text
+                x="38"
+                y="21"
+                font-family="Literata, serif"
+                font-size="14"
+                fill="#1a1c1a"
+              >
+                Vitamin D3 · 2,000 IU
+              </text>
+              <use href="#done" x="6" y="32" width="22" height="22" />
+              <text
+                x="38"
+                y="49"
+                font-family="Literata, serif"
+                font-size="14"
+                fill="#1a1c1a"
+              >
+                Omega-3 · 1 g
+              </text>
+              <use href="#open" x="6" y="60" width="22" height="22" />
+              <text
+                x="38"
+                y="77"
+                font-family="Literata, serif"
+                font-size="14"
+                fill="#414844"
+              >
+                Magnesium · evening
+              </text>
+            </svg>
             <h3>Your protocol</h3>
             <p>
               Log supplements and medications in a tap, and keep a record of
               every regimen.
             </p>
           </div>
-          <div class="card">
+          <div class="page">
+            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
+              <g fill="#c1c8c2">
+                <rect x="8" y="10" width="80" height="6" rx="3" />
+                <rect x="8" y="24" width="64" height="6" rx="3" />
+                <rect x="8" y="38" width="74" height="6" rx="3" />
+                <rect x="8" y="52" width="56" height="6" rx="3" />
+                <rect x="8" y="66" width="70" height="6" rx="3" />
+              </g>
+              <g
+                filter="url(#pen)"
+                fill="none"
+                stroke="#7a5c7e"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <path d="M98 42 C 116 34, 132 34, 146 42" />
+                <path d="M138 34 L 147 42 L 137 48" />
+              </g>
+              <text
+                x="154"
+                y="38"
+                font-family="Kalam, cursive"
+                font-size="15"
+                fill="#3d6450"
+              >
+                32 results
+              </text>
+              <text
+                x="154"
+                y="56"
+                font-family="Kalam, cursive"
+                font-size="15"
+                fill="#3d6450"
+              >
+                filled in
+              </text>
+            </svg>
             <h3>Your AI</h3>
             <p>
               Paste a lab report into your own AI assistant. Healthy fills in
@@ -272,33 +689,63 @@
 
       <section aria-labelledby="privacy">
         <h2 id="privacy">Free, private and yours</h2>
-        <ul class="checks">
-          <li>Free, forever. No account, no subscription.</li>
-          <li>
-            Your data lives on your device. Healthy has no server, no ads and no
-            analytics.
-          </li>
-          <li>
-            Sync between your devices through your own Google Drive, encrypted
-            on your device first. Google can't read it.
-          </li>
-          <li>Open source, so anyone can check these claims in the code.</li>
-        </ul>
+        <div class="split">
+          <ul class="checks">
+            <li>
+              <svg aria-hidden="true"><use href="#tick" /></svg>
+              <span>Free, forever. No account, no subscription.</span>
+            </li>
+            <li>
+              <svg aria-hidden="true"><use href="#tick" /></svg>
+              <span
+                >Your data lives on your device. Healthy has no server, no ads
+                and no analytics.</span
+              >
+            </li>
+            <li>
+              <svg aria-hidden="true"><use href="#tick" /></svg>
+              <span
+                >Sync between your devices through your own Google Drive,
+                encrypted on your device first. Google can't read it.</span
+              >
+            </li>
+            <li>
+              <svg aria-hidden="true"><use href="#tick" /></svg>
+              <span
+                >Open source, so anyone can check these claims in the
+                code.</span
+              >
+            </li>
+          </ul>
+          <p class="hand aside">
+            Every line of it is
+            <a href="https://github.com/DeividasK/healthy">on GitHub</a>.
+          </p>
+        </div>
       </section>
 
       <section aria-labelledby="open-source">
-        <h2 id="open-source">Shaped by the people who use it.</h2>
-        <p>
-          Lab results are where Healthy starts. Next: making sense of the bigger
-          picture and preparing what to discuss with your doctor or your AI.
-          Tell us what you need most at
-          <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>.
-        </p>
+        <div class="split">
+          <div>
+            <h2 id="open-source">Shaped by the people who use it.</h2>
+            <p>
+              Lab results are where Healthy starts. Next: making sense of the
+              bigger picture and preparing what to discuss with your doctor or
+              your AI.
+            </p>
+          </div>
+          <div class="sticky">
+            <div class="tape" aria-hidden="true"></div>
+            <div class="hand">What do you need most? Tell me.</div>
+            <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>
+          </div>
+        </div>
       </section>
 
       <section class="cta" aria-labelledby="start">
         <h2 id="start">Add your first blood test in a minute.</h2>
         <a class="button" href="a/">Open Healthy</a>
+        <span class="hand" aria-hidden="true">← it's free</span>
       </section>
     </main>
 

@@ -1,7 +1,7 @@
 export const THEME_COLORS = {
   light: {
-    // Base surfaces & layout
-    background: '#ffffff',
+    // Base surfaces & layout. Screens sit on warm paper; cards stay white.
+    background: '#fffdf9',
     foreground: '#1a1c1a',
     card: '#ffffff',
     cardForeground: '#1a1c1a',
@@ -65,6 +65,10 @@ export const THEME_COLORS = {
     inRangeTint: '#DCE8E1',
     inRangeWash: '#E6EFE9',
     noRange: '#d9dbd7',
+    // Graph grid inside charts: sage at 10%, visible on both range washes.
+    chartGrid: 'rgba(61, 100, 80, 0.1)',
+    // Condition severity markers: one ink, the fill level shows the severity.
+    severityMarker: '#9C5B34',
 
     // Timeline status tones: row wash, node circle and node icon
     statusPlannedWash: '#f3f7fc',
