@@ -12,7 +12,6 @@ export const THEME_COLORS = {
     // Brand & primary actions
     primary: '#3d6450',
     primaryForeground: '#ffffff',
-    primaryLogo: '#5A8669',
     emptyIconContainer: '#d1e9cd',
 
     // Text & typography

@@ -13,7 +13,7 @@
     "android": {
       "package": "com.deividas.healthy",
       "adaptiveIcon": {
-        "backgroundColor": "#7BA386",
+        "backgroundColor": "#3d6450",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
