@@ -229,6 +229,26 @@
         width: 100%;
         height: auto;
       }
+      /* Real app screenshots, pasted into the notebook like photos. */
+      .shot {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #fff;
+        border: 1px solid var(--card-border);
+        border-radius: 6px;
+        margin-bottom: 14px;
+      }
+      .caption {
+        display: block;
+        margin-top: -2px;
+      }
+      .shot-note {
+        display: block;
+        text-align: right;
+        margin: -10px 4px 6px 0;
+        transform: rotate(-3deg);
+      }
       .page .label {
         font-family: var(--script);
         font-size: 0.85rem;
@@ -266,9 +286,6 @@
         margin: 0;
         color: var(--text-secondary);
         font-size: 1rem;
-      }
-      .doodle {
-        margin-bottom: 12px;
       }
       .split {
         display: grid;
@@ -361,15 +378,6 @@
   <body>
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
       <defs>
-        <filter id="pen">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.04"
-            numOctaves="2"
-            seed="5"
-          />
-          <feDisplacementMap in="SourceGraphic" scale="2.6" />
-        </filter>
         <symbol id="tick" viewBox="0 0 28 26">
           <path
             d="M4 14 C 7 16, 9 19, 11 22 C 14 14, 19 8, 25 3"
@@ -378,33 +386,6 @@
             stroke-width="2.6"
             stroke-linecap="round"
             stroke-linejoin="round"
-          />
-        </symbol>
-        <symbol id="done" viewBox="0 0 28 28">
-          <path
-            d="M14 3 C 21 2.5, 25.5 8, 25 14.5 C 24.5 21, 19.5 25.5, 13.5 25 C 7 24.5, 2.8 19.5, 3.2 13.6 C 3.6 7.6, 8.5 3.4, 15 3.6"
-            fill="#e6efe8"
-            stroke="#3d6450"
-            stroke-width="1.6"
-            stroke-linecap="round"
-          />
-          <path
-            d="M8.5 14.5 C 10 15.5, 11.5 17.5, 12.5 19.5 C 14.5 14, 17.5 10.5, 21 8"
-            fill="none"
-            stroke="#3d6450"
-            stroke-width="2.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </symbol>
-        <symbol id="open" viewBox="0 0 28 28">
-          <path
-            d="M14 3 C 21 2.5, 25.5 8, 25 14.5 C 24.5 21, 19.5 25.5, 13.5 25 C 7 24.5, 2.8 19.5, 3.2 13.6 C 3.6 7.6, 8.5 3.4, 15 3.6"
-            fill="none"
-            stroke="#717973"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-dasharray="3 3"
           />
         </symbol>
       </defs>
@@ -444,95 +425,16 @@
         </div>
         <figure class="page" style="margin: 0">
           <div class="tape" aria-hidden="true"></div>
-          <div class="label" aria-hidden="true">FERRITIN · ng/mL</div>
-          <svg
-            viewBox="0 0 320 190"
-            role="img"
-            aria-label="Example chart: ferritin rising into the normal range over a year"
-          >
-            <rect
-              x="14"
-              y="44"
-              width="300"
-              height="70"
-              fill="#d1e9cd"
-              opacity="0.6"
-            />
-            <text
-              x="22"
-              y="60"
-              font-family="Kalam, cursive"
-              font-size="13"
-              fill="#3d6450"
-            >
-              normal range
-            </text>
-            <g
-              filter="url(#pen)"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline
-                points="24,160 84,150 144,132 204,96 274,70"
-                stroke="#3d6450"
-                stroke-width="3"
-              />
-              <circle
-                cx="274"
-                cy="70"
-                r="14"
-                stroke="#c77c4e"
-                stroke-width="2.2"
-              />
-              <path
-                d="M218 24 C 242 16, 264 28, 270 52"
-                stroke="#7a5c7e"
-                stroke-width="2"
-              />
-              <path
-                d="M262 44 L 270 54 L 276 42"
-                stroke="#7a5c7e"
-                stroke-width="2"
-              />
-              <line
-                x1="14"
-                y1="174"
-                x2="314"
-                y2="174"
-                stroke="#1a1c1a"
-                stroke-width="1.3"
-              />
-            </g>
-            <g fill="#1a1c1a">
-              <circle cx="24" cy="160" r="3.5" />
-              <circle cx="84" cy="150" r="3.5" />
-              <circle cx="144" cy="132" r="3.5" />
-              <circle cx="204" cy="96" r="3.5" />
-              <circle cx="274" cy="70" r="3.5" />
-            </g>
-            <g
-              font-family="Kalam, cursive"
-              font-size="12"
-              fill="#414844"
-              text-anchor="middle"
-            >
-              <text x="24" y="188">Jan</text>
-              <text x="84" y="188">Apr</text>
-              <text x="144" y="188">Jul</text>
-              <text x="204" y="188">Oct</text>
-              <text x="274" y="188">Jan</text>
-            </g>
-            <text
-              x="96"
-              y="30"
-              font-family="Kalam, cursive"
-              font-size="17"
-              fill="#7a5c7e"
-            >
-              finally in range!
-            </text>
-          </svg>
+          <img
+            class="shot"
+            src="screens/biomarker-history.webp"
+            width="720"
+            height="690"
+            alt="Healthy's value history chart for red blood cells: two results, 4.5 and 4.8, inside the shaded normal range of 3.92 to 5.65"
+          />
+          <figcaption class="hand caption">
+            ↑ every result against your range, straight from the app
+          </figcaption>
         </figure>
       </div>
 
@@ -540,61 +442,14 @@
         <h2 id="features">Everything in one view</h2>
         <div class="grid">
           <div class="page">
-            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
-              <g filter="url(#pen)">
-                <rect
-                  x="10"
-                  y="22"
-                  width="200"
-                  height="10"
-                  rx="5"
-                  fill="#e2e3df"
-                />
-                <rect
-                  x="60"
-                  y="22"
-                  width="90"
-                  height="10"
-                  rx="5"
-                  fill="#b9cfc0"
-                />
-                <rect
-                  x="10"
-                  y="56"
-                  width="200"
-                  height="10"
-                  rx="5"
-                  fill="#e2e3df"
-                />
-                <rect
-                  x="50"
-                  y="56"
-                  width="110"
-                  height="10"
-                  rx="5"
-                  fill="#b9cfc0"
-                />
-                <circle cx="118" cy="27" r="6" fill="#1a1c1a" />
-                <circle cx="34" cy="61" r="6" fill="#1a1c1a" />
-                <circle
-                  cx="34"
-                  cy="61"
-                  r="14"
-                  fill="none"
-                  stroke="#c77c4e"
-                  stroke-width="2"
-                />
-              </g>
-              <text
-                x="54"
-                y="84"
-                font-family="Kalam, cursive"
-                font-size="13"
-                fill="#7a5c7e"
-              >
-                low, retest
-              </text>
-            </svg>
+            <img
+              class="shot"
+              src="screens/out-of-range.webp"
+              width="720"
+              height="380"
+              loading="lazy"
+              alt="Healthy's out of range list: white blood cells 12.4, above range, and red blood cells 3.9, below range, each with a range bar"
+            />
             <h3>Your biomarkers</h3>
             <p>
               200+ biomarkers across all your blood tests. See what's changing
@@ -602,38 +457,14 @@
             </p>
           </div>
           <div class="page">
-            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
-              <use href="#done" x="6" y="4" width="22" height="22" />
-              <text
-                x="38"
-                y="21"
-                font-family="Literata, serif"
-                font-size="14"
-                fill="#1a1c1a"
-              >
-                Vitamin D3 · 2,000 IU
-              </text>
-              <use href="#done" x="6" y="32" width="22" height="22" />
-              <text
-                x="38"
-                y="49"
-                font-family="Literata, serif"
-                font-size="14"
-                fill="#1a1c1a"
-              >
-                Omega-3 · 1 g
-              </text>
-              <use href="#open" x="6" y="60" width="22" height="22" />
-              <text
-                x="38"
-                y="77"
-                font-family="Literata, serif"
-                font-size="14"
-                fill="#414844"
-              >
-                Magnesium · evening
-              </text>
-            </svg>
+            <img
+              class="shot"
+              src="screens/daily-protocol.webp"
+              width="720"
+              height="340"
+              loading="lazy"
+              alt="Healthy's daily protocol: Omega-3 and Probiotic in the morning, each with skip and done buttons"
+            />
             <h3>Your protocol</h3>
             <p>
               Log supplements and medications in a tap, and keep a record of
@@ -641,43 +472,14 @@
             </p>
           </div>
           <div class="page">
-            <svg class="doodle" viewBox="0 0 220 86" aria-hidden="true">
-              <g fill="#c1c8c2">
-                <rect x="8" y="10" width="80" height="6" rx="3" />
-                <rect x="8" y="24" width="64" height="6" rx="3" />
-                <rect x="8" y="38" width="74" height="6" rx="3" />
-                <rect x="8" y="52" width="56" height="6" rx="3" />
-                <rect x="8" y="66" width="70" height="6" rx="3" />
-              </g>
-              <g
-                filter="url(#pen)"
-                fill="none"
-                stroke="#7a5c7e"
-                stroke-width="2"
-                stroke-linecap="round"
-              >
-                <path d="M98 42 C 116 34, 132 34, 146 42" />
-                <path d="M138 34 L 147 42 L 137 48" />
-              </g>
-              <text
-                x="154"
-                y="38"
-                font-family="Kalam, cursive"
-                font-size="15"
-                fill="#3d6450"
-              >
-                32 results
-              </text>
-              <text
-                x="154"
-                y="56"
-                font-family="Kalam, cursive"
-                font-size="15"
-                fill="#3d6450"
-              >
-                filled in
-              </text>
-            </svg>
+            <img
+              class="shot"
+              src="screens/filled-results.webp"
+              width="720"
+              height="450"
+              loading="lazy"
+              alt="Healthy's Add Lab Results form with hemoglobin 14.2 g/dL and platelets 260 filled in"
+            /><span class="hand shot-note">filled in for you</span>
             <h3>Your AI</h3>
             <p>
               Paste a lab report into your own AI assistant. Healthy fills in
