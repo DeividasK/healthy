@@ -15,7 +15,9 @@ import {
   CircleDot,
   FileText,
   FlaskConical,
+  FolderPlus,
   Hash,
+  Waypoints,
 } from 'lucide-react-native';
 import Svg, {
   Circle,
@@ -39,16 +41,24 @@ import {
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
+import { getConditionLabResultLinks } from '@/src/features/conditions/conditionService';
+import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
+import { latestBiomarkers } from '@/src/features/home/LabsSummary';
 import {
   isCalculatedObservation,
   withCalculatedObservations,
 } from './calculatedBiomarkers';
-import { BIOMARKERS, type BiomarkerCalculation } from '@/src/data/biomarkers';
+import {
+  BIOMARKERS,
+  type BiomarkerCalculation,
+  type BiomarkerDefinition,
+} from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
 import {
   convertBiomarkerValue,
+  getObservationMarker,
   getObservationReferenceRange,
   getObservationStatus,
   getObservationUnitCode,
@@ -64,6 +74,7 @@ import {
   resolveReferenceRange,
 } from './referenceRanges';
 import { RangeProfileNotice } from './RangeProfileNotice';
+import { getChartScale } from './chartScale';
 import { useRangeDemographics } from './useRangeDemographics';
 
 type Measurement = {
@@ -100,6 +111,39 @@ function describeCalculation({ inputs, formula }: BiomarkerCalculation) {
   return `Worked out as ${formula}, from your ${names.join(' and ')} results in the same report:`;
 }
 
+/** Whether one biomarker is an input of the other's calculation. */
+function isCalculationRelated(a: BiomarkerDefinition, b: BiomarkerDefinition) {
+  const usesInput = (
+    { calculation }: BiomarkerDefinition,
+    input: BiomarkerDefinition
+  ) => calculation?.inputs.some(({ id }) => [id].flat().includes(input.id));
+  return usesInput(a, b) || usesInput(b, a);
+}
+
+/**
+ * Other biomarkers with results that are read together with this one: the
+ * inputs or results of its calculation first, then others in its catalog
+ * category. The catch-all Other category relates nothing.
+ */
+function getRelatedBiomarkers<T extends { observation: Observation }>(
+  marker: BiomarkerDefinition,
+  biomarkers: T[]
+) {
+  const related = biomarkers.flatMap((biomarker) => {
+    const other = getObservationMarker(biomarker.observation);
+    if (!other || other.id === marker.id) return [];
+    if (isCalculationRelated(marker, other))
+      return [{ biomarker, calculation: true }];
+    if (marker.category !== 'Other' && other.category === marker.category)
+      return [{ biomarker, calculation: false }];
+    return [];
+  });
+  return [
+    ...related.filter(({ calculation }) => calculation),
+    ...related.filter(({ calculation }) => !calculation),
+  ].map(({ biomarker }) => biomarker);
+}
+
 /** Shows patient-scoped biomarker history with compatible units and education. */
 export function BiomarkerDetailView() {
   const router = useRouter();
@@ -110,6 +154,9 @@ export function BiomarkerDetailView() {
   const [history, setHistory] = useState({
     patientId: '',
     reports: [] as Awaited<ReturnType<typeof getAllReports>>,
+    conditionLinks: [] as Awaited<
+      ReturnType<typeof getConditionLabResultLinks>
+    >,
     isLoading: true,
     hasError: false,
   });
@@ -129,20 +176,36 @@ export function BiomarkerDetailView() {
     if (isPatientLoading || !activePatientId) return;
     const generation = ++loadGeneration.current;
     const patientId = activePatientId;
-    setHistory({ patientId, reports: [], isLoading: true, hasError: false });
+    setHistory({
+      patientId,
+      reports: [],
+      conditionLinks: [],
+      isLoading: true,
+      hasError: false,
+    });
     try {
-      const loadedReports = await getAllReports(patientId);
+      const [loadedReports, conditionLinks] = await Promise.all([
+        getAllReports(patientId),
+        getConditionLabResultLinks(patientId),
+      ]);
       if (generation !== loadGeneration.current) return;
       setHistory({
         patientId,
         reports: loadedReports,
+        conditionLinks,
         isLoading: false,
         hasError: false,
       });
     } catch (error) {
       if (generation !== loadGeneration.current) return;
       console.error('Failed to load biomarker history:', error);
-      setHistory({ patientId, reports: [], isLoading: false, hasError: true });
+      setHistory({
+        patientId,
+        reports: [],
+        conditionLinks: [],
+        isLoading: false,
+        hasError: true,
+      });
     }
   }, [activePatientId, isPatientLoading]);
 
@@ -154,7 +217,10 @@ export function BiomarkerDetailView() {
       };
     }, [load])
   );
-  useDatabaseSubscription(['diagnostic_reports', 'observations'], load);
+  useDatabaseSubscription(
+    ['diagnostic_reports', 'observations', 'conditions', 'service_requests'],
+    load
+  );
 
   const marker = BIOMARKERS.find(
     (candidate) =>
@@ -239,6 +305,24 @@ export function BiomarkerDetailView() {
           })
         : [],
     [measurements, latestMeasurement, marker]
+  );
+
+  /** Conditions whose lab results include this biomarker. */
+  const conditions = useMemo(() => {
+    const reportIds = new Set(measurements.map(({ reportId }) => reportId));
+    return (isCurrentPatient ? history.conditionLinks : [])
+      .filter((link) => link.reportIds.some((id) => reportIds.has(id)))
+      .map(({ condition }) => condition);
+  }, [measurements, isCurrentPatient, history.conditionLinks]);
+  const relatedBiomarkers = useMemo(
+    () =>
+      marker
+        ? getRelatedBiomarkers(
+            marker,
+            latestBiomarkers(reports, -Infinity, demographics)
+          )
+        : [],
+    [marker, reports, demographics]
   );
 
   if (isLoading)
@@ -441,6 +525,41 @@ export function BiomarkerDetailView() {
           )}
         />
       </ResourceSection>
+      <ResourceSection
+        icon={FolderPlus}
+        title="Conditions"
+        count={conditions.length}
+        testID="biomarker-conditions"
+      >
+        {conditions.map((condition) => (
+          <ConditionRelatedRow
+            key={condition.id}
+            condition={condition}
+            testID={`biomarker-condition-${condition.id}`}
+            onPress={() => router.push(`/condition/${condition.id}`)}
+          />
+        ))}
+      </ResourceSection>
+      <ResourceSection
+        icon={Waypoints}
+        title="Related biomarkers"
+        count={relatedBiomarkers.length}
+        testID="biomarker-related"
+      >
+        {relatedBiomarkers.length > 0 && (
+          <CollapsibleList
+            items={relatedBiomarkers}
+            testID="biomarker-related-list"
+            renderItem={({ id: key, observation }) => (
+              <BiomarkerResultRow
+                key={key}
+                observation={observation}
+                testID={`biomarker-related-result-${key}`}
+              />
+            )}
+          />
+        )}
+      </ResourceSection>
       <View style={styles.learnSection} testID="biomarker-learn">
         <Text style={styles.sectionTitle}>Learn</Text>
         <LearnItem title="About this biomarker">
@@ -500,14 +619,38 @@ function LearnItem({ title, children }: { title: string; children: string }) {
 const formatChartValue = (value: number) =>
   String(Number(value.toPrecision(10)));
 
-/**
- * Plots compatible measurements against the latest result's reference range:
- * a colour-coded axis, a tinted in-range band, each value above its point and
- * its date below.
- */
 /** Spacing of the chart's graph grid, matching the marketing site. */
 const CHART_GRID = 22;
 
+/**
+ * Keeps the labels that have room, newest first so the latest result is
+ * always labelled: a label too close to one already kept is left out.
+ */
+function spacedLabels(
+  points: { x: number; y: number }[],
+  minX: number,
+  minY = Infinity
+) {
+  const kept: number[] = [];
+  for (let index = points.length - 1; index >= 0; index--) {
+    const point = points[index];
+    if (
+      kept.every(
+        (other) =>
+          Math.abs(points[other].x - point.x) >= minX ||
+          Math.abs(points[other].y - point.y) >= minY
+      )
+    )
+      kept.push(index);
+  }
+  return new Set(kept);
+}
+
+/**
+ * Plots compatible measurements by date against the latest result's
+ * reference range: a colour-coded axis, a tinted in-range band whose edges
+ * fall on grid lines, each value above its point and its date below.
+ */
 function BiomarkerChart({
   measurements,
   low,
@@ -529,14 +672,13 @@ function BiomarkerChart({
   const axisX = 48;
   const plotRight = width - 8;
   const plotWidth = Math.max(0, plotRight - axisX);
-  const paddingTop = 12;
   const plotBottom = height - 44;
+  // The plot is a whole number of grid squares tall.
+  const rows = Math.floor((plotBottom - 12) / CHART_GRID);
+  const paddingTop = plotBottom - rows * CHART_GRID;
   const values = measurements.map((item) => item.value);
   const hasRange = low !== undefined || high !== undefined;
-  const rawMin = Math.min(...values, low ?? Infinity);
-  const rawMax = Math.max(...values, high ?? -Infinity);
-  const pad = (rawMax - rawMin || Math.max(Math.abs(rawMax) * 0.1, 1)) * 0.2;
-  // The axis ends are rounded to the precision of the values and limits.
+  // The axis ends are labelled to the precision of the values and limits.
   const decimals = Math.min(
     2,
     Math.max(
@@ -549,13 +691,7 @@ function BiomarkerChart({
       )
     )
   );
-  const step = 10 ** -decimals;
-  // Values that cannot be negative keep the axis at or above zero.
-  const min =
-    Math.floor(
-      (rawMin >= 0 ? Math.max(0, rawMin - pad) : rawMin - pad) / step
-    ) * step;
-  const max = Math.ceil((rawMax + pad) / step) * step;
+  const { min, max } = getChartScale(values, rows, low, high);
   /** Maps a value to the chart's vertical coordinate. */
   const yFor = (value: number) =>
     plotBottom - ((value - min) / (max - min)) * (plotBottom - paddingTop);
@@ -570,14 +706,21 @@ function BiomarkerChart({
         ? 'outOfRange'
         : 'inRange';
   const inset = 28;
+  // Points are spaced by date, so gaps between tests show as gaps.
+  const times = measurements.map(({ date }) => Date.parse(date));
+  const first = Math.min(...times);
+  const span = Math.max(...times) - first;
   const points = measurements.map((item, index) => ({
     x:
       axisX +
       inset +
-      (index / (measurements.length - 1)) * (plotRight - axisX - inset * 2),
+      (span ? (times[index] - first) / span : 0.5) *
+        (plotRight - axisX - inset * 2),
     y: yFor(item.value),
     status: statusFor(item.value),
   }));
+  const dateLabels = spacedLabels(points, 44);
+  const valueLabels = spacedLabels(points, 30, 16);
   const endStatus = hasRange ? ('outOfRange' as const) : undefined;
   const axisLabels = [
     { value: max, text: max.toFixed(decimals), status: endStatus },
@@ -722,38 +865,44 @@ function BiomarkerChart({
                   stroke={status ? STATUS_COLORS[status] : COLORS.light.muted}
                   strokeWidth="3"
                 />
-                <SvgText
-                  x={x}
-                  y={y - 14}
-                  fill={
-                    status
-                      ? STATUS_TEXT_COLORS[status]
-                      : COLORS.light.foreground
-                  }
-                  fontSize="12"
-                  fontWeight="700"
-                  textAnchor="middle"
-                >
-                  {formatChartValue(measurements[index].value)}
-                </SvgText>
-                <SvgText
-                  x={x}
-                  y={plotBottom + 18}
-                  fill={COLORS.light.mutedForeground}
-                  fontSize="10"
-                  textAnchor="middle"
-                >
-                  {day}
-                </SvgText>
-                <SvgText
-                  x={x}
-                  y={plotBottom + 32}
-                  fill={COLORS.light.mutedForeground}
-                  fontSize="10"
-                  textAnchor="middle"
-                >
-                  {year}
-                </SvgText>
+                {valueLabels.has(index) && (
+                  <SvgText
+                    x={x}
+                    y={y - 14}
+                    fill={
+                      status
+                        ? STATUS_TEXT_COLORS[status]
+                        : COLORS.light.foreground
+                    }
+                    fontSize="12"
+                    fontWeight="700"
+                    textAnchor="middle"
+                  >
+                    {formatChartValue(measurements[index].value)}
+                  </SvgText>
+                )}
+                {dateLabels.has(index) && (
+                  <>
+                    <SvgText
+                      x={x}
+                      y={plotBottom + 18}
+                      fill={COLORS.light.mutedForeground}
+                      fontSize="10"
+                      textAnchor="middle"
+                    >
+                      {day}
+                    </SvgText>
+                    <SvgText
+                      x={x}
+                      y={plotBottom + 32}
+                      fill={COLORS.light.mutedForeground}
+                      fontSize="10"
+                      textAnchor="middle"
+                    >
+                      {year}
+                    </SvgText>
+                  </>
+                )}
               </React.Fragment>
             );
           })}
