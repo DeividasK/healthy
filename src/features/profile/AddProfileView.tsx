@@ -1,10 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArchiveRestore } from 'lucide-react-native';
+import { ArchiveRestore, Compass } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { RowIconDisc } from '@/src/components/IconDisc';
 import { COLORS } from '@/src/theme/colors';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
+import { useLoadDemoProfile } from '@/src/features/demo/useLoadDemoProfile';
 import { ProfileForm } from './ProfileForm';
 import { createOrUpdatePatient, type PatientInput } from './patientService';
 import { useActivePatient } from './ActivePatientContext';
@@ -16,6 +18,7 @@ import { useActivePatient } from './ActivePatientContext';
 export function AddProfileView() {
   const router = useRouter();
   const { setActivePatientId, refreshPatients } = useActivePatient();
+  const demo = useLoadDemoProfile();
 
   const handleSave = async (values: PatientInput) => {
     const created = await createOrUpdatePatient(values);
@@ -53,6 +56,24 @@ export function AddProfileView() {
             accessibilityLabel="Restore a profile instead"
             testID="add-profile-restore"
           />
+          <ResourceRow
+            title="Explore a demo profile"
+            description={
+              demo.loading
+                ? 'Adding sample records…'
+                : 'A sample person with three years of records'
+            }
+            leading={<RowIconDisc icon={Compass} />}
+            onPress={demo.loadDemo}
+            accessibilityLabel="Explore a demo profile"
+            testID="add-profile-demo"
+          />
+          {demo.error && (
+            <FormErrorBanner
+              message={demo.error}
+              testID="add-profile-demo-error"
+            />
+          )}
         </View>
       }
     />

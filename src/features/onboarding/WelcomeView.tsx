@@ -22,6 +22,8 @@ import {
 import { AppLogo } from '@/src/components/AppLogo';
 import { IconDisc } from '@/src/components/IconDisc';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
+import { useLoadDemoProfile } from '@/src/features/demo/useLoadDemoProfile';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { useActionDock } from '@/src/components/AppChrome';
 import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
@@ -101,11 +103,12 @@ export function WelcomeView() {
   const router = useRouter();
   const { patients } = useActivePatient();
   const heartRef = useRef<View>(null);
+  const demo = useLoadDemoProfile();
   // Clears the previous screen's dock; these screens have their own buttons.
   useActionDock(NO_ACTIONS);
 
-  // Welcome is for a device with no profile yet.
-  const hasProfile = patients.length > 0;
+  // Welcome is for a device with no profile yet; the demo leaves on its own.
+  const hasProfile = patients.length > 0 && !demo.loading;
   // Only while in front: under Home after setup, it stays put.
   useFocusEffect(
     useCallback(() => {
@@ -174,6 +177,16 @@ export function WelcomeView() {
             onPress={() => router.push('/profile/restore')}
             testID="welcome-restore"
           />
+          <OnboardingButton
+            label="Explore a demo profile"
+            variant="link"
+            onPress={demo.loadDemo}
+            done={demo.loading}
+            testID="welcome-demo"
+          />
+          {demo.error && (
+            <FormErrorBanner message={demo.error} testID="welcome-demo-error" />
+          )}
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
