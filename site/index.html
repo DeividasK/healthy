@@ -85,10 +85,23 @@
         margin: 0;
         color: var(--foreground);
         background-color: var(--paper);
+        /* The notebook's margin rule, drawn into the page so it runs the
+           full height, over the graph grid. */
+        --margin: max(12px, calc(50% - 520px));
         background-image:
+          linear-gradient(
+            90deg,
+            transparent var(--margin),
+            rgba(199, 124, 78, 0.5) var(--margin),
+            rgba(199, 124, 78, 0.5) calc(var(--margin) + 1.5px),
+            transparent calc(var(--margin) + 1.5px)
+          ),
           linear-gradient(var(--grid) 1px, transparent 1px),
           linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-        background-size: 22px 22px;
+        background-size:
+          100% 100%,
+          22px 22px,
+          22px 22px;
         font: 17px/1.6 var(--serif);
       }
       header,
@@ -100,18 +113,6 @@
         margin: 0 auto;
         padding-left: max(28px, env(safe-area-inset-left));
         padding-right: max(20px, env(safe-area-inset-right));
-      }
-      /* The notebook's margin rule. */
-      body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        left: max(12px, calc(50% - 520px));
-        width: 1.5px;
-        background: var(--apricot);
-        opacity: 0.5;
-        pointer-events: none;
       }
       header {
         display: flex;
@@ -461,9 +462,9 @@
               class="shot"
               src="screens/daily-protocol.webp"
               width="720"
-              height="340"
+              height="332"
               loading="lazy"
-              alt="Healthy's daily protocol: Omega-3 and Probiotic in the morning, each with skip and done buttons"
+              alt="Healthy's journal: Vitamin D 1000 IU marked as taken and Ferrous sulfate 200mg marked as skipped"
             />
             <h3>Your protocol</h3>
             <p>

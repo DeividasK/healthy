@@ -19,7 +19,7 @@ const SCREENS = {
   },
   'daily-protocol': {
     from: 'my-actions-grouped-by-time-of-day',
-    region: [0, 240, 360, 170],
+    region: [0, 540, 360, 166],
   },
   'filled-results': {
     from: 'add-report-view-populated-biomarkers',
