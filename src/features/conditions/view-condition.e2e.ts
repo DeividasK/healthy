@@ -131,7 +131,9 @@ test.describe('View Condition', () => {
       await showAllTimelineSteps(page);
       await page.getByTestId(`condition-timeline-item-${type}-${id}`).click();
       await expect(page.getByTestId(titleTestID)).toHaveText(title);
-      await page.goBack();
+      // The app's own back: a browser back here leaves the app's history out
+      // of step, and a later test's in-app back then leaves the page.
+      await page.getByTestId('back-button').click();
       await expect(page.getByTestId('condition-title')).toHaveText('Knee pain');
     }
   });
