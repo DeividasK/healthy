@@ -6,6 +6,7 @@ import {
   fetchAllConditionRecords,
   fetchConditionById,
   deleteConditionRecord,
+  fetchConditionLabResultLinks,
 } from './conditionsRepository';
 
 export const CLINICAL_STATUS_SYSTEM =
@@ -258,6 +259,16 @@ export async function getConditionById(
   return patientId && condition?.subject.reference !== `Patient/${patientId}`
     ? null
     : condition;
+}
+
+/**
+ * The patient's conditions with the ids of their linked lab results, through
+ * a service request whose reason is the condition.
+ */
+export async function getConditionLabResultLinks(
+  patientId: string
+): Promise<{ condition: Condition; reportIds: string[] }[]> {
+  return await fetchConditionLabResultLinks(patientId);
 }
 
 /**

@@ -1,12 +1,25 @@
 import { getConditionCategoryLabel } from './conditionCategories';
 import { VERIFICATION_OPTIONS } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ClipboardList, MapPin, Pill, Stethoscope } from 'lucide-react-native';
+import {
+  ClipboardList,
+  FlaskConical,
+  MapPin,
+  Pill,
+  Stethoscope,
+} from 'lucide-react-native';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
+import { ResourceSection } from '@/src/components/ResourceSection';
+import { CollapsibleList } from '@/src/components/CollapsibleList';
+import { BiomarkerResultRow } from '@/src/features/home/BiomarkerResultRow';
+import { latestBiomarkers } from '@/src/features/home/LabsSummary';
+import { sortSummaryBiomarkers } from '@/src/features/home/labsSummarySorting';
+import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import type { DiagnosticReportRecord } from '@/src/database/types';
 import { ConditionTimeline } from './ConditionTimeline';
 import { buildTimelineItems } from './conditionTimeline';
 import { getConditionMeta } from './ConditionRelatedRow';
@@ -16,7 +29,10 @@ import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { getConsultationsByConditionId } from '@/src/features/consultations/consultationService';
 import { getTreatmentsByConditionId } from '@/src/features/treatments/treatmentService';
 import { getServiceRequestsByConditionId } from '@/src/features/service-requests/serviceRequestService';
-import { getLabResultsByConditionId } from '@/src/features/lab-results/diagnosticReportService';
+import {
+  getAllReports,
+  getLabResultsByConditionId,
+} from '@/src/features/lab-results/diagnosticReportService';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -39,6 +55,7 @@ export function ViewConditionView() {
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [labResults, setLabResults] = useState<DiagnosticReport[]>([]);
+  const [reports, setReports] = useState<DiagnosticReportRecord[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [notFound, setNotFound] = useState(!id);
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -55,12 +72,14 @@ export function ViewConditionView() {
         treatmentData,
         serviceRequestsData,
         labResultsData,
+        reportsData,
       ] = await Promise.all([
         getConditionById(id, activePatientId),
         getConsultationsByConditionId(id),
         getTreatmentsByConditionId(id, activePatientId),
         getServiceRequestsByConditionId(id, activePatientId),
         getLabResultsByConditionId(id, activePatientId),
+        getAllReports(activePatientId),
       ]);
       if (sequence !== loadSequence.current) return;
       setHasLoadError(false);
@@ -71,6 +90,7 @@ export function ViewConditionView() {
         setTreatments([]);
         setServiceRequests([]);
         setLabResults([]);
+        setReports([]);
       } else {
         setNotFound(false);
         setCondition(conditionData);
@@ -78,6 +98,7 @@ export function ViewConditionView() {
         setTreatments(treatmentData);
         setServiceRequests(serviceRequestsData);
         setLabResults(labResultsData);
+        setReports(reportsData);
       }
     } catch (error) {
       if (sequence !== loadSequence.current) return;
@@ -96,9 +117,25 @@ export function ViewConditionView() {
       'medication_requests',
       'service_requests',
       'diagnostic_reports',
+      'observations',
     ],
     loadData
   );
+  const demographics = useRangeDemographics();
+  // The latest result of each biomarker in the condition's lab results,
+  // largest deviation from the range first.
+  const biomarkers = useMemo(() => {
+    const linked = new Set(labResults.map((report) => report.id));
+    return sortSummaryBiomarkers(
+      latestBiomarkers(
+        reports.filter(({ report }) => linked.has(report.id)),
+        -Infinity,
+        demographics
+      ),
+      'deviation',
+      demographics
+    );
+  }, [labResults, reports, demographics]);
 
   if (
     isLoading ||
@@ -293,6 +330,27 @@ export function ViewConditionView() {
           )}
         </View>
       )}
+
+      <ResourceSection
+        icon={FlaskConical}
+        title="Biomarkers"
+        count={biomarkers.length}
+        testID="condition-biomarkers"
+      >
+        {biomarkers.length > 0 && (
+          <CollapsibleList
+            items={biomarkers}
+            testID="condition-biomarkers-list"
+            renderItem={({ id: key, observation }) => (
+              <BiomarkerResultRow
+                key={key}
+                observation={observation}
+                testID={`condition-biomarker-result-${key}`}
+              />
+            )}
+          />
+        )}
+      </ResourceSection>
 
       <ConditionTimeline
         items={buildTimelineItems({

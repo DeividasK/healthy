@@ -131,6 +131,45 @@ export async function fetchAllConditionRecords(
 }
 
 /**
+ * The patient's conditions with the lab results linked to them: a result
+ * based on a service request whose reason is the condition. Ordered like
+ * the condition list.
+ */
+export async function fetchConditionLabResultLinks(
+  patientId: string
+): Promise<{ condition: Condition; reportIds: string[] }[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    condition_id: string;
+    report_id: string;
+  }>(
+    `SELECT DISTINCT conditions.id AS condition_id, diagnostic_reports.id AS report_id
+     FROM diagnostic_reports
+     JOIN json_each(diagnostic_reports.fhir_json, '$.basedOn') AS based_on
+     JOIN service_requests
+       ON json_extract(based_on.value, '$.reference') = 'ServiceRequest/' || service_requests.id
+       AND service_requests.patient_id = diagnostic_reports.patient_id
+     JOIN json_each(service_requests.fhir_json, '$.reason') AS reason
+     JOIN conditions
+       ON json_extract(reason.value, '$.reference.reference') = 'Condition/' || conditions.id
+       AND conditions.patient_id = diagnostic_reports.patient_id
+     WHERE diagnostic_reports.patient_id = ?;`,
+    [patientId]
+  );
+  const reportIds = new Map<string, string[]>();
+  for (const row of rows)
+    reportIds.set(row.condition_id, [
+      ...(reportIds.get(row.condition_id) || []),
+      row.report_id,
+    ]);
+  return (await fetchAllConditionRecords(patientId)).flatMap((condition) =>
+    condition.id && reportIds.has(condition.id)
+      ? [{ condition, reportIds: reportIds.get(condition.id)! }]
+      : []
+  );
+}
+
+/**
  * Retrieves a Condition record by its ID from SQLite.
  * Single unified implementation across Web, Android, and iOS.
  */

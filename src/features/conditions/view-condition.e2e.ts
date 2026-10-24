@@ -121,6 +121,28 @@ test.describe('View Condition', () => {
       )
     ).toContainText('City Lab');
 
+    // Biomarkers come only from the condition's own lab results, and each
+    // opens its page, which links back to every condition it is tested for.
+    const biomarkers = page.getByTestId('condition-biomarkers');
+    await expect(page.getByTestId('condition-biomarkers-count')).toHaveText(
+      '1'
+    );
+    const hemoglobin = biomarkers.getByRole('button', {
+      name: 'View biomarker: Hemoglobin (Hgb)',
+    });
+    await expect(hemoglobin).toContainText('14.5g/dL');
+    await hemoglobin.click();
+    await expect(page.getByTestId('biomarker-title')).toHaveText(
+      'Hemoglobin (Hgb)'
+    );
+    const conditions = page.getByTestId('biomarker-conditions');
+    await expect(conditions.getByRole('button')).toHaveText([
+      /Back pain/,
+      /Knee pain/,
+    ]);
+    await page.getByTestId('back-button').click();
+    await expect(page.getByTestId('condition-title')).toHaveText('Knee pain');
+
     // Every row opens its step
     for (const [type, id, titleTestID, title] of [
       ['consultation', visit.id, 'consultation-title', 'Orthopaedic review'],

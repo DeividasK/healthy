@@ -435,6 +435,17 @@ test.describe('Biomarker detail', () => {
     await expect(
       page.getByTestId('biomarker-source-result-2085-9')
     ).toContainText('40mg/dL');
+    // Related biomarkers: its calculation's inputs, then the rest of Lipids.
+    // Unrelated results and those from other categories are left out.
+    await expect(
+      page.getByTestId('biomarker-related').getByRole('button')
+    ).toHaveText([
+      /^HDL Cholesterol/,
+      /^Triglycerides\d/,
+      /^Triglycerides\/HDL Ratio/,
+    ]);
+    await expect(page.getByTestId('biomarker-conditions')).toHaveCount(0);
+
     await triglycerides.click();
     await expect(page).toHaveURL(/biomarker\/2571-8$/);
 

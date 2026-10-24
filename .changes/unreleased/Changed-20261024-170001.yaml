@@ -1,0 +1,3 @@
+kind: Changed
+body: The biomarker history chart spaces results by date, so long gaps between tests show, and the edges of the reference range now line up with the chart's grid.
+time: 2026-10-24T16:47:18.000000000Z

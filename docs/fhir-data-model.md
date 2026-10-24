@@ -220,6 +220,11 @@ Reference cleanup is transactional:
 - Deleting a Condition removes it from `reason[].reference` and keeps the
   wording.
 
+A condition's biomarkers are derived, not stored: they are the results of
+lab reports whose `DiagnosticReport.basedOn` names a service request whose
+`reason[].reference` is the condition. The same chain lists, on a biomarker,
+the conditions it was tested for.
+
 ZIP archives carry `records/service_request_*.json` envelopes; restore order is
 patients, organizations, conditions, reports, encounters, treatments, service
 requests, then Compositions. Encrypted sync replicates `ServiceRequest` after
