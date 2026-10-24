@@ -46,12 +46,13 @@ jobs:
           ref: ${{ steps.release.outputs.tag }}
           persist-credentials: false
 
-      # The landing page and the build action come from this workflow's commit,
-      # not from the release.
+      # The landing page and the build action come from the default branch,
+      # not from the release, so deploying an older release keeps them current.
       - name: Checkout Landing Page
         uses: actions/checkout@v7
         with:
           path: .pages
+          ref: ${{ github.event.repository.default_branch }}
           sparse-checkout: |
             .github/actions
             site
