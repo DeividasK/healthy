@@ -22,7 +22,7 @@ A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application
   - **Smart Autocomplete**: Allows users to search by clinical name (e.g. _Hemoglobin A1c_) or common abbreviations / aliases (_"a1c"_, _"wbc"_, _"tsh"_, _"ldl"_, _"crp"_).
   - Selecting a biomarker auto-populates category, default unit, and physiological reference intervals (Min/Max).
   - **Dual-Unit Support**: Seamless toggle and mathematical conversion between **SI units** (`mmol/L`, `µmol/L`) and **Conventional US units** (`mg/dL`, `g/dL`), with synchronized reference ranges.
-  - **Dynamic Live Flagging**: Real-time visual status indicators (🟢 Normal, 🔵 Low, 🔴 High, 🚨 Critical) calculated live as values are entered.
+  - **Dynamic Live Flagging**: Live Normal, Low and High status as values are entered, shown with the word and a range line so it never relies on colour alone.
 - **Design System**: Fully responsive mobile-first UI styled with NativeWind and Tailwind CSS.
 
 ## 🚀 Running the App
