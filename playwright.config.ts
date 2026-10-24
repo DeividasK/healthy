@@ -35,6 +35,8 @@ export default defineConfig<ChromaticConfig>({
       name: 'visual',
       use: {
         viewport: { width: 360, height: 740 },
+        // Sharper PNGs for the website's app screenshots (pnpm site:screens).
+        deviceScaleFactor: Number(process.env.VISUAL_PNG_SCALE) || 1,
         colorScheme: 'light',
         reducedMotion: 'reduce',
         disableAutoSnapshot: true,

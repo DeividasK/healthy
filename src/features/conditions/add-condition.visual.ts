@@ -28,5 +28,11 @@ test.describe('Add Condition View - Visual Regression', () => {
     await page.getByTestId('form-add-menu').waitFor({ state: 'visible' });
     await waitForMenuToggle(page, 'add-option-button', true);
     await takeSnapshot(page, 'Condition optional fields menu', testInfo);
+    await page
+      .getByTestId('form-add-menu')
+      .getByText('Severity', { exact: true })
+      .click();
+    await page.getByTestId('severity-option-moderate').click();
+    await takeSnapshot(page, 'Condition severity markers', testInfo);
   });
 });

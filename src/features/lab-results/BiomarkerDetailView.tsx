@@ -17,7 +17,13 @@ import {
   FlaskConical,
   Hash,
 } from 'lucide-react-native';
-import Svg, { Circle, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Line,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
 import type { Observation } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
@@ -499,6 +505,9 @@ const formatChartValue = (value: number) =>
  * a colour-coded axis, a tinted in-range band, each value above its point and
  * its date below.
  */
+/** Spacing of the chart's graph grid, matching the marketing site. */
+const CHART_GRID = 22;
+
 function BiomarkerChart({
   measurements,
   low,
@@ -632,6 +641,35 @@ function BiomarkerChart({
               />
             </>
           )}
+          {/* The notebook's graph grid, drawn only inside the plot. */}
+          {Array.from(
+            { length: Math.floor(plotWidth / CHART_GRID) },
+            (_, index) => axisX + (index + 1) * CHART_GRID
+          ).map((x) => (
+            <Line
+              key={`grid-x-${x}`}
+              x1={x}
+              x2={x}
+              y1={paddingTop}
+              y2={plotBottom}
+              stroke={COLORS.light.chartGrid}
+              strokeWidth="1"
+            />
+          ))}
+          {Array.from(
+            { length: Math.floor((plotBottom - paddingTop) / CHART_GRID) },
+            (_, index) => plotBottom - (index + 1) * CHART_GRID
+          ).map((y) => (
+            <Line
+              key={`grid-y-${y}`}
+              x1={axisX}
+              x2={plotRight}
+              y1={y}
+              y2={y}
+              stroke={COLORS.light.chartGrid}
+              strokeWidth="1"
+            />
+          ))}
           {/* The axis takes the colour of the range it passes through. */}
           <Rect
             x={axisX - 3}
