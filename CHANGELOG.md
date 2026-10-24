@@ -4,6 +4,33 @@ What changed in each release of Healthy, newest first, compiled from the
 fragments in `.changes/unreleased/` by changie; see
 [Releasing Healthy](docs/releasing.md).
 
+## [2026.10.2] - 2026-10-24
+
+### Added
+
+- Lab results can now record Free Androgen Index, Platelet Large Cell Ratio (P-LCR) and prothrombin activity in % (Quick), and AI import picks them up from your reports.
+- Your biomarkers now include the Atherogenic Index of Plasma, calculated from the triglycerides and HDL in each lab report, with a page explaining how it's worked out.
+- Calculated values are marked with a calculator wherever they're listed, appear in the lab report they come from, and their page links the results they're worked out from.
+- Import with AI now also fills in new consultations, service requests and treatments: copy the instructions to your AI assistant with a visit summary, referral or prescription, then paste its reply to review the filled-in form before saving. Treatments get their dosing as a regimen, and service requests their repeat schedule.
+
+### Changed
+
+- Values with a standard formula, such as cholesterol ratios, non-HDL cholesterol, globulin, transferrin saturation, HOMA-IR and the Free Androgen Index, are now worked out from the results in the same report so they always agree with them. A value your lab reported without those results still shows.
+- Condition timelines initially show Active and Planned steps. Clear the filters to see all steps.
+- Biomarker status grids are visual only; tapping individual squares no longer opens biomarker details.
+- The Google Drive backup status now shows on its own line under your email, so long email addresses no longer hide it.
+- The journal now flags doses recorded on a day the treatment was on hold as not matching the regimen.
+
+### Fixed
+
+- Restoring a profile from a backup file now shows a spinner and keeps the app locked until the restore finishes, then opens your record.
+- Google Drive backup on the web works again after the page was opened offline, without reloading.
+- The offline icon now also shows on the web when your device is connected to a network that can't reach the internet, and disappears once the connection is back.
+- Doses or sessions logged on one device for a treatment or schedule deleted on another no longer get stuck in sync and fill the console with warnings.
+- After deleting your last profile, choosing to restore from a backup no longer sometimes jumps back to the welcome screen.
+- On the web, pressing Escape right after a form opens now cancels it.
+- On the web, you can now reach and scroll record pages with the keyboard, even when a page has no buttons or links in its content.
+
 ## [2026.10.1] - 2026-10-22
 
 ### Added
