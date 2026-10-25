@@ -4,11 +4,13 @@ import { getWhenLabel } from '@/src/features/treatments/regimen';
 export type PartOfDay = 'MORN' | 'NOON' | 'AFT' | 'EVE' | 'HS';
 
 /**
- * The journal's order within each part of the day (or `any`): resource keys
- * (`MedicationRequest/<id>`, `ServiceRequest/<id>`,
- * `RequestOrchestration/<id>`), first on top.
+ * The journal's order within each part of the day (or `any`, or a clock time
+ * HH:mm before the first part): resource keys (`MedicationRequest/<id>`,
+ * `ServiceRequest/<id>`, `RequestOrchestration/<id>`), first on top.
  */
-export type JournalOrder = Partial<Record<PartOfDay | 'any', string[]>>;
+export type JournalOrder = Partial<
+  Record<PartOfDay | 'any' | `${string}:${string}`, string[]>
+>;
 
 /**
  * A profile's settings. App infrastructure, not a FHIR resource: synced as

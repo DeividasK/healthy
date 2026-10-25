@@ -1,0 +1,3 @@
+kind: Changed
+body: Treatments set for a specific time now appear under that time in the journal, in clock order between the parts of the day, instead of joining the nearest part of the day.
+time: 2026-10-25T05:57:24.082147811Z

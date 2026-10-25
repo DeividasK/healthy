@@ -11,10 +11,16 @@ import {
   type TimesOfDay,
 } from './bundleGrouping';
 
-/** A part of the day, or `any` for rows without one time. */
-export type JournalGroupId = PartOfDay | 'any';
+/** An exact clock time (HH:mm). */
+export type ClockTime = `${string}:${string}`;
 
-/** The journal rows taken at one part of the day. */
+/**
+ * A part of the day, an exact clock time, or `any` for rows without one
+ * time.
+ */
+export type JournalGroupId = PartOfDay | ClockTime | 'any';
+
+/** The journal rows taken at one part of the day or clock time. */
 export interface JournalGroup {
   id: JournalGroupId;
   label: string;
@@ -31,51 +37,19 @@ const minutesOf = (time?: string) => {
   return match ? +match[1] * 60 + +match[2] : null;
 };
 
-/** Parts of the day in clock order, from the profile's settings. */
-function getOrderedParts(timesOfDay: TimesOfDay) {
-  return PARTS_OF_DAY.map((part, index) => ({
-    ...part,
-    minutes: minutesOf(timesOfDay[part.code]),
-    index,
-  })).sort(
-    (a, b) =>
-      (a.minutes ?? Infinity) - (b.minutes ?? Infinity) || a.index - b.index
-  );
-}
-
-/** The part of the day nearest a clock time; ties go to the earlier part. */
-function getNearestPart(
-  minutes: number,
-  parts: ReturnType<typeof getOrderedParts>
-): PartOfDay | null {
-  let nearest: PartOfDay | null = null;
-  let best = Infinity;
-  for (const part of parts) {
-    if (part.minutes === null) continue;
-    const distance = Math.abs(part.minutes - minutes);
-    if (distance < best) {
-      best = distance;
-      nearest = part.code;
-    }
-  }
-  return nearest;
-}
-
 /**
- * The part of the day a row is taken at: its `when` code, or the part
- * nearest its exact time. A dose taken at several parts of the day, at
- * other times (e.g. with meals) or without a time is `any`.
+ * The part of the day or exact time (HH:mm) a row is taken at. A dose taken
+ * at several times, at other times (e.g. with meals) or without a time is
+ * `any`.
  */
-export function getRowGroup(
-  row: JournalRow,
-  parts: ReturnType<typeof getOrderedParts>
-): JournalGroupId {
-  const found = new Set<PartOfDay | null>();
+export function getRowGroup(row: JournalRow): JournalGroupId {
+  const found = new Set<JournalGroupId | null>();
   const add = (code?: string, time?: string) => {
     if (code) found.add(isPartOfDay(code) ? code : null);
-    const minutes = minutesOf(time);
     if (time)
-      found.add(minutes === null ? null : getNearestPart(minutes, parts));
+      found.add(
+        minutesOf(time) === null ? null : (time.slice(0, 5) as ClockTime)
+      );
   };
   if (row.kind === 'bundle') {
     if (row.time?.kind === 'when') add(row.time.code);
@@ -135,38 +109,56 @@ export function applyJournalOrder(
 }
 
 /**
- * A day's rows by part of the day, in clock order with `any` last. Within a
- * part, rows come in the user's order, then by clock time.
+ * A day's rows by part of the day and exact time, in clock order with `any`
+ * last; a part of the day comes before an exact time at the same minute.
+ * Within a group, rows come in the user's order, then by clock time.
  */
 export function groupJournalRows(
   rows: JournalRow[],
   timesOfDay: TimesOfDay,
   journalOrder: JournalOrder = {}
 ): JournalGroup[] {
-  const parts = getOrderedParts(timesOfDay);
   const byGroup = new Map<JournalGroupId, JournalRow[]>();
   for (const row of rows) {
-    const id = getRowGroup(row, parts);
+    const id = getRowGroup(row);
     byGroup.set(id, [...(byGroup.get(id) ?? []), row]);
   }
-  return [
-    ...parts.map((part) => ({ id: part.code, label: part.label })),
-    { id: 'any' as const, label: ANY_TIME_LABEL },
-  ].flatMap(({ id, label }) => {
-    const groupRows = byGroup.get(id);
-    if (!groupRows) return [];
-    const byTime = groupRows
-      .map((row, index) => ({
-        row,
-        index,
-        // Rows at any time keep the day's order.
-        minutes:
-          id === 'any' ? 0 : (getRowMinutes(row, timesOfDay) ?? Infinity),
-      }))
-      .sort((a, b) => a.minutes - b.minutes || a.index - b.index)
-      .map(({ row }) => row);
-    return [{ id, label, rows: applyJournalOrder(byTime, journalOrder[id]) }];
-  });
+  const timed = [
+    ...PARTS_OF_DAY.map((part, index) => ({
+      id: part.code as JournalGroupId,
+      label: part.label,
+      minutes: minutesOf(timesOfDay[part.code]),
+      rank: index,
+    })),
+    ...[...byGroup.keys()]
+      .filter((id) => id.includes(':'))
+      .map((id) => ({
+        id,
+        label: id,
+        minutes: minutesOf(id),
+        rank: PARTS_OF_DAY.length,
+      })),
+  ].sort(
+    (a, b) =>
+      (a.minutes ?? Infinity) - (b.minutes ?? Infinity) || a.rank - b.rank
+  );
+  return [...timed, { id: 'any' as const, label: ANY_TIME_LABEL }].flatMap(
+    ({ id, label }) => {
+      const groupRows = byGroup.get(id);
+      if (!groupRows) return [];
+      const byTime = groupRows
+        .map((row, index) => ({
+          row,
+          index,
+          // Rows at any time keep the day's order.
+          minutes:
+            id === 'any' ? 0 : (getRowMinutes(row, timesOfDay) ?? Infinity),
+        }))
+        .sort((a, b) => a.minutes - b.minutes || a.index - b.index)
+        .map(({ row }) => row);
+      return [{ id, label, rows: applyJournalOrder(byTime, journalOrder[id]) }];
+    }
+  );
 }
 
 /**
