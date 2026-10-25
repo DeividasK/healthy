@@ -38,6 +38,31 @@ const minutesOf = (time?: string) => {
 };
 
 /**
+ * The part of the day nearest a clock time, where exact times were grouped
+ * before they had groups of their own; ties go to the earlier part.
+ */
+function getNearestPart(
+  minutes: number,
+  timesOfDay: TimesOfDay
+): PartOfDay | null {
+  let nearest: PartOfDay | null = null;
+  let best = Infinity;
+  for (const { code } of PARTS_OF_DAY) {
+    const partMinutes = minutesOf(timesOfDay[code]);
+    if (partMinutes === null) continue;
+    const distance = Math.abs(partMinutes - minutes);
+    if (
+      distance < best ||
+      (distance === best && partMinutes < minutesOf(timesOfDay[nearest!])!)
+    ) {
+      best = distance;
+      nearest = code;
+    }
+  }
+  return nearest;
+}
+
+/**
  * The part of the day or exact time (HH:mm) a row is taken at. A dose taken
  * at several times, at other times (e.g. with meals) or without a time is
  * `any`.
@@ -161,7 +186,7 @@ export function groupJournalRows(
       const order =
         journalOrder[id] ??
         (id.includes(':')
-          ? PARTS_OF_DAY.flatMap((part) => journalOrder[part.code] ?? [])
+          ? journalOrder[getNearestPart(minutesOf(id)!, timesOfDay) ?? 'any']
           : undefined);
       return [{ id, label, rows: applyJournalOrder(byTime, order) }];
     }

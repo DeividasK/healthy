@@ -180,6 +180,15 @@ test('an exact time keeps the order saved by part of the day until it has its ow
   expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, saved))).toEqual(
     { '07:30': ['b-07:30', 'a-07:30'] }
   );
+  // Only the part the time was grouped with counts: 12:30 was Noon's.
+  const both = {
+    MORN: ['MedicationRequest/a', 'MedicationRequest/b'],
+    NOON: ['MedicationRequest/b', 'MedicationRequest/a'],
+  };
+  const noon = [row('a', '12:30'), row('b', '12:30')];
+  expect(describe(groupJournalRows(noon, DEFAULT_TIMES_OF_DAY, both))).toEqual({
+    '12:30': ['b-12:30', 'a-12:30'],
+  });
   const own = { ...saved, '07:30': ['MedicationRequest/a'] };
   expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, own))).toEqual({
     '07:30': ['a-07:30', 'b-07:30'],
