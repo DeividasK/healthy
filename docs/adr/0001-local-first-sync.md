@@ -203,7 +203,7 @@ The sync design keeps this an add-on:
 | Pull, push, compaction, vault, device-only removal | `src/features/sync/engine.ts`, `downloadPlan.ts`                   |
 | Recovery phrase, key derivation, JWE files         | `src/features/sync/vault/`                                         |
 | Storage provider interface and Google Drive        | `src/features/sync/providers/`                                     |
-| When sync runs, token refresh                      | `src/context/SyncContext.tsx`                                      |
+| When sync runs, token refresh                      | `src/context/SyncContext.tsx`, `workers/google-token/`             |
 | Screens                                            | `src/features/sync/RecoveryPhraseView.tsx`, `RestoreVaultView.tsx` |
 
 Remote changes that fail repository validation (for example a reference whose target has not arrived yet) are kept in `sync_pending_apply` and retried on every sync instead of failing the round.
@@ -212,7 +212,7 @@ Remote changes that fail repository validation (for example a reference whose ta
 
 **Positive**
 
-- **Free.** It costs users nothing and needs no server of ours.
+- **Free.** It costs users nothing. The only server of ours is a stateless Cloudflare Worker that renews Google tokens on the free plan; it never sees health data ([Google token service](../google-token-service.md)).
 - **Real E2EE.** Google sees only file names, sizes and timestamps.
 - **Cheap when idle.** A sync with no new data costs one Drive request, and a save uploads one small chunk.
 - **Deletes stick.** Deletes propagate to every device, which fixes the resurrection bug.
@@ -224,7 +224,7 @@ Remote changes that fail repository validation (for example a reference whose ta
 - **Not real-time.** Latency is seconds (polling), with no push.
 - **Data loss risk.** Losing the recovery phrase _and_ every device means losing the synced data. Users must be told to keep the phrase. The phrase screen offers copying and a `.txt` download. A user who has forgotten the phrase can choose "Forgot your recovery phrase?" when restoring: this deletes the unreadable cloud data and sets up a new vault with a new phrase, keeping and re-uploading the profiles on that device. Devices still holding the old key detect that the vault was replaced (its `space` no longer matches) and disconnect until given the new phrase.
 - **Google only at first.** iCloud is realistic only on iOS (CloudKit). Dropbox and OneDrive are possible later behind the same interface.
-- **Drive limits remain.** Drive API rate limits and OAuth token refresh still apply. The native implicit OAuth flow has no refresh token.
+- **Drive limits remain.** Drive API rate limits and OAuth token refresh still apply. On web, background renewal depends on the Google token service; builds without it renew only when the user syncs by hand. The iOS implicit OAuth flow has no refresh token.
 - **No sharing yet.** Sharing between users isn't possible until SMART Health Links are built.
 
 **Breaking changes (accepted; there are no users yet)**

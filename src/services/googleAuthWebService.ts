@@ -178,3 +178,202 @@ export async function silentRefreshWebAccessToken(
     hint: userEmail,
   });
 }
+
+// ── Authorization code flow through Healthy's token service ─────────────────
+// GIS tokens last an hour and renewing them needs a popup, which browsers
+// block outside a click. With the token service (workers/google-token), the
+// web app signs in once with the code flow and gets a refresh token, which
+// the service swaps for new access tokens in the background.
+
+const TOKEN_SERVICE_URL =
+  process.env.EXPO_PUBLIC_GOOGLE_TOKEN_SERVICE_URL || '';
+const GOOGLE_SCOPE =
+  'openid profile email https://www.googleapis.com/auth/drive.appdata';
+// Matches public/oauth-callback.html.
+const CALLBACK_CHANNEL = 'healthy-google-auth';
+const AUTHORIZE_TIMEOUT_MS = 3 * 60 * 1000;
+
+export interface WebGoogleTokens {
+  accessToken: string;
+  expiresIn: number;
+  refreshToken?: string;
+}
+
+/** Whether this web build can renew Google tokens without a popup. */
+export function hasGoogleTokenService(): boolean {
+  return Platform.OS === 'web' && Boolean(TOKEN_SERVICE_URL);
+}
+
+/** Google revoked the refresh token, e.g. from the Google account page. */
+export class GoogleRefreshRevokedError extends Error {
+  constructor() {
+    super('Google refused the refresh token');
+    this.name = 'GoogleRefreshRevokedError';
+  }
+}
+
+/** The token service or Google is down; trying again later may work. */
+export class GoogleTokenServiceUnavailableError extends Error {
+  constructor(status: number) {
+    super(`Google token service unavailable (HTTP ${status})`);
+    this.name = 'GoogleTokenServiceUnavailableError';
+  }
+}
+
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function randomString(): string {
+  return base64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+async function codeChallenge(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(verifier)
+  );
+  return base64Url(new Uint8Array(digest));
+}
+
+function callbackUrl(): string {
+  return `${window.location.origin}${process.env.EXPO_BASE_URL ?? ''}/oauth-callback.html`;
+}
+
+async function callTokenService(
+  path: '/token' | '/refresh',
+  body: Record<string, string>
+): Promise<WebGoogleTokens> {
+  const res = await fetch(`${TOKEN_SERVICE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status >= 500)
+    throw new GoogleTokenServiceUnavailableError(res.status);
+  if (!res.ok || !data.access_token) {
+    if (path === '/refresh' && data.error === 'invalid_grant')
+      throw new GoogleRefreshRevokedError();
+    throw new Error(
+      `Google token request failed (HTTP ${res.status}): ${data.error ?? ''}`
+    );
+  }
+  return {
+    accessToken: data.access_token,
+    expiresIn: Number(data.expires_in) || 3600,
+    refreshToken: data.refresh_token || undefined,
+  };
+}
+
+/** Resolves with the code Google sends to the callback page. */
+function waitForAuthorizationCode(
+  state: string,
+  popup: Window
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const channel = new BroadcastChannel(CALLBACK_CHANNEL);
+    let closedCheck: ReturnType<typeof setTimeout> | undefined;
+    const finish = (settle: () => void) => {
+      clearTimeout(timeout);
+      clearTimeout(closedCheck);
+      window.removeEventListener('focus', onFocus);
+      channel.close();
+      settle();
+    };
+    const timeout = setTimeout(
+      () => finish(() => reject(new Error('Google sign-in timed out'))),
+      AUTHORIZE_TIMEOUT_MS
+    );
+    // Closing the popup sends no message; focus returns here instead. The
+    // callback page posts before it closes itself, so a short wait suffices.
+    const onFocus = () => {
+      clearTimeout(closedCheck);
+      closedCheck = setTimeout(() => {
+        if (popup.closed)
+          finish(() => reject(new Error('Google sign-in was closed')));
+      }, 2000);
+    };
+    window.addEventListener('focus', onFocus);
+    channel.onmessage = (event: MessageEvent) => {
+      const message = event.data as {
+        state?: string;
+        code?: string | null;
+        error?: string | null;
+      };
+      if (message?.state !== state) return;
+      finish(() =>
+        message.code
+          ? resolve(message.code)
+          : reject(
+              new Error(
+                `Google sign-in failed: ${message.error ?? 'no code returned'}`
+              )
+            )
+      );
+    };
+  });
+}
+
+/**
+ * Signs in with Google's authorization code flow in a popup and swaps the
+ * code for tokens, including a refresh token. Call it straight from a click:
+ * the popup opens before anything is awaited, so browsers allow it.
+ */
+export async function authorizeWithTokenService(options: {
+  hint?: string;
+}): Promise<WebGoogleTokens> {
+  const popup = window.open('', CALLBACK_CHANNEL, 'popup,width=500,height=640');
+  if (!popup) throw new Error('The Google sign-in window was blocked');
+  try {
+    const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+    if (!clientId) throw new Error('Missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+    const state = randomString();
+    const verifier = randomString();
+    const redirectUri = callbackUrl();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: GOOGLE_SCOPE,
+      state,
+      code_challenge: await codeChallenge(verifier),
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      include_granted_scopes: 'true',
+      // Google only returns a refresh token when the user consents, so each
+      // device asks. Without a known account, the user picks one first.
+      prompt: options.hint ? 'consent' : 'select_account consent',
+    });
+    if (options.hint) params.set('login_hint', options.hint);
+    const code = waitForAuthorizationCode(state, popup);
+    popup.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    return await callTokenService('/token', {
+      code: await code,
+      code_verifier: verifier,
+      redirect_uri: redirectUri,
+    });
+  } catch (err) {
+    popup.close();
+    throw err;
+  }
+}
+
+/** Gets a new access token for a refresh token, without any UI. */
+export async function refreshWithTokenService(
+  refreshToken: string
+): Promise<WebGoogleTokens> {
+  return callTokenService('/refresh', { refresh_token: refreshToken });
+}
+
+/** Revokes a refresh token so a disconnected device can no longer use it. */
+export async function revokeGoogleToken(token: string): Promise<void> {
+  await fetch('https://oauth2.googleapis.com/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token }).toString(),
+  });
+}

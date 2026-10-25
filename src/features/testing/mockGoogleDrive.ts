@@ -76,6 +76,7 @@ export async function mockGoogleAuthRoutes(
   await page.route('https://accounts.google.com/**', (route) => {
     route.fulfill({ status: 200, body: 'OK' });
   });
+  await mockTokenService(page, options);
 
   await page.route('https://oauth2.googleapis.com/**', (route) => {
     route.fulfill({
@@ -101,8 +102,37 @@ export async function mockGoogleAuthRoutes(
   });
 }
 
+/** Matches EXPO_PUBLIC_GOOGLE_TOKEN_SERVICE_URL in playwright.config.ts. */
+export const MOCK_TOKEN_SERVICE_URL = 'https://token-service.test';
+/** A refresh token the mock token service reports as revoked by Google. */
+export const REVOKED_REFRESH_TOKEN = 'revoked-refresh-token';
+
 /**
- * Injects Google Identity Services (GIS) mock into the window before navigation.
+ * Healthy's Google token service (workers/google-token): codes and refresh
+ * tokens become `accessToken`, except a revoked refresh token.
+ */
+export async function mockTokenService(
+  page: Page,
+  options?: { accessToken?: string; expiresIn?: number }
+): Promise<void> {
+  await page.route(`${MOCK_TOKEN_SERVICE_URL}/**`, (route) => {
+    const body = route.request().postDataJSON() ?? {};
+    if (body.refresh_token === REVOKED_REFRESH_TOKEN)
+      return route.fulfill({ status: 400, json: { error: 'invalid_grant' } });
+    return route.fulfill({
+      json: {
+        access_token: options?.accessToken ?? 'fresh-gis-token',
+        expires_in: options?.expiresIn ?? 3600,
+        refresh_token: body.code ? 'mock-refresh-token' : undefined,
+      },
+    });
+  });
+}
+
+/**
+ * Injects Google sign-in mocks into the window before navigation: Google
+ * Identity Services, the code flow popup (which answers through the
+ * callback page's channel).
  */
 export async function mockGoogleIdentityServices(
   page: Page,
@@ -129,6 +159,34 @@ export async function mockGoogleIdentityServices(
           },
         },
       };
+      // Google's consent page sends the code to oauth-callback.html, which
+      // posts it on this channel.
+      const open = window.open.bind(window);
+      (window as any).__googleAuthPopups = 0;
+      window.open = ((
+        url?: string | URL,
+        target?: string,
+        features?: string
+      ) => {
+        if (target !== 'healthy-google-auth')
+          return open(url, target, features);
+        (window as any).__googleAuthPopups++;
+        const popup = { closed: false, close: () => (popup.closed = true) };
+        Object.defineProperty(popup, 'location', {
+          value: {
+            set href(href: string) {
+              const state = new URL(href).searchParams.get('state');
+              setTimeout(() => {
+                const channel = new BroadcastChannel('healthy-google-auth');
+                channel.postMessage({ state, code: 'mock-code', error: null });
+                channel.close();
+                popup.closed = true;
+              }, 10);
+            },
+          },
+        });
+        return popup as unknown as Window;
+      }) as typeof window.open;
     },
     { injectedToken: token, injectedExpiresIn: expiresIn }
   );
@@ -182,6 +240,7 @@ export async function mockGoogleDrive(
   store: MockDriveStore = createMockDriveStore()
 ): Promise<MockDriveStore> {
   const { files, changes } = store;
+  await mockTokenService(page);
   await page.route('https://www.googleapis.com/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());

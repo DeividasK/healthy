@@ -11,6 +11,7 @@ import {
   syncAllTestProfiles,
   bootstrapApp,
   openRoute,
+  REVOKED_REFRESH_TOKEN,
 } from '@/src/features/testing/testStorage';
 import { readFile } from 'node:fs/promises';
 import type { Page, Route } from '@playwright/test';
@@ -331,9 +332,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     ).toBeNull();
   });
 
-  test('an expired Google token pauses background sync until the user syncs', async ({
-    page,
-  }) => {
+  test('renews an expired Google token in the background', async ({ page }) => {
     await seedTestPatient(page);
     const { store } = await connectTestSync(page, {
       userEmail: 'bob@gmail.com',
@@ -345,10 +344,56 @@ test.describe('Google Drive sync with a recovery phrase', () => {
         JSON.stringify({
           ...config,
           accessToken: 'stale-token',
+          refreshToken: 'mock-refresh-token',
           tokenExpiresAt: Date.now() - 100000,
         })
       );
     }, CONFIG_KEY);
+    store.acceptedToken = 'fresh-gis-token';
+    // Reload so sync starts with the connection made through the bridge.
+    await page.goto('/profile');
+    // The token service swaps the refresh token without any popup.
+    await expect(page.getByTestId('backup-status-text')).toHaveText(
+      'up to date'
+    );
+    const saved = await page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)!),
+      CONFIG_KEY
+    );
+    expect(saved.accessToken).toBe('fresh-gis-token');
+    expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
+    expect(await page.evaluate(() => (window as any).__googleAuthPopups)).toBe(
+      0
+    );
+  });
+
+  test('a revoked Google session pauses background sync until the user syncs', async ({
+    page,
+    consoleMonitor,
+  }) => {
+    // Chromium logs the token service refusing the revoked refresh token.
+    consoleMonitor.ignore(
+      'Failed to load resource: the server responded with a status of 400'
+    );
+    await seedTestPatient(page);
+    const { store } = await connectTestSync(page, {
+      userEmail: 'bob@gmail.com',
+    });
+    await page.evaluate(
+      ({ key, refreshToken }) => {
+        const config = JSON.parse(localStorage.getItem(key)!);
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            ...config,
+            accessToken: 'stale-token',
+            refreshToken,
+            tokenExpiresAt: Date.now() - 100000,
+          })
+        );
+      },
+      { key: CONFIG_KEY, refreshToken: REVOKED_REFRESH_TOKEN }
+    );
     store.acceptedToken = 'fresh-gis-token';
     const savedConfig = () =>
       page.evaluate(
@@ -357,19 +402,20 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       );
     // Reload so sync starts with the connection made through the bridge.
     await page.goto('/profile');
-    // Renewing on web needs Google's popup, which browsers block without a
+    // Signing in again needs Google's popup, which browsers block without a
     // click, so the background sync on start leaves the token alone.
     await expect(page.getByTestId('sync-now-button')).toBeVisible();
     await page.waitForLoadState('networkidle');
     expect((await savedConfig()).accessToken).toBe('stale-token');
 
-    // Syncing by hand renews the token and catches up.
+    // Syncing by hand signs in again, gets a new refresh token and catches up.
     await page.getByTestId('sync-now-button').click();
     await expect(page.getByTestId('backup-status-text')).toHaveText(
       'up to date'
     );
     const saved = await savedConfig();
     expect(saved.accessToken).toBe('fresh-gis-token');
+    expect(saved.refreshToken).toBe('mock-refresh-token');
     expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
   });
 

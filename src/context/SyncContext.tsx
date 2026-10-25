@@ -9,7 +9,13 @@ import React, {
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
   GoogleIdentityUnavailableError,
+  GoogleRefreshRevokedError,
+  GoogleTokenServiceUnavailableError,
+  authorizeWithTokenService,
+  hasGoogleTokenService,
   loadGisScript,
+  refreshWithTokenService,
+  revokeGoogleToken,
   silentRefreshWebAccessToken,
 } from '@/src/services/googleAuthWebService';
 import {
@@ -132,15 +138,49 @@ function isAuthError(err: unknown): boolean {
   );
 }
 
+/** A refresh that may work later: offline, or the token service is down. */
+function isTransientRefreshError(err: unknown): boolean {
+  return (
+    isNetworkError(err) || err instanceof GoogleTokenServiceUnavailableError
+  );
+}
+
 /**
- * Obtains a new Google access token without user interaction, if possible.
- * On web that needs Google's popup, which browsers block unless a click
- * opened it, so only `interactive` refreshes (started by the user) try it.
+ * Obtains a new Google access token, without user interaction if possible.
+ * On web without a refresh token that needs Google's popup, which browsers
+ * block unless a click opened it, so only `interactive` refreshes (started
+ * by the user) try it.
  */
 async function refreshAccessToken(
   config: GoogleDriveConfig,
   { interactive }: { interactive: boolean }
 ): Promise<GoogleDriveConfig | null> {
+  if (hasGoogleTokenService()) {
+    if (config.refreshToken) {
+      try {
+        const refreshed = await refreshWithTokenService(config.refreshToken);
+        return {
+          ...config,
+          accessToken: refreshed.accessToken,
+          tokenExpiresAt: Date.now() + refreshed.expiresIn * 1000,
+        };
+      } catch (err) {
+        if (!(err instanceof GoogleRefreshRevokedError)) throw err;
+      }
+    }
+    // No refresh token yet (connected before the token service) or Google
+    // revoked it: signing in again gets a new one.
+    if (!interactive) return null;
+    const authorized = await authorizeWithTokenService({
+      hint: config.userEmail,
+    });
+    return {
+      ...config,
+      accessToken: authorized.accessToken,
+      refreshToken: authorized.refreshToken ?? config.refreshToken,
+      tokenExpiresAt: Date.now() + authorized.expiresIn * 1000,
+    };
+  }
   const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
   if (config.refreshToken && clientId) {
     const refreshed = await refreshGoogleAccessToken(
@@ -283,6 +323,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const refreshed = await refreshAccessToken(active!, {
           interactive,
         }).catch((err) => {
+          // Offline or briefly unavailable: the session itself is fine, so
+          // the next automatic sync tries again.
+          if (isTransientRefreshError(err)) throw err;
           // Google's script failing to load was already reported.
           if (!(err instanceof GoogleIdentityUnavailableError))
             console.warn('Google token refresh failed:', err);
@@ -360,6 +403,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           if (isNetworkError(err)) {
             // The header shows the device offline in the sync status's place.
             reportUnreachable();
+            setSyncState('idle');
+            setIsUpToDate(false);
+            return;
+          }
+          if (err instanceof GoogleTokenServiceUnavailableError) {
+            // The next automatic sync tries again.
+            console.warn('Sync postponed:', err.message);
             setSyncState('idle');
             setIsUpToDate(false);
             return;
@@ -536,6 +586,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (options?.deleteCloudData && configRef.current)
         await withProvider((provider) => deleteCloudData(provider));
       else await forgetVaultKey();
+      const refreshToken = configRef.current?.refreshToken;
+      if (refreshToken && hasGoogleTokenService())
+        revokeGoogleToken(refreshToken).catch((err) =>
+          console.warn('Failed to revoke the Google token:', err)
+        );
       await updateConfig(null);
       setVaultState('disconnected');
       setSyncState('idle');
