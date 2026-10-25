@@ -13,7 +13,7 @@ import {
   openRoute,
 } from '@/src/features/testing/testStorage';
 import { readFile } from 'node:fs/promises';
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 const CONFIG_KEY = '@healthy_device_google_sync_config';
 // A valid 24-word phrase that belongs to no vault in these tests.
@@ -203,7 +203,25 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await syncExpect(
       picker.getByTestId('remote-profile-item-alice')
     ).toContainText('Alice Doe');
-    await picker.getByTestId('restore-selected-profiles-button').click();
+    // Drive is held so the picker's in-progress state can be checked.
+    let releaseDrive!: () => void;
+    const driveHeld = new Promise<void>((resolve) => (releaseDrive = resolve));
+    const holdDrive = async (route: Route) => {
+      await driveHeld;
+      await route.fallback();
+    };
+    await device.route('https://www.googleapis.com/**', holdDrive);
+    const restoreSelected = picker.getByTestId(
+      'restore-selected-profiles-button'
+    );
+    await restoreSelected.click();
+    await expect(restoreSelected).toHaveText('Restoring…');
+    await expect(restoreSelected).toHaveAttribute('aria-disabled', 'true');
+    await expect(
+      picker.getByTestId('cancel-remote-picker-button')
+    ).toHaveAttribute('aria-disabled', 'true');
+    releaseDrive();
+    await device.unroute('https://www.googleapis.com/**', holdDrive);
     await syncExpect(device.getByTestId('start-your-record')).toBeVisible();
     expect(
       await device.evaluate(() =>
