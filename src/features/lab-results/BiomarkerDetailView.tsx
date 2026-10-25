@@ -30,6 +30,7 @@ import type { Observation } from 'fhir/r5';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { useIsWideLayout } from '@/src/theme/layout';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ResourceSection } from '@/src/components/ResourceSection';
@@ -145,9 +146,17 @@ function getRelatedBiomarkers<T extends { observation: Observation }>(
 }
 
 /** Shows patient-scoped biomarker history with compatible units and education. */
-export function BiomarkerDetailView() {
+export function BiomarkerDetailView({
+  id: selectedId,
+}: {
+  /** Shown beside the biomarker list on desktop instead of the route's. */
+  id?: string;
+} = {}) {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = selectedId ?? params.id;
+  const isWideWindow = useIsWideLayout();
+  const isWide = !selectedId && isWideWindow;
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const demographics = useRangeDemographics();
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -347,9 +356,215 @@ export function BiomarkerDetailView() {
     marker && !latestMeasurement.reportedRange
       ? resolveReferenceRange(marker, demographics, latestMeasurement.date)
       : undefined;
+  const about = (
+    <>
+      {marker?.description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.description}>{marker.description}</Text>
+        </View>
+      )}
+    </>
+  );
+  const latest = (
+    <>
+      <View style={styles.section} testID="biomarker-latest">
+        <Text style={styles.sectionTitle}>Latest</Text>
+        <View style={styles.latestValueGroup}>
+          <Text style={styles.latestValue} testID="biomarker-latest-value">
+            {latestMeasurement.value}
+          </Text>
+          <Text style={styles.latestUnit} testID="biomarker-latest-unit">
+            {latestMeasurement.unit}
+          </Text>
+        </View>
+        <BiomarkerRangeLine
+          value={latestMeasurement.value}
+          low={latestMeasurement.range?.low}
+          high={latestMeasurement.range?.high}
+          width="100%"
+          large
+          testID="biomarker-latest-range"
+        />
+      </View>
+    </>
+  );
+  const calculated = (
+    <>
+      {marker?.calculation && latestSources.length > 0 && (
+        <ResourceSection
+          icon={Calculator}
+          title="Calculated from"
+          testID="biomarker-calculation"
+        >
+          <Text
+            style={[styles.description, styles.calculationText]}
+            testID="biomarker-calculation-formula"
+          >
+            {describeCalculation(marker.calculation)}
+          </Text>
+          {latestSources.map((source) => (
+            <BiomarkerResultRow
+              key={source.id}
+              observation={source}
+              testID={`biomarker-source-result-${getBiomarkerRouteId(source)}`}
+            />
+          ))}
+        </ResourceSection>
+      )}
+    </>
+  );
+  const range = (
+    <>
+      {marker && (
+        <View style={styles.section} testID="biomarker-range">
+          <Text style={styles.sectionTitle}>Reference range</Text>
+          <Text style={styles.description} testID="biomarker-range-explanation">
+            {latestRange
+              ? explainReferenceRange(marker, latestRange)
+              : 'This range comes from your laboratory report.'}
+          </Text>
+          <RangeProfileNotice
+            missing={latestRange?.missing ?? []}
+            testID="biomarker-range-notice"
+            style={styles.notice}
+          />
+        </View>
+      )}
+    </>
+  );
+  const chart = (
+    <>
+      {chartMeasurements.length > 1 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Value history</Text>
+          <View style={styles.legend} testID="biomarker-chart-legend">
+            {RANGE_STATUSES.map((status) => (
+              <View key={status} style={styles.legendItem}>
+                <View
+                  style={[
+                    styles.legendSwatch,
+                    { backgroundColor: STATUS_COLORS[status] },
+                  ]}
+                />
+                <Text style={styles.legendLabel}>
+                  {RANGE_STATUS_LABELS[status]}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <BiomarkerChart
+            measurements={chartMeasurements}
+            low={latestMeasurement.range?.low}
+            high={latestMeasurement.range?.high}
+            fill={isWide || Boolean(selectedId)}
+          />
+        </View>
+      )}
+    </>
+  );
+  const results = (
+    <>
+      <ResourceSection
+        icon={FlaskConical}
+        title="Results"
+        count={measurements.length}
+        testID="biomarker-history"
+      >
+        <CollapsibleList
+          items={[...measurements].reverse()}
+          testID="biomarker-history-list"
+          renderItem={(measurement) => (
+            <View key={measurement.id}>
+              <BiomarkerValueRow
+                title={formatDisplayDate(measurement.date)}
+                value={measurement.value}
+                unit={measurement.unit}
+                low={measurement.range?.low}
+                high={measurement.range?.high}
+                calculated={isCalculatedObservation(measurement.observation)}
+                accessibilityLabel={`View lab result: ${formatDisplayDate(measurement.date)}`}
+                testID={`biomarker-history-${measurement.id}`}
+                rangeTestID={`biomarker-history-range-${measurement.id}`}
+                onPress={() =>
+                  router.push(`/lab-result/${measurement.reportId}`)
+                }
+              />
+            </View>
+          )}
+        />
+      </ResourceSection>
+    </>
+  );
+  const conditionsSection = (
+    <>
+      <ResourceSection
+        icon={FolderPlus}
+        title="Conditions"
+        count={conditions.length}
+        testID="biomarker-conditions"
+      >
+        {conditions.map((condition) => (
+          <ConditionRelatedRow
+            key={condition.id}
+            condition={condition}
+            testID={`biomarker-condition-${condition.id}`}
+            onPress={() => router.push(`/condition/${condition.id}`)}
+          />
+        ))}
+      </ResourceSection>
+    </>
+  );
+  const related = (
+    <>
+      <ResourceSection
+        icon={Waypoints}
+        title="Related biomarkers"
+        count={relatedBiomarkers.length}
+        testID="biomarker-related"
+      >
+        {relatedBiomarkers.length > 0 && (
+          <CollapsibleList
+            items={relatedBiomarkers}
+            testID="biomarker-related-list"
+            renderItem={({ id: key, observation }) => (
+              <BiomarkerResultRow
+                key={key}
+                observation={observation}
+                testID={`biomarker-related-result-${key}`}
+              />
+            )}
+          />
+        )}
+      </ResourceSection>
+    </>
+  );
+  const learn = (
+    <>
+      <View style={styles.learnSection} testID="biomarker-learn">
+        <Text style={styles.sectionTitle}>Learn</Text>
+        <LearnItem title="About this biomarker">
+          {marker?.education?.about ||
+            marker?.description ||
+            'This biomarker is one part of your laboratory result and is interpreted together with other findings.'}
+        </LearnItem>
+        <LearnItem title="Why it matters">
+          {marker?.education?.whyItMatters ||
+            'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'}
+        </LearnItem>
+        <LearnItem title="What it may affect">
+          {marker?.education?.whatItMayAffect || ''}
+        </LearnItem>
+        <LearnItem title="What may be related to a change">
+          {marker?.education?.whatMayBeRelatedToAChange || ''}
+        </LearnItem>
+      </View>
+    </>
+  );
   return (
     <ResourceViewLayout
       testID="biomarker-view"
+      wide={isWide}
       title={title}
       titleTestID="biomarker-title"
       meta={[
@@ -380,204 +595,70 @@ export function BiomarkerDetailView() {
             ]
           : []),
       ]}
+      // Beside the biomarker list, the list's page owns the dock.
       actions={
-        <ResourceActionDock
-          onAdd={() => setShowAddMenu((visible) => !visible)}
-          addLabel="Add record"
-          addTestID="floating-add-button"
-          addMenuExpanded={showAddMenu}
-        />
+        selectedId ? undefined : (
+          <ResourceActionDock
+            onAdd={() => setShowAddMenu((visible) => !visible)}
+            addLabel="Add record"
+            addTestID="floating-add-button"
+            addMenuExpanded={showAddMenu}
+          />
+        )
       }
       modal={
-        <FloatingAddMenu
-          visible={showAddMenu}
-          onClose={() => setShowAddMenu(false)}
-          options={[
-            {
-              id: 'lab-results',
-              label: 'Lab Results',
-              testID: 'menu-add-lab-results',
-              icon: (
-                <FileText
-                  color={COLORS.light.primary}
-                  size={18}
-                  style={{ marginRight: 10 }}
-                />
-              ),
-              onPress: () => router.push('/lab-result/add'),
-            },
-          ]}
-        />
+        !selectedId && (
+          <FloatingAddMenu
+            visible={showAddMenu}
+            onClose={() => setShowAddMenu(false)}
+            options={[
+              {
+                id: 'lab-results',
+                label: 'Lab Results',
+                testID: 'menu-add-lab-results',
+                icon: (
+                  <FileText
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () => router.push('/lab-result/add'),
+              },
+            ]}
+          />
+        )
       }
     >
-      {marker?.description && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.description}>{marker.description}</Text>
-        </View>
-      )}
-      <View style={styles.section} testID="biomarker-latest">
-        <Text style={styles.sectionTitle}>Latest</Text>
-        <View style={styles.latestValueGroup}>
-          <Text style={styles.latestValue} testID="biomarker-latest-value">
-            {latestMeasurement.value}
-          </Text>
-          <Text style={styles.latestUnit} testID="biomarker-latest-unit">
-            {latestMeasurement.unit}
-          </Text>
-        </View>
-        <BiomarkerRangeLine
-          value={latestMeasurement.value}
-          low={latestMeasurement.range?.low}
-          high={latestMeasurement.range?.high}
-          width="100%"
-          large
-          testID="biomarker-latest-range"
-        />
-      </View>
-      {marker?.calculation && latestSources.length > 0 && (
-        <ResourceSection
-          icon={Calculator}
-          title="Calculated from"
-          testID="biomarker-calculation"
-        >
-          <Text
-            style={[styles.description, styles.calculationText]}
-            testID="biomarker-calculation-formula"
-          >
-            {describeCalculation(marker.calculation)}
-          </Text>
-          {latestSources.map((source) => (
-            <BiomarkerResultRow
-              key={source.id}
-              observation={source}
-              testID={`biomarker-source-result-${getBiomarkerRouteId(source)}`}
-            />
-          ))}
-        </ResourceSection>
-      )}
-      {marker && (
-        <View style={styles.section} testID="biomarker-range">
-          <Text style={styles.sectionTitle}>Reference range</Text>
-          <Text style={styles.description} testID="biomarker-range-explanation">
-            {latestRange
-              ? explainReferenceRange(marker, latestRange)
-              : 'This range comes from your laboratory report.'}
-          </Text>
-          <RangeProfileNotice
-            missing={latestRange?.missing ?? []}
-            testID="biomarker-range-notice"
-            style={styles.notice}
-          />
-        </View>
-      )}
-      {chartMeasurements.length > 1 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Value history</Text>
-          <View style={styles.legend} testID="biomarker-chart-legend">
-            {RANGE_STATUSES.map((status) => (
-              <View key={status} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: STATUS_COLORS[status] },
-                  ]}
-                />
-                <Text style={styles.legendLabel}>
-                  {RANGE_STATUS_LABELS[status]}
-                </Text>
-              </View>
-            ))}
+      {isWide ? (
+        <View style={styles.columns}>
+          <View style={styles.column}>
+            {latest}
+            {chart}
+            {results}
+            {calculated}
           </View>
-          <BiomarkerChart
-            measurements={chartMeasurements}
-            low={latestMeasurement.range?.low}
-            high={latestMeasurement.range?.high}
-          />
+          <View style={styles.column}>
+            {about}
+            {range}
+            {conditionsSection}
+            {related}
+            {learn}
+          </View>
         </View>
+      ) : (
+        <>
+          {about}
+          {latest}
+          {calculated}
+          {range}
+          {chart}
+          {results}
+          {conditionsSection}
+          {related}
+          {learn}
+        </>
       )}
-      <ResourceSection
-        icon={FlaskConical}
-        title="Results"
-        count={measurements.length}
-        testID="biomarker-history"
-      >
-        <CollapsibleList
-          items={[...measurements].reverse()}
-          testID="biomarker-history-list"
-          renderItem={(measurement) => (
-            <View key={measurement.id}>
-              <BiomarkerValueRow
-                title={formatDisplayDate(measurement.date)}
-                value={measurement.value}
-                unit={measurement.unit}
-                low={measurement.range?.low}
-                high={measurement.range?.high}
-                calculated={isCalculatedObservation(measurement.observation)}
-                accessibilityLabel={`View lab result: ${formatDisplayDate(measurement.date)}`}
-                testID={`biomarker-history-${measurement.id}`}
-                rangeTestID={`biomarker-history-range-${measurement.id}`}
-                onPress={() =>
-                  router.push(`/lab-result/${measurement.reportId}`)
-                }
-              />
-            </View>
-          )}
-        />
-      </ResourceSection>
-      <ResourceSection
-        icon={FolderPlus}
-        title="Conditions"
-        count={conditions.length}
-        testID="biomarker-conditions"
-      >
-        {conditions.map((condition) => (
-          <ConditionRelatedRow
-            key={condition.id}
-            condition={condition}
-            testID={`biomarker-condition-${condition.id}`}
-            onPress={() => router.push(`/condition/${condition.id}`)}
-          />
-        ))}
-      </ResourceSection>
-      <ResourceSection
-        icon={Waypoints}
-        title="Related biomarkers"
-        count={relatedBiomarkers.length}
-        testID="biomarker-related"
-      >
-        {relatedBiomarkers.length > 0 && (
-          <CollapsibleList
-            items={relatedBiomarkers}
-            testID="biomarker-related-list"
-            renderItem={({ id: key, observation }) => (
-              <BiomarkerResultRow
-                key={key}
-                observation={observation}
-                testID={`biomarker-related-result-${key}`}
-              />
-            )}
-          />
-        )}
-      </ResourceSection>
-      <View style={styles.learnSection} testID="biomarker-learn">
-        <Text style={styles.sectionTitle}>Learn</Text>
-        <LearnItem title="About this biomarker">
-          {marker?.education?.about ||
-            marker?.description ||
-            'This biomarker is one part of your laboratory result and is interpreted together with other findings.'}
-        </LearnItem>
-        <LearnItem title="Why it matters">
-          {marker?.education?.whyItMatters ||
-            'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'}
-        </LearnItem>
-        <LearnItem title="What it may affect">
-          {marker?.education?.whatItMayAffect || ''}
-        </LearnItem>
-        <LearnItem title="What may be related to a change">
-          {marker?.education?.whatMayBeRelatedToAChange || ''}
-        </LearnItem>
-      </View>
     </ResourceViewLayout>
   );
 }
@@ -655,17 +736,23 @@ function BiomarkerChart({
   measurements,
   low,
   high,
+  fill = false,
 }: {
   measurements: Measurement[];
   low?: number;
   high?: number;
+  /** Spans its column instead of stopping at 600px (desktop layouts). */
+  fill?: boolean;
 }) {
   const [chartWidth, setChartWidth] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const maxChartWidth = Math.max(
     1,
-    Math.min(600, screenWidth - insets.left - insets.right - 40)
+    Math.min(
+      fill ? screenWidth : 600,
+      screenWidth - insets.left - insets.right - 40
+    )
   );
   const width = chartWidth || maxChartWidth;
   const height = 260;
@@ -746,7 +833,7 @@ function BiomarkerChart({
   ];
   return (
     <View
-      style={[styles.chart, { width: maxChartWidth }]}
+      style={[styles.chart, fill ? styles.chartFill : { width: maxChartWidth }]}
       testID="biomarker-chart"
       accessibilityLabel="Biomarker values over time"
       onLayout={(event) => {
@@ -1010,6 +1097,8 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   section: { marginBottom: 28 },
+  columns: { flexDirection: 'row', gap: 48, alignItems: 'flex-start' },
+  column: { flex: 1, minWidth: 0 },
   notice: { marginTop: 16 },
   sectionTitle: {
     color: COLORS.light.foreground,
@@ -1024,4 +1113,5 @@ const styles = StyleSheet.create({
   },
   calculationText: { marginBottom: 12 },
   chart: { maxWidth: 600 },
+  chartFill: { width: '100%', maxWidth: '100%' },
 });

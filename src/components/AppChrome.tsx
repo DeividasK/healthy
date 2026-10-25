@@ -10,7 +10,11 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { AppHeader } from './AppHeader';
 import { ActionDock, getActionDockLayout, type DockAction } from './ActionDock';
+import { AppSidebar } from './AppSidebar';
+import { KeyboardShortcutsProvider } from './KeyboardShortcuts';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
+import { useIsWideLayout } from '@/src/theme/layout';
 
 const OverlayContext = createContext<{
   setOverlay: (id: string, content: React.ReactNode) => void;
@@ -25,6 +29,10 @@ export const useDockMenuAnchor = () => useContext(DockMenuAnchorContext);
 
 /** Keeps navigation chrome mounted while screens change. */
 export function AppChrome({ children }: { children: React.ReactNode }) {
+  const isWide = useIsWideLayout();
+  // The sidebar navigates between a profile's sections, so it waits for one.
+  const { activePatient } = useActivePatient();
+  const showSidebar = isWide && Boolean(activePatient);
   const [overlays, setOverlays] = useState<Record<string, React.ReactNode>>({});
   const [dock, setActiveDock] = useState<{
     id: string;
@@ -64,23 +72,40 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
     [setOverlay, removeOverlay, setDock, removeDock]
   );
 
+  // Menus and the dock centre on the content beside the sidebar.
+  const overlayLayer = (
+    <>
+      {Object.entries(overlays).map(([id, content]) => (
+        <React.Fragment key={id}>{content}</React.Fragment>
+      ))}
+      <ActionDock actions={dock?.actions ?? []} enabled={dock?.active} />
+    </>
+  );
+
   return (
     <OverlayContext.Provider value={context}>
-      <DockMenuAnchorContext.Provider value={menuAnchor}>
-        <KeyboardAvoidingView
-          style={styles.container}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.container}>
-            <AppHeader />
-            <View style={styles.container}>{children}</View>
-            {Object.entries(overlays).map(([id, content]) => (
-              <React.Fragment key={id}>{content}</React.Fragment>
-            ))}
-            <ActionDock actions={dock?.actions ?? []} enabled={dock?.active} />
-          </View>
-        </KeyboardAvoidingView>
-      </DockMenuAnchorContext.Provider>
+      <KeyboardShortcutsProvider enabled={showSidebar}>
+        <DockMenuAnchorContext.Provider value={menuAnchor}>
+          <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            {/* The screens keep their place in the tree in both layouts, so
+              resizing the window never remounts them. */}
+            <View style={styles.container}>
+              {!showSidebar && <AppHeader />}
+              <View style={styles.main}>
+                {showSidebar && <AppSidebar />}
+                <View style={styles.container}>
+                  {children}
+                  {showSidebar && overlayLayer}
+                </View>
+              </View>
+              {!showSidebar && overlayLayer}
+            </View>
+          </KeyboardAvoidingView>
+        </DockMenuAnchorContext.Provider>
+      </KeyboardShortcutsProvider>
     </OverlayContext.Provider>
   );
 }
@@ -116,4 +141,5 @@ export function AppOverlay({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.light.background },
+  main: { flex: 1, flexDirection: 'row' },
 });

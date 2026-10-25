@@ -8,7 +8,7 @@ import { ResourceActionDock } from './ResourceActionDock';
 import { ResourceSkeleton } from './ResourceSkeleton';
 import { ResourceMetaLine, type ResourceMeta } from './ResourceSection';
 import { COLORS } from '@/src/theme/colors';
-import { CONTENT_COLUMN } from '@/src/theme/layout';
+import { CONTENT_COLUMN, WIDE_MAX_WIDTH } from '@/src/theme/layout';
 
 interface ResourceViewLayoutProps {
   testID: string;
@@ -21,6 +21,8 @@ interface ResourceViewLayoutProps {
   children?: React.ReactNode;
   actions?: React.ReactNode;
   modal?: React.ReactNode;
+  /** Uses the wider desktop column for side-by-side layouts. */
+  wide?: boolean;
 }
 
 /** Shared navigation and compact page layout for resource detail screens. */
@@ -34,6 +36,7 @@ export function ResourceViewLayout({
   children,
   actions,
   modal,
+  wide = false,
 }: ResourceViewLayoutProps) {
   const insets = useSafeAreaInsets();
 
@@ -60,6 +63,7 @@ export function ResourceViewLayout({
               style={styles.scroll}
               contentContainerStyle={[
                 styles.content,
+                wide && { maxWidth: WIDE_MAX_WIDTH },
                 { paddingBottom: insets.bottom + 132 },
               ]}
             >

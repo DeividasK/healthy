@@ -5,6 +5,8 @@ import {
   seedTestCondition,
   openRoute,
   showAllTimelineSteps,
+  getContentCenterX,
+  getContentColumn,
 } from '@/src/features/testing/testStorage';
 
 test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
@@ -242,7 +244,9 @@ test('edits verification independently and roundtrips source and standard catego
   await expect
     .poll(async () => {
       const save = (await dock.getByTestId('save-button').boundingBox())!;
-      return Math.abs(save.x + save.width / 2 - page.viewportSize()!.width / 2);
+      return Math.abs(
+        save.x + save.width / 2 - (await getContentCenterX(page))
+      );
     })
     .toBeLessThan(1);
   await expect
@@ -251,7 +255,7 @@ test('edits verification independently and roundtrips source and standard catego
         .getByTestId('action-dock-background')
         .boundingBox())!;
       return Math.abs(
-        island.x + island.width / 2 - page.viewportSize()!.width / 2
+        island.x + island.width / 2 - (await getContentCenterX(page))
       );
     })
     .toBeLessThan(1);
@@ -295,13 +299,13 @@ test.describe('Condition add menu motion', () => {
     const view = page.getByTestId('condition-view');
     const addButton = page.getByTestId('condition-add-button');
     const menu = page.getByTestId('condition-add-menu');
-    const viewportWidth = page.viewportSize()!.width;
     await expect(view.getByTestId('condition-title')).toBeVisible();
+    const column = await getContentColumn(page);
     const conditionHeading = await view
       .getByTestId('condition-title')
       .boundingBox();
-    expect(conditionHeading!.x).toBeCloseTo(20);
-    expect(conditionHeading!.width).toBeCloseTo(viewportWidth - 40);
+    expect(conditionHeading!.x).toBeCloseTo(column.x + 20);
+    expect(conditionHeading!.width).toBeCloseTo(column.width - 40);
 
     await addButton.click();
     await expect(menu).toBeVisible();
@@ -415,11 +419,11 @@ test.describe('Condition add menu motion', () => {
     );
     // The row reaches the screen edge, after its timeline node at the margin
     const rowBox = (await consultationRow.boundingBox())!;
-    expect(rowBox.x + rowBox.width).toBeCloseTo(viewportWidth);
+    expect(rowBox.x + rowBox.width).toBeCloseTo(column.x + column.width);
     const nodeBox = (await view
       .getByTestId(/^condition-timeline-item-consultation-.*-tone-done$/)
       .boundingBox())!;
-    expect(nodeBox.x).toBeCloseTo(20);
+    expect(nodeBox.x).toBeCloseTo(column.x + 20);
     // The whole row opens the consultation
     await consultationRow.getByText('Linked Consultation').click();
     const consultationView = page.getByTestId('consultation-view');
@@ -429,11 +433,11 @@ test.describe('Condition add menu motion', () => {
     const consultationHeading = await consultationView
       .getByTestId('consultation-title')
       .boundingBox();
-    expect(consultationHeading!.x).toBeCloseTo(20);
-    expect(consultationHeading!.width).toBeCloseTo(viewportWidth - 40);
+    expect(consultationHeading!.x).toBeCloseTo(column.x + 20);
+    expect(consultationHeading!.width).toBeCloseTo(column.width - 40);
     await page.getByTestId('back-button').click();
 
-    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await page.getByTestId('app-home-button').click();
     await expect(page).toHaveURL(/.*(\/|#)$/);
     // Linked consultations are listed on the homepage too.
     await expect(page.getByText('Linked Consultation')).toBeVisible();

@@ -5,9 +5,13 @@ import {
   seedTestReport,
   seedTestCondition,
   openRoute,
+  useSingleColumnLayout,
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
+  // The single-column summary; desktop's list beside the detail is tested
+  // under 'Desktop' below.
+  await useSingleColumnLayout(page);
   await page.clock.setFixedTime(new Date('2026-10-14T10:00:00Z'));
   await seedTestPatient(page, { id: 'summary-patient-a' });
 });

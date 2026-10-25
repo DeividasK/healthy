@@ -10,14 +10,18 @@ import { useRouter, usePathname } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { useActivePatient } from './ActivePatientContext';
 import { getPatientInitials } from './patientService';
+import { getPatientDisplayName } from './patientNames';
 import { PatientAvatar } from './PatientAvatar';
 import { getPatientPhotoUri } from './patientPhoto';
 import { COLORS } from '@/src/theme/colors';
 
 export function ProfileHeaderButton({
   style,
+  showName = false,
 }: {
   style?: StyleProp<ViewStyle>;
+  /** Shows the profile's name beside the avatar (the desktop sidebar). */
+  showName?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,6 +52,11 @@ export function ProfileHeaderButton({
           <User size={16} color={COLORS.light.primary} />
         )}
       </PatientAvatar>
+      {showName && (
+        <Text style={styles.name} numberOfLines={1}>
+          {getPatientDisplayName(activePatient)}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -63,6 +72,12 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.card,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  name: {
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.light.foreground,
   },
   initialsText: {
     fontSize: 11,
