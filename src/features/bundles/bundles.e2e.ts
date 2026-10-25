@@ -195,6 +195,19 @@ test.describe('Treatment bundles', () => {
       '1 of 2 taken'
     );
 
+    // Moving between days, the bundle starts closed, even answered in part.
+    await page.getByTestId('actions-previous-day').click();
+    await page.getByTestId('actions-next-day').click();
+    await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
+      '1 of 2 taken'
+    );
+    await expect(page.getByTestId(`bundle-log-members-${key}`)).toHaveCount(0);
+    await expect(page.getByTestId(`bundle-log-toggle-${key}`)).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    await page.getByTestId(`bundle-log-toggle-${key}`).click();
+
     // Bundle ✓ replaces every answer; pressing it again clears them.
     await takenAll.click();
     await expect(

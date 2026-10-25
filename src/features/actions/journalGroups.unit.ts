@@ -66,34 +66,43 @@ test('rows group by part of the day, in clock order, any time last', () => {
     DEFAULT_TIMES_OF_DAY
   );
   expect(groups.map((group) => group.label)).toEqual([
+    '07:30',
     'Morning',
     'Evening',
     'Any time',
   ]);
-  // Within a part of the day, rows come by clock time.
+  // An exact time has a group of its own, here before Morning (08:00).
   expect(describe(groups)).toEqual({
-    MORN: ['d-07:30', 'c-MORN'],
+    '07:30': ['d-07:30'],
+    MORN: ['c-MORN'],
     EVE: ['b-EVE'],
     any: ['a-any', 'e-MORN+EVE', 'f-C'],
   });
 });
 
-test('exact times join the nearest part of the day from the settings', () => {
+test('each exact time is a group of its own, in clock order', () => {
   const groups = groupJournalRows(
     [
       row('a', '10:00'),
-      row('b', '13:31'),
-      row('c', '20:00'),
+      row('b', 'NOON'),
+      row('c', '13:00'),
       row('d', '03:00'),
+      row('e', '10:00'),
     ],
     { ...DEFAULT_TIMES_OF_DAY, NOON: '13:00' }
   );
-  // 10:00 is as near Morning (08:00) as Noon would be at 12:00, but Noon is
-  // at 13:00; ties go to the earlier part.
+  // A part of the day comes before an exact time at the same minute.
+  expect(groups.map((group) => group.label)).toEqual([
+    '03:00',
+    '10:00',
+    'Noon',
+    '13:00',
+  ]);
   expect(describe(groups)).toEqual({
-    MORN: ['d-03:00', 'a-10:00'],
-    NOON: ['b-13:31'],
-    EVE: ['c-20:00'],
+    '03:00': ['d-03:00'],
+    '10:00': ['a-10:00', 'e-10:00'],
+    NOON: ['b-NOON'],
+    '13:00': ['c-13:00'],
   });
 });
 
@@ -163,4 +172,25 @@ test('a move applies to the rows grouped next time', () => {
   expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, order))).toEqual(
     { MORN: ['b-MORN', 'a-MORN'], EVE: ['c-EVE'] }
   );
+});
+
+test('an exact time keeps the order saved by part of the day until it has its own', () => {
+  const rows = [row('a', '07:30'), row('b', '07:30')];
+  const saved = { MORN: ['MedicationRequest/b', 'MedicationRequest/a'] };
+  expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, saved))).toEqual(
+    { '07:30': ['b-07:30', 'a-07:30'] }
+  );
+  // Only the part the time was grouped with counts: 12:30 was Noon's.
+  const both = {
+    MORN: ['MedicationRequest/a', 'MedicationRequest/b'],
+    NOON: ['MedicationRequest/b', 'MedicationRequest/a'],
+  };
+  const noon = [row('a', '12:30'), row('b', '12:30')];
+  expect(describe(groupJournalRows(noon, DEFAULT_TIMES_OF_DAY, both))).toEqual({
+    '12:30': ['b-12:30', 'a-12:30'],
+  });
+  const own = { ...saved, '07:30': ['MedicationRequest/a'] };
+  expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, own))).toEqual({
+    '07:30': ['a-07:30', 'b-07:30'],
+  });
 });

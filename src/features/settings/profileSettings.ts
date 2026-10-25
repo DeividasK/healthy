@@ -4,11 +4,13 @@ import { getWhenLabel } from '@/src/features/treatments/regimen';
 export type PartOfDay = 'MORN' | 'NOON' | 'AFT' | 'EVE' | 'HS';
 
 /**
- * The journal's order within each part of the day (or `any`): resource keys
- * (`MedicationRequest/<id>`, `ServiceRequest/<id>`,
- * `RequestOrchestration/<id>`), first on top.
+ * The journal's order within each part of the day (or `any`, or a clock time
+ * HH:mm before the first part): resource keys (`MedicationRequest/<id>`,
+ * `ServiceRequest/<id>`, `RequestOrchestration/<id>`), first on top.
  */
-export type JournalOrder = Partial<Record<PartOfDay | 'any', string[]>>;
+export type JournalOrder = Partial<
+  Record<PartOfDay | 'any' | `${string}:${string}`, string[]>
+>;
 
 /**
  * A profile's settings. App infrastructure, not a FHIR resource: synced as
@@ -51,12 +53,8 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
     !Array.isArray(storedOrder)
       ? { ...storedOrder }
       : {};
-  for (const code of [
-    ...PARTS_OF_DAY.map((part) => part.code),
-    'any',
-  ] as const) {
+  for (const code of Object.keys(journalOrder) as (keyof JournalOrder)[]) {
     const keys = journalOrder[code];
-    if (keys === undefined) continue;
     if (Array.isArray(keys))
       journalOrder[code] = keys.filter((key) => typeof key === 'string');
     else delete journalOrder[code];

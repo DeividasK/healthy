@@ -554,20 +554,31 @@ test.describe('My actions: journal organisation', () => {
         treatment('org-magnesium', 'Magnesium', 'EVE'),
         treatment('org-vit-d', 'Vitamin D', 'MORN'),
         treatment('org-zinc', 'Zinc', '07:30'),
+        treatment('org-b12', 'Vitamin B12', 'MORN'),
         treatment('org-cream', 'Hydrocortisone cream'),
       ],
     });
     await openRoute(page, '/journal');
 
-    // Parts of the day in clock order; an exact time joins the nearest one,
-    // and treatments without a time come last.
+    // Parts of the day and exact times in clock order; treatments without
+    // a time come last.
     const sections = page.locator('[data-testid^="actions-group-"]');
-    await expect(sections).toHaveCount(3);
+    await expect(sections).toHaveCount(4);
     expect(
       await sections.evaluateAll((all) =>
         all.map((section) => section.getAttribute('data-testid'))
       )
-    ).toEqual(['actions-group-MORN', 'actions-group-EVE', 'actions-group-any']);
+    ).toEqual([
+      'actions-group-07:30',
+      'actions-group-MORN',
+      'actions-group-EVE',
+      'actions-group-any',
+    ]);
+    const atTime = page.getByTestId('actions-group-07:30');
+    await expect(atTime.getByRole('heading')).toHaveText('07:30');
+    await expect(
+      atTime.getByTestId('treatment-log-row-org-zinc-0')
+    ).toBeVisible();
     const morning = page.getByTestId('actions-group-MORN');
     await expect(morning.getByRole('heading')).toHaveText('Morning');
     await expect(page.getByTestId('actions-group-any')).toContainText(
@@ -583,18 +594,17 @@ test.describe('My actions: journal organisation', () => {
         .getByTestId('actions-group-any')
         .getByTestId('treatment-log-row-org-cream')
     ).toBeVisible();
-    // Within a part of the day, earlier times come first.
     const initial = await rowIds(morning);
     expect(initial).toHaveLength(3);
-    expect(initial[0]).toBe('treatment-log-row-org-zinc-0');
     await checkA11y(page);
 
     // Reordering swaps answers for move buttons, within each part of the day.
     await page.getByTestId('actions-reorder-button').click();
-    await expect(
-      page.getByTestId('treatment-log-taken-org-zinc-0')
-    ).toHaveCount(0);
-    await expect(page.getByTestId('journal-move-up-org-zinc-0')).toBeDisabled();
+    await expect(page.getByTestId('treatment-log-taken-org-b12-0')).toHaveCount(
+      0
+    );
+    const first = initial[0].replace('treatment-log-row-', '');
+    await expect(page.getByTestId(`journal-move-up-${first}`)).toBeDisabled();
     await expect(
       page.getByTestId('journal-move-down-org-magnesium-0')
     ).toBeDisabled();
@@ -607,7 +617,7 @@ test.describe('My actions: journal organisation', () => {
     await checkA11y(page);
     await page.getByTestId('actions-reorder-done-button').click();
     await expect(
-      page.getByTestId('treatment-log-taken-org-zinc-0')
+      page.getByTestId('treatment-log-taken-org-b12-0')
     ).toBeVisible();
 
     // The order is kept in the profile's settings, for every day.

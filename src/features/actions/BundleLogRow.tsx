@@ -25,8 +25,8 @@ import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 /**
  * One time of a bundle in the journal: its buttons answer every dose it
  * groups. The chevron shows the doses, each with its own buttons; the row
- * opens the bundle. Open while answers are mixed, until toggled; once every
- * dose is answered both ways, both buttons are tinted. While the
+ * opens the bundle. Closed on every day until toggled; once every dose is
+ * answered both ways, both buttons are tinted. While the
  * journal is reordered, move buttons replace the chevron and answers, and
  * the doses stay hidden.
  */
@@ -50,13 +50,13 @@ export function BundleLogRow({
   onOpen: () => void;
   onOpenTreatment: (item: ActionItem) => void;
 }) {
-  const [toggled, setToggled] = useState<boolean | null>(null);
+  const [isToggled, setToggled] = useState(false);
   const title = getBundleTitle(row.bundle);
   const answer = getBundleAnswer(row.items);
   const answered = row.items.filter((item) => item.answer);
   const taken = row.items.filter((item) => item.answer === 'taken').length;
   const isMixed = answered.length > 0 && !answer;
-  const isOpen = !reorder && (toggled ?? isMixed);
+  const isOpen = !reorder && isToggled;
   const treatmentCount = new Set(row.items.map((item) => item.treatment.id))
     .size;
   const testID = (name: string) =>

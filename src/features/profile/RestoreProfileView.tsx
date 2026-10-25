@@ -53,6 +53,8 @@ export function RestoreProfileView() {
   // A file restore rewrites records the whole app reads, so nothing else
   // can be used, not even Escape or back, until it finishes.
   const isRestoringFile = actionLoading === 'file';
+  // Restoring chosen profiles keeps the picker open with its buttons locked.
+  const isRestoringSelected = actionLoading === 'restoring-selected';
   useDismissKey(ignoreDismiss, isRestoringFile);
   // Arriving right after the recovery phrase was entered: choose profiles.
   const { pick } = useLocalSearchParams<{ pick?: string }>();
@@ -172,7 +174,7 @@ export function RestoreProfileView() {
   };
 
   const handleRestoreSelectedRemotePatients = async () => {
-    if (selectedPatientIds.length === 0) return;
+    if (selectedPatientIds.length === 0 || isRestoringSelected) return;
     setActionLoading('restoring-selected');
     try {
       for (const patientId of selectedPatientIds) {
@@ -298,7 +300,7 @@ export function RestoreProfileView() {
             testID="restore-from-file"
           />
         </View>
-        {actionLoading !== null && !isRestoringFile && (
+        {actionLoading !== null && !isRestoringFile && !isRestoringSelected && (
           <ActivityIndicator
             style={styles.busy}
             color={COLORS.light.primary}
@@ -329,10 +331,16 @@ export function RestoreProfileView() {
         visible={showPickerModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowPickerModal(false)}
+        onRequestClose={
+          isRestoringSelected ? ignoreDismiss : () => setShowPickerModal(false)
+        }
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} testID="google-profile-picker-modal">
+          <View
+            style={styles.modalCard}
+            testID="google-profile-picker-modal"
+            accessibilityState={{ busy: isRestoringSelected }}
+          >
             <Text style={styles.modalTitle}>Select Profiles to Restore</Text>
             <Text style={styles.modalSubtitle}>
               Choose the profile(s) you wish to restore and sync to this device:
@@ -343,6 +351,8 @@ export function RestoreProfileView() {
                 <TouchableOpacity
                   testID="toggle-select-all-profiles-button"
                   onPress={toggleSelectAll}
+                  disabled={isRestoringSelected}
+                  style={isRestoringSelected && styles.buttonDisabled}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.selectAllText}>
@@ -368,11 +378,16 @@ export function RestoreProfileView() {
                     style={[
                       styles.remoteProfileItem,
                       isSelected && styles.remoteProfileItemSelected,
+                      isRestoringSelected && styles.buttonDisabled,
                     ]}
                     onPress={() => toggleSelectPatient(pId)}
+                    disabled={isRestoringSelected}
                     activeOpacity={0.7}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isSelected }}
+                    accessibilityState={{
+                      checked: isSelected,
+                      disabled: isRestoringSelected,
+                    }}
                   >
                     <View style={styles.remoteProfileLeft}>
                       <View style={styles.remoteAvatar}>
@@ -408,8 +423,13 @@ export function RestoreProfileView() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 testID="cancel-remote-picker-button"
-                style={styles.cancelModalButton}
+                style={[
+                  styles.cancelModalButton,
+                  isRestoringSelected && styles.buttonDisabled,
+                ]}
                 onPress={() => setShowPickerModal(false)}
+                disabled={isRestoringSelected}
+                accessibilityState={{ disabled: isRestoringSelected }}
                 activeOpacity={0.7}
               >
                 <Text style={styles.cancelModalButtonText}>Cancel</Text>
@@ -419,18 +439,35 @@ export function RestoreProfileView() {
                 testID="restore-selected-profiles-button"
                 style={[
                   styles.restoreSelectedButton,
-                  selectedPatientIds.length === 0 && styles.buttonDisabled,
+                  (selectedPatientIds.length === 0 || isRestoringSelected) &&
+                    styles.buttonDisabled,
                 ]}
-                disabled={selectedPatientIds.length === 0}
+                disabled={
+                  selectedPatientIds.length === 0 || isRestoringSelected
+                }
                 onPress={handleRestoreSelectedRemotePatients}
+                accessibilityState={{
+                  disabled:
+                    selectedPatientIds.length === 0 || isRestoringSelected,
+                  busy: isRestoringSelected,
+                }}
                 activeOpacity={0.7}
               >
+                {isRestoringSelected && (
+                  <ActivityIndicator
+                    size="small"
+                    color={COLORS.light.primaryForeground}
+                    testID="restore-selected-busy"
+                  />
+                )}
                 <Text style={styles.restoreSelectedButtonText}>
-                  {selectedPatientIds.length === 0
-                    ? 'Select Profiles'
-                    : selectedPatientIds.length === 1
-                      ? 'Restore Profile'
-                      : `Restore (${selectedPatientIds.length}) Profiles`}
+                  {isRestoringSelected
+                    ? 'Restoring…'
+                    : selectedPatientIds.length === 0
+                      ? 'Select Profiles'
+                      : selectedPatientIds.length === 1
+                        ? 'Restore Profile'
+                        : `Restore (${selectedPatientIds.length}) Profiles`}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -627,6 +664,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   restoreSelectedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
