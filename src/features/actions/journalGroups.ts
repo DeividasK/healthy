@@ -156,7 +156,14 @@ export function groupJournalRows(
         }))
         .sort((a, b) => a.minutes - b.minutes || a.index - b.index)
         .map(({ row }) => row);
-      return [{ id, label, rows: applyJournalOrder(byTime, journalOrder[id]) }];
+      // Until an exact time has an order of its own, its rows keep the
+      // order saved when they were grouped by part of the day.
+      const order =
+        journalOrder[id] ??
+        (id.includes(':')
+          ? PARTS_OF_DAY.flatMap((part) => journalOrder[part.code] ?? [])
+          : undefined);
+      return [{ id, label, rows: applyJournalOrder(byTime, order) }];
     }
   );
 }

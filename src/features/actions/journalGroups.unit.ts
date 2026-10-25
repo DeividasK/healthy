@@ -173,3 +173,15 @@ test('a move applies to the rows grouped next time', () => {
     { MORN: ['b-MORN', 'a-MORN'], EVE: ['c-EVE'] }
   );
 });
+
+test('an exact time keeps the order saved by part of the day until it has its own', () => {
+  const rows = [row('a', '07:30'), row('b', '07:30')];
+  const saved = { MORN: ['MedicationRequest/b', 'MedicationRequest/a'] };
+  expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, saved))).toEqual(
+    { '07:30': ['b-07:30', 'a-07:30'] }
+  );
+  const own = { ...saved, '07:30': ['MedicationRequest/a'] };
+  expect(describe(groupJournalRows(rows, DEFAULT_TIMES_OF_DAY, own))).toEqual({
+    '07:30': ['a-07:30', 'b-07:30'],
+  });
+});

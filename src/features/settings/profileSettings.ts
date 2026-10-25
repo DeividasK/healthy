@@ -53,12 +53,8 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
     !Array.isArray(storedOrder)
       ? { ...storedOrder }
       : {};
-  for (const code of [
-    ...PARTS_OF_DAY.map((part) => part.code),
-    'any',
-  ] as const) {
+  for (const code of Object.keys(journalOrder) as (keyof JournalOrder)[]) {
     const keys = journalOrder[code];
-    if (keys === undefined) continue;
     if (Array.isArray(keys))
       journalOrder[code] = keys.filter((key) => typeof key === 'string');
     else delete journalOrder[code];

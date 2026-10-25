@@ -352,6 +352,7 @@ export function RestoreProfileView() {
                   testID="toggle-select-all-profiles-button"
                   onPress={toggleSelectAll}
                   disabled={isRestoringSelected}
+                  style={isRestoringSelected && styles.buttonDisabled}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.selectAllText}>
@@ -377,6 +378,7 @@ export function RestoreProfileView() {
                     style={[
                       styles.remoteProfileItem,
                       isSelected && styles.remoteProfileItemSelected,
+                      isRestoringSelected && styles.buttonDisabled,
                     ]}
                     onPress={() => toggleSelectPatient(pId)}
                     disabled={isRestoringSelected}
