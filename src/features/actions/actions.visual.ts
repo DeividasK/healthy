@@ -152,7 +152,7 @@ test.describe('My actions - Visual Regression', () => {
       memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
     });
     await page.goto('/journal');
-    // Answers are mixed today, so the bundle opens on its treatments.
+    await page.getByTestId(`bundle-log-toggle-${bundle.id}:0`).click();
     await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
     await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
   });
