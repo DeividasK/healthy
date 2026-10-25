@@ -60,6 +60,7 @@ import {
 } from '@/src/database/dbEvents';
 import { LabsSummary } from './LabsSummary';
 import { StartYourRecord } from './StartYourRecord';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 const blurActiveElement = () => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -637,6 +638,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollListContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 132,
   },

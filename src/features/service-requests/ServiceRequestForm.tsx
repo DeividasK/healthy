@@ -66,6 +66,7 @@ import {
   parseServiceRequestAIReply,
   type ImportedServiceRequest,
 } from './serviceRequestAIImport';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** Fields that only apply to a request that repeats. */
 const SCHEDULE_DETAILS = ['periodMax', 'count', 'duration', 'timeOfDay'];
@@ -703,6 +704,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 120,
   },

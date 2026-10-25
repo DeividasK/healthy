@@ -14,6 +14,7 @@ import { ResourceRow } from '@/src/components/ResourceSection';
 import { RowIconDisc } from '@/src/components/IconDisc';
 import { rise } from '@/src/features/onboarding/motion';
 import { COLORS } from '@/src/theme/colors';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 const STARTERS: {
   id: string;
@@ -121,11 +122,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 132,
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
   },
   title: {
     fontSize: 24,

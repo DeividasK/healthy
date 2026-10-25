@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useDelayedVisibility } from './LoadingView';
 import { COLORS } from '@/src/theme/colors';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** Row title widths, varied so the placeholder reads as a list. */
 const TITLE_WIDTHS: DimensionValue[] = ['62%', '48%', '70%', '55%'];
@@ -101,6 +102,7 @@ export function ResourceSkeleton({
 
 const styles = StyleSheet.create({
   container: {
+    ...CONTENT_COLUMN,
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 24,

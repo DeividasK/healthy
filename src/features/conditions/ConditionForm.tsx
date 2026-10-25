@@ -40,6 +40,7 @@ import { useOptionalFields } from '@/src/components/useOptionalFields';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { goBackOr } from '@/src/utils/navigation';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 export interface ConditionStatusOption {
   id: string;
@@ -560,6 +561,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
+    ...CONTENT_COLUMN,
     padding: 16,
     paddingBottom: 132,
   },

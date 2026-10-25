@@ -28,6 +28,7 @@ import { PatientInput } from './patientService';
 import { PatientAvatar } from './PatientAvatar';
 import { IconTextButton } from './IconTextButton';
 import { getPhotoUri, pickPatientPhoto } from './patientPhoto';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 type Gender = NonNullable<PatientInput['gender']>;
 
@@ -336,11 +337,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 132,
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
   },
   photoRow: {
     flexDirection: 'row',

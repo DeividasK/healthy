@@ -8,6 +8,7 @@ import { ResourceActionDock } from './ResourceActionDock';
 import { ResourceSkeleton } from './ResourceSkeleton';
 import { ResourceMetaLine, type ResourceMeta } from './ResourceSection';
 import { COLORS } from '@/src/theme/colors';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 interface ResourceViewLayoutProps {
   testID: string;
@@ -111,6 +112,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...CONTENT_COLUMN,
     paddingHorizontal: 20,
     paddingTop: 24,
   },

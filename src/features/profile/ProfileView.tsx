@@ -10,6 +10,7 @@ import { LoadingView } from '@/src/components/LoadingView';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { ProfileBackupRows } from './ProfileBackupRows';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 export function ProfileView() {
   const router = useRouter();
@@ -116,6 +117,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     paddingHorizontal: 20,
     paddingBottom: 132,
   },
