@@ -437,7 +437,8 @@ export function RestoreProfileView() {
                 testID="restore-selected-profiles-button"
                 style={[
                   styles.restoreSelectedButton,
-                  selectedPatientIds.length === 0 && styles.buttonDisabled,
+                  (selectedPatientIds.length === 0 || isRestoringSelected) &&
+                    styles.buttonDisabled,
                 ]}
                 disabled={
                   selectedPatientIds.length === 0 || isRestoringSelected
