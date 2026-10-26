@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestReport,
   seedTestCondition,
+  seedTestConsultation,
   openRoute,
 } from '@/src/features/testing/testStorage';
 
@@ -137,6 +138,33 @@ test('a biomarker page puts the chart and results beside the explanation', async
   const viewBox = (await biomarker.boundingBox())!;
   expect(viewBox.width).toBeGreaterThan(800);
   expect(latestBox.x).toBeLessThan(viewBox.x + viewBox.width / 2);
+});
+
+test('a condition puts its timeline beside the details', async ({ page }) => {
+  await seedTestCondition(page, {
+    id: 'desktop-timeline-condition',
+    title: 'Asthma',
+    notes: 'Worse in spring.',
+  });
+  await openRoute(page, '/condition/desktop-timeline-condition');
+  const view = page.getByTestId('condition-view');
+  const notes = view.getByTestId('condition-notes');
+  await expect(notes).toBeVisible();
+  // Without a timeline the details keep one column.
+  await expect(view.getByTestId('condition-timeline')).toHaveCount(0);
+
+  await seedTestConsultation(page, {
+    title: 'Allergy review',
+    date: '2026-10-01',
+    conditionIds: ['desktop-timeline-condition'],
+  });
+  await openRoute(page, '/condition/desktop-timeline-condition');
+  const timeline = view.getByTestId('condition-timeline');
+  await expect(timeline).toBeVisible();
+  const notesBox = (await notes.boundingBox())!;
+  const timelineBox = (await timeline.boundingBox())!;
+  expect(timelineBox.x).toBeGreaterThan(notesBox.x + notesBox.width);
+  expect(timelineBox.y).toBeLessThan(notesBox.y + notesBox.height);
 });
 
 test('keyboard shortcuts move between sections and open the shortcut list', async ({

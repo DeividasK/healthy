@@ -7,6 +7,7 @@ import {
   showAllTimelineSteps,
   getContentCenterX,
   getContentColumn,
+  useSingleColumnLayout,
 } from '@/src/features/testing/testStorage';
 
 test('ordinary condition edits preserve diagnosis coding and unexposed FHIR metadata', async ({
@@ -286,6 +287,9 @@ test.describe('Condition add menu motion', () => {
   // Samples animation frames, so it runs with full motion.
   test.use({ reducedMotion: 'no-preference' });
   test.beforeEach(async ({ page }) => {
+    // Rows reaching the page edge are a single-column layout; desktop's
+    // timeline column is tested in desktop.e2e.ts.
+    await useSingleColumnLayout(page);
     await seedTestPatient(page);
   });
 
