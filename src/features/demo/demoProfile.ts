@@ -404,13 +404,13 @@ async function addDemoRecords(patientId: string): Promise<void> {
 
   await saveBundle({
     patientId,
-    title: 'Morning stack',
+    title: 'Supplement stack',
     times: [{ kind: 'when', code: 'MORN' }],
     memberIds: [vitaminD.id!, omega3.id!],
   });
   await saveBundle({
     patientId,
-    title: 'Evening medication',
+    title: 'Cholesterol medication',
     times: [{ kind: 'when', code: 'EVE' }],
     memberIds: [atorvastatin.id!, ezetimibe.id!],
   });
@@ -464,7 +464,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
     instructions: 'One session in the chamber.',
   });
 
-  // An evening bundle with a treatment and an activity.
+  // A bundle with a treatment and an activity.
   const stretching = await createOrUpdateServiceRequest({
     patientId,
     title: 'Stretching',
@@ -477,7 +477,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
   });
   await saveBundle({
     patientId,
-    title: 'Evening wind-down',
+    title: 'Wind-down',
     times: [{ kind: 'when', code: 'EVE' }],
     memberIds: [magnesium.id!],
     activityIds: [stretching.id!],

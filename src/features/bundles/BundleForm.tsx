@@ -159,7 +159,7 @@ export function BundleForm({
               testID: 'bundle-title-input',
               autoFocus: !isEditing,
               accessibilityLabel: 'Bundle Name',
-              placeholder: 'e.g. Morning supplements',
+              placeholder: 'e.g. Daily supplements',
               value: title,
               onChangeText: (text) => {
                 setTitle(text);

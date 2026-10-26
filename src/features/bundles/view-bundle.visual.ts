@@ -26,7 +26,7 @@ test.describe('View Bundle - Visual Regression', () => {
       ],
     });
     const bundle = await seedTestBundle(page, {
-      title: 'Morning supplements',
+      title: 'Daily supplements',
       times: ['MORN', '20:00'],
       memberIds: ['visual-bundle-vit-d', 'visual-bundle-omega'],
     });

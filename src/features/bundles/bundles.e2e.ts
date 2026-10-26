@@ -156,7 +156,7 @@ test.describe('Treatment bundles', () => {
       ],
     });
     const bundle = await seedTestBundle(page, {
-      title: 'Morning supplements',
+      title: 'Daily supplements',
       times: ['MORN'],
       memberIds: ['j-vit-d', 'j-omega'],
     });
@@ -164,7 +164,7 @@ test.describe('Treatment bundles', () => {
     await openRoute(page, '/journal');
 
     const row = page.getByTestId(`bundle-log-row-${key}`);
-    await expect(row).toContainText('Morning supplements');
+    await expect(row).toContainText('Daily supplements');
     await expect(page.getByTestId(`bundle-log-count-${key}`)).toHaveText(
       '2 treatments'
     );
@@ -223,7 +223,7 @@ test.describe('Treatment bundles', () => {
     // The row opens the bundle.
     await row.getByRole('button', { name: /View bundle/ }).click();
     await expect(page.getByTestId('bundle-title')).toHaveText(
-      'Morning supplements'
+      'Daily supplements'
     );
   });
 
