@@ -5,6 +5,7 @@ import {
   seedTestPatient,
   seedTestResources,
   openRoute,
+  useSingleColumnLayout,
 } from '@/src/features/testing/testStorage';
 
 const TREATMENTS = {
@@ -14,6 +15,7 @@ const TREATMENTS = {
   'not-started': 'list-ibuprofen',
 };
 
+// Listed newest first: Vitamin D, Magnesium, Doxycycline, Ibuprofen.
 test.beforeEach(async ({ page }) => {
   await seedTestPatient(page);
   await seedTestResources(page, {
@@ -21,18 +23,18 @@ test.beforeEach(async ({ page }) => {
       {
         id: TREATMENTS.taking,
         title: 'Vitamin D',
-        authoredOn: '2026-01-01',
+        authoredOn: '2026-01-04',
         takingSince: '2026-01-05',
       },
       {
         id: TREATMENTS['on-hold'],
         title: 'Magnesium',
-        authoredOn: '2026-01-01',
+        authoredOn: '2026-01-03',
       },
       {
         id: TREATMENTS.stopped,
         title: 'Doxycycline',
-        authoredOn: '2026-01-01',
+        authoredOn: '2026-01-02',
       },
       {
         id: TREATMENTS['not-started'],
@@ -60,6 +62,7 @@ test.beforeEach(async ({ page }) => {
 test('lists every treatment and filters them by current usage', async ({
   page,
 }) => {
+  await useSingleColumnLayout(page);
   await openRoute(page, '/');
   await page.getByTestId('home-treatments-open').click();
   await expect(page).toHaveURL(/\/treatments$/);
@@ -136,5 +139,61 @@ test('lists every treatment and filters them by current usage', async ({
     await closeFilters();
     await expect(rows).toHaveCount(4);
     await expect(filterButton).toHaveAccessibleName('Filter treatments');
+  });
+});
+
+test('desktop shows the chosen treatment beside the list', async ({ page }) => {
+  await openRoute(page, '/treatments');
+  const view = page.getByTestId('treatments-view');
+  const row = (id: string) => view.getByTestId(`treatments-row-${id}`);
+  const title = view.getByTestId('treatment-title');
+
+  await test.step('starts with the first listed treatment', async () => {
+    await expect(title).toHaveText('Vitamin D');
+    await expect(row(TREATMENTS.taking)).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+  });
+
+  await test.step('rows and arrow keys choose a treatment in place', async () => {
+    await row(TREATMENTS.stopped).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/treatments\\?treatment=${TREATMENTS.stopped}$`)
+    );
+    await expect(title).toHaveText('Doxycycline');
+    await expect(row(TREATMENTS.stopped)).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    await expect(row(TREATMENTS.taking)).not.toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    await page.keyboard.press('ArrowDown');
+    await expect(title).toHaveText('Ibuprofen');
+    await page.keyboard.press('ArrowUp');
+    await expect(title).toHaveText('Doxycycline');
+    await checkA11y(page);
+  });
+
+  await test.step('a filter that hides it shows the first match', async () => {
+    await view.getByTestId('treatments-filter-button').click();
+    await page.getByTestId('treatments-filter-status-on-hold').click();
+    await page.getByTestId('treatments-filters-done').click();
+    await expect(title).toHaveText('Magnesium');
+    await view.getByTestId('treatments-filter-button').click();
+    await page.getByTestId('treatments-filters-reset').click();
+    await page.getByTestId('treatments-filters-done').click();
+  });
+
+  await test.step('deleting it stays on the list', async () => {
+    await row(TREATMENTS['not-started']).click();
+    await expect(title).toHaveText('Ibuprofen');
+    await page.getByTestId('delete-treatment-button').click();
+    await page.getByTestId('delete-modal-confirm-button').click();
+    await expect(page).toHaveURL(/\/treatments$/);
+    await expect(row(TREATMENTS['not-started'])).toHaveCount(0);
+    await expect(title).toHaveText('Vitamin D');
   });
 });

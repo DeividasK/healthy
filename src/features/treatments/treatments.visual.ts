@@ -4,10 +4,9 @@ import {
   seedTestPatient,
   seedTestResources,
 } from '@/src/features/testing/visualTest';
+import type { Page } from '@playwright/test';
 
-test('Treatments page - all treatments and filtered by status', async ({
-  page,
-}, testInfo) => {
+const seedTreatments = async (page: Page) => {
   await seedTestPatient(page);
   await seedTestResources(page, {
     conditions: [{ id: 'visual-deficiency', title: 'Vitamin D deficiency' }],
@@ -55,6 +54,12 @@ test('Treatments page - all treatments and filtered by status', async ({
       { treatmentId: 'visual-doxycycline', action: 'stop', date: '2026-07-16' },
     ],
   });
+};
+
+test('Treatments page - all treatments and filtered by status', async ({
+  page,
+}, testInfo) => {
+  await seedTreatments(page);
   await page.goto('/treatments');
   const view = page.getByTestId('treatments-view');
   await view.getByTestId('treatments-row-visual-ibuprofen').waitFor();
@@ -68,4 +73,15 @@ test('Treatments page - all treatments and filtered by status', async ({
     state: 'detached',
   });
   await takeSnapshot(page, 'Treatments - taking or on hold', testInfo);
+});
+
+test('Treatments page - desktop list beside the chosen treatment', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await seedTreatments(page);
+  await page.goto('/treatments?treatment=visual-vitamin-d');
+  await page.getByTestId('treatment-title').waitFor();
+  await page.getByTestId('treatments-row-visual-ibuprofen').waitFor();
+  await takeSnapshot(page, 'Treatments - desktop', testInfo);
 });

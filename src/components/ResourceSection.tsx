@@ -97,6 +97,11 @@ export interface ResourceRowAppearance {
   backgroundColor?: string;
   /** Fades the title, meta and note, e.g. for a cancelled step. */
   dimmed?: boolean;
+  /**
+   * The row whose details show beside its list (desktop): shaded like a
+   * selected biomarker row and marked `aria-current`.
+   */
+  selected?: boolean;
 }
 
 interface ResourceRowProps extends ResourceRowAppearance {
@@ -165,9 +170,11 @@ export function ResourceRow({
   accessibilityLabel,
   testID,
   leading,
-  backgroundColor,
+  backgroundColor: wash,
   dimmed = false,
+  selected = false,
 }: ResourceRowProps) {
+  const backgroundColor = selected ? COLORS.light.pillBackground : wash;
   if (onPress && accessory) {
     return (
       <View style={styles.row} testID={testID}>
@@ -235,6 +242,7 @@ export function ResourceRow({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      aria-current={selected || undefined}
       style={style}
       activeOpacity={0.6}
       onPress={onPress}

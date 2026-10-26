@@ -38,8 +38,17 @@ import {
   useTreatmentUsage,
 } from '@/src/features/actions/TreatmentUsageSection';
 
-export function ViewTreatmentView() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+export function ViewTreatmentView({
+  id: selectedId,
+  onDeleted,
+}: {
+  /** Shown beside the treatments list on desktop instead of the route's. */
+  id?: string;
+  /** Beside the list, deleting stays on it instead of returning home. */
+  onDeleted?: () => void;
+} = {}) {
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = selectedId ?? params.id;
   const { activePatientId, isLoading } = useActivePatient();
   if (isLoading)
     return <ResourceViewLayout testID="treatment-view" isLoading />;
@@ -48,6 +57,7 @@ export function ViewTreatmentView() {
       key={`${activePatientId}:${id}`}
       id={id}
       activePatientId={activePatientId}
+      onDeleted={onDeleted}
     />
   );
 }
@@ -55,9 +65,11 @@ export function ViewTreatmentView() {
 function TreatmentForPatient({
   id,
   activePatientId,
+  onDeleted,
 }: {
   id: string;
   activePatientId: string;
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
 
@@ -172,7 +184,8 @@ function TreatmentForPatient({
     try {
       await deleteTreatment(id, activePatientId);
       setShowDeleteModal(false);
-      router.dismissTo('/');
+      if (onDeleted) onDeleted();
+      else router.dismissTo('/');
     } catch (err) {
       console.error('Failed to delete treatment:', err);
       const message = 'Failed to delete. Please try again.';
