@@ -367,11 +367,17 @@ export async function refreshWithTokenService(
   return callTokenService('/refresh', { refresh_token: refreshToken });
 }
 
-/** Revokes a refresh token so a disconnected device can no longer use it. */
+/**
+ * Revokes a refresh token so a disconnected device can no longer use it.
+ * It goes through the token service because Google's revoke endpoint sends
+ * no CORS headers, so the app could not tell whether it worked.
+ */
 export async function revokeGoogleToken(token: string): Promise<void> {
-  await fetch('https://oauth2.googleapis.com/revoke', {
+  const res = await fetch(`${TOKEN_SERVICE_URL}/revoke`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ token }).toString(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
   });
+  if (!res.ok)
+    throw new Error(`Google token revocation failed (HTTP ${res.status})`);
 }

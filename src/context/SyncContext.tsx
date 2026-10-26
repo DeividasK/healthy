@@ -620,9 +620,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (options?.deleteCloudData && configRef.current)
         await withProvider((provider) => deleteCloudData(provider));
       else await forgetVaultKey();
+      // Revoked before the token is deleted. If that fails (e.g. offline)
+      // disconnecting still goes ahead: the deleted token can't be used here
+      // again, and it stays listed under the Google account's third-party
+      // access, where the user can remove it.
       const refreshToken = configRef.current?.refreshToken;
       if (refreshToken && hasGoogleTokenService())
-        revokeGoogleToken(refreshToken).catch((err) =>
+        await revokeGoogleToken(refreshToken).catch((err) =>
           console.warn('Failed to revoke the Google token:', err)
         );
       await updateConfig(null);

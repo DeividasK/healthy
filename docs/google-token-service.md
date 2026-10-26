@@ -9,6 +9,9 @@ the two requests that need it:
 - `POST /token` swaps the code from Google's sign-in popup (with its PKCE
   verifier) for an access token and a refresh token.
 - `POST /refresh` swaps a refresh token for a new access token.
+- `POST /revoke` revokes a refresh token when the user disconnects. Google's
+  revoke endpoint sends no CORS headers, so only the Worker can see whether
+  it worked.
 
 It stores nothing and only sees Google tokens, never health data. It only
 answers origins listed in `ALLOWED_ORIGINS` (`wrangler.toml`). It runs on

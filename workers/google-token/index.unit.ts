@@ -110,6 +110,23 @@ test('reports Google rate limiting as a retryable failure', async () => {
   }
 });
 
+test('revokes a token and reports whether Google accepted it', async () => {
+  const sent: { url: string; body: URLSearchParams }[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    sent.push({ url, body: new URLSearchParams(init.body as string) });
+    return new Response('{}', { status: 200 });
+  }) as typeof fetch;
+  try {
+    const res = await worker.fetch(post('/revoke', { token: 't' }), env);
+    expect(await res.json()).toEqual({ revoked: true });
+    expect(sent[0].url).toBe('https://oauth2.googleapis.com/revoke');
+    expect(Object.fromEntries(sent[0].body)).toEqual({ token: 't' });
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test('rejects malformed requests without calling Google', async () => {
   const google = mockGoogle(200, {});
   try {

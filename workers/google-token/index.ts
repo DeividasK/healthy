@@ -16,6 +16,7 @@ export interface Env {
 }
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
 function corsHeaders(origin: string): Record<string, string> {
   return {
@@ -63,6 +64,10 @@ function googleParams(
       redirect_uri: redirectUri,
     });
   }
+  if (path === '/revoke') {
+    const token = str('token');
+    return token ? new URLSearchParams({ token }) : null;
+  }
   if (path === '/refresh') {
     const refreshToken = str('refresh_token');
     if (!refreshToken) return null;
@@ -94,11 +99,15 @@ export default {
     const params = body && googleParams(pathname, body, env);
     if (!params) return json({ error: 'invalid_request' }, 400, origin);
 
-    const google = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
-    });
+    // Google's revoke endpoint has no CORS, so the app can't see its answer.
+    const google = await fetch(
+      pathname === '/revoke' ? GOOGLE_REVOKE_URL : GOOGLE_TOKEN_URL,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      }
+    );
     const data = (await google.json().catch(() => ({}))) as Record<
       string,
       unknown
@@ -110,6 +119,7 @@ export default {
         google.status >= 500 || google.status === 429 ? 502 : 400,
         origin
       );
+    if (pathname === '/revoke') return json({ revoked: true }, 200, origin);
     return json(
       {
         access_token: data.access_token,
