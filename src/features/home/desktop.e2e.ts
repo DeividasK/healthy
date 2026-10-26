@@ -12,7 +12,6 @@ import {
 // shortcuts; phones keep the header and one column.
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.clock.setFixedTime(new Date('2026-10-14T10:00:00Z'));
   await seedTestPatient(page, { id: 'desktop-patient' });
 });
 
@@ -114,6 +113,17 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
   await expect(
     page.getByTestId('labs-summary-view').getByTestId('biomarker-title')
   ).toHaveText('Hemoglobin (Hgb)');
+
+  // A lab result opened from the list keeps the arrow keys to itself.
+  await page
+    .getByTestId('lab-results-list')
+    .getByRole('button')
+    .first()
+    .click();
+  await expect(page).toHaveURL(/lab-result\//);
+  const labResultUrl = page.url();
+  await page.keyboard.press('ArrowUp');
+  await expect(page).toHaveURL(labResultUrl);
 });
 
 test('a biomarker page puts the chart and results beside the explanation', async ({
@@ -126,6 +136,7 @@ test('a biomarker page puts the chart and results beside the explanation', async
     .getByRole('button', { name: 'View biomarker: Hemoglobin' })
     .first()
     .click();
+  await expect(page).toHaveURL(/labs-summary\?.*biomarker=/);
   const url = new URL(page.url());
   const id = url.searchParams.get('biomarker');
   await openRoute(page, `/biomarker/${id}`);

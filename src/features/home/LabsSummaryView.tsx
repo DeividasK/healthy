@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import type { DiagnosticReportRecord } from '@/src/database/types';
@@ -8,7 +8,13 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { LabResultsSection } from '@/src/features/lab-results/LabResultsSection';
-import { LabsSummary, latestBiomarkers } from './LabsSummary';
+import {
+  LabsSummary,
+  latestBiomarkers,
+  PERIODS,
+  periodCutoff,
+} from './LabsSummary';
+import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
 import {
   BiomarkerSelectionContext,
   getBiomarkerRouteId,
@@ -23,33 +29,37 @@ import { WIDE_MAX_WIDTH, useIsWideLayout } from '@/src/theme/layout';
  * (web), choosing each biomarker they reach, unless a field has the keys.
  */
 function useListArrowKeys(enabled: boolean) {
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !enabled) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select')) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
-      const rows = [
-        ...document.querySelectorAll<HTMLElement>(
-          '#biomarker-list [aria-label^="View biomarker:"]'
-        ),
-      ];
-      if (rows.length === 0) return;
-      const current = rows.findIndex(
-        (row) => row.getAttribute('aria-current') === 'true'
-      );
-      const next = Math.min(
-        rows.length - 1,
-        Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1))
-      );
-      event.preventDefault();
-      rows[next].focus();
-      rows[next].click();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enabled]);
+  // Only while this screen is in front: the stack keeps it mounted beneath
+  // the screens opened from it.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'web' || !enabled) return;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('input, textarea, select')) return;
+        if (document.querySelector('[aria-modal="true"]')) return;
+        const rows = [
+          ...document.querySelectorAll<HTMLElement>(
+            '#biomarker-list [aria-label^="View biomarker:"]'
+          ),
+        ];
+        if (rows.length === 0) return;
+        const current = rows.findIndex(
+          (row) => row.getAttribute('aria-current') === 'true'
+        );
+        const next = Math.min(
+          rows.length - 1,
+          Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1))
+        );
+        event.preventDefault();
+        rows[next].focus();
+        rows[next].click();
+      };
+      window.addEventListener('keydown', onKeyDown);
+      return () => window.removeEventListener('keydown', onKeyDown);
+    }, [enabled])
+  );
 }
 
 /** The active patient's latest biomarker results for the chosen period, then every lab result. */
@@ -102,14 +112,21 @@ export function LabsSummaryView() {
     () => (isCurrentPatient && activePatientId ? data.reports : []),
     [isCurrentPatient, activePatientId, data.reports]
   );
+  // The list's own filters, so the default is a row the list shows.
+  const demographics = useRangeDemographics();
+  const months = PERIODS.find(({ id }) => id === period)?.months ?? 0;
   // Desktop: the list stays on the left and the chosen biomarker shows on
   // the right, starting with the first one out of range.
   const firstId = useMemo(() => {
-    const biomarkers = latestBiomarkers(reports);
+    const biomarkers = latestBiomarkers(
+      reports,
+      periodCutoff(months),
+      demographics
+    );
     const first =
       biomarkers.find(({ status }) => status === 'outOfRange') ?? biomarkers[0];
     return first && getBiomarkerRouteId(first.observation);
-  }, [reports]);
+  }, [reports, months, demographics]);
   const selectedId = biomarker ?? firstId;
   const selection = useMemo(
     () => ({

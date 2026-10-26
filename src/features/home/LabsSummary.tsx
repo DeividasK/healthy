@@ -28,7 +28,7 @@ import {
   type SummarySort,
 } from './labsSummarySorting';
 
-const PERIODS = [
+export const PERIODS = [
   { id: 'all', label: 'All time', months: 0 },
   { id: '120', label: '10 years', months: 120 },
   { id: '60', label: '5 years', months: 60 },
@@ -39,7 +39,7 @@ const PERIODS = [
 ];
 
 /** Calendar-month cutoff, clamped for months with fewer days. */
-function periodCutoff(months: number) {
+export function periodCutoff(months: number) {
   if (!months) return -Infinity;
   const cutoff = new Date();
   const day = cutoff.getDate();
