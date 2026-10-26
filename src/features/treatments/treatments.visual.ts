@@ -59,9 +59,13 @@ test('Treatments page - all treatments and filtered by status', async ({
   const view = page.getByTestId('treatments-view');
   await view.getByTestId('treatments-row-visual-ibuprofen').waitFor();
   await takeSnapshot(page, 'Treatments - all', testInfo);
-  await view.getByRole('combobox', { name: 'Status' }).selectOption('taking');
-  await view.getByTestId('treatments-row-visual-magnesium').waitFor({
+  await view.getByTestId('treatments-filter-button').click();
+  await page.getByTestId('treatments-filter-status-taking').click();
+  await page.getByTestId('treatments-filter-status-on-hold').click();
+  await takeSnapshot(page, 'Treatments - filters', testInfo);
+  await page.getByTestId('treatments-filters-done').click();
+  await view.getByTestId('treatments-row-visual-ibuprofen').waitFor({
     state: 'detached',
   });
-  await takeSnapshot(page, 'Treatments - taking', testInfo);
+  await takeSnapshot(page, 'Treatments - taking or on hold', testInfo);
 });

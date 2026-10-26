@@ -72,16 +72,39 @@ test('lists every treatment and filters them by current usage', async ({
   ).toHaveText('On Hold');
   await checkA11y(page);
 
-  const status = view.getByRole('combobox', { name: 'Status' });
+  const filterButton = view.getByTestId('treatments-filter-button');
+  const chip = (usage: string) =>
+    page.getByTestId(`treatments-filter-status-${usage}`);
+  const closeFilters = () =>
+    page.getByTestId('treatments-filters-done').click();
+
   for (const [usage, id] of Object.entries(TREATMENTS)) {
     await test.step(`shows only ${usage} treatments`, async () => {
-      await status.selectOption(usage);
+      await filterButton.click();
+      await page.getByTestId('treatments-filters-reset').click();
+      await chip(usage).click();
+      await expect(chip(usage)).toHaveAttribute('aria-checked', 'true');
+      await closeFilters();
       await expect(rows).toHaveCount(1);
       await expect(view.getByTestId(`treatments-row-${id}`)).toBeVisible();
+      await expect(filterButton).toHaveAccessibleName(
+        'Filter treatments, filters on'
+      );
     });
   }
 
-  await test.step('opens a treatment and keeps the filter on return', async () => {
+  await test.step('combines statuses', async () => {
+    await filterButton.click();
+    await chip('taking').click();
+    await closeFilters();
+    await expect(rows).toHaveCount(2);
+    await checkA11y(page);
+    await expect(view.getByTestId('treatments-list')).toContainText(
+      'Taking, Not started'
+    );
+  });
+
+  await test.step('opens a treatment and keeps the filters on return', async () => {
     await view
       .getByTestId(`treatments-row-${TREATMENTS['not-started']}`)
       .click();
@@ -89,12 +112,14 @@ test('lists every treatment and filters them by current usage', async ({
       new RegExp(`/treatment/${TREATMENTS['not-started']}$`)
     );
     await page.goBack();
-    await expect(status).toHaveValue('not-started');
-    await expect(rows).toHaveCount(1);
+    await expect(rows).toHaveCount(2);
   });
 
   await test.step('updates when usage changes and says when none match', async () => {
-    await status.selectOption('taking');
+    await filterButton.click();
+    await page.getByTestId('treatments-filters-reset').click();
+    await chip('taking').click();
+    await closeFilters();
     await expect(rows).toHaveCount(1);
     await seedTestResources(page, {
       treatmentUsage: [
@@ -103,5 +128,13 @@ test('lists every treatment and filters them by current usage', async ({
     });
     await expect(view.getByTestId('treatments-no-matches')).toBeVisible();
     await expect(rows).toHaveCount(0);
+  });
+
+  await test.step('reset shows every treatment again', async () => {
+    await filterButton.click();
+    await page.getByTestId('treatments-filters-reset').click();
+    await closeFilters();
+    await expect(rows).toHaveCount(4);
+    await expect(filterButton).toHaveAccessibleName('Filter treatments');
   });
 });

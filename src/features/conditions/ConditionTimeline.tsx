@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { GitCommitVertical, ListFilter } from 'lucide-react-native';
+import { GitCommitVertical } from 'lucide-react-native';
+import { FilterButton, FilterNoMatches } from '@/src/components/FilterControls';
 import {
   ResourceSection,
   type ResourceRowAppearance,
@@ -126,31 +127,18 @@ export function ConditionTimeline({ items }: { items: TimelineItem[] }) {
       count={count}
       testID="condition-timeline"
       action={
-        <TouchableOpacity
+        <FilterButton
+          label="Filter timeline"
+          active={filtered}
           testID="condition-timeline-filter-button"
-          accessibilityRole="button"
-          accessibilityLabel={
-            filtered ? 'Filter timeline, filters on' : 'Filter timeline'
-          }
-          style={[styles.filterButton, filtered && styles.filterButtonActive]}
-          activeOpacity={0.7}
           onPress={() => setFiltersOpen(true)}
-        >
-          <ListFilter
-            size={18}
-            color={
-              filtered
-                ? COLORS.light.primaryForeground
-                : COLORS.light.textSecondary
-            }
-          />
-        </TouchableOpacity>
+        />
       }
     >
       {count === 0 && (
-        <Text style={styles.noMatches} testID="condition-timeline-no-matches">
+        <FilterNoMatches testID="condition-timeline-no-matches">
           No steps match these filters.
-        </Text>
+        </FilterNoMatches>
       )}
       {groups.flatMap((group, groupIndex) => [
         <View
@@ -182,26 +170,6 @@ const NODE_TOP = 16;
 const NODE_SIZE = 28;
 
 const styles = StyleSheet.create({
-  filterButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.light.pillBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterButtonActive: {
-    borderColor: COLORS.light.primary,
-    backgroundColor: COLORS.light.primary,
-  },
-  noMatches: {
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.light.cardBorder,
-    fontSize: 14,
-    color: COLORS.light.textSecondary,
-  },
   rail: {
     width: 40,
     alignSelf: 'stretch',

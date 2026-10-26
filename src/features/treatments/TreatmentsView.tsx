@@ -12,27 +12,20 @@ import {
   getUsagePeriods,
   type CurrentUsage,
 } from '@/src/features/actions/treatmentUsage';
-import { NativeSelect } from '@/src/components/NativeSelect';
+import { FilterButton, FilterNoMatches } from '@/src/components/FilterControls';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { COLORS } from '@/src/theme/colors';
 import { getTreatmentReasonConditionIds } from '@/src/utils/fhirUtils';
+import { TIMELINE_TONES } from '@/src/features/conditions/timelineAppearance';
 import { getAllTreatments } from './treatmentService';
+import {
+  TreatmentFilterModal,
+  USAGE_FILTERS,
+  USAGE_TONES,
+} from './TreatmentFilterModal';
 import { TreatmentRelatedRow } from './TreatmentRelatedRow';
-
-type StatusFilter = 'all' | CurrentUsage;
-
-const STATUS_FILTERS: StatusFilter[] = [
-  'all',
-  'taking',
-  'on-hold',
-  'stopped',
-  'not-started',
-];
-
-const getStatusFilterLabel = (filter: StatusFilter) =>
-  filter === 'all' ? 'All treatments' : getCurrentUsageLabel(filter);
 
 interface TreatmentItem {
   treatment: MedicationRequest;
@@ -43,7 +36,8 @@ interface TreatmentItem {
 export function TreatmentsView() {
   const router = useRouter();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const [statuses, setStatuses] = useState<CurrentUsage[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const generation = useRef(0);
   const [data, setData] = useState({
     patientId: '',
@@ -90,8 +84,10 @@ export function TreatmentsView() {
     (!!activePatientId && (!isCurrentPatient || data.isLoading));
 
   const items = isCurrentPatient ? data.items : [];
-  const listed =
-    status === 'all' ? items : items.filter((item) => item.usage === status);
+  const filtered = statuses.length > 0;
+  const listed = filtered
+    ? items.filter((item) => statuses.includes(item.usage))
+    : items;
 
   return (
     <ResourceViewLayout
@@ -111,70 +107,75 @@ export function TreatmentsView() {
             No treatments yet.
           </Text>
         ) : (
-          <>
-            <View style={styles.statusControl}>
-              <Text style={styles.controlLabel}>Status</Text>
-              <NativeSelect
-                compact
-                value={status}
-                options={STATUS_FILTERS.map((id) => ({
-                  id,
-                  label: getStatusFilterLabel(id),
-                }))}
-                onChange={(value) => setStatus(value as StatusFilter)}
-                label="Status"
-                testID="treatments-status-filter"
-                name="treatments-status-filter"
+          <ResourceSection
+            icon={Pill}
+            title={
+              filtered
+                ? USAGE_FILTERS.filter((usage) => statuses.includes(usage))
+                    .map(getCurrentUsageLabel)
+                    .join(', ')
+                : 'All treatments'
+            }
+            count={listed.length}
+            testID="treatments-list"
+            action={
+              <FilterButton
+                label="Filter treatments"
+                active={filtered}
+                testID="treatments-filter-button"
+                onPress={() => setFiltersOpen(true)}
               />
-            </View>
-            {listed.length === 0 ? (
-              <Text style={styles.emptyText} testID="treatments-no-matches">
-                No treatments match this status.
-              </Text>
-            ) : (
-              <ResourceSection
-                icon={Pill}
-                title={getStatusFilterLabel(status)}
-                count={listed.length}
-                testID="treatments-list"
-              >
-                {listed.map(({ treatment, usage }) => {
-                  const treatId = treatment.id || '';
-                  const conditionCount =
-                    getTreatmentReasonConditionIds(treatment).length;
-                  return (
-                    <TreatmentRelatedRow
-                      key={treatId}
-                      treatment={treatment}
-                      testID={`treatments-row-${treatId}`}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/treatment/[id]',
-                          params: { id: treatId },
-                        })
-                      }
-                      extraMeta={[
-                        {
-                          icon: History,
-                          text: getCurrentUsageLabel(usage),
-                          testID: `treatments-usage-${treatId}`,
-                        },
-                        ...(conditionCount > 0
-                          ? [
-                              {
-                                icon: FolderPlus,
-                                text: String(conditionCount),
-                                accessibilityLabel: `${conditionCount} conditions`,
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
-                  );
-                })}
-              </ResourceSection>
+            }
+          >
+            {listed.length === 0 && (
+              <FilterNoMatches testID="treatments-no-matches">
+                No treatments match these filters.
+              </FilterNoMatches>
             )}
-          </>
+            {listed.map(({ treatment, usage }) => {
+              const treatId = treatment.id || '';
+              const conditionCount =
+                getTreatmentReasonConditionIds(treatment).length;
+              return (
+                <TreatmentRelatedRow
+                  key={treatId}
+                  treatment={treatment}
+                  testID={`treatments-row-${treatId}`}
+                  appearance={{
+                    backgroundColor: TIMELINE_TONES[USAGE_TONES[usage]].wash,
+                  }}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/treatment/[id]',
+                      params: { id: treatId },
+                    })
+                  }
+                  extraMeta={[
+                    {
+                      icon: History,
+                      text: getCurrentUsageLabel(usage),
+                      testID: `treatments-usage-${treatId}`,
+                    },
+                    ...(conditionCount > 0
+                      ? [
+                          {
+                            icon: FolderPlus,
+                            text: String(conditionCount),
+                            accessibilityLabel: `${conditionCount} conditions`,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              );
+            })}
+            <TreatmentFilterModal
+              visible={filtersOpen}
+              statuses={statuses}
+              onChange={setStatuses}
+              onClose={() => setFiltersOpen(false)}
+            />
+          </ResourceSection>
         )}
       </View>
     </ResourceViewLayout>
@@ -183,12 +184,6 @@ export function TreatmentsView() {
 
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'flex-start' },
-  statusControl: { width: 160, gap: 4, marginBottom: 20 },
-  controlLabel: {
-    fontSize: 14,
-    lineHeight: 18,
-    color: COLORS.light.textSecondary,
-  },
   emptyText: {
     fontSize: 14,
     color: COLORS.light.textSecondary,

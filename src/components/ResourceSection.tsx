@@ -189,7 +189,10 @@ export function ResourceRow({
   const body = (
     <>
       <View
-        style={[styles.row, leading ? styles.rowAfterLeading : undefined]}
+        style={[
+          styles.row,
+          leading ? styles.rowAfterLeading : { backgroundColor },
+        ]}
         testID={onPress ? `${testID}-row` : testID}
       >
         <View style={[styles.main, dimmed && styles.dimmed]}>
