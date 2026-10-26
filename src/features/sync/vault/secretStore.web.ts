@@ -1,6 +1,8 @@
+import { namespaced } from '@/src/services/storageNamespace';
+
 // expo-secure-store has no web implementation; IndexedDB keeps the secret out
 // of synchronous storage and away from other origins.
-const DB_NAME = 'healthy-vault';
+const DB_NAME = namespaced('healthy-vault');
 const STORE = 'secrets';
 const SECRET_KEY = 'root-secret';
 

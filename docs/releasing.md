@@ -87,9 +87,10 @@ edit `.changes/<version>.md` and run `pnpm changie merge`.
      a production AAB and submit it to Play internal testing as a draft.
    - Builds the tagged web app and deploys it to GitHub Pages under `/a`,
      next to the landing page in `site/`
-     ([`pages.yml`](../.github/workflows/pages.yml)). Landing page changes
-     deploy on their own when merged, with the app rebuilt from the latest
-     release.
+     ([`pages.yml`](../.github/workflows/pages.yml)). Every merge to main
+     redeploys the landing page, with `/a` rebuilt from the latest release,
+     and the latest main build under `/i`. Nothing links to `/i`, and it
+     keeps its own database and settings, apart from `/a`'s.
 
    EAS also verifies that the release notes exist and no fragments remain.
    The GitHub Actions token advances the internal branch; no Expo token is

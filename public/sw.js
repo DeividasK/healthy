@@ -1,8 +1,14 @@
 // Healthy's offline service worker. Keeps the app shell and its hashed
 // bundles cached so the installed web app opens without a connection.
 // Health data never passes through here: it lives in the local database.
-const CACHE = 'healthy-shell-v1';
 const SCOPE = new URL(self.registration.scope);
+// Each deployment on the origin (/a, and the latest build under /i) keeps its
+// own cache, so updating one never deletes the other's. The released app's
+// cache keeps the name it always had.
+const SUFFIX = SCOPE.pathname.endsWith('/i/') ? '@i' : '';
+const CACHE = 'healthy-shell-v1' + SUFFIX;
+const isOwnCache = (key) =>
+  SUFFIX ? key.endsWith(SUFFIX) : !key.includes('@');
 const INDEX = new URL('index.html', SCOPE).href;
 
 /**
@@ -39,7 +45,9 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))
+          keys
+            .filter((key) => key !== CACHE && isOwnCache(key))
+            .map((key) => caches.delete(key))
         )
       )
       .then(() => self.clients.claim())

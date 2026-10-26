@@ -9,10 +9,11 @@ import {
 import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
+import { namespaced } from '@/src/services/storageNamespace';
 
 export * from './migrations';
 
-export const DB_NAME = 'healthy.db';
+export const DB_NAME = namespaced('healthy.db');
 let dbInstance: SQLiteDatabase | null = null;
 let initPromise: Promise<SQLiteDatabase> | null = null;
 

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Healthy – Privacy Policy</title>
+    <meta
+      name="description"
+      content="What Healthy stores, where it stores it and who can read it. Your records stay on your device, and synced copies are end-to-end encrypted."
+    />
+    <link rel="canonical" href="https://usehealthy.app/privacy.html" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <link
+      rel="preload"
+      href="fonts/literata.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <style>
+      /* The landing page's Field Notebook look, kept to what this page uses.
+         See index.html. */
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata-italic.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: italic;
+        font-display: swap;
+      }
+      :root {
+        --paper: #fffdf9;
+        --grid: #e6efe8;
+        --foreground: #1a1c1a;
+        --text-secondary: #414844;
+        --primary: #3d6450;
+        --serif: 'Literata', Georgia, 'Times New Roman', serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--foreground);
+        background-color: var(--paper);
+        --margin: max(12px, calc(50% - 520px));
+        background-image:
+          linear-gradient(
+            90deg,
+            transparent var(--margin),
+            rgba(199, 124, 78, 0.5) var(--margin),
+            rgba(199, 124, 78, 0.5) calc(var(--margin) + 1.5px),
+            transparent calc(var(--margin) + 1.5px)
+          ),
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size:
+          100% 100%,
+          22px 22px,
+          22px 22px;
+        font: 17px/1.6 var(--serif);
+      }
+      header,
+      main,
+      footer {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding-left: max(28px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+      }
+      header {
+        padding-top: 20px;
+        padding-bottom: 20px;
+        font-weight: 600;
+        font-size: 1.2rem;
+      }
+      header a {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--foreground);
+        text-decoration: none;
+      }
+      header img {
+        width: 28px;
+        height: 28px;
+      }
+      main {
+        padding-top: 40px;
+        padding-bottom: 56px;
+      }
+      h1,
+      h2 {
+        font-weight: 500;
+        line-height: 1.12;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+      }
+      h1 {
+        font-size: clamp(2.4rem, 6vw, 3.2rem);
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: clamp(1.4rem, 3vw, 1.7rem);
+        margin: 48px 0 12px;
+        padding-top: 24px;
+        border-top: 1px solid var(--grid);
+      }
+      p,
+      ul {
+        max-width: 36em;
+      }
+      p.updated {
+        color: var(--text-secondary);
+        margin-top: 0;
+      }
+      ul {
+        padding-left: 1.2em;
+      }
+      li + li {
+        margin-top: 8px;
+      }
+      code {
+        font-size: 0.9em;
+      }
+      a {
+        color: var(--primary);
+      }
+      a:focus-visible {
+        outline: 3px solid var(--primary);
+        outline-offset: 3px;
+      }
+      footer {
+        padding-top: 28px;
+        padding-bottom: 48px;
+        border-top: 1px solid var(--grid);
+        font-size: 0.95rem;
+        color: var(--text-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        justify-content: space-between;
+      }
+      footer a {
+        color: var(--text-secondary);
+      }
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="./"><img src="favicon.svg" alt="" />Healthy</a>
+    </header>
+
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Healthy · Effective 26 October 2026</p>
+
+      <p>
+        Healthy is a personal health record app for the web, Android and iOS. It
+        is built so that your health information stays under your control. This
+        policy explains what the app stores, where, and who can read it.
+      </p>
+
+      <h2>Summary</h2>
+      <ul>
+        <li>
+          The developer never receives or stores your health records. On the
+          web, the developer's sign-in helper passes your Google sign-in tokens
+          on to Google without keeping them.
+        </li>
+        <li>
+          There are no accounts on our side, no ads, no analytics and no
+          tracking. The only server is a small Google sign-in helper that never
+          sees your health data and stores nothing.
+        </li>
+        <li>Your records are stored on your device.</li>
+        <li>
+          Optional Google Drive sync stores your records in your own Google
+          Drive, end-to-end encrypted, so neither Google nor the developer can
+          read them.
+        </li>
+      </ul>
+
+      <h2>Information stored on your device</h2>
+      <p>
+        Everything you enter (profiles, conditions, consultations, treatments,
+        lab results and related notes) is saved in a database on your device. On
+        the web, it is saved in your browser's storage. This data never leaves
+        your device unless you choose to export it or turn on sync.
+      </p>
+      <p>
+        Exports (for example a <code>.zip</code> backup) are files you create
+        and share yourself. Where they go is up to you.
+      </p>
+
+      <h2>Optional Google Drive sync</h2>
+      <p>If you connect a Google account to sync between your devices:</p>
+      <ul>
+        <li>
+          The app asks Google for your basic profile (name, email address and
+          account ID) to show which account is connected, and for access to a
+          hidden app-only folder in your Google Drive
+          (<code>drive.appdata</code>). It cannot see your other Drive files.
+        </li>
+        <li>
+          Your records are encrypted on your device before upload, with a key
+          generated on your device and shown to you as a 24-word recovery
+          phrase. Google stores only encrypted files and can see their names,
+          sizes and timestamps, but not their contents.
+        </li>
+        <li>
+          Your sign-in tokens and encryption key are kept in your device's
+          secure storage (or your browser's storage on the web). Your encryption
+          key never leaves your device.
+        </li>
+        <li>
+          On the web, Google only issues long-lived sign-in tokens to apps that
+          hold a secret key, which cannot ship inside a public web app. So the
+          web app passes your Google sign-in tokens through a small sign-in
+          helper run by the developer on Cloudflare Workers, which adds the key
+          and forwards them to Google. It handles Google tokens only, never your
+          health data, and keeps no copy or logs of them.
+        </li>
+        <li>
+          Google's handling of your account and Drive is covered by the
+          <a href="https://policies.google.com/privacy">Google Privacy Policy</a
+          >.
+        </li>
+      </ul>
+      <p>
+        Keep your recovery phrase safe. Without it, nobody (including the
+        developer) can decrypt your synced data.
+      </p>
+
+      <h2>Data sharing</h2>
+      <p>
+        The developer does not sell, share or transfer your data. Your health
+        records never reach the developer, and the sign-in helper only passes
+        Google sign-in tokens through without keeping them. The app talks only
+        to Google, and on the web to the sign-in helper hosted on Cloudflare,
+        and only when you use Google sign-in and sync.
+      </p>
+
+      <h2>Deleting your data</h2>
+      <ul>
+        <li>
+          Delete a profile in the app to remove its records from your device.
+        </li>
+        <li>
+          When deleting a synced profile, you can choose to delete it from
+          Google Drive too. You can also remove the app's data from Google Drive
+          under
+          <em>Settings → Manage apps</em> in Google Drive, and revoke the app's
+          access at
+          <a href="https://myaccount.google.com/permissions"
+            >myaccount.google.com/permissions</a
+          >.
+        </li>
+        <li>
+          Uninstalling the Android or iOS app removes all data it stored on that
+          device. On the web, uninstalling or closing the app keeps its data:
+          clear the site data for usehealthy.app in your browser's settings to
+          remove it.
+        </li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>
+        Healthy is intended for adults and is not directed at children under 13.
+      </p>
+
+      <h2>Medical disclaimer</h2>
+      <p>
+        Healthy is a record-keeping tool. It does not provide medical advice,
+        diagnosis or treatment.
+      </p>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        If this policy changes, the updated version will be published on this
+        page with a new effective date.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests: open an issue at
+        <a href="https://github.com/DeividasK/healthy/issues"
+          >github.com/DeividasK/healthy/issues</a
+        >.
+      </p>
+    </main>
+
+    <footer>
+      <span>Made with ❤️ in 🇱🇹</span>
+      <nav aria-label="Footer">
+        <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>
+        <a href="./">Home</a>
+        <a href="https://github.com/DeividasK/healthy/releases">What's new</a>
+      </nav>
+    </footer>
+  </body>
+</html>

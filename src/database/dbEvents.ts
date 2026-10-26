@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
+import { namespaced } from '@/src/services/storageNamespace';
 
 export type DatabaseTable =
   | 'patients'
@@ -25,7 +26,7 @@ type Listener = (tables: DatabaseTable[]) => void;
 
 const listeners = new Set<Listener>();
 
-const BROADCAST_CHANNEL_NAME = 'healthy_db_channel';
+const BROADCAST_CHANNEL_NAME = namespaced('healthy_db_channel');
 let channel: BroadcastChannel | null = null;
 
 if (Platform.OS === 'web' && typeof BroadcastChannel !== 'undefined') {
