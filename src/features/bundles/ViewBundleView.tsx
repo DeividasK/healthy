@@ -7,14 +7,23 @@ import type {
   ServiceRequest,
 } from 'fhir/r5';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { ResourceSection } from '@/src/components/ResourceSection';
+import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import { formatDosingLines } from '@/src/features/treatments/regimen';
 import { getTreatmentById } from '@/src/features/treatments/treatmentService';
-import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
+import {
+  formatScheduleDuration,
+  formatScheduleRepeat,
+  formatScheduleTime,
+  getScheduleRepeat,
+} from '@/src/features/service-requests/serviceRequestSchedule';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
+import {
+  getServiceRequestTitle,
+  getTreatmentTitle,
+} from '@/src/utils/fhirUtils';
 import { getBundleMeta } from './BundleRelatedRow';
 import {
   getBundleActivityIds,
@@ -22,6 +31,25 @@ import {
   getBundleTitle,
 } from './bundleModel';
 import { deleteBundle, getBundleById } from './bundleService';
+
+/** A treatment's dosing in words, e.g. "1 capsule oral in the evening". */
+const formatTreatmentRegimen = (treatment: MedicationRequest) =>
+  formatDosingLines(treatment.dosageInstruction).join('\n') || undefined;
+
+/** An activity's schedule in words, e.g. "Every day, Evening, 10 min". */
+function formatActivitySchedule(request: ServiceRequest) {
+  const repeat = getScheduleRepeat(request);
+  if (!repeat) return undefined;
+  return (
+    [
+      formatScheduleRepeat(repeat),
+      formatScheduleTime(repeat),
+      formatScheduleDuration(repeat),
+    ]
+      .filter(Boolean)
+      .join(', ') || undefined
+  );
+}
 
 export function ViewBundleView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -145,14 +173,19 @@ function BundleForPatient({
         count={treatments.length}
         testID="bundle-treatments-section"
       >
-        {treatments.map((treatment) => (
-          <TreatmentRelatedRow
-            key={treatment.id}
-            treatment={treatment}
-            testID={`bundle-treatment-${treatment.id}`}
-            onPress={() => router.push(`/treatment/${treatment.id}`)}
-          />
-        ))}
+        {treatments.map((treatment) => {
+          const title = getTreatmentTitle(treatment);
+          return (
+            <ResourceRow
+              key={treatment.id}
+              testID={`bundle-treatment-${treatment.id}`}
+              title={title}
+              description={formatTreatmentRegimen(treatment)}
+              accessibilityLabel={`View treatment: ${title}`}
+              onPress={() => router.push(`/treatment/${treatment.id}`)}
+            />
+          );
+        })}
       </ResourceSection>
       <ResourceSection
         icon={ClipboardList}
@@ -160,14 +193,19 @@ function BundleForPatient({
         count={activities.length}
         testID="bundle-activities-section"
       >
-        {activities.map((request) => (
-          <ServiceRequestRelatedRow
-            key={request.id}
-            request={request}
-            testID={`bundle-activity-${request.id}`}
-            onPress={() => router.push(`/service-request/${request.id}`)}
-          />
-        ))}
+        {activities.map((request) => {
+          const title = getServiceRequestTitle(request);
+          return (
+            <ResourceRow
+              key={request.id}
+              testID={`bundle-activity-${request.id}`}
+              title={title}
+              description={formatActivitySchedule(request)}
+              accessibilityLabel={`View service request: ${title}`}
+              onPress={() => router.push(`/service-request/${request.id}`)}
+            />
+          );
+        })}
       </ResourceSection>
     </ResourceViewLayout>
   );

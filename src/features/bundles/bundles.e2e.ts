@@ -289,7 +289,13 @@ test.describe('Treatment bundles', () => {
     await expect(page.getByTestId('bundle-activity-count')).toHaveText(
       '1 activity'
     );
-    await expect(page.getByTestId('bundle-activity-w-stretch')).toBeVisible();
+    // Members show only how they are taken or done.
+    await expect(page.getByTestId('bundle-treatment-w-magnesium')).toHaveText(
+      'Magnesium1 tablet in the evening'
+    );
+    await expect(page.getByTestId('bundle-activity-w-stretch')).toHaveText(
+      'StretchingEvery day, Evening, 10 min'
+    );
     const stored = await bridge(
       page,
       (b, bundleId) => b.getBundle(bundleId),
