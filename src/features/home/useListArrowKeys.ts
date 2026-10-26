@@ -2,9 +2,22 @@ import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
+const ROW = '[aria-label^="View biomarker:"]';
+const CLOSED_GROUP =
+  '[data-testid*="-groups-"][data-testid$="-toggle"][aria-expanded="false"]';
+
+// Keeps the chosen row in the middle of the list, so the list scrolls with
+// every step instead of only at its edges.
+function choose(row: HTMLElement) {
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ block: 'center' });
+  row.click();
+}
+
 /**
  * Up and down arrows move through the biomarker list beside the detail
- * (web), choosing each biomarker they reach, unless a field has the keys.
+ * (web), choosing each biomarker they reach and opening collapsed status
+ * groups on the way, unless a field has the keys.
  * `listID` is the list's native ID, unique per screen since the stack keeps
  * earlier screens in the page.
  */
@@ -19,25 +32,30 @@ export function useListArrowKeys(listID: string, enabled: boolean) {
         const target = event.target as HTMLElement | null;
         if (target?.closest('input, textarea, select')) return;
         if (document.querySelector('[aria-modal="true"]')) return;
-        const rows = [
+        const items = [
           ...document.querySelectorAll<HTMLElement>(
-            `#${listID} [aria-label^="View biomarker:"]`
+            `#${listID} ${ROW}, #${listID} ${CLOSED_GROUP}`
           ),
         ];
-        if (rows.length === 0) return;
-        const current = rows.findIndex(
-          (row) => row.getAttribute('aria-current') === 'true'
-        );
-        const next = Math.min(
-          rows.length - 1,
-          Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1))
-        );
+        if (items.length === 0) return;
         event.preventDefault();
-        // Keeps the chosen row in the middle of the list, so the list
-        // scrolls with every step instead of only at its edges.
-        rows[next].focus({ preventScroll: true });
-        rows[next].scrollIntoView({ block: 'center' });
-        rows[next].click();
+        const current = items.findIndex(
+          (item) => item.getAttribute('aria-current') === 'true'
+        );
+        const down = event.key === 'ArrowDown';
+        // With no row chosen yet, the first step goes to the top.
+        const next =
+          current === -1 ? items[0] : items[current + (down ? 1 : -1)];
+        if (!next) return;
+        if (next.matches(ROW)) return choose(next);
+        // A collapsed group in the way opens, and the step lands on its
+        // nearest row.
+        next.click();
+        requestAnimationFrame(() => {
+          const opened = next.parentElement?.querySelectorAll<HTMLElement>(ROW);
+          if (opened?.length)
+            choose(down ? opened[0] : opened[opened.length - 1]);
+        });
       };
       window.addEventListener('keydown', onKeyDown);
       return () => window.removeEventListener('keydown', onKeyDown);

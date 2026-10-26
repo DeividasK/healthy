@@ -111,9 +111,18 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
     })
     .first();
   await expect(selected).toHaveAttribute('aria-current', 'true');
-  await expect(
-    view.getByTestId('labs-summary-groups-inRange-toggle')
-  ).toHaveAttribute('aria-expanded', 'false');
+  const inRange = view.getByTestId('labs-summary-groups-inRange-toggle');
+  await expect(inRange).toHaveAttribute('aria-expanded', 'false');
+  // Arrow keys open a collapsed group on the way and land on its first row.
+  await page.keyboard.press('ArrowDown');
+  await expect(inRange).toHaveAttribute('aria-expanded', 'true');
+  await expect(view.getByTestId('biomarker-title')).not.toHaveText(
+    /^White Blood Cells/
+  );
+  await page.keyboard.press('ArrowUp');
+  await expect(view.getByTestId('biomarker-title')).toHaveText(
+    /^White Blood Cells/
+  );
   await expandBiomarkerGroups(view.getByTestId('labs-summary'));
 
   await view
