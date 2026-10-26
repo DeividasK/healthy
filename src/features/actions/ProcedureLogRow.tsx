@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   CalendarClock,
+  ClipboardList,
   ListChecks,
+  type LucideIcon,
   Minus,
   Plus,
   Timer,
-  type LucideIcon,
 } from 'lucide-react-native';
 import {
   ResourceRow,
@@ -113,6 +114,7 @@ export function ProcedureLogRow({
       <ResourceRow
         testID={testID('row')}
         title={title}
+        typeIcon={ClipboardList}
         meta={getProcedureLogMeta(item, testID)}
         accessibilityLabel={`View service request: ${title}`}
         onPress={onOpen}

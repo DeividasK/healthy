@@ -3,7 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import {
   ChevronDown,
   ChevronUp,
-  Clock,
+  Group,
   ListChecks,
   Pill,
 } from 'lucide-react-native';
@@ -61,8 +61,8 @@ export function BundleLogRow({
     .size;
   const testID = (name: string) =>
     isLeaving ? undefined : `bundle-log-${name}-${row.key}`;
+  // The time is left out: the journal's group heading already shows it.
   const meta: ResourceMeta[] = [
-    ...(row.time ? [{ icon: Clock, text: formatBundleTime(row.time) }] : []),
     isMixed
       ? {
           icon: ListChecks,
@@ -83,6 +83,7 @@ export function BundleLogRow({
       <ResourceRow
         testID={testID('row')}
         title={title}
+        typeIcon={Group}
         meta={meta}
         accessibilityLabel={`View bundle: ${title}`}
         onPress={onOpen}

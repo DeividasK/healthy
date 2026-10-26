@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tablets, TriangleAlert } from 'lucide-react-native';
+import { Pill, Tablets, TriangleAlert } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
@@ -34,6 +34,7 @@ export function TreatmentLogRow({
     <ResourceRow
       testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
       title={title}
+      typeIcon={Pill}
       meta={[
         // What it was taken under, once that no longer matches.
         ...(item.takenAs || item.dose

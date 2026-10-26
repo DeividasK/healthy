@@ -257,8 +257,10 @@ test.describe('Treatment bundles', () => {
 
     // Evening doses join the Evening time; morning doses are at 08:00, not
     // 07:30, so they stay their own rows.
-    const evening = page.getByTestId(`bundle-log-row-${bundle.id}:1`);
-    await expect(evening).toContainText('Evening');
+    const evening = page
+      .getByTestId('actions-group-EVE')
+      .getByTestId(`bundle-log-row-${bundle.id}:1`);
+    await expect(evening).toBeVisible();
     await expect(page.getByTestId(`bundle-log-row-${bundle.id}:0`)).toHaveCount(
       0
     );
@@ -275,8 +277,10 @@ test.describe('Treatment bundles', () => {
     // Saving returns to the journal.
     await expect(page).toHaveURL(/\/journal$/);
     await expect(
-      page.getByTestId(`bundle-log-row-${bundle.id}:0`)
-    ).toContainText('07:30');
+      page
+        .getByTestId('actions-group-07:30')
+        .getByTestId(`bundle-log-row-${bundle.id}:0`)
+    ).toBeVisible();
     await expect(
       page.getByTestId('treatment-log-row-t-magnesium-0')
     ).toHaveCount(0);
