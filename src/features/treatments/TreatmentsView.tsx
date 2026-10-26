@@ -97,11 +97,12 @@ export function TreatmentsView() {
     : items;
 
   // Desktop: the list stays on the left and the chosen treatment shows on
-  // the right, starting with the first one listed.
+  // the right, starting with the first one listed. The split stays while
+  // filters match nothing, so the layout doesn't jump.
   const selectedId = listed.some(({ treatment }) => treatment.id === selected)
     ? selected
     : listed[0]?.treatment.id;
-  const isSplit = isWideWindow && !isLoading && Boolean(selectedId);
+  const isSplit = isWideWindow && !isLoading && items.length > 0;
 
   const list =
     items.length === 0 ? (
@@ -174,47 +175,58 @@ export function TreatmentsView() {
             />
           );
         })}
-        <TreatmentFilterModal
-          visible={filtersOpen}
-          statuses={statuses}
-          onChange={setStatuses}
-          onClose={() => setFiltersOpen(false)}
-        />
       </ResourceSection>
     );
 
-  if (isSplit)
-    return (
-      <ListDetailLayout
-        title="Treatments"
-        listId="treatment-list"
-        rowLabel="View treatment:"
-        testID="treatments-view"
-        list={list}
-        detail={
-          <ViewTreatmentView
-            key={selectedId}
-            id={selectedId}
-            onDeleted={() => router.setParams({ treatment: undefined })}
-          />
-        }
-      />
-    );
+  // Outside both layouts, so a filter change that switches between them
+  // keeps the modal open.
+  const filterModal = (
+    <TreatmentFilterModal
+      visible={filtersOpen}
+      statuses={statuses}
+      onChange={setStatuses}
+      onClose={() => setFiltersOpen(false)}
+    />
+  );
 
   return (
-    <ResourceViewLayout
-      testID="treatments-view"
-      title="Treatments"
-      isLoading={isLoading}
-      error={
-        isCurrentPatient && data.hasError
-          ? 'Unable to load treatments.'
-          : undefined
-      }
-      actions={<ResourceActionDock actions={[]} />}
-    >
-      <View style={styles.content}>{list}</View>
-    </ResourceViewLayout>
+    <>
+      {isSplit ? (
+        <ListDetailLayout
+          title="Treatments"
+          listId="treatment-list"
+          rowLabel="View treatment:"
+          testID="treatments-view"
+          list={list}
+          detail={
+            selectedId ? (
+              <ViewTreatmentView
+                key={selectedId}
+                id={selectedId}
+                onDeleted={() => router.setParams({ treatment: undefined })}
+              />
+            ) : null
+          }
+          // The chosen treatment brings its own dock.
+          dock={selectedId ? null : <ResourceActionDock actions={[]} />}
+        />
+      ) : (
+        <ResourceViewLayout
+          testID="treatments-view"
+          title="Treatments"
+          isLoading={isLoading}
+          error={
+            isCurrentPatient && data.hasError
+              ? 'Unable to load treatments.'
+              : undefined
+          }
+          actions={<ResourceActionDock actions={[]} />}
+        >
+          <View style={styles.content}>{list}</View>
+        </ResourceViewLayout>
+      )}
+      {filterModal}
+    </>
   );
 }
 

@@ -196,4 +196,17 @@ test('desktop shows the chosen treatment beside the list', async ({ page }) => {
     await expect(row(TREATMENTS['not-started'])).toHaveCount(0);
     await expect(title).toHaveText('Vitamin D');
   });
+
+  await test.step('a filter that matches nothing keeps the layout and modal', async () => {
+    await view.getByTestId('treatments-filter-button').click();
+    await page.getByTestId('treatments-filter-status-not-started').click();
+    await expect(view.getByTestId('treatments-no-matches')).toBeVisible();
+    await expect(page.getByTestId('treatments-filters')).toBeVisible();
+    await expect(
+      page.getByTestId('treatments-filter-status-not-started')
+    ).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('treatments-filters-done').click();
+    await expect(title).toHaveCount(0);
+    await expect(page.locator('#treatment-list')).toBeVisible();
+  });
 });
