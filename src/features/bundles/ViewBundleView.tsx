@@ -14,9 +14,7 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { formatDosingLines } from '@/src/features/treatments/regimen';
 import { getTreatmentById } from '@/src/features/treatments/treatmentService';
 import {
-  formatScheduleDuration,
-  formatScheduleRepeat,
-  formatScheduleTime,
+  formatScheduleText,
   getScheduleRepeat,
 } from '@/src/features/service-requests/serviceRequestSchedule';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
@@ -28,27 +26,26 @@ import { getBundleMeta } from './BundleRelatedRow';
 import {
   getBundleActivityIds,
   getBundleMemberIds,
+  getBundleTimes,
   getBundleTitle,
 } from './bundleModel';
 import { deleteBundle, getBundleById } from './bundleService';
 
-/** A treatment's dosing in words, e.g. "1 capsule oral in the evening". */
-const formatTreatmentRegimen = (treatment: MedicationRequest) =>
-  formatDosingLines(treatment.dosageInstruction).join('\n') || undefined;
+/**
+ * A treatment's dosing in words, e.g. "1 capsule oral", leaving out the time
+ * of day when the bundle's own times show it.
+ */
+const formatTreatmentRegimen = (
+  treatment: MedicationRequest,
+  withoutTime: boolean
+) =>
+  formatDosingLines(treatment.dosageInstruction, { withoutTime }).join('\n') ||
+  undefined;
 
-/** An activity's schedule in words, e.g. "Every day, Evening, 10 min". */
-function formatActivitySchedule(request: ServiceRequest) {
+/** An activity's schedule in words, e.g. "10 min, once a day". */
+function formatActivitySchedule(request: ServiceRequest, withoutTime: boolean) {
   const repeat = getScheduleRepeat(request);
-  if (!repeat) return undefined;
-  return (
-    [
-      formatScheduleRepeat(repeat),
-      formatScheduleTime(repeat),
-      formatScheduleDuration(repeat),
-    ]
-      .filter(Boolean)
-      .join(', ') || undefined
-  );
+  return (repeat && formatScheduleText(repeat, { withoutTime })) || undefined;
 }
 
 export function ViewBundleView() {
@@ -135,6 +132,7 @@ function BundleForPatient({
     );
   }
 
+  const hasTimes = getBundleTimes(bundle).length > 0;
   return (
     <ResourceViewLayout
       testID="bundle-view"
@@ -180,7 +178,7 @@ function BundleForPatient({
               key={treatment.id}
               testID={`bundle-treatment-${treatment.id}`}
               title={title}
-              description={formatTreatmentRegimen(treatment)}
+              description={formatTreatmentRegimen(treatment, hasTimes)}
               accessibilityLabel={`View treatment: ${title}`}
               onPress={() => router.push(`/treatment/${treatment.id}`)}
             />
@@ -200,7 +198,7 @@ function BundleForPatient({
               key={request.id}
               testID={`bundle-activity-${request.id}`}
               title={title}
-              description={formatActivitySchedule(request)}
+              description={formatActivitySchedule(request, hasTimes)}
               accessibilityLabel={`View service request: ${title}`}
               onPress={() => router.push(`/service-request/${request.id}`)}
             />

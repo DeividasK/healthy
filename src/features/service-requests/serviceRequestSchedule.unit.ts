@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   formatScheduleRepeat,
+  formatScheduleText,
   parseScheduleDraft,
   withSchedule,
 } from './serviceRequestSchedule';
@@ -37,6 +38,41 @@ test('formats schedules', () => {
     'Every 2 months'
   );
   expect(formatScheduleRepeat({ period: 1, periodUnit: 'h' })).toBeNull();
+});
+
+test('words schedules like treatment doses', () => {
+  const daily = {
+    period: 1,
+    periodUnit: 'd' as const,
+    duration: 10,
+    durationUnit: 'min' as const,
+  };
+  expect(formatScheduleText({ ...daily, when: ['EVE'] })).toBe(
+    '10 min in the evening'
+  );
+  expect(formatScheduleText({ ...daily, timeOfDay: ['07:30:00'] })).toBe(
+    '10 min at 07:30'
+  );
+  expect(formatScheduleText(daily)).toBe('10 min, once a day');
+  // Under a time heading, the time and the daily repeat go unsaid.
+  expect(
+    formatScheduleText({ ...daily, when: ['EVE'] }, { withoutTime: true })
+  ).toBe('10 min');
+  expect(
+    formatScheduleText({
+      period: 2,
+      periodUnit: 'd',
+      duration: 45,
+      durationUnit: 'min',
+      when: ['MORN'],
+    })
+  ).toBe('45 min, every 2 days, in the morning');
+  expect(
+    formatScheduleText({ period: 4, periodMax: 6, periodUnit: 'wk', count: 3 })
+  ).toBe('3 sessions, every 4–6 weeks');
+  expect(formatScheduleText({ period: 1, periodUnit: 'wk' })).toBe(
+    'Once a week'
+  );
 });
 
 test('parses shown fields and clears hidden ones', () => {

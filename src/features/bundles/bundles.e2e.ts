@@ -289,12 +289,13 @@ test.describe('Treatment bundles', () => {
     await expect(page.getByTestId('bundle-activity-count')).toHaveText(
       '1 activity'
     );
-    // Members show only how they are taken or done.
+    // Members show only how they are taken or done, without the time of
+    // day the bundle already shows.
     await expect(page.getByTestId('bundle-treatment-w-magnesium')).toHaveText(
-      'Magnesium1 tablet in the evening'
+      'Magnesium1 tablet'
     );
     await expect(page.getByTestId('bundle-activity-w-stretch')).toHaveText(
-      'StretchingEvery day, Evening, 10 min'
+      'Stretching10 min'
     );
     const stored = await bridge(
       page,

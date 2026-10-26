@@ -608,6 +608,7 @@ function ActionsForPatient({
           key={row.item.key}
           item={row.item}
           isLeaving={isLeaving}
+          underTimeHeading={group.id !== 'any'}
           disabled={isLeaving || savingKeys.includes(row.item.key)}
           reorder={reorder}
           onAnswer={(answer) => void handleProcedureAnswer(row.item, answer)}

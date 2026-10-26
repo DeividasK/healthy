@@ -152,6 +152,7 @@ export function BundleLogRow({
               key={item.key}
               item={item}
               isLeaving={isLeaving}
+              underTimeHeading={Boolean(row.time)}
               disabled={isLeaving || isSaving(item)}
               onAnswer={(next) => onProcedureAnswer(item, next)}
               onDurationChange={(minutes) => onProcedureDuration(item, minutes)}
