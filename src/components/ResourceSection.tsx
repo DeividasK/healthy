@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { CountBadge } from './CountBadge';
+import { SelectedRowMarker } from './SelectedRowMarker';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceSectionProps {
@@ -98,8 +99,8 @@ export interface ResourceRowAppearance {
   /** Fades the title, meta and note, e.g. for a cancelled step. */
   dimmed?: boolean;
   /**
-   * The row whose details show beside its list (desktop): shaded like a
-   * selected biomarker row and marked `aria-current`.
+   * The row whose details show beside its list (desktop): marked by a bar
+   * on its left edge and `aria-current`.
    */
   selected?: boolean;
 }
@@ -170,11 +171,10 @@ export function ResourceRow({
   accessibilityLabel,
   testID,
   leading,
-  backgroundColor: wash,
+  backgroundColor,
   dimmed = false,
   selected = false,
 }: ResourceRowProps) {
-  const backgroundColor = selected ? COLORS.light.pillBackground : wash;
   if (onPress && accessory) {
     return (
       <View style={styles.row} testID={testID}>
@@ -202,6 +202,7 @@ export function ResourceRow({
         ]}
         testID={onPress ? `${testID}-row` : testID}
       >
+        {selected && <SelectedRowMarker />}
         <View style={[styles.main, dimmed && styles.dimmed]}>
           <Text style={styles.rowTitle}>{title}</Text>
           {description && <Text style={styles.description}>{description}</Text>}
