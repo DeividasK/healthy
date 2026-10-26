@@ -1,13 +1,13 @@
 name: Pages
 
 # usehealthy.app is one GitHub Pages site: the landing page in site/ at the
-# root, and the web app under /a. The landing page deploys from main whenever
-# site/ changes; the app is always built from the latest release, so a landing
-# page change never ships unreleased app code.
+# root, the released web app under /a, and the latest main build under /i,
+# which nothing links to. Every push to main redeploys the landing page and
+# /i; /a is always built from the latest release, so a change on main never
+# ships unreleased code to /a.
 on:
   push:
     branches: [main]
-    paths: [site/**, .github/workflows/pages.yml]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -46,16 +46,14 @@ jobs:
           ref: ${{ steps.release.outputs.tag }}
           persist-credentials: false
 
-      # The landing page and the build action come from the default branch,
-      # not from the release, so deploying an older release keeps them current.
-      - name: Checkout Landing Page
+      # The landing page, the build action and /i come from the default
+      # branch, not from the release, so deploying an older release keeps
+      # them current.
+      - name: Checkout Main
         uses: actions/checkout@v7
         with:
           path: .pages
           ref: ${{ github.event.repository.default_branch }}
-          sparse-checkout: |
-            .github/actions
-            site
           persist-credentials: false
 
       - uses: pnpm/setup@v3
@@ -72,13 +70,27 @@ jobs:
         with:
           base-url: ${{ steps.pages.outputs.base_path }}/a
 
+      - name: Build Latest App
+        working-directory: .pages
+        env:
+          EXPO_BASE_URL: ${{ steps.pages.outputs.base_path }}/i
+          # Its own database and settings, apart from the released app's.
+          EXPO_PUBLIC_STORAGE_NAMESPACE: i
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:web
+
       - name: Assemble Site
         run: |
           mkdir _site
           cp -R .pages/site/. _site/
           cp -R dist _site/a
-          # Unknown paths fall back to the app so its deep links load.
-          cp _site/a/index.html _site/404.html
+          cp -R .pages/dist _site/i
+          # Keep /i out of search results.
+          sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' _site/i/index.html
+          # Unknown paths fall back to the app they are under, so deep links
+          # load. GitHub Pages has one 404 page, so it writes the right shell.
+          node .pages/scripts/pages-404.mjs _site
           touch _site/.nojekyll
 
       - name: Upload Pages Artifact

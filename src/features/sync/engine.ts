@@ -49,6 +49,7 @@ import {
   loadRootSecret,
   saveRootSecret,
 } from './vault/secretStore';
+import { namespaced } from '@/src/services/storageNamespace';
 
 export const VAULT_FILE_NAME = 'vault.json';
 const COMPACT_AFTER_CHUNKS = 50;
@@ -934,8 +935,8 @@ export async function removePatientFromDevice(
 // ---------------------------------------------------------------------------
 
 const LEGACY_TOMBSTONE_KEYS = {
-  consultations: '@healthy_pending_deleted_consultations',
-  clinical: '@healthy_pending_deleted_clinical_resources',
+  consultations: namespaced('@healthy_pending_deleted_consultations'),
+  clinical: namespaced('@healthy_pending_deleted_clinical_resources'),
 };
 
 export async function importLegacyTombstones(): Promise<void> {

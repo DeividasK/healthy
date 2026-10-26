@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureTokenStore } from './tokenStore';
+import { namespaced } from '@/src/services/storageNamespace';
 
-export const GOOGLE_DRIVE_STORAGE_KEY = '@healthy_device_google_sync_config';
+export const GOOGLE_DRIVE_STORAGE_KEY = namespaced(
+  '@healthy_device_google_sync_config'
+);
 
 /** Device-only Google account connection used as the sync storage provider. */
 export interface GoogleDriveConfig {
