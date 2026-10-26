@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { CountBadge } from './CountBadge';
+import { SelectedRowMarker } from './SelectedRowMarker';
 import { COLORS } from '@/src/theme/colors';
 
 interface ResourceSectionProps {
@@ -97,6 +98,11 @@ export interface ResourceRowAppearance {
   backgroundColor?: string;
   /** Fades the title, meta and note, e.g. for a cancelled step. */
   dimmed?: boolean;
+  /**
+   * The row whose details show beside its list (desktop): marked by a bar
+   * on its left edge and `aria-current`.
+   */
+  selected?: boolean;
 }
 
 interface ResourceRowProps extends ResourceRowAppearance {
@@ -167,6 +173,7 @@ export function ResourceRow({
   leading,
   backgroundColor,
   dimmed = false,
+  selected = false,
 }: ResourceRowProps) {
   if (onPress && accessory) {
     return (
@@ -189,9 +196,13 @@ export function ResourceRow({
   const body = (
     <>
       <View
-        style={[styles.row, leading ? styles.rowAfterLeading : undefined]}
+        style={[
+          styles.row,
+          leading ? styles.rowAfterLeading : { backgroundColor },
+        ]}
         testID={onPress ? `${testID}-row` : testID}
       >
+        {selected && <SelectedRowMarker />}
         <View style={[styles.main, dimmed && styles.dimmed]}>
           <Text style={styles.rowTitle}>{title}</Text>
           {description && <Text style={styles.description}>{description}</Text>}
@@ -232,6 +243,7 @@ export function ResourceRow({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      aria-current={selected || undefined}
       style={style}
       activeOpacity={0.6}
       onPress={onPress}

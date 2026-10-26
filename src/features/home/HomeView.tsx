@@ -412,6 +412,12 @@ export function HomeView() {
       title="Treatments"
       count={treatments.length}
       testID="home-treatments-section"
+      pressLabel="Open treatments"
+      pressTestID="home-treatments-open"
+      onPress={() => {
+        blurActiveElement();
+        router.push('/treatments');
+      }}
     >
       {treatments.map((treatment) => {
         const treatId = treatment.id || '';

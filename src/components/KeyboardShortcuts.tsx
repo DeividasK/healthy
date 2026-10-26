@@ -17,6 +17,7 @@ const GO_TO: Record<string, { href: Href; label: string }> = {
   h: { href: '/', label: 'Go to Home' },
   j: { href: '/journal', label: 'Go to the journal' },
   b: { href: '/labs-summary', label: 'Go to biomarkers' },
+  t: { href: '/treatments', label: 'Go to treatments' },
   s: { href: '/settings', label: 'Go to settings' },
 };
 const SHORTCUTS: { keys: string[]; action: string }[] = [

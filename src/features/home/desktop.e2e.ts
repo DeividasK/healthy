@@ -45,6 +45,8 @@ test('the sidebar replaces the header and marks the current section', async ({
   await expect(biomarkers).toHaveAttribute('aria-current', 'page');
   await expect(home).not.toHaveAttribute('aria-current', 'page');
 
+  await nav.getByRole('link', { name: 'Treatments' }).click();
+  await expect(page).toHaveURL(/treatments$/);
   await nav.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/settings$/);
   await home.click();
@@ -201,6 +203,9 @@ test('keyboard shortcuts move between sections and open the shortcut list', asyn
   await page.keyboard.press('g');
   await page.keyboard.press('b');
   await expect(page).toHaveURL(/labs-summary/);
+  await page.keyboard.press('g');
+  await page.keyboard.press('t');
+  await expect(page).toHaveURL(/treatments$/);
   await page.keyboard.press('g');
   await page.keyboard.press('j');
   await expect(page).toHaveURL(/journal$/);

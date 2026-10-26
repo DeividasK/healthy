@@ -6,6 +6,7 @@ import {
   House,
   Keyboard as KeyboardIcon,
   ListChecks,
+  Pill,
   Settings,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -43,6 +44,13 @@ const SECTIONS: {
     path: '/labs-summary',
     icon: FlaskConical,
     testID: 'sidebar-biomarkers',
+  },
+  {
+    label: 'Treatments',
+    href: '/treatments',
+    path: '/treatments',
+    icon: Pill,
+    testID: 'sidebar-treatments',
   },
   {
     label: 'Settings',
