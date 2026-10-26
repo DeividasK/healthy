@@ -157,7 +157,7 @@ function reportItems(values: LabValues) {
   });
 }
 
-/** A one-dose daily regimen, e.g. 1 tablet in the evening. */
+/** A one-dose daily regimen, e.g. 1 tablet in the evening; '' leaves the time open. */
 function daily(amount: string, unit: string, when: string): RegimenDraft {
   const dose = createDoseDraft();
   return {
@@ -345,9 +345,45 @@ async function addDemoRecords(patientId: string): Promise<void> {
     regimen: daily('2', '{capsule}', 'MORN'),
     reason: 'Heart health',
   });
+  // Supplements taken on their own, outside any bundle.
+  const collagen = await createOrUpdateTreatment({
+    patientId,
+    title: 'Collagen',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-8),
+    regimen: daily('10', 'g', 'MORN'),
+    reason: 'Skin and joints',
+  });
+  const creatine = await createOrUpdateTreatment({
+    patientId,
+    title: 'Creatine',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-5),
+    regimen: daily('5', 'g', ''),
+    reason: 'Strength and energy',
+  });
+  const inulin = await createOrUpdateTreatment({
+    patientId,
+    title: 'Inulin',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-4),
+    regimen: daily('5', 'g', 'EVE'),
+    reason: 'Gut health',
+  });
   await changeTreatmentUsage(iron, patientId, 'start', fromToday(-36, 5));
   await changeTreatmentUsage(iron, patientId, 'stop', fromToday(-26, 5));
-  for (const treatment of [atorvastatin, ezetimibe, vitaminD, omega3])
+  for (const treatment of [
+    atorvastatin,
+    ezetimibe,
+    vitaminD,
+    omega3,
+    collagen,
+    creatine,
+    inulin,
+  ])
     await changeTreatmentUsage(
       treatment,
       patientId,
