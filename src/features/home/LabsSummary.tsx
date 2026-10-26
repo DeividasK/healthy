@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { FlaskConical } from 'lucide-react-native';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
@@ -28,7 +28,7 @@ import {
   type SummarySort,
 } from './labsSummarySorting';
 
-const PERIODS = [
+export const PERIODS = [
   { id: 'all', label: 'All time', months: 0 },
   { id: '120', label: '10 years', months: 120 },
   { id: '60', label: '5 years', months: 60 },
@@ -39,7 +39,7 @@ const PERIODS = [
 ];
 
 /** Calendar-month cutoff, clamped for months with fewer days. */
-function periodCutoff(months: number) {
+export function periodCutoff(months: number) {
   if (!months) return -Infinity;
   const cutoff = new Date();
   const day = cutoff.getDate();
@@ -115,14 +115,22 @@ export function LabsSummary({
   records,
   showAll = false,
   initialPeriod = 'all',
+  autoFocusSearch = false,
 }: {
   records: DiagnosticReportRecord[];
   showAll?: boolean;
   initialPeriod?: string;
+  /** Starts in the search field (the / keyboard shortcut). */
+  autoFocusSearch?: boolean;
 }) {
   const router = useRouter();
   const demographics = useRangeDemographics();
   const [search, setSearch] = useState('');
+  // The user asked for search with a key, so focus is where they expect it.
+  const searchRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (autoFocusSearch) searchRef.current?.focus();
+  }, [autoFocusSearch]);
   const [sort, setSort] = useState<SummarySort>('deviation');
   const [period, setPeriod] = useState(() =>
     PERIODS.some((option) => option.id === initialPeriod)
@@ -255,6 +263,7 @@ export function LabsSummary({
         onChangeText={setSearch}
         autoCorrect={false}
         autoCapitalize="none"
+        ref={searchRef}
       />
       {query && listed.length === 0 ? (
         <Text style={styles.noResults} testID="labs-summary-no-results">

@@ -30,6 +30,7 @@ import { restoreFromZipBytes } from '@/src/services/zipArchiveService';
 import { COLORS } from '@/src/theme/colors';
 import { useDismissKey } from '@/src/utils/dismissKey';
 import { PatientIdText } from './PatientIdText';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 const ignoreDismiss = () => {};
 
@@ -516,11 +517,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 132,
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
   },
   title: {
     fontSize: 24,

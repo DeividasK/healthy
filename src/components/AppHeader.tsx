@@ -23,6 +23,7 @@ import {
 } from '@/src/features/onboarding/logoHandoff';
 import { HEARTBEAT, pop } from '@/src/features/onboarding/motion';
 import { COLORS } from '@/src/theme/colors';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /**
  * The header logo. Welcome shows its own large heart, so the logo hides
@@ -159,14 +160,18 @@ export function AppHeader() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: COLORS.light.card },
+  // The divider spans the window; the header row lines up with the content.
+  safeArea: {
+    backgroundColor: COLORS.light.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.light.cardBorder,
+  },
   header: {
-    height: 64,
+    ...CONTENT_COLUMN,
+    height: 64 - StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
     backgroundColor: COLORS.light.card,
   },
   button: {

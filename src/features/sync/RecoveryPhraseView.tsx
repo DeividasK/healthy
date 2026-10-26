@@ -12,6 +12,7 @@ import {
   RecoveryPhraseBox,
   saveRecoveryPhraseFile,
 } from './RecoveryPhraseBox';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /**
  * Shows the 24-word recovery phrase once, right after sync is set up. Later
@@ -77,6 +78,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 16,
     paddingBottom: 132,
   },

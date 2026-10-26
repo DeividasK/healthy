@@ -12,7 +12,12 @@ import {
   seedTestTreatment,
   seedTestServiceRequest,
   openRoute,
+  useSingleColumnLayout,
 } from '@/src/features/testing/testStorage';
+
+// Home's single column and header; the desktop overview and sidebar are
+// tested in desktop.e2e.ts.
+test.beforeEach(async ({ page }) => useSingleColumnLayout(page));
 
 test.describe('Fresh Install Onboarding Redirect', () => {
   test(

@@ -38,6 +38,7 @@ import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { deleteCondition, getConditionById } from './conditionService';
 import { goBackOr } from '@/src/utils/navigation';
+import { useIsWideLayout } from '@/src/theme/layout';
 import type {
   Condition,
   DiagnosticReport,
@@ -50,6 +51,7 @@ export function ViewConditionView() {
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const isWideWindow = useIsWideLayout();
   const [condition, setCondition] = useState<Condition | null>(null);
   const [consultations, setConsultations] = useState<Encounter[]>([]);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
@@ -162,98 +164,16 @@ export function ViewConditionView() {
   const severity = condition.severity?.coding?.[0]?.code;
   const bodySite = condition.bodySite?.[0]?.text;
 
-  return (
-    <ResourceViewLayout
-      testID="condition-view"
-      title={title}
-      titleTestID="condition-title"
-      meta={getConditionMeta(condition)}
-      actions={
-        <>
-          <FloatingAddMenu
-            visible={showAddMenu}
-            onClose={() => setShowAddMenu(false)}
-            testID="condition-add-menu"
-            options={[
-              {
-                id: 'consultation',
-                label: 'Consultation',
-                testID: 'menu-add-consultation',
-                icon: (
-                  <Stethoscope
-                    color={COLORS.light.primary}
-                    size={18}
-                    style={{ marginRight: 10 }}
-                  />
-                ),
-                onPress: () =>
-                  router.push({
-                    pathname: '/consultation/add',
-                    params: { conditionId: id },
-                  }),
-              },
-              {
-                id: 'treatment',
-                label: 'Treatment',
-                testID: 'menu-add-treatment',
-                icon: (
-                  <Pill
-                    color={COLORS.light.primary}
-                    size={18}
-                    style={{ marginRight: 10 }}
-                  />
-                ),
-                onPress: () =>
-                  router.push({
-                    pathname: '/treatment/add',
-                    params: { conditionId: id },
-                  }),
-              },
-              {
-                id: 'service-request',
-                label: 'Service Request',
-                testID: 'menu-add-service-request',
-                icon: (
-                  <ClipboardList
-                    color={COLORS.light.primary}
-                    size={18}
-                    style={{ marginRight: 10 }}
-                  />
-                ),
-                onPress: () =>
-                  router.push({
-                    pathname: '/service-request/add',
-                    params: { conditionId: id },
-                  }),
-              },
-            ]}
-          />
-          <ResourceActionDock
-            editLabel="Edit condition"
-            onEdit={() => {
-              setShowAddMenu(false);
-              router.push(`/condition/${id}/edit`);
-            }}
-            onAdd={() => setShowAddMenu((visible) => !visible)}
-            addLabel="Add record"
-            addMenuExpanded={showAddMenu}
-            editTestID="edit-condition-button"
-            addTestID="condition-add-button"
-            deleteLabel="Delete condition"
-            deleteTestID="delete-condition-button"
-            deleteConfirmation={{
-              title: 'Delete Condition',
-              message:
-                'Are you sure you want to delete this condition? This action cannot be undone.',
-              onConfirm: async () => {
-                await deleteCondition(condition.id!);
-                goBackOr(router, '/');
-              },
-            }}
-          />
-        </>
-      }
-    >
+  const timelineItems = buildTimelineItems({
+    consultations,
+    serviceRequests,
+    treatments,
+    labResults,
+  });
+  // Desktop puts the timeline beside the details, when there is one.
+  const isWide = isWideWindow && timelineItems.length > 0;
+  const info = (
+    <>
       <View style={styles.details}>
         {condition.verificationStatus && (
           <Text style={styles.notes} testID="condition-verification-status">
@@ -351,15 +271,114 @@ export function ViewConditionView() {
           />
         )}
       </ResourceSection>
+    </>
+  );
+  const timeline = <ConditionTimeline items={timelineItems} />;
 
-      <ConditionTimeline
-        items={buildTimelineItems({
-          consultations,
-          serviceRequests,
-          treatments,
-          labResults,
-        })}
-      />
+  return (
+    <ResourceViewLayout
+      testID="condition-view"
+      wide={isWide}
+      title={title}
+      titleTestID="condition-title"
+      meta={getConditionMeta(condition)}
+      actions={
+        <>
+          <FloatingAddMenu
+            visible={showAddMenu}
+            onClose={() => setShowAddMenu(false)}
+            testID="condition-add-menu"
+            options={[
+              {
+                id: 'consultation',
+                label: 'Consultation',
+                testID: 'menu-add-consultation',
+                icon: (
+                  <Stethoscope
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/consultation/add',
+                    params: { conditionId: id },
+                  }),
+              },
+              {
+                id: 'treatment',
+                label: 'Treatment',
+                testID: 'menu-add-treatment',
+                icon: (
+                  <Pill
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/treatment/add',
+                    params: { conditionId: id },
+                  }),
+              },
+              {
+                id: 'service-request',
+                label: 'Service Request',
+                testID: 'menu-add-service-request',
+                icon: (
+                  <ClipboardList
+                    color={COLORS.light.primary}
+                    size={18}
+                    style={{ marginRight: 10 }}
+                  />
+                ),
+                onPress: () =>
+                  router.push({
+                    pathname: '/service-request/add',
+                    params: { conditionId: id },
+                  }),
+              },
+            ]}
+          />
+          <ResourceActionDock
+            editLabel="Edit condition"
+            onEdit={() => {
+              setShowAddMenu(false);
+              router.push(`/condition/${id}/edit`);
+            }}
+            onAdd={() => setShowAddMenu((visible) => !visible)}
+            addLabel="Add record"
+            addMenuExpanded={showAddMenu}
+            editTestID="edit-condition-button"
+            addTestID="condition-add-button"
+            deleteLabel="Delete condition"
+            deleteTestID="delete-condition-button"
+            deleteConfirmation={{
+              title: 'Delete Condition',
+              message:
+                'Are you sure you want to delete this condition? This action cannot be undone.',
+              onConfirm: async () => {
+                await deleteCondition(condition.id!);
+                goBackOr(router, '/');
+              },
+            }}
+          />
+        </>
+      }
+    >
+      {isWide ? (
+        <View style={styles.columns}>
+          <View style={styles.column}>{info}</View>
+          <View style={styles.column}>{timeline}</View>
+        </View>
+      ) : (
+        <>
+          {info}
+          {timeline}
+        </>
+      )}
     </ResourceViewLayout>
   );
 }
@@ -384,6 +403,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  columns: { flexDirection: 'row', gap: 48, alignItems: 'flex-start' },
+  column: { flex: 1, minWidth: 0 },
   notes: {
     fontSize: 14,
     lineHeight: 21,

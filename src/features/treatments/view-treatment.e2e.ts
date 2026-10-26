@@ -7,6 +7,7 @@ import {
   checkA11y,
   getBrowserLocalDate,
   openRoute,
+  getContentCenterX,
 } from '@/src/features/testing/testStorage';
 
 test.describe('View Treatment Flow', () => {
@@ -66,7 +67,7 @@ test('the island centers Start taking and keeps Edit available beside it', async
   await expect
     .poll(async () => {
       const box = (await start.boundingBox())!;
-      return Math.abs(box.x + box.width / 2 - page.viewportSize()!.width / 2);
+      return Math.abs(box.x + box.width / 2 - (await getContentCenterX(page)));
     })
     .toBeLessThan(1);
   await expect

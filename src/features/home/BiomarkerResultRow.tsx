@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { useRouter } from 'expo-router';
 import type { Observation } from 'fhir/r5';
 import { Calculator, ChevronRight } from 'lucide-react-native';
@@ -11,6 +12,13 @@ import {
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
 import { isCalculatedObservation } from '@/src/features/lab-results/calculatedBiomarkers';
+
+// PROTOTYPE: the desktop list-and-detail option. Inside a provider, rows
+// select their biomarker instead of opening its page.
+export const BiomarkerSelectionContext = createContext<{
+  selectedId?: string;
+  onSelect: (id: string) => void;
+} | null>(null);
 
 /**
  * Route id of an observation's biomarker page: its catalog test's key, else
@@ -44,6 +52,7 @@ export function BiomarkerValueRow({
   low,
   high,
   calculated = false,
+  selected = false,
   onPress,
   accessibilityLabel,
   testID,
@@ -55,6 +64,7 @@ export function BiomarkerValueRow({
   low?: number;
   high?: number;
   calculated?: boolean;
+  selected?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
   testID?: string;
@@ -62,7 +72,8 @@ export function BiomarkerValueRow({
 }) {
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={[styles.row, selected && styles.selected]}
+      aria-current={selected || undefined}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={
@@ -110,6 +121,8 @@ export function BiomarkerResultRow({
   testID?: string;
 }) {
   const router = useRouter();
+  const selection = useContext(BiomarkerSelectionContext);
+  const routeId = getBiomarkerRouteId(observation);
   const demographics = useRangeDemographics();
   const name = getBiomarkerName(observation);
   const code = observation.code?.coding?.[0]?.code;
@@ -129,17 +142,21 @@ export function BiomarkerResultRow({
           : `biomarker-range-line-${code || observation.id || 'unknown'}`
       }
       accessibilityLabel={`View biomarker: ${name}`}
+      selected={selection?.selectedId === routeId}
       onPress={() =>
-        router.push({
-          pathname: '/biomarker/[id]',
-          params: { id: getBiomarkerRouteId(observation) },
-        })
+        selection
+          ? selection.onSelect(routeId)
+          : router.push({
+              pathname: '/biomarker/[id]',
+              params: { id: routeId },
+            })
       }
     />
   );
 }
 
 const styles = StyleSheet.create({
+  selected: { backgroundColor: COLORS.light.pillBackground },
   // Spans the screen width like resource rows, divided by the same hairline.
   row: {
     minHeight: 72,
