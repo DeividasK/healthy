@@ -377,6 +377,8 @@ export async function revokeGoogleToken(token: string): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
+    // Disconnecting waits for this, so a silent service must not hold it up.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok)
     throw new Error(`Google token revocation failed (HTTP ${res.status})`);
