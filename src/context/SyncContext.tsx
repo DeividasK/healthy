@@ -9,7 +9,14 @@ import React, {
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
   GoogleIdentityUnavailableError,
+  GoogleRefreshRevokedError,
+  GoogleTokenServiceUnavailableError,
+  authorizeWithTokenService,
+  hasGoogleTokenService,
   loadGisScript,
+  openGoogleAuthPopup,
+  refreshWithTokenService,
+  revokeGoogleToken,
   silentRefreshWebAccessToken,
 } from '@/src/services/googleAuthWebService';
 import {
@@ -132,15 +139,58 @@ function isAuthError(err: unknown): boolean {
   );
 }
 
+/** A refresh that may work later: offline, or the token service is down. */
+function isTransientRefreshError(err: unknown): boolean {
+  return (
+    isNetworkError(err) || err instanceof GoogleTokenServiceUnavailableError
+  );
+}
+
 /**
- * Obtains a new Google access token without user interaction, if possible.
- * On web that needs Google's popup, which browsers block unless a click
- * opened it, so only `interactive` refreshes (started by the user) try it.
+ * Obtains a new Google access token, without user interaction if possible.
+ * On web without a refresh token that needs Google's popup, which browsers
+ * block unless a click opened it, so only `interactive` refreshes (started
+ * by the user) try it.
  */
 async function refreshAccessToken(
   config: GoogleDriveConfig,
-  { interactive }: { interactive: boolean }
+  {
+    interactive,
+    popup,
+  }: {
+    interactive: boolean;
+    /** Opened by the click that started a sync, for signing in again. */
+    popup?: Window | null;
+  }
 ): Promise<GoogleDriveConfig | null> {
+  if (hasGoogleTokenService()) {
+    if (config.refreshToken) {
+      try {
+        const refreshed = await refreshWithTokenService(config.refreshToken);
+        return {
+          ...config,
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken ?? config.refreshToken,
+          tokenExpiresAt: Date.now() + refreshed.expiresIn * 1000,
+        };
+      } catch (err) {
+        if (!(err instanceof GoogleRefreshRevokedError)) throw err;
+      }
+    }
+    // No refresh token yet (connected before the token service) or Google
+    // revoked it: signing in again gets a new one.
+    if (!interactive) return null;
+    const authorized = await authorizeWithTokenService({
+      hint: config.userEmail,
+      popup,
+    });
+    return {
+      ...config,
+      accessToken: authorized.accessToken,
+      refreshToken: authorized.refreshToken ?? config.refreshToken,
+      tokenExpiresAt: Date.now() + authorized.expiresIn * 1000,
+    };
+  }
   const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
   if (config.refreshToken && clientId) {
     const refreshed = await refreshGoogleAccessToken(
@@ -271,7 +321,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     async <T,>(
       operation: (provider: CloudStorageProvider) => Promise<T>,
       // Background syncs never prompt; everything else is a user action.
-      { interactive = true }: { interactive?: boolean } = {}
+      {
+        interactive = true,
+        popup,
+      }: { interactive?: boolean; popup?: Window | null } = {}
     ): Promise<T> => {
       let active = configRef.current;
       if (!active) throw new Error('Google Drive is not connected.');
@@ -282,7 +335,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         refreshAttempted = true;
         const refreshed = await refreshAccessToken(active!, {
           interactive,
+          popup,
         }).catch((err) => {
+          // Offline or briefly unavailable: the session itself is fine, so
+          // the next automatic sync tries again.
+          if (isTransientRefreshError(err)) throw err;
           // Google's script failing to load was already reported.
           if (!(err instanceof GoogleIdentityUnavailableError))
             console.warn('Google token refresh failed:', err);
@@ -314,7 +371,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   );
 
   const runSync = useCallback(
-    async ({ manual = false } = {}): Promise<void> => {
+    async ({
+      manual = false,
+      popup,
+    }: { manual?: boolean; popup?: Window | null } = {}): Promise<void> => {
       if (!configRef.current) return;
       // Automatic syncs wait for the user once Google has refused a token.
       if (authExpiredRef.current && !manual) return;
@@ -336,6 +396,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         try {
           await withProvider((provider) => syncOnce(provider, keys), {
             interactive: manual,
+            popup,
           });
           reportReachable();
           const now = new Date();
@@ -364,6 +425,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             setIsUpToDate(false);
             return;
           }
+          if (err instanceof GoogleTokenServiceUnavailableError) {
+            // The next automatic sync tries again.
+            console.warn('Sync postponed:', err.message);
+            setSyncState('idle');
+            setIsUpToDate(false);
+            return;
+          }
           if (err instanceof VaultMissingError) {
             await forgetVaultKey();
             await updateConfig(null);
@@ -388,8 +456,24 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     [markAuthExpired, updateConfig, withProvider]
   );
 
-  /** A sync the user asked for, which may ask Google for a new token. */
-  const syncNow = useCallback(() => runSync({ manual: true }), [runSync]);
+  /**
+   * A sync the user asked for, which may ask Google for a new token. Call it
+   * straight from a click: when the user must sign in again, the popup for
+   * it opens before anything is awaited, so browsers allow it.
+   */
+  const syncNow = useCallback(() => {
+    const active = configRef.current;
+    const needsSignIn =
+      hasGoogleTokenService() &&
+      active !== null &&
+      (authExpiredRef.current ||
+        (!active.refreshToken &&
+          active.tokenExpiresAt !== undefined &&
+          Date.now() >= active.tokenExpiresAt - 60000));
+    const popup = needsSignIn ? openGoogleAuthPopup() : undefined;
+    // An unused popup (e.g. a sync was already running) closes again.
+    return runSync({ manual: true, popup }).finally(() => popup?.close());
+  }, [runSync]);
 
   // Upload local edits shortly after they are saved.
   useDatabaseSubscription(
@@ -517,9 +601,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       await withProvider((provider) => unlockVault(provider, phrase));
       await refreshSyncedProfiles();
       setVaultState('unlocked');
-      await syncNow();
+      await runSync({ manual: true });
     },
-    [refreshSyncedProfiles, syncNow, withProvider]
+    [refreshSyncedProfiles, runSync, withProvider]
   );
 
   const startOverWithNewPhrase = useCallback(async () => {
@@ -536,6 +620,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (options?.deleteCloudData && configRef.current)
         await withProvider((provider) => deleteCloudData(provider));
       else await forgetVaultKey();
+      // Revoked before the token is deleted. If that fails (e.g. offline)
+      // disconnecting still goes ahead: the deleted token can't be used here
+      // again, and it stays listed under the Google account's third-party
+      // access, where the user can remove it.
+      const refreshToken = configRef.current?.refreshToken;
+      if (refreshToken && hasGoogleTokenService())
+        await revokeGoogleToken(refreshToken).catch((err) =>
+          console.warn('Failed to revoke the Google token:', err)
+        );
       await updateConfig(null);
       setVaultState('disconnected');
       setSyncState('idle');
@@ -562,11 +655,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       );
       const remaining = await listSyncedProfileIds();
       setSyncedProfileIds(remaining);
-      if (synced) await syncNow();
+      if (synced) await runSync({ manual: true });
       // As before per-profile sync, the account goes with the last profile.
       else if (remaining.length === 0) await disconnect();
     },
-    [disconnect, syncNow, withProvider]
+    [disconnect, runSync, withProvider]
   );
 
   const resolveProfileDeletion = useCallback(
@@ -582,12 +675,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       await refreshProfileDeletionHolds();
       const remaining = await listSyncedProfileIds();
       setSyncedProfileIds(remaining);
-      if (choice === 'restore') await syncNow();
+      if (choice === 'restore') await runSync({ manual: true });
       // As when stopping a profile, the account goes with the last one.
       else if (choice === 'keep-local' && remaining.length === 0)
         await disconnect();
     },
-    [disconnect, refreshProfileDeletionHolds, syncNow, withProvider]
+    [disconnect, refreshProfileDeletionHolds, runSync, withProvider]
   );
 
   const clearError = useCallback(() => {

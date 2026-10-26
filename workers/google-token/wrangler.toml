@@ -1,0 +1,11 @@
+# Deployed by .github/workflows/google-token.yml
+name = "healthy-google-token"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "https://usehealthy.app,http://localhost:8081"
+# The web client ID from .env (public, unlike the secret).
+GOOGLE_CLIENT_ID = "136779351088-07i6uhl4crebttb5r21sicsdsihl2ppp.apps.googleusercontent.com"
+# GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET`.

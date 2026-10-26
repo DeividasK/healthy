@@ -50,6 +50,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== SCOPE.origin) return;
+  // Google's sign-in callback is not the app shell and must not replace it.
+  if (url.pathname.endsWith('/oauth-callback.html')) return;
 
   // Pages: the network's latest shell, the cached one when offline.
   if (request.mode === 'navigate') {

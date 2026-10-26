@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 // Pure TypeScript tests reuse the runner without starting Expo or a browser.
 export default defineConfig({
   testDir: '.',
-  testMatch: /\/(src|babel)\/.*\.unit\.ts$/,
+  testMatch: /\/(src|babel|workers)\/.*\.unit\.ts$/,
   fullyParallel: true,
   workers: 2,
   forbidOnly: !!process.env.CI,

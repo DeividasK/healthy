@@ -51,7 +51,11 @@ export default defineConfig<ChromaticConfig>({
   ],
   webServer: {
     command: 'pnpm expo start --web --port 8089',
-    env: { EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'playwright-synthetic-client' },
+    env: {
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'playwright-synthetic-client',
+      // Mocked in src/features/testing/mockGoogleDrive.ts.
+      EXPO_PUBLIC_GOOGLE_TOKEN_SERVICE_URL: 'https://token-service.test',
+    },
     url: 'http://localhost:8089',
     reuseExistingServer: !process.env.CI,
     timeout: 60000,

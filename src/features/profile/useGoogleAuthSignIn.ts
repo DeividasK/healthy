@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import {
+  authorizeWithTokenService,
+  hasGoogleTokenService,
   loadGisScript,
   requestWebAccessToken,
 } from '@/src/services/googleAuthWebService';
@@ -95,7 +97,7 @@ export function useGoogleAuthSignIn(
 
   // Pre-load the GIS script on web so the button is ready when the user taps.
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || hasGoogleTokenService()) return;
     loadGisScript().then((loaded) => {
       setIsGisReady(loaded);
     });
@@ -182,7 +184,18 @@ export function useGoogleAuthSignIn(
   const signIn = useCallback(async () => {
     setIsLoading(true);
     try {
-      if (Platform.OS === 'web') {
+      if (hasGoogleTokenService()) {
+        // The code flow also returns a refresh token, so sync can renew
+        // access in the background instead of stopping after an hour.
+        const tokens = await authorizeWithTokenService({});
+        await resolveUserAndNotify(
+          tokens.accessToken,
+          Date.now() + tokens.expiresIn * 1000,
+          tokens.refreshToken,
+          onSuccessRef.current,
+          () => mountedRef.current
+        );
+      } else if (Platform.OS === 'web') {
         // GIS manages its own popup — no redirect URI needed, so no 404 on
         // GitHub Pages subpath deployments. The GIS script is guaranteed to be
         // loaded before this callback fires (isGisReady gates the button).
@@ -231,7 +244,7 @@ export function useGoogleAuthSignIn(
     // auth request has been prepared by expo-auth-session.
     isReady:
       Platform.OS === 'web'
-        ? isGisReady
+        ? hasGoogleTokenService() || isGisReady
         : Platform.OS === 'android' || Boolean(request),
   };
 }
