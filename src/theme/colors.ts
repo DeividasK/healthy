@@ -8,6 +8,11 @@ export const THEME_COLORS = {
     cardBorder: '#e2e3df',
     cardShadow: '#0f172a',
     divider: '#eeeeeb',
+    // App chrome (header on phones, sidebar on desktop): a deeper paper,
+    // like a notebook cover around the pages.
+    chrome: '#f4efe4',
+    chromeHover: '#ebe5d7',
+    chromeCurrent: '#e2dac8',
 
     // Brand & primary actions
     primary: '#3d6450',
