@@ -690,8 +690,14 @@ function formatFrequency(repeat: TimingRepeat): string | null {
   return `${times} ${unit.singular === 'hour' ? 'an' : 'a'} ${unit.singular}`;
 }
 
-/** One dose in words, e.g. "2 tablets oral, twice a day, for 7 days". */
-export function formatDose(dosage: Dosage): string {
+/**
+ * One dose in words, e.g. "2 tablets oral, twice a day, for 7 days".
+ * `withoutTime` leaves out the time of day, e.g. under a "Morning" heading.
+ */
+export function formatDose(
+  dosage: Dosage,
+  { withoutTime = false }: { withoutTime?: boolean } = {}
+): string {
   const dose = dosage.doseAndRate?.[0];
   const repeat = dosage.timing?.repeat;
   const range = dose?.doseRange;
@@ -704,24 +710,27 @@ export function formatDose(dosage: Dosage): string {
   const bounds = repeat?.boundsDuration;
   const boundsUnit =
     bounds?.code && isTimeUnit(bounds.code) ? TIME_UNITS[bounds.code] : null;
-  const when =
-    repeat?.when
-      ?.map((code) => WHEN_LABELS[code]?.phrase || code)
-      .join(' and ') ||
-    (repeat?.timeOfDay?.length
-      ? `at ${repeat.timeOfDay.map(formatClockTime).join(' and ')}`
-      : undefined);
+  const when = withoutTime
+    ? undefined
+    : repeat?.when
+        ?.map((code) => WHEN_LABELS[code]?.phrase || code)
+        .join(' and ') ||
+      (repeat?.timeOfDay?.length
+        ? `at ${repeat.timeOfDay.map(formatClockTime).join(' and ')}`
+        : undefined);
   // A time of day implies once a day: "1 tablet in the morning".
   const isOnceDaily =
     repeat?.frequency === 1 &&
     !repeat.frequencyMax &&
     (repeat.period ?? 1) === 1 &&
     repeat.periodUnit === 'd';
+  // A time of day heading likewise implies once a day.
+  const isDailyAtTime = isOnceDaily && (Boolean(when) || withoutTime);
   const parts = [
     when && isOnceDaily
       ? [amount, route?.toLowerCase(), when].filter(Boolean).join(' ')
       : [amount, route?.toLowerCase()].filter(Boolean).join(' '),
-    !(when && isOnceDaily) && repeat && formatFrequency(repeat),
+    !isDailyAtTime && repeat && formatFrequency(repeat),
     !(when && isOnceDaily) && when,
     bounds?.value !== undefined &&
       `for ${bounds.value} ${

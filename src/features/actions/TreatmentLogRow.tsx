@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pill, Tablets, TriangleAlert } from 'lucide-react-native';
 import { ResourceRow } from '@/src/components/ResourceSection';
+import { formatDose } from '@/src/features/treatments/regimen';
 import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 import type { ActionItem, TreatmentLogAnswer } from './actionDays';
 import { AnswerButtons, ReorderButtons } from './AnswerButtons';
@@ -8,18 +9,22 @@ import { AnswerButtons, ReorderButtons } from './AnswerButtons';
 /**
  * A treatment, or one scheduled dose of it, with "not taken" (×) and "taken"
  * (✓) buttons. Pressing the selected button again clears the answer. While
- * the journal is reordered, move buttons take their place.
+ * the journal is reordered, move buttons take their place. Under a time
+ * heading, the dose leaves out the time of day the heading already shows.
  */
 export function TreatmentLogRow({
   item,
   disabled = false,
   isLeaving = false,
+  underTimeHeading = false,
   reorder,
   onAnswer,
   onOpen,
 }: {
   item: ActionItem;
   disabled?: boolean;
+  /** Shown under a part of the day or clock time heading. */
+  underTimeHeading?: boolean;
   /** Sliding out for another day's rows: a copy without test IDs. */
   isLeaving?: boolean;
   /** Set while the journal is reordered. */
@@ -30,6 +35,10 @@ export function TreatmentLogRow({
 }) {
   const title = getTreatmentTitle(item.treatment);
   const name = item.dose ? `${title}, ${item.dose.text}` : title;
+  const doseText =
+    underTimeHeading && item.dose?.dosage
+      ? formatDose(item.dose.dosage, { withoutTime: true })
+      : item.dose?.text;
   return (
     <ResourceRow
       testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
@@ -38,7 +47,7 @@ export function TreatmentLogRow({
       meta={[
         // What it was taken under, once that no longer matches.
         ...(item.takenAs || item.dose
-          ? [{ icon: Tablets, text: item.takenAs ?? item.dose!.text }]
+          ? [{ icon: Tablets, text: item.takenAs ?? doseText! }]
           : []),
         ...(item.mismatch
           ? [

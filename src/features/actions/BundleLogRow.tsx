@@ -131,6 +131,7 @@ export function BundleLogRow({
               key={item.key}
               item={item}
               isLeaving={isLeaving}
+              underTimeHeading={Boolean(row.time)}
               disabled={isLeaving || isSaving(item)}
               onAnswer={(next) => onAnswer(item, next)}
               onOpen={() => onOpenTreatment(item)}

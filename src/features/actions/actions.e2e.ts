@@ -168,8 +168,19 @@ test.describe('My actions: treatment logging', () => {
 
     const morning = page.getByTestId('treatment-log-row-log-regimen-0');
     const evening = page.getByTestId('treatment-log-row-log-regimen-1');
-    await expect(morning).toContainText('1 tablet in the morning');
-    await expect(evening).toContainText('1 tablet in the evening');
+    // The Morning and Evening headings already show the time of day.
+    await expect(
+      page
+        .getByTestId('actions-group-MORN')
+        .getByTestId('treatment-log-row-log-regimen-0')
+    ).toContainText('Metformin 500mg1 tablet');
+    await expect(morning).not.toContainText('morning');
+    await expect(
+      page
+        .getByTestId('actions-group-EVE')
+        .getByTestId('treatment-log-row-log-regimen-1')
+    ).toBeVisible();
+    await expect(evening).not.toContainText('evening');
 
     await page.getByTestId('treatment-log-taken-log-regimen-0').click();
     await expect(
