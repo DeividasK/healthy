@@ -269,18 +269,16 @@ async function callTokenService(
   };
 }
 
-/** Resolves with the code Google sends to the callback page. */
-function waitForAuthorizationCode(
-  state: string,
-  popup: Window
-): Promise<string> {
+/**
+ * Resolves with the code Google sends to the callback page. Google's pages
+ * can cut the popup off from this window, after which it reads as closed,
+ * so only the callback or the timeout ends the wait.
+ */
+function waitForAuthorizationCode(state: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const channel = new BroadcastChannel(CALLBACK_CHANNEL);
-    let closedCheck: ReturnType<typeof setTimeout> | undefined;
     const finish = (settle: () => void) => {
       clearTimeout(timeout);
-      clearTimeout(closedCheck);
-      window.removeEventListener('focus', onFocus);
       channel.close();
       settle();
     };
@@ -288,16 +286,6 @@ function waitForAuthorizationCode(
       () => finish(() => reject(new Error('Google sign-in timed out'))),
       AUTHORIZE_TIMEOUT_MS
     );
-    // Closing the popup sends no message; focus returns here instead. The
-    // callback page posts before it closes itself, so a short wait suffices.
-    const onFocus = () => {
-      clearTimeout(closedCheck);
-      closedCheck = setTimeout(() => {
-        if (popup.closed)
-          finish(() => reject(new Error('Google sign-in was closed')));
-      }, 2000);
-    };
-    window.addEventListener('focus', onFocus);
     channel.onmessage = (event: MessageEvent) => {
       const message = event.data as {
         state?: string;
@@ -319,14 +307,24 @@ function waitForAuthorizationCode(
 }
 
 /**
+ * Opens the window Google's sign-in later loads into. Browsers only allow
+ * popups during a click, so call it straight from one, before any await.
+ */
+export function openGoogleAuthPopup(): Window | null {
+  return window.open('', CALLBACK_CHANNEL, 'popup,width=500,height=640');
+}
+
+/**
  * Signs in with Google's authorization code flow in a popup and swaps the
- * code for tokens, including a refresh token. Call it straight from a click:
- * the popup opens before anything is awaited, so browsers allow it.
+ * code for tokens, including a refresh token. Pass a popup opened during the
+ * click when work was awaited since; otherwise call it straight from one.
  */
 export async function authorizeWithTokenService(options: {
   hint?: string;
+  popup?: Window | null;
 }): Promise<WebGoogleTokens> {
-  const popup = window.open('', CALLBACK_CHANNEL, 'popup,width=500,height=640');
+  const popup =
+    options.popup === undefined ? openGoogleAuthPopup() : options.popup;
   if (!popup) throw new Error('The Google sign-in window was blocked');
   try {
     const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
@@ -349,7 +347,7 @@ export async function authorizeWithTokenService(options: {
       prompt: options.hint ? 'consent' : 'select_account consent',
     });
     if (options.hint) params.set('login_hint', options.hint);
-    const code = waitForAuthorizationCode(state, popup);
+    const code = waitForAuthorizationCode(state);
     popup.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
     return await callTokenService('/token', {
       code: await code,

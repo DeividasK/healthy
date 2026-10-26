@@ -97,6 +97,19 @@ test('passes on a revoked refresh token as invalid_grant', async () => {
   }
 });
 
+test('reports Google rate limiting as a retryable failure', async () => {
+  const google = mockGoogle(429, { error: 'rate_limit_exceeded' });
+  try {
+    const res = await worker.fetch(
+      post('/refresh', { refresh_token: 'r' }),
+      env
+    );
+    expect(res.status).toBe(502);
+  } finally {
+    google.restore();
+  }
+});
+
 test('rejects malformed requests without calling Google', async () => {
   const google = mockGoogle(200, {});
   try {

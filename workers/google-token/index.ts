@@ -106,7 +106,8 @@ export default {
     if (!google.ok)
       return json(
         { error: data.error ?? 'google_error' },
-        google.status >= 500 ? 502 : 400,
+        // Google being down or rate limiting is worth retrying later.
+        google.status >= 500 || google.status === 429 ? 502 : 400,
         origin
       );
     return json(
