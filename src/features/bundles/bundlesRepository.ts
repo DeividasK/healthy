@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import {
+  getBundleActivityIds,
   getBundleMemberIds,
   getBundleTitle,
   withoutMember,
@@ -26,9 +27,9 @@ function parse(row: { fhir_json: string; updated_at: string }) {
 }
 
 /**
- * Persists a treatment bundle (FHIR R5 RequestOrchestration) in SQLite. The
- * JSON is canonical; the title and status columns are projections of it.
- * Treatments it references must belong to the same patient; a treatment not
+ * Persists a bundle (FHIR R5 RequestOrchestration) in SQLite. The JSON is
+ * canonical; the title and status columns are projections of it. Treatments
+ * and activities it references must belong to the same patient; one not
  * stored yet is tolerated, so restores and sync can apply in any order.
  */
 export async function insertRequestOrchestrationRecord(
@@ -64,14 +65,24 @@ export async function insertRequestOrchestrationRecord(
   const id = bundle.id;
 
   const persist = async () => {
-    for (const treatmentId of getBundleMemberIds(stored)) {
-      const treatment = await db.getFirstAsync<{ patient_id: string }>(
-        'SELECT patient_id FROM medication_requests WHERE id = ?;',
-        [treatmentId]
+    const members = [
+      ...getBundleMemberIds(stored).map((memberId) => ({
+        memberId,
+        table: 'medication_requests',
+      })),
+      ...getBundleActivityIds(stored).map((memberId) => ({
+        memberId,
+        table: 'service_requests',
+      })),
+    ];
+    for (const { memberId, table } of members) {
+      const member = await db.getFirstAsync<{ patient_id: string }>(
+        `SELECT patient_id FROM ${table} WHERE id = ?;`,
+        [memberId]
       );
-      if (treatment && treatment.patient_id !== patientId) {
+      if (member && member.patient_id !== patientId) {
         throw new Error(
-          'A bundle must only reference treatments for the same patient'
+          'A bundle must only reference treatments and activities for the same patient'
         );
       }
     }
@@ -167,24 +178,24 @@ export async function deleteRequestOrchestrationRecord(
 }
 
 /**
- * Removes a treatment from every bundle of its patient, deleting bundles left
- * with no treatments. Runs inside the caller's transaction (e.g. deleting the
- * treatment).
+ * Removes a treatment or activity, e.g. `MedicationRequest/<id>`, from every
+ * bundle of its patient, deleting bundles left with no members. Runs inside
+ * the caller's transaction (e.g. deleting the treatment).
  */
-export async function removeTreatmentFromBundles(
+export async function removeFromBundles(
   db: SQLiteDatabase,
-  treatmentId: string,
+  reference: string,
   patientId: string
 ): Promise<void> {
   const rows = await db.getAllAsync<{ fhir_json: string; updated_at: string }>(
     `SELECT fhir_json, updated_at FROM request_orchestrations
      WHERE patient_id = ? AND instr(fhir_json, ?) > 0;`,
-    [patientId, `"MedicationRequest/${treatmentId}"`]
+    [patientId, `"${reference}"`]
   );
   const now = new Date().toISOString();
   for (const row of rows) {
     const bundle = parse(row);
-    const next = withoutMember(bundle, treatmentId);
+    const next = withoutMember(bundle, reference);
     if (!next) {
       await db.runAsync('DELETE FROM request_orchestrations WHERE id = ?;', [
         bundle.id!,

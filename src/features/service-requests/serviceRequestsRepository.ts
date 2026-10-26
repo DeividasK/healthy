@@ -10,6 +10,7 @@ import {
   withBasedOnServiceRequests,
 } from '@/src/utils/fhirUtils';
 import { removeEntryFromAllDocuments } from '@/src/features/consultations/consultationDocumentEntries';
+import { removeFromBundles } from '@/src/features/bundles/bundlesRepository';
 
 export const VALID_SERVICE_REQUEST_STATUSES: ServiceRequest['status'][] = [
   'draft',
@@ -263,8 +264,8 @@ export async function fetchAllServiceRequestRecords(
 
 /**
  * Deletes a ServiceRequest and, in the same transaction, removes its
- * Composition entries and `Encounter.basedOn` and `DiagnosticReport.basedOn`
- * references.
+ * Composition entries, `Encounter.basedOn` and `DiagnosticReport.basedOn`
+ * references, and bundle memberships.
  */
 export async function deleteServiceRequestRecord(
   id: string,
@@ -290,6 +291,7 @@ export async function deleteServiceRequestRecord(
 
     const reference = `ServiceRequest/${id}`;
     await removeEntryFromAllDocuments(db, reference);
+    await removeFromBundles(db, reference, existing.patient_id);
 
     const encounters = await db.getAllAsync<{ id: string; fhir_json: string }>(
       `SELECT id, fhir_json FROM consultations
@@ -346,6 +348,7 @@ export async function deleteServiceRequestRecord(
         'clinical_documents',
         'consultations',
         'diagnostic_reports',
+        'request_orchestrations',
       ]);
     }
   }

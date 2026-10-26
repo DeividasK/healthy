@@ -4,6 +4,7 @@ import {
   checkA11y,
   evaluateBridge as bridge,
   getBrowserLocalDate,
+  getTestProcedureLog,
   getTestTreatmentLog,
   seedTestBundle,
   seedTestPatient,
@@ -224,6 +225,128 @@ test.describe('Treatment bundles', () => {
     await expect(page.getByTestId('bundle-title')).toHaveText(
       'Morning supplements'
     );
+  });
+
+  test('holds activities beside treatments and answers them together', async ({
+    page,
+  }) => {
+    const today = await getBrowserLocalDate(page);
+    const started = await getBrowserLocalDate(page, -3);
+    await seedTestResources(page, {
+      treatments: [
+        {
+          id: 'w-magnesium',
+          title: 'Magnesium',
+          status: 'active',
+          takingSince: started,
+          regimen: dailyAt('EVE'),
+        },
+      ],
+      serviceRequests: [
+        {
+          id: 'w-stretch',
+          title: 'Stretching',
+          status: 'active',
+          authoredOn: started,
+          schedule: { period: 1, periodUnit: 'd', duration: 10, when: 'EVE' },
+        },
+        {
+          id: 'w-once',
+          title: 'Blood test',
+          status: 'active',
+          authoredOn: started,
+        },
+      ],
+    });
+
+    // Only scheduled service requests are offered as activities.
+    await openRoute(page, '/bundle/add');
+    await page.getByTestId('bundle-title-input').fill('Wind-down');
+    await page.getByTestId('bundle-treatment-search-input').click();
+    await page
+      .getByTestId('bundle-treatment-autocomplete-item-w-magnesium')
+      .click();
+    await page.getByTestId('bundle-activity-search-input').click();
+    await expect(
+      page.getByTestId('bundle-activity-autocomplete-item-w-once')
+    ).toHaveCount(0);
+    await page
+      .getByTestId('bundle-activity-autocomplete-item-w-stretch')
+      .click();
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-bundle-times').click();
+    await page
+      .getByTestId('bundle-time-1-select')
+      .selectOption({ label: 'Evening' });
+    await checkA11y(page);
+    await page.getByTestId('save-bundle-button').click();
+
+    await expect(page).toHaveURL(/\/bundle\/bundle-/);
+    const id = page.url().split('/bundle/')[1];
+    await expect(page.getByTestId('bundle-treatment-count')).toHaveText(
+      '1 treatment'
+    );
+    await expect(page.getByTestId('bundle-activity-count')).toHaveText(
+      '1 activity'
+    );
+    await expect(page.getByTestId('bundle-activity-w-stretch')).toBeVisible();
+    const stored = await bridge(
+      page,
+      (b, bundleId) => b.getBundle(bundleId),
+      id
+    );
+    expect(stored.action[0].action[0].action).toEqual([
+      {
+        resource: {
+          reference: 'MedicationRequest/w-magnesium',
+          type: 'MedicationRequest',
+        },
+      },
+      {
+        resource: {
+          reference: 'ServiceRequest/w-stretch',
+          type: 'ServiceRequest',
+        },
+      },
+    ]);
+
+    // In the journal, the activity is answered with the bundle.
+    const key = `${id}:0`;
+    await openRoute(page, '/journal');
+    await expect(page.getByTestId('procedure-log-row-w-stretch')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId(`bundle-log-activity-count-${key}`)
+    ).toHaveText('1 activity');
+    await page.getByTestId(`bundle-log-taken-${key}`).click();
+    await expect
+      .poll(() => getTestTreatmentLog(page, `w-magnesium-${today}-0`))
+      .toMatchObject({ status: 'completed' });
+    await expect
+      .poll(() => getTestProcedureLog(page, `w-stretch-${today}`))
+      .toMatchObject({ status: 'completed' });
+
+    // Opened, the activity is answered on its own.
+    await page.getByTestId(`bundle-log-toggle-${key}`).click();
+    await page.getByTestId('procedure-log-not-taken-w-stretch').click();
+    await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
+      '1 of 2 done'
+    );
+    await checkA11y(page);
+
+    // The activity's page lists the bundle; deleting it leaves the bundle
+    // with the treatment.
+    await openRoute(page, '/service-request/w-stretch');
+    await expect(
+      page.getByTestId(`service-request-bundle-${id}`)
+    ).toBeVisible();
+    await bridge(page, (b) => b.deleteServiceRequest('w-stretch'));
+    await openRoute(page, `/bundle/${id}`);
+    await expect(page.getByTestId('bundle-treatment-count')).toHaveText(
+      '1 treatment'
+    );
+    await expect(page.getByTestId('bundle-activity-count')).toHaveCount(0);
   });
 
   test('groups doses by time and follows the times of day settings', async ({

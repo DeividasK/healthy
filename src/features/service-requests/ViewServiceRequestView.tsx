@@ -5,6 +5,7 @@ import {
   Calendar,
   FlaskConical,
   FolderPlus,
+  Group,
   ListChecks,
   Stethoscope,
   Timer,
@@ -14,6 +15,7 @@ import type {
   DiagnosticReport,
   Encounter,
   Procedure,
+  RequestOrchestration,
   ServiceRequest,
 } from 'fhir/r5';
 import { getServiceRequestMeta } from './ServiceRequestRelatedRow';
@@ -36,6 +38,8 @@ import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelated
 import { getLabResultsByServiceRequestId } from '@/src/features/lab-results/diagnosticReportService';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
+import { BundleRelatedRow } from '@/src/features/bundles/BundleRelatedRow';
+import { getBundlesWithActivity } from '@/src/features/bundles/bundleService';
 import {
   deleteServiceRequest,
   getConsultationIdsBasedOnServiceRequest,
@@ -77,6 +81,7 @@ interface RelatedRecords {
   labResults: DiagnosticReport[];
   /** Sessions done (completed Procedures based on it), newest first. */
   sessions: Procedure[];
+  bundles: RequestOrchestration[];
 }
 
 const NO_RELATED: RelatedRecords = {
@@ -86,6 +91,7 @@ const NO_RELATED: RelatedRecords = {
   basedOn: [],
   labResults: [],
   sessions: [],
+  bundles: [],
 };
 
 async function loadConsultations(ids: string[], patientId: string) {
@@ -125,21 +131,29 @@ function ServiceRequestForPatient({
         return;
       }
       const originId = getServiceRequestOriginId(loaded);
-      const [conditions, origin, linkedIds, basedOnIds, labResults, logs] =
-        await Promise.all([
-          Promise.all(
-            getReasonConditionIds(loaded).map((conditionId) =>
-              getConditionById(conditionId, activePatientId).catch(() => null)
-            )
-          ),
-          originId
-            ? getConsultationById(originId, activePatientId).catch(() => null)
-            : null,
-          getConsultationIdsLinkingServiceRequest(id, activePatientId),
-          getConsultationIdsBasedOnServiceRequest(id, activePatientId),
-          getLabResultsByServiceRequestId(id, activePatientId),
-          fetchProceduresByServiceRequestId(id, activePatientId),
-        ]);
+      const [
+        conditions,
+        origin,
+        linkedIds,
+        basedOnIds,
+        labResults,
+        logs,
+        bundles,
+      ] = await Promise.all([
+        Promise.all(
+          getReasonConditionIds(loaded).map((conditionId) =>
+            getConditionById(conditionId, activePatientId).catch(() => null)
+          )
+        ),
+        originId
+          ? getConsultationById(originId, activePatientId).catch(() => null)
+          : null,
+        getConsultationIdsLinkingServiceRequest(id, activePatientId),
+        getConsultationIdsBasedOnServiceRequest(id, activePatientId),
+        getLabResultsByServiceRequestId(id, activePatientId),
+        fetchProceduresByServiceRequestId(id, activePatientId),
+        getBundlesWithActivity(id, activePatientId),
+      ]);
       const [linked, basedOn] = await Promise.all([
         loadConsultations(
           linkedIds.filter((cId) => cId !== originId),
@@ -157,6 +171,7 @@ function ServiceRequestForPatient({
         basedOn,
         labResults,
         sessions: logs.filter((log) => log.status === 'completed').reverse(),
+        bundles,
       });
     } catch (err) {
       if (sequence !== loadSequence.current) return;
@@ -176,6 +191,7 @@ function ServiceRequestForPatient({
       'conditions',
       'diagnostic_reports',
       'procedures',
+      'request_orchestrations',
     ],
     loadData
   );
@@ -335,6 +351,22 @@ function ServiceRequestForPatient({
             }}
           />
         )}
+      </ResourceSection>
+
+      <ResourceSection
+        icon={Group}
+        title="Bundles"
+        count={related.bundles.length}
+        testID="service-request-bundles-section"
+      >
+        {related.bundles.map((bundle) => (
+          <BundleRelatedRow
+            key={bundle.id}
+            bundle={bundle}
+            testID={`service-request-bundle-${bundle.id}`}
+            onPress={() => router.push(`/bundle/${bundle.id}`)}
+          />
+        ))}
       </ResourceSection>
 
       <ResourceSection

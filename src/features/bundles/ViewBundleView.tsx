@@ -1,7 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Pencil, Pill } from 'lucide-react-native';
-import type { MedicationRequest, RequestOrchestration } from 'fhir/r5';
+import { ClipboardList, Pencil, Pill } from 'lucide-react-native';
+import type {
+  MedicationRequest,
+  RequestOrchestration,
+  ServiceRequest,
+} from 'fhir/r5';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
@@ -9,8 +13,14 @@ import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
 import { getTreatmentById } from '@/src/features/treatments/treatmentService';
+import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
+import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
 import { getBundleMeta } from './BundleRelatedRow';
-import { getBundleMemberIds, getBundleTitle } from './bundleModel';
+import {
+  getBundleActivityIds,
+  getBundleMemberIds,
+  getBundleTitle,
+} from './bundleModel';
 import { deleteBundle, getBundleById } from './bundleService';
 
 export function ViewBundleView() {
@@ -36,6 +46,7 @@ function BundleForPatient({
   const router = useRouter();
   const [bundle, setBundle] = useState<RequestOrchestration | null>(null);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
+  const [activities, setActivities] = useState<ServiceRequest[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>(
     'loading'
   );
@@ -52,10 +63,22 @@ function BundleForPatient({
             )
           )
         : [];
+      const activityMembers = loaded
+        ? await Promise.all(
+            getBundleActivityIds(loaded).map((requestId) =>
+              getServiceRequestById(requestId, activePatientId)
+            )
+          )
+        : [];
       if (sequence !== loadSequence.current) return;
       setBundle(loaded);
       setTreatments(
         members.filter((member): member is MedicationRequest => Boolean(member))
+      );
+      setActivities(
+        activityMembers.filter((member): member is ServiceRequest =>
+          Boolean(member)
+        )
       );
       setState(loaded ? 'ready' : 'missing');
     } catch (err) {
@@ -67,7 +90,7 @@ function BundleForPatient({
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['request_orchestrations', 'medication_requests'],
+    ['request_orchestrations', 'medication_requests', 'service_requests'],
     loadData
   );
 
@@ -106,7 +129,7 @@ function BundleForPatient({
           deleteConfirmation={{
             title: 'Delete Bundle',
             message:
-              'Delete this bundle? Its treatments and their journal answers are kept.',
+              'Delete this bundle? Its treatments, activities and their journal answers are kept.',
             onConfirm: async () => {
               await deleteBundle(id, activePatientId);
               if (router.canGoBack()) router.back();
@@ -128,6 +151,21 @@ function BundleForPatient({
             treatment={treatment}
             testID={`bundle-treatment-${treatment.id}`}
             onPress={() => router.push(`/treatment/${treatment.id}`)}
+          />
+        ))}
+      </ResourceSection>
+      <ResourceSection
+        icon={ClipboardList}
+        title="Activities"
+        count={activities.length}
+        testID="bundle-activities-section"
+      >
+        {activities.map((request) => (
+          <ServiceRequestRelatedRow
+            key={request.id}
+            request={request}
+            testID={`bundle-activity-${request.id}`}
+            onPress={() => router.push(`/service-request/${request.id}`)}
           />
         ))}
       </ResourceSection>

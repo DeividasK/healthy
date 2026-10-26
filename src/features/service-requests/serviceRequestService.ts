@@ -39,6 +39,7 @@ import {
   SNOMED_SYSTEM,
 } from './serviceRequestLabels';
 import {
+  getScheduleRepeat,
   withSchedule,
   type ServiceRequestSchedule,
 } from './serviceRequestSchedule';
@@ -340,6 +341,21 @@ export async function getServiceRequestLinkOptions(
   return (await fetchServiceRequestsByPatientId(patientId)).flatMap(
     (request) =>
       request.id
+        ? [{ id: request.id, label: getServiceRequestTitle(request) }]
+        : []
+  );
+}
+
+/**
+ * The patient's activities as link options: service requests that repeat on
+ * a schedule, so they can be logged in the journal.
+ */
+export async function getActivityLinkOptions(
+  patientId: string
+): Promise<{ id: string; label: string }[]> {
+  return (await fetchServiceRequestsByPatientId(patientId)).flatMap(
+    (request) =>
+      request.id && getScheduleRepeat(request)
         ? [{ id: request.id, label: getServiceRequestTitle(request) }]
         : []
   );

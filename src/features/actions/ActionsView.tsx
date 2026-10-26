@@ -42,6 +42,7 @@ import type { ProcedureItem } from './procedureDays';
 import { setProcedureDuration, setProcedureLog } from './procedureLogService';
 import {
   getBundleChanges,
+  type BundleChanges,
   groupActionDay,
   type JournalRow,
 } from './bundleGrouping';
@@ -55,6 +56,7 @@ import { useJournalBundles } from './useJournalBundles';
 import { CheckboxRow } from './CheckboxRow';
 import {
   getActionDays,
+  setBundleAnswers,
   setTreatmentLog,
   setTreatmentLogs,
 } from './treatmentLogService';
@@ -467,8 +469,7 @@ function ActionsForPatient({
   const applyAnswers = useCallback(
     async (
       date: string,
-      changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[],
-      kind: 'copy' | 'bundle' = 'copy'
+      changes: { item: ActionItem; answer: TreatmentLogAnswer | null }[]
     ) => {
       if (!changes.length) return;
       setSaveErrorsByDate((current) => ({ ...current, [date]: undefined }));
@@ -491,18 +492,10 @@ function ActionsForPatient({
       try {
         await setTreatmentLogs(changes, date, activePatientId);
       } catch (err) {
-        console.error(
-          kind === 'copy'
-            ? 'Failed to copy treatment logs:'
-            : 'Failed to save bundle answers:',
-          err
-        );
+        console.error('Failed to copy treatment logs:', err);
         setSaveErrorsByDate((current) => ({
           ...current,
-          [date]:
-            kind === 'copy'
-              ? 'Failed to copy treatment answers. Please try again.'
-              : 'Failed to save treatment answers. Please try again.',
+          [date]: 'Failed to copy treatment answers. Please try again.',
         }));
       } finally {
         setSavingKeys((current) =>
@@ -513,6 +506,49 @@ function ActionsForPatient({
     },
     [activePatientId, loadData]
   );
+
+  /**
+   * Answers a bundle's doses and activities at once, then saves them
+   * together: one transaction and one refresh.
+   */
+  const applyBundleAnswers = async (date: string, changes: BundleChanges) => {
+    const keys = [...changes.items, ...changes.procedures].map(
+      ({ item }) => item.key
+    );
+    if (!keys.length) return;
+    setSaveErrorsByDate((current) => ({ ...current, [date]: undefined }));
+    const answers = new Map(
+      [...changes.items, ...changes.procedures].map(({ item, answer }) => [
+        item.key,
+        answer,
+      ])
+    );
+    const withAnswer = <T extends { key: string }>(item: T) =>
+      answers.has(item.key)
+        ? { ...item, answer: answers.get(item.key) ?? null }
+        : item;
+    setDaysByDate((current) => ({
+      ...current,
+      [date]: {
+        ...current[date],
+        items: current[date].items.map(withAnswer),
+        procedures: current[date].procedures?.map(withAnswer),
+      },
+    }));
+    setSavingKeys((current) => [...current, ...keys]);
+    try {
+      await setBundleAnswers(changes, date, activePatientId);
+    } catch (err) {
+      console.error('Failed to save bundle answers:', err);
+      setSaveErrorsByDate((current) => ({
+        ...current,
+        [date]: 'Failed to save bundle answers. Please try again.',
+      }));
+    } finally {
+      setSavingKeys((current) => current.filter((key) => !keys.includes(key)));
+      await loadData();
+    }
+  };
 
   /**
    * Checking fills this day's unanswered rows with the previous day's
@@ -549,6 +585,12 @@ function ActionsForPatient({
       params: { id: item.treatment.id || '' },
     });
 
+  const openProcedure = (item: ProcedureItem) =>
+    router.push({
+      pathname: '/service-request/[id]',
+      params: { id: item.request.id || '' },
+    });
+
   const renderRow = (row: JournalRow, group: JournalGroup, index: number) => {
     const reorder: ReorderHandlers | undefined = isReordering
       ? {
@@ -572,12 +614,7 @@ function ActionsForPatient({
           onDurationChange={(minutes) =>
             void handleProcedureDuration(row.item, minutes)
           }
-          onOpen={() =>
-            router.push({
-              pathname: '/service-request/[id]',
-              params: { id: row.item.request.id || '' },
-            })
-          }
+          onOpen={() => openProcedure(row.item)}
         />
       );
     return row.kind === 'bundle' ? (
@@ -588,13 +625,15 @@ function ActionsForPatient({
         isSaving={(item) => savingKeys.includes(item.key)}
         reorder={reorder}
         onAnswerAll={(pressed) =>
-          void applyAnswers(
-            shown.date,
-            getBundleChanges(row.items, pressed),
-            'bundle'
-          )
+          void applyBundleAnswers(shown.date, getBundleChanges(row, pressed))
         }
         onAnswer={(item, answer) => void handleAnswer(item, answer)}
+        onProcedureAnswer={(item, answer) =>
+          void handleProcedureAnswer(item, answer)
+        }
+        onProcedureDuration={(item, minutes) =>
+          void handleProcedureDuration(item, minutes)
+        }
         onOpen={() =>
           router.push({
             pathname: '/bundle/[id]',
@@ -602,6 +641,7 @@ function ActionsForPatient({
           })
         }
         onOpenTreatment={openTreatment}
+        onOpenProcedure={openProcedure}
       />
     ) : (
       <TreatmentLogRow

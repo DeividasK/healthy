@@ -26,8 +26,9 @@ import { addDays, formatLocalDate } from '@/src/utils/dateUtils';
 /**
  * A sample person whose records use every feature: lab results over three
  * years, a permanent and a temporary condition, consultations, treatments in
- * bundles, a planned retest and repeating activities with recent logs. Dates
- * count back from today, so the journal and timelines always look current.
+ * bundles (one with an activity), a planned retest and repeating activities
+ * with recent logs. Dates count back from today, so the journal and
+ * timelines always look current.
  */
 
 const GP = 'Dr. Sarah Lee';
@@ -373,6 +374,15 @@ async function addDemoRecords(patientId: string): Promise<void> {
     regimen: daily('5', 'g', 'EVE'),
     reason: 'Gut health',
   });
+  const magnesium = await createOrUpdateTreatment({
+    patientId,
+    title: 'Magnesium glycinate 200 mg',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-2),
+    regimen: daily('1', '{capsule}', 'EVE'),
+    reason: 'Sleep',
+  });
   await changeTreatmentUsage(iron, patientId, 'start', fromToday(-36, 5));
   await changeTreatmentUsage(iron, patientId, 'stop', fromToday(-26, 5));
   for (const treatment of [
@@ -383,6 +393,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
     collagen,
     creatine,
     inulin,
+    magnesium,
   ])
     await changeTreatmentUsage(
       treatment,
@@ -451,6 +462,25 @@ async function addDemoRecords(patientId: string): Promise<void> {
     authoredDate: fromToday(-3),
     schedule: { period: 1, periodUnit: 'd', duration: 60 },
     instructions: 'One session in the chamber.',
+  });
+
+  // An evening bundle with a treatment and an activity.
+  const stretching = await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Stretching',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-2),
+    schedule: { period: 1, periodUnit: 'd', duration: 10, when: 'EVE' },
+    instructions: 'Gentle stretches before bed.',
+  });
+  await saveBundle({
+    patientId,
+    title: 'Evening wind-down',
+    times: [{ kind: 'when', code: 'EVE' }],
+    memberIds: [magnesium.id!],
+    activityIds: [stretching.id!],
   });
 
   // A planned annual review, based on the retest.

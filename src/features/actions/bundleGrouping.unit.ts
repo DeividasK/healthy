@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import type { Dosage, MedicationRequest } from 'fhir/r5';
+import type { Dosage, MedicationRequest, ServiceRequest } from 'fhir/r5';
 import {
   buildBundle,
   type BundleTime,
 } from '@/src/features/bundles/bundleModel';
 import type { ActionItem } from './actionDays';
+import type { ProcedureItem } from './procedureDays';
 import {
   getBundleAnswer,
   getBundleChanges,
@@ -50,9 +51,33 @@ const time = (value: string): BundleTime =>
     ? { kind: 'time', time: value }
     : { kind: 'when', code: value as 'MORN' };
 
-const bundle = (id: string, memberIds: string[], times: string[] = []) =>
+/** A scheduled activity's item; `at` is a part of the day (MORN). */
+const activity = (id: string, at?: string): ProcedureItem => {
+  const request: ServiceRequest = {
+    resourceType: 'ServiceRequest',
+    id,
+    status: 'active',
+    intent: 'plan',
+    subject: { reference: 'Patient/p1' },
+    occurrenceTiming: {
+      repeat: {
+        period: 1,
+        periodUnit: 'd',
+        ...(at && { when: [at as 'MORN'] }),
+      },
+    },
+  };
+  return { key: `${id}-log`, rowId: id, request, answer: null, duration: null };
+};
+
+const bundle = (
+  id: string,
+  memberIds: string[],
+  times: string[] = [],
+  activityIds: string[] = []
+) =>
   buildBundle(
-    { title: id, memberIds, times: times.map(time) },
+    { title: id, memberIds, activityIds, times: times.map(time) },
     { id, patientId: 'p1', now: new Date('2026-10-19T08:00:00Z') }
   );
 
@@ -60,7 +85,7 @@ const bundle = (id: string, memberIds: string[], times: string[] = []) =>
 const describe = (rows: JournalRow[]) =>
   rows.map((row) =>
     row.kind === 'bundle'
-      ? `${row.key}: ${row.items.map((entry) => entry.key).join(', ')}`
+      ? `${row.key}: ${[...row.items, ...row.procedures].map((entry) => entry.key).join(', ')}`
       : row.item.key
   );
 
@@ -137,14 +162,43 @@ test('bundle buttons answer every dose and clear when pressed again', () => {
   ];
   expect(getBundleAnswer(doses)).toBeNull();
   expect(
-    getBundleChanges(doses, 'taken').map(({ item: entry, answer }) => [
-      entry.key,
-      answer,
-    ])
+    getBundleChanges({ items: doses, procedures: [] }, 'taken').items.map(
+      ({ item: entry, answer }) => [entry.key, answer]
+    )
   ).toEqual([['b-any', 'taken']]);
   const allTaken = doses.map((dose) => ({ ...dose, answer: 'taken' as const }));
   expect(getBundleAnswer(allTaken)).toBe('taken');
   expect(
-    getBundleChanges(allTaken, 'taken').map(({ answer }) => answer)
+    getBundleChanges({ items: allTaken, procedures: [] }, 'taken').items.map(
+      ({ answer }) => answer
+    )
   ).toEqual([null, null]);
+});
+
+test('a bundle groups its activities with its doses at their time', () => {
+  const rows = groupActionDay(
+    [item('a', 'MORN'), item('a', 'EVE')],
+    [bundle('x', ['a'], ['MORN', 'EVE'], ['walk', 'read'])],
+    TIMES,
+    [activity('walk', 'EVE'), activity('read'), activity('other', 'MORN')]
+  );
+  // The untimed activity fills the first time it has not filled yet.
+  expect(describe(rows)).toEqual([
+    'x:0: a-MORN, read-log',
+    'x:1: a-EVE, walk-log',
+    'other-log',
+  ]);
+});
+
+test('bundle buttons answer its activities too', () => {
+  const row = {
+    items: [item('a', undefined, { answer: 'taken' })],
+    procedures: [activity('walk')],
+  };
+  expect(getBundleAnswer([...row.items, ...row.procedures])).toBeNull();
+  const changes = getBundleChanges(row, 'taken');
+  expect(changes.items).toEqual([]);
+  expect(changes.procedures.map(({ item: entry }) => entry.key)).toEqual([
+    'walk-log',
+  ]);
 });

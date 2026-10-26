@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AutocompleteItem } from '@/src/components/AutocompleteDropdown';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getTreatmentLinkOptions } from '@/src/features/treatments/treatmentService';
+import { getActivityLinkOptions } from '@/src/features/service-requests/serviceRequestService';
 import { BundleForm } from './BundleForm';
 import { saveBundle } from './bundleService';
 import { LoadingView } from '@/src/components/LoadingView';
@@ -12,33 +13,38 @@ export function AddBundleView() {
   const router = useRouter();
   const { treatmentId } = useLocalSearchParams<{ treatmentId?: string }>();
   const { activePatientId, isLoading } = useActivePatient();
-  const [treatmentOptions, setTreatmentOptions] = useState<
-    AutocompleteItem[] | null
-  >(null);
+  const [options, setOptions] = useState<{
+    treatments: AutocompleteItem[];
+    activities: AutocompleteItem[];
+  } | null>(null);
 
   useEffect(() => {
     if (!activePatientId) return;
     let isMounted = true;
-    void getTreatmentLinkOptions(activePatientId).then((options) => {
-      if (isMounted) setTreatmentOptions(options);
+    void Promise.all([
+      getTreatmentLinkOptions(activePatientId),
+      getActivityLinkOptions(activePatientId),
+    ]).then(([treatments, activities]) => {
+      if (isMounted) setOptions({ treatments, activities });
     });
     return () => {
       isMounted = false;
     };
   }, [activePatientId]);
 
-  if (isLoading || !treatmentOptions) {
+  if (isLoading || !options) {
     return <LoadingView />;
   }
 
   return (
     <BundleForm
       key={activePatientId}
-      treatmentOptions={treatmentOptions}
+      treatmentOptions={options.treatments}
+      activityOptions={options.activities}
       initialValues={{
         memberIds:
           treatmentId &&
-          treatmentOptions.some((option) => option.id === treatmentId)
+          options.treatments.some((option) => option.id === treatmentId)
             ? [treatmentId]
             : [],
       }}
