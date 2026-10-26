@@ -26,7 +26,7 @@ import { addDays, formatLocalDate } from '@/src/utils/dateUtils';
 /**
  * A sample person whose records use every feature: lab results over three
  * years, a permanent and a temporary condition, consultations, treatments in
- * bundles, a planned retest and a repeating activity with recent logs. Dates
+ * bundles, a planned retest and repeating activities with recent logs. Dates
  * count back from today, so the journal and timelines always look current.
  */
 
@@ -368,7 +368,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
     memberIds: [atorvastatin.id!, ezetimibe.id!],
   });
 
-  // Service requests: a planned retest and a repeating activity.
+  // Service requests: a planned retest and repeating activities.
   const retest = await createOrUpdateServiceRequest({
     patientId,
     consultationId: followUp.id,
@@ -394,6 +394,27 @@ async function addDemoRecords(patientId: string): Promise<void> {
     instructions: 'Brisk cycling or walking, able to hold a conversation.',
     reasonConditionIds: [cholesterol.id!],
     requesterName: CARDIOLOGIST,
+  });
+  // Daily activities the demo person chose for themselves.
+  await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Meditation',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-6),
+    schedule: { period: 1, periodUnit: 'd', duration: 15, when: 'MORN' },
+    instructions: 'Sit quietly and follow the breath.',
+  });
+  await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Hyperbaric oxygen therapy (HBOT)',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-3),
+    schedule: { period: 1, periodUnit: 'd', duration: 60 },
+    instructions: 'One session in the chamber.',
   });
 
   // A planned annual review, based on the retest.
@@ -439,11 +460,12 @@ async function addDemoRecords(patientId: string): Promise<void> {
           patientId,
           true
         );
-      for (const item of day.procedures ?? [])
+      // Each activity is skipped on a different day.
+      for (const [order, item] of (day.procedures ?? []).entries())
         await setProcedureLog(
           item,
           day.date,
-          index === 8 ? 'not-taken' : 'taken',
+          index === 8 - order * 3 ? 'not-taken' : 'taken',
           patientId,
           true
         );

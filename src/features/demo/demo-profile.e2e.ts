@@ -75,6 +75,10 @@ test.describe('Demo profile', () => {
       await openRoute(page, '/journal');
       await expect(page.getByText('Morning stack')).toBeVisible();
       await expect(page.getByText('Evening medication')).toBeVisible();
+      for (const activity of ['Meditation', 'Hyperbaric oxygen therapy (HBOT)'])
+        await expect(
+          page.getByRole('checkbox', { name: `Mark ${activity} done` })
+        ).toBeVisible();
     });
 
     await test.step('The profile is the demo person', async () => {
