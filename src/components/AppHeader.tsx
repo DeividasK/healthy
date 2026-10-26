@@ -162,7 +162,7 @@ export function AppHeader() {
 const styles = StyleSheet.create({
   // The divider spans the window; the header row lines up with the content.
   safeArea: {
-    backgroundColor: COLORS.light.card,
+    backgroundColor: COLORS.light.chrome,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.light.cardBorder,
   },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: COLORS.light.card,
+    backgroundColor: COLORS.light.chrome,
   },
   button: {
     width: 44,

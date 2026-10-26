@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: COLORS.light.emptyIconContainer,
     borderWidth: 1,
-    borderColor: COLORS.light.card,
+    borderColor: COLORS.light.chrome,
     alignItems: 'center',
     justifyContent: 'center',
   },
