@@ -15,7 +15,7 @@ import {
   getBiomarkerRouteId,
 } from '@/src/features/home/BiomarkerResultRow';
 import { BiomarkerStatusGroups } from '@/src/features/home/BiomarkerStatusGroups';
-import { useListArrowKeys } from '@/src/features/home/useListArrowKeys';
+import { useListArrowKeys } from '@/src/components/useListArrowKeys';
 import { useIsWideLayout } from '@/src/theme/layout';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
@@ -139,7 +139,7 @@ function LabResultForPatient({
     [selectedId, router]
   );
   const isSplit = isWideWindow && Boolean(record) && Boolean(selectedId);
-  useListArrowKeys('lab-result-list', isSplit);
+  useListArrowKeys('lab-result-list', 'View biomarker:', isSplit);
 
   if (isLoading) {
     return <ResourceViewLayout testID="lab-result-view" isLoading />;

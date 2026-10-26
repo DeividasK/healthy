@@ -6,6 +6,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getBiomarkerKey } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
+import { SelectedRowMarker } from '@/src/components/SelectedRowMarker';
 import {
   getObservationMarker,
   getObservationReferenceRange,
@@ -72,7 +73,7 @@ export function BiomarkerValueRow({
 }) {
   return (
     <TouchableOpacity
-      style={[styles.row, selected && styles.selected]}
+      style={styles.row}
       aria-current={selected || undefined}
       testID={testID}
       accessibilityRole="button"
@@ -82,6 +83,7 @@ export function BiomarkerValueRow({
       onPress={onPress}
       activeOpacity={0.6}
     >
+      {selected && <SelectedRowMarker />}
       <View style={styles.main}>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.valueGroup}>
@@ -156,7 +158,6 @@ export function BiomarkerResultRow({
 }
 
 const styles = StyleSheet.create({
-  selected: { backgroundColor: COLORS.light.pillBackground },
   // Spans the screen width like resource rows, divided by the same hairline.
   row: {
     minHeight: 72,

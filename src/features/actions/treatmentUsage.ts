@@ -161,6 +161,15 @@ export function getCurrentUsage(periods: UsagePeriod[]): CurrentUsage {
   return open.state;
 }
 
+const CURRENT_USAGE_DISPLAY: Record<CurrentUsage, string> = {
+  ...STATE_DISPLAY,
+  'not-started': 'Not started',
+};
+
+/** Display label for a current usage, e.g. "Taking". */
+export const getCurrentUsageLabel = (current: CurrentUsage) =>
+  CURRENT_USAGE_DISPLAY[current];
+
 /** The changes offered for the current usage. */
 export function getAvailableActions(current: CurrentUsage): UsageAction[] {
   if (current === 'taking') return ['pause', 'stop', 'change'];

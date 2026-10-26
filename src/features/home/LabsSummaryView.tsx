@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import type { DiagnosticReportRecord } from '@/src/database/types';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
@@ -20,10 +20,8 @@ import {
   getBiomarkerRouteId,
 } from './BiomarkerResultRow';
 import { BiomarkerDetailView } from '@/src/features/lab-results/BiomarkerDetailView';
-import { ScreenHeading } from '@/src/components/ScreenHeading';
-import { COLORS } from '@/src/theme/colors';
-import { WIDE_MAX_WIDTH, useIsWideLayout } from '@/src/theme/layout';
-import { useListArrowKeys } from './useListArrowKeys';
+import { ListDetailLayout } from '@/src/components/ListDetailLayout';
+import { useIsWideLayout } from '@/src/theme/layout';
 
 /** The active patient's latest biomarker results for the chosen period, then every lab result. */
 export function LabsSummaryView() {
@@ -99,7 +97,6 @@ export function LabsSummaryView() {
     [selectedId, router]
   );
   const isSplit = isWideWindow && !isLoading && Boolean(selectedId);
-  useListArrowKeys('biomarker-list', isSplit);
 
   const summary = (
     <LabsSummary
@@ -116,23 +113,22 @@ export function LabsSummaryView() {
     return (
       // Related biomarkers on the right are chosen in place too.
       <BiomarkerSelectionContext.Provider value={selection}>
-        <View style={styles.split} testID="labs-summary-view">
-          <ScrollView
-            nativeID="biomarker-list"
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-          >
-            <ScreenHeading>Biomarkers</ScreenHeading>
-            {labResults}
-            {summary}
-          </ScrollView>
-          <View style={styles.detail}>
-            {/* Not keyed by the biomarker: a remount would reload every
-                report and flash the skeleton on each step. */}
-            <BiomarkerDetailView id={selectedId} />
-          </View>
-          <ResourceActionDock actions={[]} />
-        </View>
+        <ListDetailLayout
+          title="Biomarkers"
+          listId="biomarker-list"
+          rowLabel="View biomarker:"
+          testID="labs-summary-view"
+          list={
+            <>
+              {labResults}
+              {summary}
+            </>
+          }
+          // Not keyed by the biomarker: a remount would reload every report
+          // and flash the skeleton on each step.
+          detail={<BiomarkerDetailView id={selectedId} />}
+          dock={<ResourceActionDock actions={[]} />}
+        />
       </BiomarkerSelectionContext.Provider>
     );
 
@@ -157,19 +153,4 @@ export function LabsSummaryView() {
 }
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'flex-start' },
-  split: {
-    flex: 1,
-    flexDirection: 'row',
-    width: '100%',
-    maxWidth: WIDE_MAX_WIDTH,
-    alignSelf: 'center',
-  },
-  list: {
-    width: 440,
-    flexGrow: 0,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: COLORS.light.cardBorder,
-  },
-  listContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 132 },
-  detail: { flex: 1 },
 });

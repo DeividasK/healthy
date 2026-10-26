@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-const ROW = '[aria-label^="View biomarker:"]';
 const CLOSED_GROUP =
   '[data-testid*="-groups-"][data-testid$="-toggle"][aria-expanded="false"]';
 
@@ -15,18 +14,24 @@ function choose(row: HTMLElement) {
 }
 
 /**
- * Up and down arrows move through the biomarker list beside the detail
- * (web), choosing each biomarker they reach and opening collapsed status
- * groups on the way, unless a field has the keys.
- * `listID` is the list's native ID, unique per screen since the stack keeps
+ * Up and down arrows move through a list beside its detail (web), choosing
+ * each row they reach and opening collapsed status groups on the way,
+ * unless a field or dialog has the keys. Rows are the buttons in `#listId`
+ * whose accessible name starts with `rowLabel`; the chosen one has
+ * `aria-current`. The list ID is unique per screen, since the stack keeps
  * earlier screens in the page.
  */
-export function useListArrowKeys(listID: string, enabled: boolean) {
+export function useListArrowKeys(
+  listId: string,
+  rowLabel: string,
+  enabled = true
+) {
   // Only while this screen is in front: the stack keeps it mounted beneath
   // the screens opened from it.
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== 'web' || !enabled) return;
+      const row = `[aria-label^="${rowLabel}"]`;
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
         const target = event.target as HTMLElement | null;
@@ -34,7 +39,7 @@ export function useListArrowKeys(listID: string, enabled: boolean) {
         if (document.querySelector('[aria-modal="true"]')) return;
         const items = [
           ...document.querySelectorAll<HTMLElement>(
-            `#${listID} ${ROW}, #${listID} ${CLOSED_GROUP}`
+            `#${listId} ${row}, #${listId} ${CLOSED_GROUP}`
           ),
         ];
         if (items.length === 0) return;
@@ -47,18 +52,18 @@ export function useListArrowKeys(listID: string, enabled: boolean) {
         const next =
           current === -1 ? items[0] : items[current + (down ? 1 : -1)];
         if (!next) return;
-        if (next.matches(ROW)) return choose(next);
+        if (next.matches(row)) return choose(next);
         // A collapsed group in the way opens, and the step lands on its
         // nearest row.
         next.click();
         requestAnimationFrame(() => {
-          const opened = next.parentElement?.querySelectorAll<HTMLElement>(ROW);
+          const opened = next.parentElement?.querySelectorAll<HTMLElement>(row);
           if (opened?.length)
             choose(down ? opened[0] : opened[opened.length - 1]);
         });
       };
       window.addEventListener('keydown', onKeyDown);
       return () => window.removeEventListener('keydown', onKeyDown);
-    }, [listID, enabled])
+    }, [listId, rowLabel, enabled])
   );
 }
