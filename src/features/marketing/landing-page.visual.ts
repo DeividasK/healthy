@@ -26,10 +26,12 @@ test.describe('Landing page - Visual Regression', () => {
     });
   });
 
-  for (const { name, viewport } of [
+  const viewports = [
     { name: 'Mobile', viewport: null },
     { name: 'Desktop', viewport: { width: 1280, height: 900 } },
-  ]) {
+  ];
+
+  for (const { name, viewport } of viewports) {
     test(`Landing page - ${name}`, async ({ page }, testInfo) => {
       if (viewport) await page.setViewportSize(viewport);
       await page.goto(SITE_PATH);
@@ -42,6 +44,15 @@ test.describe('Landing page - Visual Regression', () => {
           )
         );
       await takeSnapshot(page, `Landing page - ${name}`, testInfo);
+    });
+  }
+
+  for (const { name, viewport } of viewports) {
+    test(`Privacy policy - ${name}`, async ({ page }, testInfo) => {
+      if (viewport) await page.setViewportSize(viewport);
+      await page.goto(`${SITE_PATH}privacy.html`);
+      await page.evaluate(() => document.fonts.ready);
+      await takeSnapshot(page, `Privacy policy - ${name}`, testInfo);
     });
   }
 });

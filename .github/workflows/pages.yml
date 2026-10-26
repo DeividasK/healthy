@@ -77,7 +77,6 @@ jobs:
           mkdir _site
           cp -R .pages/site/. _site/
           cp -R dist _site/a
-          cp public/privacy.html _site/privacy.html
           # Unknown paths fall back to the app so its deep links load.
           cp _site/a/index.html _site/404.html
           touch _site/.nojekyll

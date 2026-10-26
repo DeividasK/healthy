@@ -4,59 +4,166 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Healthy – Privacy Policy</title>
+    <meta
+      name="description"
+      content="What Healthy stores, where it stores it and who can read it. Your records stay on your device, and synced copies are end-to-end encrypted."
+    />
+    <link rel="canonical" href="https://usehealthy.app/privacy.html" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <link
+      rel="preload"
+      href="fonts/literata.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <style>
-      :root {
-        color-scheme: light dark;
-        --fg: #1c1f1d;
-        --muted: #5b625d;
-        --bg: #ffffff;
-        --accent: #2f5d45;
+      /* The landing page's Field Notebook look, kept to what this page uses.
+         See index.html. */
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: normal;
+        font-display: swap;
       }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --fg: #e8ece9;
-          --muted: #a7afa9;
-          --bg: #121513;
-          --accent: #8fc3a3;
-        }
+      @font-face {
+        font-family: 'Literata';
+        src: url('fonts/literata-italic.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: italic;
+        font-display: swap;
+      }
+      :root {
+        --paper: #fffdf9;
+        --grid: #e6efe8;
+        --foreground: #1a1c1a;
+        --text-secondary: #414844;
+        --primary: #3d6450;
+        --serif: 'Literata', Georgia, 'Times New Roman', serif;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font:
-          16px/1.6 system-ui,
-          -apple-system,
-          'Segoe UI',
-          Roboto,
-          sans-serif;
+        color: var(--foreground);
+        background-color: var(--paper);
+        --margin: max(12px, calc(50% - 520px));
+        background-image:
+          linear-gradient(
+            90deg,
+            transparent var(--margin),
+            rgba(199, 124, 78, 0.5) var(--margin),
+            rgba(199, 124, 78, 0.5) calc(var(--margin) + 1.5px),
+            transparent calc(var(--margin) + 1.5px)
+          ),
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size:
+          100% 100%,
+          22px 22px,
+          22px 22px;
+        font: 17px/1.6 var(--serif);
+      }
+      header,
+      main,
+      footer {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding-left: max(28px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+      }
+      header {
+        padding-top: 20px;
+        padding-bottom: 20px;
+        font-weight: 600;
+        font-size: 1.2rem;
+      }
+      header a {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--foreground);
+        text-decoration: none;
+      }
+      header img {
+        width: 28px;
+        height: 28px;
       }
       main {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 40px 16px 64px;
+        padding-top: 40px;
+        padding-bottom: 56px;
+      }
+      h1,
+      h2 {
+        font-weight: 500;
+        line-height: 1.12;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
       }
       h1 {
-        font-size: 2rem;
-        margin: 0 0 4px;
+        font-size: clamp(2.4rem, 6vw, 3.2rem);
+        margin: 0 0 8px;
       }
       h2 {
-        font-size: 1.2rem;
-        margin: 32px 0 8px;
+        font-size: clamp(1.4rem, 3vw, 1.7rem);
+        margin: 48px 0 12px;
+        padding-top: 24px;
+        border-top: 1px solid var(--grid);
+      }
+      p,
+      ul {
+        max-width: 36em;
       }
       p.updated {
-        color: var(--muted);
+        color: var(--text-secondary);
         margin-top: 0;
       }
-      a {
-        color: var(--accent);
+      ul {
+        padding-left: 1.2em;
       }
       li + li {
-        margin-top: 6px;
+        margin-top: 8px;
+      }
+      code {
+        font-size: 0.9em;
+      }
+      a {
+        color: var(--primary);
+      }
+      a:focus-visible {
+        outline: 3px solid var(--primary);
+        outline-offset: 3px;
+      }
+      footer {
+        padding-top: 28px;
+        padding-bottom: 48px;
+        border-top: 1px solid var(--grid);
+        font-size: 0.95rem;
+        color: var(--text-secondary);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        justify-content: space-between;
+      }
+      footer a {
+        color: var(--text-secondary);
+      }
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
       }
     </style>
   </head>
   <body>
+    <header>
+      <a href="./"><img src="favicon.svg" alt="" />Healthy</a>
+    </header>
+
     <main>
       <h1>Privacy Policy</h1>
       <p class="updated">Healthy · Effective 26 October 2026</p>
@@ -187,5 +294,16 @@
         >.
       </p>
     </main>
+
+    <footer>
+      <span>Made with ❤️ in 🇱🇹</span>
+      <nav aria-label="Footer">
+        <a href="mailto:hello@usehealthy.app">hello@usehealthy.app</a>
+        <a href="./">Home</a>
+        <a href="https://github.com/DeividasK/healthy/blob/main/CHANGELOG.md"
+          >What's new</a
+        >
+      </nav>
+    </footer>
   </body>
 </html>
