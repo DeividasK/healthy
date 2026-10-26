@@ -69,6 +69,7 @@ import {
   parseConsultationAIReply,
   type ImportedConsultation,
 } from './consultationAIImport';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 export interface ConsultationStatusOption {
   id: string;
@@ -960,6 +961,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
+    ...CONTENT_COLUMN,
     padding: 16,
     paddingBottom: 132,
   },

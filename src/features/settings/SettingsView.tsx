@@ -17,6 +17,7 @@ import {
   saveProfileSettings,
 } from './profileSettingsRepository';
 import { LoadingView } from '@/src/components/LoadingView';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** The active profile's settings: the clock time of each part of the day. */
 export function SettingsView() {
@@ -125,6 +126,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 120,
   },

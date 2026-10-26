@@ -34,6 +34,7 @@ import {
   type BundleValues,
   type BundleWhen,
 } from './bundleModel';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** One time in the form: a part of the day, or a specific clock time. */
 interface TimeDraft {
@@ -272,6 +273,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 120,
   },

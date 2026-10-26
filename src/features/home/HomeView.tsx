@@ -60,6 +60,11 @@ import {
 } from '@/src/database/dbEvents';
 import { LabsSummary } from './LabsSummary';
 import { StartYourRecord } from './StartYourRecord';
+import {
+  CONTENT_COLUMN,
+  WIDE_MAX_WIDTH,
+  useIsWideLayout,
+} from '@/src/theme/layout';
 
 const blurActiveElement = () => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -168,6 +173,7 @@ async function fetchHomeData(patientId: string): Promise<HomeData> {
 /** Displays the active patient's records and routes observations to their histories. */
 export function HomeView() {
   const router = useRouter();
+  const isWideWindow = useIsWideLayout();
   const pathname = usePathname();
   const {
     activePatient,
@@ -309,6 +315,226 @@ export function HomeView() {
     consultations.length > 0 ||
     treatments.length > 0 ||
     serviceRequests.length > 0;
+  const hasJournal = actionDays.some(
+    (day) => day.items.length + (day.procedures?.length ?? 0) > 0
+  );
+  // Desktop: how you're doing beside what's going on, once there is both.
+  const isOverview =
+    isWideWindow &&
+    (hasJournal || records.length > 0) &&
+    conditions.length +
+      treatments.length +
+      serviceRequests.length +
+      recentConsultations.length >
+      0;
+
+  // Journal: the last 7 days of treatment logs
+  const journal = hasJournal && (
+    <ResourceSection
+      icon={ListChecks}
+      title="Journal"
+      testID="home-actions-section"
+      pressLabel="Open journal"
+      pressTestID="home-actions-open"
+      onPress={() => {
+        blurActiveElement();
+        router.push('/journal');
+      }}
+    >
+      <ActionWeekStrip
+        days={actionDays}
+        today={actionDays[actionDays.length - 1].date}
+        onOpenDay={(date) => {
+          blurActiveElement();
+          router.push({ pathname: '/journal', params: { date } });
+        }}
+      />
+    </ResourceSection>
+  );
+  // Conditions Section
+  const conditionsSection = conditions.length > 0 && (
+    <ResourceSection
+      icon={FolderPlus}
+      title="Conditions"
+      count={conditions.length}
+      testID="home-conditions-section"
+    >
+      <CollapsibleList
+        items={conditions}
+        testID="conditions-list"
+        renderItem={(condition) => {
+          const condId = condition.id || '';
+          return (
+            <View key={condId} testID={`condition-card-${condId}`}>
+              <ConditionRelatedRow
+                condition={condition}
+                testID={`condition-open-${condId}`}
+                onPress={() => {
+                  blurActiveElement();
+                  router.push(`/condition/${condId}`);
+                }}
+                extraMeta={withoutZeroCounts([
+                  countMeta(
+                    Stethoscope,
+                    countConditionConsultations(condId),
+                    'consultations',
+                    `condition-consultations-count-${condId}`
+                  ),
+                  countMeta(
+                    Pill,
+                    countConditionTreatments(condId),
+                    'treatments',
+                    `condition-treatments-count-${condId}`
+                  ),
+                  countMeta(
+                    ClipboardList,
+                    countConditionServiceRequests(condId),
+                    'service requests',
+                    `condition-service-request-count-${condId}`
+                  ),
+                ])}
+              />
+            </View>
+          );
+        }}
+      />
+    </ResourceSection>
+  );
+  // Biomarkers: the latest result of each, as a status grid
+  // On wide screens the overview has room for every biomarker by status.
+  const biomarkers = records.length > 0 && (
+    <LabsSummary records={records} showAll={isOverview} />
+  );
+  // Treatments Section
+  const treatmentsSection = treatments.length > 0 && (
+    <ResourceSection
+      icon={Pill}
+      title="Treatments"
+      count={treatments.length}
+      testID="home-treatments-section"
+      pressLabel="Open treatments"
+      pressTestID="home-treatments-open"
+      onPress={() => {
+        blurActiveElement();
+        router.push('/treatments');
+      }}
+    >
+      {treatments.map((treatment) => {
+        const treatId = treatment.id || '';
+        return (
+          <View key={treatId} testID={`treatment-card-${treatId}`}>
+            <TreatmentRelatedRow
+              treatment={treatment}
+              testID={`treatment-open-${treatId}`}
+              onPress={() => {
+                blurActiveElement();
+                router.push({
+                  pathname: '/treatment/[id]',
+                  params: { id: treatId },
+                });
+              }}
+              extraMeta={withoutZeroCounts([
+                countMeta(
+                  FolderPlus,
+                  getTreatmentReasonConditionIds(treatment).length,
+                  'conditions',
+                  `treatment-conditions-count-${treatId}`
+                ),
+              ])}
+            />
+          </View>
+        );
+      })}
+    </ResourceSection>
+  );
+  // Service Requests Section
+  const serviceRequestsSection = serviceRequests.length > 0 && (
+    <ResourceSection
+      icon={ClipboardList}
+      title="Service requests"
+      count={serviceRequests.length}
+      testID="home-service-requests-section"
+    >
+      {serviceRequests.map((request) => {
+        const requestId = request.id || '';
+        return (
+          <View key={requestId} testID={`service-request-card-${requestId}`}>
+            <ServiceRequestRelatedRow
+              request={request}
+              testID={`service-request-open-${requestId}`}
+              onPress={() => {
+                blurActiveElement();
+                router.push({
+                  pathname: '/service-request/[id]',
+                  params: { id: requestId },
+                });
+              }}
+              extraMeta={withoutZeroCounts([
+                countMeta(
+                  FolderPlus,
+                  getReasonConditionIds(request).length,
+                  'conditions',
+                  `service-request-conditions-count-${requestId}`
+                ),
+              ])}
+            />
+          </View>
+        );
+      })}
+    </ResourceSection>
+  );
+  // Consultations Section
+  const consultationsSection = recentConsultations.length > 0 && (
+    <ResourceSection
+      icon={Stethoscope}
+      title="Consultations"
+      count={recentConsultations.length}
+      testID="home-consultations-section"
+    >
+      <CollapsibleList
+        items={recentConsultations}
+        testID="consultations-list"
+        renderItem={(consultation) => {
+          const consId = consultation.id || '';
+          return (
+            <View key={consId} testID={`consultation-card-${consId}`}>
+              <ConsultationRelatedRow
+                consultation={consultation}
+                testID={`consultation-open-${consId}`}
+                onPress={() => {
+                  blurActiveElement();
+                  router.push({
+                    pathname: '/consultation/[id]',
+                    params: { id: consId },
+                  });
+                }}
+                extraMeta={withoutZeroCounts([
+                  countMeta(
+                    FolderPlus,
+                    countConsultationConditions(consultation),
+                    'conditions',
+                    `consultation-conditions-count-${consId}`
+                  ),
+                  countMeta(
+                    Pill,
+                    consultationTreatmentCounts[consId] || 0,
+                    'treatments',
+                    `consultation-treatments-count-${consId}`
+                  ),
+                  countMeta(
+                    ClipboardList,
+                    consultationServiceRequestCounts[consId] || 0,
+                    'service requests',
+                    `consultation-service-request-count-${consId}`
+                  ),
+                ])}
+              />
+            </View>
+          );
+        }}
+      />
+    </ResourceSection>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -326,221 +552,35 @@ export function HomeView() {
             testID="results-scroll-view"
             keyboardShouldPersistTaps="handled"
             style={styles.scrollList}
-            contentContainerStyle={styles.scrollListContent}
+            contentContainerStyle={[
+              styles.scrollListContent,
+              isOverview && styles.scrollListContentWide,
+            ]}
           >
-            {/* Journal: the last 7 days of treatment logs */}
-            {actionDays.some(
-              (day) => day.items.length + (day.procedures?.length ?? 0) > 0
-            ) && (
-              <ResourceSection
-                icon={ListChecks}
-                title="Journal"
-                testID="home-actions-section"
-                pressLabel="Open journal"
-                pressTestID="home-actions-open"
-                onPress={() => {
-                  blurActiveElement();
-                  router.push('/journal');
-                }}
-              >
-                <ActionWeekStrip
-                  days={actionDays}
-                  today={actionDays[actionDays.length - 1].date}
-                  onOpenDay={(date) => {
-                    blurActiveElement();
-                    router.push({ pathname: '/journal', params: { date } });
-                  }}
-                />
-              </ResourceSection>
-            )}
-
-            {/* Conditions Section */}
-            {conditions.length > 0 && (
-              <ResourceSection
-                icon={FolderPlus}
-                title="Conditions"
-                count={conditions.length}
-                testID="home-conditions-section"
-              >
-                <CollapsibleList
-                  items={conditions}
-                  testID="conditions-list"
-                  renderItem={(condition) => {
-                    const condId = condition.id || '';
-                    return (
-                      <View key={condId} testID={`condition-card-${condId}`}>
-                        <ConditionRelatedRow
-                          condition={condition}
-                          testID={`condition-open-${condId}`}
-                          onPress={() => {
-                            blurActiveElement();
-                            router.push(`/condition/${condId}`);
-                          }}
-                          extraMeta={withoutZeroCounts([
-                            countMeta(
-                              Stethoscope,
-                              countConditionConsultations(condId),
-                              'consultations',
-                              `condition-consultations-count-${condId}`
-                            ),
-                            countMeta(
-                              Pill,
-                              countConditionTreatments(condId),
-                              'treatments',
-                              `condition-treatments-count-${condId}`
-                            ),
-                            countMeta(
-                              ClipboardList,
-                              countConditionServiceRequests(condId),
-                              'service requests',
-                              `condition-service-request-count-${condId}`
-                            ),
-                          ])}
-                        />
-                      </View>
-                    );
-                  }}
-                />
-              </ResourceSection>
-            )}
-
-            {/* Biomarkers: the latest result of each, as a status grid */}
-            {records.length > 0 && <LabsSummary records={records} />}
-
-            {/* Treatments Section */}
-            {treatments.length > 0 && (
-              <ResourceSection
-                icon={Pill}
-                title="Treatments"
-                count={treatments.length}
-                testID="home-treatments-section"
-                pressLabel="Open treatments"
-                pressTestID="home-treatments-open"
-                onPress={() => {
-                  blurActiveElement();
-                  router.push('/treatments');
-                }}
-              >
-                {treatments.map((treatment) => {
-                  const treatId = treatment.id || '';
-                  return (
-                    <View key={treatId} testID={`treatment-card-${treatId}`}>
-                      <TreatmentRelatedRow
-                        treatment={treatment}
-                        testID={`treatment-open-${treatId}`}
-                        onPress={() => {
-                          blurActiveElement();
-                          router.push({
-                            pathname: '/treatment/[id]',
-                            params: { id: treatId },
-                          });
-                        }}
-                        extraMeta={withoutZeroCounts([
-                          countMeta(
-                            FolderPlus,
-                            getTreatmentReasonConditionIds(treatment).length,
-                            'conditions',
-                            `treatment-conditions-count-${treatId}`
-                          ),
-                        ])}
-                      />
-                    </View>
-                  );
-                })}
-              </ResourceSection>
-            )}
-
-            {/* Service Requests Section */}
-            {serviceRequests.length > 0 && (
-              <ResourceSection
-                icon={ClipboardList}
-                title="Service requests"
-                count={serviceRequests.length}
-                testID="home-service-requests-section"
-              >
-                {serviceRequests.map((request) => {
-                  const requestId = request.id || '';
-                  return (
-                    <View
-                      key={requestId}
-                      testID={`service-request-card-${requestId}`}
-                    >
-                      <ServiceRequestRelatedRow
-                        request={request}
-                        testID={`service-request-open-${requestId}`}
-                        onPress={() => {
-                          blurActiveElement();
-                          router.push({
-                            pathname: '/service-request/[id]',
-                            params: { id: requestId },
-                          });
-                        }}
-                        extraMeta={withoutZeroCounts([
-                          countMeta(
-                            FolderPlus,
-                            getReasonConditionIds(request).length,
-                            'conditions',
-                            `service-request-conditions-count-${requestId}`
-                          ),
-                        ])}
-                      />
-                    </View>
-                  );
-                })}
-              </ResourceSection>
-            )}
-
-            {/* Consultations Section */}
-            {recentConsultations.length > 0 && (
-              <ResourceSection
-                icon={Stethoscope}
-                title="Consultations"
-                count={recentConsultations.length}
-                testID="home-consultations-section"
-              >
-                <CollapsibleList
-                  items={recentConsultations}
-                  testID="consultations-list"
-                  renderItem={(consultation) => {
-                    const consId = consultation.id || '';
-                    return (
-                      <View key={consId} testID={`consultation-card-${consId}`}>
-                        <ConsultationRelatedRow
-                          consultation={consultation}
-                          testID={`consultation-open-${consId}`}
-                          onPress={() => {
-                            blurActiveElement();
-                            router.push({
-                              pathname: '/consultation/[id]',
-                              params: { id: consId },
-                            });
-                          }}
-                          extraMeta={withoutZeroCounts([
-                            countMeta(
-                              FolderPlus,
-                              countConsultationConditions(consultation),
-                              'conditions',
-                              `consultation-conditions-count-${consId}`
-                            ),
-                            countMeta(
-                              Pill,
-                              consultationTreatmentCounts[consId] || 0,
-                              'treatments',
-                              `consultation-treatments-count-${consId}`
-                            ),
-                            countMeta(
-                              ClipboardList,
-                              consultationServiceRequestCounts[consId] || 0,
-                              'service requests',
-                              `consultation-service-request-count-${consId}`
-                            ),
-                          ])}
-                        />
-                      </View>
-                    );
-                  }}
-                />
-              </ResourceSection>
+            {isOverview ? (
+              <View style={styles.overview}>
+                {/* How you are doing: the journal and your results */}
+                <View style={styles.overviewColumn}>
+                  {journal}
+                  {biomarkers}
+                </View>
+                {/* What is going on: conditions and their care */}
+                <View style={styles.overviewColumn}>
+                  {conditionsSection}
+                  {treatmentsSection}
+                  {serviceRequestsSection}
+                  {consultationsSection}
+                </View>
+              </View>
+            ) : (
+              <>
+                {journal}
+                {conditionsSection}
+                {biomarkers}
+                {treatmentsSection}
+                {serviceRequestsSection}
+                {consultationsSection}
+              </>
             )}
           </ScrollView>
         )}
@@ -643,7 +683,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollListContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 132,
+  },
+  scrollListContentWide: {
+    maxWidth: WIDE_MAX_WIDTH,
+  },
+  overview: {
+    flexDirection: 'row',
+    gap: 40,
+    alignItems: 'flex-start',
+  },
+  overviewColumn: {
+    flex: 1,
+    minWidth: 0,
   },
 });

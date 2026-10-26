@@ -1,10 +1,18 @@
-import { test, expect } from '@/src/features/testing/testStorage';
+import {
+  test,
+  expect,
+  useSingleColumnLayout,
+} from '@/src/features/testing/testStorage';
 import {
   seedTestPatient,
   seedTestReport,
   openRoute,
   reopenRoute,
 } from '@/src/features/testing/testSeed';
+
+// Reached from the single-column summary; the desktop list and detail is
+// tested in labs-summary.e2e.ts.
+test.beforeEach(async ({ page }) => useSingleColumnLayout(page));
 
 test.describe('Biomarker detail', () => {
   test('rejects seed biomarkers and units outside the biomarker catalog', async ({

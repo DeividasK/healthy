@@ -55,6 +55,7 @@ import {
   parseLabResultsAIReply,
   type ImportedLabResults,
 } from './labResultsAIImport';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -785,6 +786,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
+    ...CONTENT_COLUMN,
     padding: 16,
     paddingBottom: 132,
   },

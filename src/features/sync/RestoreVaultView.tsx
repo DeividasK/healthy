@@ -9,6 +9,7 @@ import { DeleteConfirmationModal } from '@/src/components/DeleteConfirmationModa
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { useSync } from '@/src/context/SyncContext';
 import { COLORS } from '@/src/theme/colors';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** Unlocks the synced records in Google Drive with the 24-word phrase. */
 export function RestoreVaultView() {
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 16,
     paddingBottom: 132,
   },

@@ -62,6 +62,7 @@ import {
   parseTreatmentAIReply,
   type ImportedTreatment,
 } from './treatmentAIImport';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 export interface TreatmentFormValues {
   id?: string;
@@ -598,6 +599,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 120,
   },

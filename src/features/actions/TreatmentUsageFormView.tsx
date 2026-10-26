@@ -47,6 +47,7 @@ import {
 } from './treatmentUsageService';
 import { formatUsagePeriod } from './usageDuration';
 import { LoadingView } from '@/src/components/LoadingView';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 /** A change while taking it: on hold, stopped for good, or a new regimen. */
 type ChangeKind = 'pause' | 'stop' | 'change';
@@ -549,6 +550,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.background,
   },
   scrollContent: {
+    ...CONTENT_COLUMN,
     padding: 20,
     paddingBottom: 120,
   },

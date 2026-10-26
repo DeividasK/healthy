@@ -67,6 +67,7 @@ import {
   type ActionItem,
   type TreatmentLogAnswer,
 } from './actionDays';
+import { CONTENT_COLUMN } from '@/src/theme/layout';
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -764,9 +765,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: 'center',
+    ...CONTENT_COLUMN,
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 132,
