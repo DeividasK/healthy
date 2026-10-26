@@ -1,6 +1,6 @@
 name: Google Token Service
 
-# Deploys workers/google-token to Cloudflare. Setup: docs/google-token-service.md
+# Deploys workers/google-token to Cloudflare.
 on:
   push:
     branches: [main]

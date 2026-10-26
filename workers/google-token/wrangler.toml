@@ -1,4 +1,4 @@
-# Deploy: see docs/google-token-service.md
+# Deployed by .github/workflows/google-token.yml
 name = "healthy-google-token"
 main = "index.ts"
 compatibility_date = "2026-10-01"
