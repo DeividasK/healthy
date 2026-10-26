@@ -59,7 +59,7 @@
   <body>
     <main>
       <h1>Privacy Policy</h1>
-      <p class="updated">Healthy · Effective 16 October 2026</p>
+      <p class="updated">Healthy · Effective 26 October 2026</p>
 
       <p>
         Healthy is a personal health record app for the web, Android and iOS. It
@@ -73,8 +73,9 @@
           The developer does not collect, receive or store any of your data.
         </li>
         <li>
-          There are no accounts on our side, no servers, no ads, no analytics
-          and no tracking.
+          There are no accounts on our side, no ads, no analytics and no
+          tracking. The only server is a small Google sign-in helper that never
+          sees your health data and stores nothing.
         </li>
         <li>Your records are stored on your device.</li>
         <li>
@@ -113,8 +114,16 @@
         </li>
         <li>
           Your sign-in tokens and encryption key are kept in your device's
-          secure storage (or your browser's storage on the web) and are sent
-          only to Google.
+          secure storage (or your browser's storage on the web). Your encryption
+          key never leaves your device.
+        </li>
+        <li>
+          On the web, Google only issues long-lived sign-in tokens to apps that
+          hold a secret key, which cannot ship inside a public web app. So the
+          web app passes your Google sign-in tokens through a small sign-in
+          helper run by the developer on Cloudflare Workers, which adds the key
+          and forwards them to Google. It handles Google tokens only, never your
+          health data, and keeps no copy or logs of them.
         </li>
         <li>
           Google's handling of your account and Drive is covered by the
@@ -130,8 +139,9 @@
       <h2>Data sharing</h2>
       <p>
         The developer does not sell, share or transfer your data, because the
-        developer never receives it. The only third party the app talks to is
-        Google, and only when you use Google sign-in and sync.
+        developer never receives it. The app talks only to Google, and on the
+        web to the sign-in helper hosted on Cloudflare, and only when you use
+        Google sign-in and sync.
       </p>
 
       <h2>Deleting your data</h2>
