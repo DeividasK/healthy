@@ -2,6 +2,7 @@ import {
   test,
   expect,
   useSingleColumnLayout,
+  expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 import {
   seedTestPatient,
@@ -265,6 +266,7 @@ test.describe('Biomarker detail', () => {
     );
     // The grid is visual only; result rows on the summary open details.
     await page.getByTestId('labs-summary-open').click();
+    await expandBiomarkerGroups(page.getByTestId('labs-summary'));
     await page.getByTestId('labs-summary-result-789-8').click();
 
     await expect(page.getByTestId('biomarker-title')).toHaveText(
@@ -408,6 +410,7 @@ test.describe('Biomarker detail', () => {
     );
     // The grid is visual only; result rows on the summary open details.
     await page.getByTestId('labs-summary-open').click();
+    await expandBiomarkerGroups(page.getByTestId('labs-summary'));
     await page.getByTestId('labs-summary-result-aip').click();
 
     await expect(page.getByTestId('biomarker-title')).toHaveText(
@@ -459,6 +462,7 @@ test.describe('Biomarker detail', () => {
 
     // Each report lists its calculated value, marked, after its results.
     await openRoute(page, '/lab-result/aip-first');
+    await expandBiomarkerGroups(page.getByTestId('lab-result-groups'));
     const row = page.getByTestId('lab-result-groups').getByRole('button', {
       name: 'View biomarker: Atherogenic Index of Plasma (AIP) (calculated)',
     });

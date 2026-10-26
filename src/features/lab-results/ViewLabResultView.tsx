@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ClipboardList, FlaskConical } from 'lucide-react-native';
@@ -9,8 +9,14 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { BiomarkerStatusGrid } from '@/src/components/BiomarkerStatusGrid';
-import { getBiomarkerName } from '@/src/features/home/BiomarkerResultRow';
+import {
+  BiomarkerSelectionContext,
+  getBiomarkerName,
+  getBiomarkerRouteId,
+} from '@/src/features/home/BiomarkerResultRow';
 import { BiomarkerStatusGroups } from '@/src/features/home/BiomarkerStatusGroups';
+import { useListArrowKeys } from '@/src/features/home/useListArrowKeys';
+import { useIsWideLayout } from '@/src/theme/layout';
 import { ServiceRequestRelatedRow } from '@/src/features/service-requests/ServiceRequestRelatedRow';
 import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
 import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
@@ -27,6 +33,7 @@ import { withCalculatedObservations } from './calculatedBiomarkers';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { useRangeDemographics } from './useRangeDemographics';
 import { getLabResultMeta, LAB_RESULT_TITLE } from './labResultMeta';
+import { BiomarkerDetailView } from './BiomarkerDetailView';
 import { goBackOr } from '@/src/utils/navigation';
 
 export function ViewLabResultView() {
@@ -51,6 +58,8 @@ function LabResultForPatient({
   activePatientId: string;
 }) {
   const router = useRouter();
+  const { biomarker } = useLocalSearchParams<{ biomarker?: string }>();
+  const isWideWindow = useIsWideLayout();
   const demographics = useRangeDemographics();
   const [record, setRecord] = useState<DiagnosticReportRecord | null>(null);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
@@ -101,6 +110,37 @@ function LabResultForPatient({
     loadData
   );
 
+  // Desktop: the chosen biomarker shows beside the report, starting with
+  // the first one out of range, like the biomarkers list.
+  const results = useMemo(() => {
+    if (!record) return [];
+    // The report's results, then the values calculated from them.
+    const [{ observations }] = withCalculatedObservations([record]);
+    return observations
+      .filter(isSupportedObservation)
+      .map((observation, index) => ({
+        id: observation.id || String(index),
+        name: getBiomarkerName(observation),
+        observation,
+        status: toRangeStatus(
+          getObservationStatus(observation, undefined, demographics)
+        ),
+      }));
+  }, [record, demographics]);
+  const first =
+    results.find(({ status }) => status === 'outOfRange') ?? results[0];
+  const selectedId =
+    biomarker ?? (first && getBiomarkerRouteId(first.observation));
+  const selection = useMemo(
+    () => ({
+      selectedId,
+      onSelect: (routeId: string) => router.setParams({ biomarker: routeId }),
+    }),
+    [selectedId, router]
+  );
+  const isSplit = isWideWindow && Boolean(record) && Boolean(selectedId);
+  useListArrowKeys('lab-result-list', isSplit);
+
   if (isLoading) {
     return <ResourceViewLayout testID="lab-result-view" isLoading />;
   }
@@ -121,26 +161,22 @@ function LabResultForPatient({
     ?.map((note) => note.text)
     .filter(Boolean)
     .join('\n');
-  // The report's results, then the values calculated from them.
-  const [{ observations }] = withCalculatedObservations([record]);
-  const results = observations
-    .filter(isSupportedObservation)
-    .map((observation, index) => ({
-      id: observation.id || String(index),
-      name: getBiomarkerName(observation),
-      observation,
-      status: toRangeStatus(
-        getObservationStatus(observation, undefined, demographics)
-      ),
-    }));
   const missing = getMissingDemographics(
     results.map(({ observation }) => observation),
     demographics
   );
 
-  return (
+  const page = (
     <ResourceViewLayout
       testID="lab-result-view"
+      scrollID="lab-result-list"
+      aside={
+        isSplit ? (
+          // Not keyed by the biomarker: a remount would reload every report
+          // and flash the skeleton on each step.
+          <BiomarkerDetailView id={selectedId} />
+        ) : undefined
+      }
       title={LAB_RESULT_TITLE}
       titleTestID="lab-result-title"
       meta={getLabResultMeta(report, { withTestIDs: true })}
@@ -212,6 +248,14 @@ function LabResultForPatient({
         ))}
       </ResourceSection>
     </ResourceViewLayout>
+  );
+  // Related biomarkers in the detail are chosen in place too.
+  return isSplit ? (
+    <BiomarkerSelectionContext.Provider value={selection}>
+      {page}
+    </BiomarkerSelectionContext.Provider>
+  ) : (
+    page
   );
 }
 

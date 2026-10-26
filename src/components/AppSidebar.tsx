@@ -66,10 +66,19 @@ export function AppSidebar() {
 
   return (
     <View style={styles.sidebar} testID="app-sidebar">
-      <View style={styles.brand}>
+      <Pressable
+        testID="sidebar-home-logo"
+        role="link"
+        aria-label="Healthy, go to Home"
+        style={styles.brand}
+        onPress={() => {
+          Keyboard.dismiss();
+          if (pathname !== '/') router.dismissTo('/');
+        }}
+      >
         <AppLogo size={26} color={COLORS.light.primary} />
         <Text style={styles.wordmark}>Healthy</Text>
-      </View>
+      </Pressable>
       <ProfileHeaderButton showName style={styles.profile} />
       <View role="navigation" aria-label="Sections" style={styles.nav}>
         {SECTIONS.map(({ label, href, path, icon: Icon, testID }) => {
@@ -137,6 +146,7 @@ const styles = StyleSheet.create({
     borderRightColor: COLORS.light.cardBorder,
   },
   brand: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

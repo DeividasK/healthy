@@ -95,14 +95,14 @@ test.describe('Home View Flow, Floating Plus Button, and Lab Result Deletion', (
     await home.getByRole('button', { name: 'Open biomarkers' }).click();
     const view = page.getByTestId('labs-summary-view');
     await expect(view.getByTestId('lab-results-section-count')).toHaveText('1');
+    // The reports come before the grouped biomarkers.
+    expect(
+      (await view.getByTestId('lab-results-section').boundingBox())!.y
+    ).toBeLessThan((await view.getByTestId('labs-summary').boundingBox())!.y);
     const row = view.getByTestId(`lab-result-open-${report.id}`);
     await expect(row).toContainText('Lab report');
     await expect(row).toContainText('Oct 2, 2026');
     await expect(row).toContainText('Final');
-    // The reports follow the grouped biomarkers.
-    expect((await row.boundingBox())!.y).toBeGreaterThan(
-      (await view.getByTestId('labs-summary-result-718-7').boundingBox())!.y
-    );
     await row.click();
     await expect(page).toHaveURL(new RegExp(`lab-result/${report.id}$`));
   });

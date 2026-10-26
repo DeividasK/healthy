@@ -23,6 +23,19 @@ interface ResourceViewLayoutProps {
   modal?: React.ReactNode;
   /** Uses the wider desktop column for side-by-side layouts. */
   wide?: boolean;
+  /**
+   * Identifies what the page shows when one screen switches between records
+   * in place: a change starts the content afresh at the top, without
+   * reloading or showing the skeleton.
+   */
+  contentKey?: string;
+  /**
+   * Desktop panel beside the content, e.g. the chosen biomarker's detail.
+   * The content then scrolls as a list column on the left.
+   */
+  aside?: React.ReactNode;
+  /** Native ID of the content's scroll view, e.g. for list arrow keys. */
+  scrollID?: string;
 }
 
 /** Shared navigation and compact page layout for resource detail screens. */
@@ -37,6 +50,9 @@ export function ResourceViewLayout({
   actions,
   modal,
   wide = false,
+  contentKey,
+  aside,
+  scrollID,
 }: ResourceViewLayoutProps) {
   const insets = useSafeAreaInsets();
 
@@ -46,7 +62,7 @@ export function ResourceViewLayout({
       edges={['left', 'right']}
       style={styles.safeArea}
     >
-      <View style={styles.page}>
+      <View style={[styles.page, aside != null && styles.split]}>
         {error && <ResourceActionDock actions={[]} />}
         {isLoading ? (
           <ResourceSkeleton heading />
@@ -57,10 +73,12 @@ export function ResourceViewLayout({
         ) : (
           <>
             <ScrollView
+              key={contentKey}
+              nativeID={scrollID}
               // Lets keyboard users focus and scroll the page on web even
               // when it has no focusable content of its own.
               tabIndex={0}
-              style={styles.scroll}
+              style={[styles.scroll, aside != null && styles.list]}
               contentContainerStyle={[
                 styles.content,
                 wide && { maxWidth: WIDE_MAX_WIDTH },
@@ -83,6 +101,7 @@ export function ResourceViewLayout({
               </View>
               {children}
             </ScrollView>
+            {aside != null && <View style={styles.aside}>{aside}</View>}
             {actions}
             {modal}
           </>
@@ -102,6 +121,20 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  split: {
+    flexDirection: 'row',
+    maxWidth: WIDE_MAX_WIDTH,
+  },
+  // Same width as the biomarker list beside its detail.
+  list: {
+    width: 440,
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: COLORS.light.cardBorder,
+  },
+  aside: { flex: 1 },
   center: {
     flex: 1,
     alignItems: 'center',

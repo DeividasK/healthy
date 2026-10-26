@@ -6,6 +6,7 @@ import {
   seedTestCondition,
   openRoute,
   useSingleColumnLayout,
+  expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
 test.beforeEach(async ({ page }) => {
@@ -134,10 +135,24 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await expect(
     outOfRange.getByRole('heading', { name: 'Out of range' })
   ).toBeVisible();
+  // Groups start collapsed; their headings open and close them.
+  const outOfRangeToggle = outOfRange.getByRole('button', {
+    name: 'Out of range: 2 biomarkers',
+  });
+  await expect(outOfRangeToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(
+    summary.locator('[data-testid^="labs-summary-result-"]')
+  ).toHaveCount(0);
+  await outOfRangeToggle.click();
+  await expect(outOfRangeToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    summary.getByTestId('labs-summary-groups-inRange-toggle')
+  ).toHaveAttribute('aria-expanded', 'false');
   await expect(
     outOfRange.locator('[data-testid^="labs-summary-result-"]')
   ).toHaveCount(2);
   // Rows show the value and range bar, leaving status, date and code to the page around them.
+  await expandBiomarkerGroups(summary);
   const hemoglobin = summary.getByTestId('labs-summary-result-718-7');
   await expect(hemoglobin).toHaveText('Hemoglobin (Hgb)15.2g/dL');
   await expect(summary.getByTestId('labs-summary-range-718-7')).toBeVisible();
@@ -206,6 +221,7 @@ test('the key and groups list only statuses with results; empty periods and inva
   );
   await home.getByRole('button', { name: 'Open biomarkers' }).click();
   const view = page.getByTestId('labs-summary-view');
+  await expandBiomarkerGroups(view);
   await expect(view.getByTestId('labs-summary-groups-inRange')).toContainText(
     '15.2'
   );
@@ -256,7 +272,8 @@ test('summary Search filters the grouped latest results and respects the period'
   const search = summary.getByRole('textbox', { name: 'Search', exact: true });
   const rows = summary.locator('[data-testid^="labs-summary-result-"]');
   const noResults = summary.getByTestId('labs-summary-no-results');
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(0);
+  // Searching opens every group with a match.
   await search.fill(' hGb ');
   await expect(rows).toHaveCount(1);
   await expect(summary.getByTestId('labs-summary-result-718-7')).toContainText(
@@ -283,6 +300,8 @@ test('summary Search filters the grouped latest results and respects the period'
   await expect(noResults).toBeVisible();
   await search.fill('   ');
   await expect(noResults).toHaveCount(0);
+  await expect(rows).toHaveCount(0);
+  await expandBiomarkerGroups(summary);
   await expect(rows).toHaveCount(3);
   await search.fill('718-7');
   await summary.getByTestId('labs-summary-result-718-7').click();
@@ -319,6 +338,7 @@ test('Sort ranks latest biomarkers within each status by deviation, value and cl
   const view = page.getByTestId('labs-summary-view');
   const sort = view.getByRole('combobox', { name: 'Sort', exact: true });
   const rows = view.getByRole('button', { name: /^View biomarker:/ });
+  await expandBiomarkerGroups(view);
   await expect(sort.locator('option')).toHaveText([
     'Largest deviations',
     'Lowest',

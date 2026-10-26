@@ -6,6 +6,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   openRoute,
+  expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
 // Desktop windows get the sidebar, side-by-side columns and keyboard
@@ -49,6 +50,13 @@ test('the sidebar replaces the header and marks the current section', async ({
   await expect(page).toHaveURL(/settings$/);
   await home.click();
   await expect(page).toHaveURL(/\/$/);
+
+  // The logo returns Home too.
+  await biomarkers.click();
+  await expect(page).toHaveURL(/labs-summary/);
+  await sidebar.getByRole('link', { name: 'Healthy, go to Home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(home).toHaveAttribute('aria-current', 'page');
 });
 
 test('Home puts results beside conditions, and stacks them when one side is empty', async ({
@@ -73,11 +81,27 @@ test('Home puts results beside conditions, and stacks them when one side is empt
   expect(Math.abs(conditionBox.y - summaryBox.y)).toBeLessThan(80);
 });
 
+/** Records whether the loading skeleton shows from now on. */
+const watchForSkeleton = (page: Parameters<typeof seedTestReport>[0]) =>
+  page.evaluate(() => {
+    const flags = window as unknown as { skeletonShown?: boolean };
+    flags.skeletonShown = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="resource-skeleton"]'))
+        flags.skeletonShown = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+const skeletonShown = (page: Parameters<typeof seedTestReport>[0]) =>
+  page.evaluate(
+    () => (window as unknown as { skeletonShown?: boolean }).skeletonShown
+  );
+
 test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
   await seedResults(page);
   await openRoute(page, '/labs-summary');
   const view = page.getByTestId('labs-summary-view');
-  // The first out-of-range result opens by default.
+  // The first out-of-range result opens by default, its group open and
+  // the others collapsed.
   await expect(view.getByTestId('biomarker-title')).toHaveText(
     /^White Blood Cells/
   );
@@ -87,6 +111,10 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
     })
     .first();
   await expect(selected).toHaveAttribute('aria-current', 'true');
+  await expect(
+    view.getByTestId('labs-summary-groups-inRange-toggle')
+  ).toHaveAttribute('aria-expanded', 'false');
+  await expandBiomarkerGroups(view.getByTestId('labs-summary'));
 
   await view
     .getByRole('button', { name: 'View biomarker: Hemoglobin' })
@@ -98,7 +126,9 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
   await expect(page).toHaveURL(/labs-summary\?.*biomarker=/);
   await expect(selected).not.toHaveAttribute('aria-current', 'true');
 
-  // Arrow keys move through the list; Hemoglobin is the last row.
+  // Arrow keys move through the list, swapping the detail in place without
+  // a loading skeleton; Hemoglobin is the last row.
+  await watchForSkeleton(page);
   await page.keyboard.press('ArrowUp');
   await expect(view.getByTestId('biomarker-title')).toHaveText(
     'Platelets (PLT)'
@@ -107,6 +137,7 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
   await expect(view.getByTestId('biomarker-title')).toHaveText(
     'Hemoglobin (Hgb)'
   );
+  expect(await skeletonShown(page)).toBe(false);
 
   // The selection survives a reload.
   await page.reload();
@@ -114,16 +145,57 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
     page.getByTestId('labs-summary-view').getByTestId('biomarker-title')
   ).toHaveText('Hemoglobin (Hgb)');
 
-  // A lab result opened from the list keeps the arrow keys to itself.
+  // A lab result opened from the list takes the arrow keys for its own
+  // results, leaving the list's selection alone.
   await page
     .getByTestId('lab-results-list')
     .getByRole('button')
     .first()
     .click();
-  await expect(page).toHaveURL(/lab-result\//);
-  const labResultUrl = page.url();
+  await expect(page).toHaveURL(/lab-result\/[^/?]+$/);
+  await expandBiomarkerGroups(page.getByTestId('lab-result-groups'));
+  await page.keyboard.press('ArrowDown');
+  await expect(page).toHaveURL(/lab-result\/[^/?]+\?biomarker=/);
+  await page.getByTestId('back-button').click();
+  await expect(
+    page.getByTestId('labs-summary-view').getByTestId('biomarker-title')
+  ).toHaveText('Hemoglobin (Hgb)');
+});
+
+test('a lab report shows its chosen biomarker beside its results', async ({
+  page,
+}) => {
+  const { report } = await seedResults(page);
+  await openRoute(page, `/lab-result/${report.id}`);
+  const view = page.getByTestId('lab-result-view');
+  const results = view.getByTestId('lab-result-results-section');
+  // The first out-of-range result opens by default, beside the report.
+  const detail = view.getByTestId('biomarker-view');
+  await expect(detail.getByTestId('biomarker-title')).toHaveText(
+    /^White Blood Cells/
+  );
+  expect((await detail.boundingBox())!.x).toBeGreaterThan(
+    (await results.boundingBox())!.x + (await results.boundingBox())!.width
+  );
+  await expandBiomarkerGroups(results);
+  await results
+    .getByRole('button', { name: 'View biomarker: Hemoglobin' })
+    .click();
+  await expect(detail.getByTestId('biomarker-title')).toHaveText(
+    'Hemoglobin (Hgb)'
+  );
+  await expect(page).toHaveURL(/\?biomarker=/);
+  await expect(
+    results.getByRole('button', { name: 'View biomarker: Hemoglobin' })
+  ).toHaveAttribute('aria-current', 'true');
+  await watchForSkeleton(page);
   await page.keyboard.press('ArrowUp');
-  await expect(page).toHaveURL(labResultUrl);
+  await expect(detail.getByTestId('biomarker-title')).not.toHaveText(
+    'Hemoglobin (Hgb)'
+  );
+  expect(await skeletonShown(page)).toBe(false);
+  // The report's own actions stay in the dock.
+  await expect(page.getByTestId('edit-lab-result-button')).toBeVisible();
 });
 
 test('a biomarker page puts the chart and results beside the explanation', async ({
@@ -132,6 +204,7 @@ test('a biomarker page puts the chart and results beside the explanation', async
   await seedResults(page);
   await openRoute(page, '/labs-summary');
   const view = page.getByTestId('labs-summary-view');
+  await expandBiomarkerGroups(view.getByTestId('labs-summary'));
   await view
     .getByRole('button', { name: 'View biomarker: Hemoglobin' })
     .first()

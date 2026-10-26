@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import type { DiagnosticReportRecord } from '@/src/database/types';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
@@ -23,44 +23,7 @@ import { BiomarkerDetailView } from '@/src/features/lab-results/BiomarkerDetailV
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { COLORS } from '@/src/theme/colors';
 import { WIDE_MAX_WIDTH, useIsWideLayout } from '@/src/theme/layout';
-
-/**
- * Up and down arrows move through the biomarker list beside the detail
- * (web), choosing each biomarker they reach, unless a field has the keys.
- */
-function useListArrowKeys(enabled: boolean) {
-  // Only while this screen is in front: the stack keeps it mounted beneath
-  // the screens opened from it.
-  useFocusEffect(
-    useCallback(() => {
-      if (Platform.OS !== 'web' || !enabled) return;
-      const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-        const target = event.target as HTMLElement | null;
-        if (target?.closest('input, textarea, select')) return;
-        if (document.querySelector('[aria-modal="true"]')) return;
-        const rows = [
-          ...document.querySelectorAll<HTMLElement>(
-            '#biomarker-list [aria-label^="View biomarker:"]'
-          ),
-        ];
-        if (rows.length === 0) return;
-        const current = rows.findIndex(
-          (row) => row.getAttribute('aria-current') === 'true'
-        );
-        const next = Math.min(
-          rows.length - 1,
-          Math.max(0, current + (event.key === 'ArrowDown' ? 1 : -1))
-        );
-        event.preventDefault();
-        rows[next].focus();
-        rows[next].click();
-      };
-      window.addEventListener('keydown', onKeyDown);
-      return () => window.removeEventListener('keydown', onKeyDown);
-    }, [enabled])
-  );
-}
+import { useListArrowKeys } from './useListArrowKeys';
 
 /** The active patient's latest biomarker results for the chosen period, then every lab result. */
 export function LabsSummaryView() {
@@ -136,7 +99,7 @@ export function LabsSummaryView() {
     [selectedId, router]
   );
   const isSplit = isWideWindow && !isLoading && Boolean(selectedId);
-  useListArrowKeys(isSplit);
+  useListArrowKeys('biomarker-list', isSplit);
 
   const summary = (
     <LabsSummary
@@ -147,11 +110,7 @@ export function LabsSummaryView() {
       autoFocusSearch={focus === 'search'}
     />
   );
-  const labResults = (
-    <View style={styles.labResults}>
-      <LabResultsSection records={reports} />
-    </View>
-  );
+  const labResults = <LabResultsSection records={reports} />;
 
   if (isSplit)
     return (
@@ -164,11 +123,13 @@ export function LabsSummaryView() {
             contentContainerStyle={styles.listContent}
           >
             <ScreenHeading>Biomarkers</ScreenHeading>
-            {summary}
             {labResults}
+            {summary}
           </ScrollView>
           <View style={styles.detail}>
-            <BiomarkerDetailView key={selectedId} id={selectedId} />
+            {/* Not keyed by the biomarker: a remount would reload every
+                report and flash the skeleton on each step. */}
+            <BiomarkerDetailView id={selectedId} />
           </View>
           <ResourceActionDock actions={[]} />
         </View>
@@ -188,8 +149,8 @@ export function LabsSummaryView() {
       actions={<ResourceActionDock actions={[]} />}
     >
       <View style={styles.content}>
-        {summary}
         {labResults}
+        {summary}
       </View>
     </ResourceViewLayout>
   );
@@ -211,5 +172,4 @@ const styles = StyleSheet.create({
   },
   listContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 132 },
   detail: { flex: 1 },
-  labResults: { marginTop: 32 },
 });
