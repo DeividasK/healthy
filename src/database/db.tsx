@@ -10,10 +10,16 @@ import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
 import { namespaced } from '@/src/services/storageNamespace';
+import {
+  IS_DEMO_BUILD,
+  IS_DEMO_SNAPSHOT_EXPORT,
+} from '@/src/features/demo/demoBuild';
+import { openDemoSnapshot } from '@/src/features/demo/demoSnapshot';
 
 export * from './migrations';
 
-export const DB_NAME = namespaced('healthy.db');
+// The demo build keeps nothing between visits.
+export const DB_NAME = IS_DEMO_BUILD ? ':memory:' : namespaced('healthy.db');
 let dbInstance: SQLiteDatabase | null = null;
 let initPromise: Promise<SQLiteDatabase> | null = null;
 
@@ -167,7 +173,10 @@ export async function initializeDatabase(): Promise<SQLiteDatabase> {
   initPromise = (async () => {
     try {
       await whenDatabaseTabOwned();
-      const db = await openNativeDatabase(DB_NAME);
+      const db =
+        (IS_DEMO_BUILD && !IS_DEMO_SNAPSHOT_EXPORT
+          ? await openDemoSnapshot()
+          : null) ?? (await openNativeDatabase(DB_NAME));
       await migrateDatabase(db);
       return db;
     } catch (err) {
