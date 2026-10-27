@@ -38,6 +38,8 @@ export interface SeedReportOptions {
     name: string;
     value: number | string;
     unit?: string;
+    /** A LOINC test outside the catalog: `name` is its LOINC name. */
+    loinc?: string;
     /** A laboratory-reported range, in `unit`. */
     referenceLow?: number;
     referenceHigh?: number;

@@ -40,6 +40,7 @@ import {
   searchBiomarkers,
   type RecordableBiomarker,
 } from '@/src/data/biomarkers';
+import { loadLoincLabTests, type LoincLabTests } from '@/src/data/loinc';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import {
@@ -180,6 +181,21 @@ export function LabResultForm({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [focusedMarkerId, setFocusedMarkerId] = useState<string | null>(null);
   const searchContainerRef = useRef<View>(null);
+  // LOINC tests beyond the catalog, loaded on the first search.
+  const [loincTests, setLoincTests] = useState<LoincLabTests | null>(null);
+  const isSearching = searchQuery.trim().length > 0;
+  useEffect(() => {
+    if (!isSearching || loincTests) return;
+    let isMounted = true;
+    loadLoincLabTests()
+      .then((tests) => {
+        if (isMounted) setLoincTests(tests);
+      })
+      .catch((err) => console.warn('Failed to load LOINC lab tests:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [isSearching, loincTests]);
 
   // Load existing report if editing
   useEffect(() => {
@@ -301,10 +317,11 @@ export function LabResultForm({
     if (!searchQuery.trim()) {
       return available;
     }
-    return searchBiomarkers(searchQuery).filter(
-      (m) => !existingLoincs.has(m.loinc)
-    );
-  }, [searchQuery, activeItems]);
+    return [
+      ...searchBiomarkers(searchQuery),
+      ...(loincTests?.search(searchQuery) ?? []),
+    ].filter((m) => !existingLoincs.has(m.loinc));
+  }, [searchQuery, activeItems, loincTests]);
 
   const menuOptions = [...fields.menuOptions, ...links.menuOptions];
 
@@ -763,7 +780,13 @@ export function LabResultForm({
             <AIImportModal
               document="lab report"
               instructions={buildLabResultsAIInstructions}
-              parse={parseLabResultsAIReply}
+              parse={async (reply) =>
+                parseLabResultsAIReply(
+                  reply,
+                  new Date(),
+                  await loadLoincLabTests().catch(() => undefined)
+                )
+              }
               onClose={() => setShowAIImport(false)}
               onImport={handleAIImport}
             />

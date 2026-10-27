@@ -1,5 +1,6 @@
 import type { Observation } from 'fhir/r5';
 import { BIOMARKERS, type BiomarkerDefinition } from '@/src/data/biomarkers';
+import { LOINC_CODE_PATTERN, loincTestBiomarker } from '@/src/data/loinc';
 import {
   resolveReferenceRange,
   type MissingDemographic,
@@ -36,9 +37,12 @@ export function toRangeStatus(
  * Matches an observation to its biomarker catalog definition: by code and
  * name together, then by name, then by code. Name first keeps results the
  * app once saved under another test's code (see migration v21) with their
- * own test.
+ * own test. A LOINC test outside the catalog gets a definition from the
+ * result itself: its name and its reported unit.
  */
-export function getObservationMarker(observation: Observation) {
+export function getObservationMarker(
+  observation: Observation
+): BiomarkerDefinition | undefined {
   const coding = observation.code.coding?.[0];
   const name = (coding?.display || observation.code.text || '').toLowerCase();
   const byName = (marker: BiomarkerDefinition) =>
@@ -49,7 +53,26 @@ export function getObservationMarker(observation: Observation) {
   return (
     BIOMARKERS.find((marker) => byCode(marker) && byName(marker)) ??
     BIOMARKERS.find(byName) ??
-    BIOMARKERS.find(byCode)
+    BIOMARKERS.find(byCode) ??
+    getLoincTestMarker(observation)
+  );
+}
+
+function getLoincTestMarker(observation: Observation) {
+  const coding = observation.code.coding?.[0];
+  const quantity = observation.valueQuantity;
+  const ucum = quantity?.code || quantity?.unit;
+  if (
+    coding?.system !== 'http://loinc.org' ||
+    !coding.code ||
+    !LOINC_CODE_PATTERN.test(coding.code) ||
+    !ucum
+  )
+    return undefined;
+  return loincTestBiomarker(
+    coding.code,
+    coding.display || observation.code.text || coding.code,
+    [{ label: quantity?.unit || ucum, ucum }]
   );
 }
 

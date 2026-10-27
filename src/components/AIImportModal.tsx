@@ -31,7 +31,7 @@ export function AIImportModal<T>({
   /** Builds the instructions copied for the AI. */
   instructions: () => string;
   /** Reads the AI's reply, or lists its problems. */
-  parse: (reply: string) => AIImportResult<T>;
+  parse: (reply: string) => AIImportResult<T> | Promise<AIImportResult<T>>;
   onClose: () => void;
   onImport: (data: T) => void;
 }) {
@@ -62,8 +62,8 @@ export function AIImportModal<T>({
     if (text) setReply(text);
   };
 
-  const handleImport = () => {
-    const result = parse(reply);
+  const handleImport = async () => {
+    const result = await parse(reply);
     if (!result.ok) {
       setErrors(result.errors);
       return;

@@ -111,3 +111,36 @@ test('migration v21 corrects stored codes and drops copied default ranges', asyn
     'Neutrophils (%)'
   );
 });
+
+test('migration v22 moves RDW-SD results to the code that replaced theirs', async ({
+  page,
+}) => {
+  await seedTestPatient(page, { id: 'legacy-rdw-patient' });
+  await seedTestReport(page, {
+    id: 'legacy-rdw-report',
+    date: '2026-09-01',
+    biomarkers: [{ name: 'RDW-SD', value: 42 }],
+  });
+  await openRoute(page, '/');
+  await expect(page.getByTestId('labs-summary')).toBeVisible();
+  await page.evaluate(async () => {
+    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+    await bridge.executeSql(
+      `UPDATE observations SET loinc_code = '21000-5',
+         fhir_json = json_set(fhir_json, '$.code.coding[0].code', '21000-5')`
+    );
+    await bridge.executeSql('PRAGMA user_version = 21');
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('labs-summary')).toBeVisible();
+  const [row] = await page.evaluate(() =>
+    (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+      'SELECT loinc_code, fhir_json FROM observations'
+    )
+  );
+  expect(row.loinc_code).toBe('115742-9');
+  expect(JSON.parse(row.fhir_json).code.coding[0].code).toBe('115742-9');
+  await openRoute(page, '/biomarker/115742-9');
+  await expect(page.getByTestId('biomarker-title')).toHaveText('RDW-SD');
+});

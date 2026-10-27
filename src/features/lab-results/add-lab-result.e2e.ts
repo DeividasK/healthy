@@ -272,6 +272,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     page,
   }) => {
     await page.getByTestId('start-lab-result').click();
+    // Searching finds LOINC tests beyond the catalog too, after its own.
+    await page.getByTestId('test-search-input').fill('glucose blood');
+    await expect(page.getByTestId('autocomplete-item-2339-0')).toContainText(
+      'Glucose [Mass/volume] in Blood'
+    );
     // An earlier test is replaced by the imported ones.
     await page.getByTestId('test-search-input').fill('MCV');
     await page.getByTestId('autocomplete-item-cbc_mcv').click();
@@ -295,6 +300,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       );
       expect(instructions).toContain('"healthyLabResults": 1');
       expect(instructions).toContain('- cbc_hemoglobin: Hemoglobin (Hgb)');
+      expect(instructions).toContain('use its LOINC code as the test id');
       // The modal takes its dialog role once it has faded in; auditing before
       // that flags its aria-modal.
       await expect(
@@ -328,7 +334,8 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     { "test": "cbc_hemoglobin", "value": 14.5, "unit": "g/dL" },
     { "test": "cbc_wbc", "value": 6.8, "unit": "10^9/L" },
     { "test": "ferritin", "value": 85, "unit": "ng/mL" },
-    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L" }
+    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L" },
+    { "test": "2339-0", "value": 92, "unit": "mg/dL" }
   ]
 }
 \`\`\``;
@@ -348,7 +355,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(
         page.getByTestId('lab-result-service-provider-input')
       ).toHaveValue('City Laboratory');
-      await expect(page.getByTestId(/^marker-card-/)).toHaveCount(4);
+      await expect(page.getByTestId(/^marker-card-/)).toHaveCount(5);
       await expect(page.getByTestId('marker-card-0')).toContainText(
         'Hemoglobin (Hgb)'
       );
@@ -365,12 +372,15 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(
         page.getByTestId('unit-picker-button-3').locator('select')
       ).toHaveValue('mmol/L');
+      await expect(page.getByTestId('marker-card-4')).toContainText(
+        'Glucose [Mass/volume] in Blood'
+      );
     });
 
     await test.step('Saving stores the imported results', async () => {
       await page.getByTestId('save-button').click();
       const home = page.getByTestId('results-scroll-view');
-      await expect(home.getByTestId('labs-summary-count')).toHaveText('4');
+      await expect(home.getByTestId('labs-summary-count')).toHaveText('5');
       await expect(
         home.getByTestId('labs-summary-grid-cell-6690-2')
       ).toHaveAccessibleName('White Blood Cells (WBC): In range');
@@ -380,6 +390,14 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(
         home.getByTestId('labs-summary-grid-cell-13457-7')
       ).toHaveAccessibleName('LDL Cholesterol: In range');
+      // A LOINC test outside the catalog has no range of its own.
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-2339-0')
+      ).toHaveAccessibleName('Glucose [Mass/volume] in Blood: No range');
+      await openRoute(page, '/biomarker/2339-0');
+      await expect(page.getByTestId('biomarker-title')).toHaveText(
+        'Glucose [Mass/volume] in Blood'
+      );
     });
   });
 

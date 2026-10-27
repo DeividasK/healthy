@@ -4,6 +4,7 @@ import {
   type RecordableBiomarker,
   type UnitOption,
 } from '@/src/data/biomarkers';
+import type { LoincLabTests } from '@/src/data/loinc';
 import {
   parseAIValue,
   readAIDate,
@@ -65,10 +66,10 @@ Rules:
 - "date" is the day the sample was collected. If the report doesn't show it, use the report date.
 - "time" is the 24-hour time the sample was collected. Leave "time" out if the report doesn't show it.
 - "serviceProvider" is the laboratory or clinic that did the tests. Leave it out if the report doesn't show it.
-- Add one entry to "results" for each test in the report that is in the list below, using its test id.
+- Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported.
 - "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
-- "unit" must be one of the units listed for that test. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
-- Leave out tests that aren't in the list or whose unit doesn't match one listed for it, and list them in a short note before the code block.
+- For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
+- Leave out tests in the list whose unit doesn't match one listed for them, and other tests whose LOINC code you aren't sure of. List the tests you leave out in a short note before the code block.
 - Don't add reference ranges, flags, comments or any other fields.
 
 Tests and units:
@@ -96,13 +97,25 @@ function findMarker(test: string): RecordableBiomarker | undefined {
   );
 }
 
+/** Finds the unit a result is reported in among a test's units. */
+function findUnit(marker: RecordableBiomarker, unitText: string) {
+  return marker.units.find(
+    (option) =>
+      normalizeUnit(option.label) === normalizeUnit(unitText) ||
+      normalizeUnit(option.ucum) === normalizeUnit(unitText)
+  );
+}
+
 /**
  * Reads lab results from an AI reply written to `buildLabResultsAIInstructions`.
- * Returns every problem found, so the user can fix the reply in one go.
+ * Tests outside the catalog are looked up by LOINC code in `loincTests`, and
+ * keep the unit the report gives. Returns every problem found, so the user can
+ * fix the reply in one go.
  */
 export function parseLabResultsAIReply(
   text: string,
-  today: Date = new Date()
+  today: Date = new Date(),
+  loincTests?: LoincLabTests
 ): LabResultsAIParseResult {
   const read = readAIReply(text, 'lab results');
   if (!read.ok) return read;
@@ -125,8 +138,13 @@ export function parseLabResultsAIReply(
         typeof item.test === 'string' && item.test.trim()
           ? item.test.trim()
           : `Result ${index + 1}`;
-      const marker =
+      const catalogMarker =
         typeof item.test === 'string' ? findMarker(item.test) : undefined;
+      const marker =
+        catalogMarker ??
+        (typeof item.test === 'string'
+          ? loincTests?.get(item.test)
+          : undefined);
       if (!marker) {
         errors.push(`"${label}" is not a supported test.`);
         return;
@@ -144,11 +162,12 @@ export function parseLabResultsAIReply(
       }
 
       const unitText = typeof item.unit === 'string' ? item.unit : '';
-      const unit = marker.units.find(
-        (option) =>
-          normalizeUnit(option.label) === normalizeUnit(unitText) ||
-          normalizeUnit(option.ucum) === normalizeUnit(unitText)
-      );
+      const reportedUnit = unitText.trim();
+      const unit =
+        findUnit(marker, unitText) ??
+        (!catalogMarker && reportedUnit
+          ? { label: reportedUnit, ucum: reportedUnit }
+          : undefined);
       if (!unit) {
         errors.push(
           `${marker.name} has an unsupported unit "${unitText}". Supported units: ${marker.units.map((option) => option.label).join(', ')}.`
@@ -156,7 +175,13 @@ export function parseLabResultsAIReply(
         return;
       }
 
-      results.push({ marker, value: String(value), unit });
+      results.push({
+        marker: marker.units.includes(unit)
+          ? marker
+          : { ...marker, units: [...marker.units, unit] },
+        value: String(value),
+        unit,
+      });
     });
   }
 

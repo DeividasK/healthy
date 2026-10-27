@@ -215,7 +215,7 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     id: 'cbc_rdw_sd',
     name: 'RDW-SD',
     aliases: ['RDW-SD', 'RDW SD'],
-    loinc: '21000-5',
+    loinc: '115742-9',
     category: 'Complete Blood Count',
     primaryUnit: 'fL',
     ucumCode: 'fL',

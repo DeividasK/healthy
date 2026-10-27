@@ -51,6 +51,36 @@ test('Biomarker detail - Red Blood Cells history', async ({
   );
 });
 
+test('Biomarker detail - LOINC test outside the catalog', async ({
+  page,
+}, testInfo) => {
+  await seedTestPatient(page);
+  const glucose = {
+    loinc: '2339-0',
+    name: 'Glucose [Mass/volume] in Blood',
+    unit: 'mg/dL',
+    referenceLow: 70,
+    referenceHigh: 99,
+  };
+  await seedTestReport(page, {
+    id: 'loinc-visual-first',
+    date: '2026-08-01',
+    biomarkers: [{ ...glucose, value: 104 }],
+  });
+  await seedTestReport(page, {
+    id: 'loinc-visual-second',
+    date: '2026-10-01',
+    biomarkers: [{ ...glucose, value: 92 }],
+  });
+  await page.goto('/biomarker/2339-0');
+  await page.getByTestId('biomarker-title').waitFor();
+  await takeSnapshot(
+    page,
+    'Biomarker detail - LOINC test outside the catalog',
+    testInfo
+  );
+});
+
 test('Biomarker detail - Calculated atherogenic index', async ({
   page,
 }, testInfo) => {
