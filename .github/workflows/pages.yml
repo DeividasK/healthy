@@ -103,6 +103,8 @@ jobs:
           # Unknown paths fall back to the app they are under, so deep links
           # load. GitHub Pages has one 404 page, so it writes the right shell.
           node .pages/scripts/pages-404.mjs _site
+          # The landing page downloads the demo's files ahead of a click.
+          node .pages/scripts/demo-prefetch.mjs _site
           touch _site/.nojekyll
 
       - name: Upload Pages Artifact

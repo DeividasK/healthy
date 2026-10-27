@@ -579,5 +579,21 @@
         <a href="https://github.com/DeividasK/healthy/releases">What's new</a>
       </nav>
     </footer>
+    <script>
+      // Downloads the demo's files once the page has loaded, so Explore a
+      // demo opens without waiting for them. Skipped when saving data.
+      addEventListener('load', () => {
+        if (navigator.connection?.saveData) return;
+        const idle = window.requestIdleCallback ?? setTimeout;
+        idle(async () => {
+          try {
+            const files = await (await fetch('d/prefetch.json')).json();
+            for (const file of files) fetch(file, { priority: 'low' });
+          } catch {
+            // Only a head start: the demo still loads on its own.
+          }
+        });
+      });
+    </script>
   </body>
 </html>
