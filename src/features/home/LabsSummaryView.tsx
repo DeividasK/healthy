@@ -107,7 +107,11 @@ export function LabsSummaryView() {
       autoFocusSearch={focus === 'search'}
     />
   );
-  const labResults = <LabResultsSection records={reports} />;
+  const labResults = (
+    <View style={styles.labResults}>
+      <LabResultsSection records={reports} />
+    </View>
+  );
 
   if (isSplit)
     return (
@@ -120,8 +124,8 @@ export function LabsSummaryView() {
           testID="labs-summary-view"
           list={
             <>
-              {labResults}
               {summary}
+              {labResults}
             </>
           }
           // Not keyed by the biomarker: a remount would reload every report
@@ -145,12 +149,13 @@ export function LabsSummaryView() {
       actions={<ResourceActionDock actions={[]} />}
     >
       <View style={styles.content}>
-        {labResults}
         {summary}
+        {labResults}
       </View>
     </ResourceViewLayout>
   );
 }
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'flex-start' },
+  labResults: { marginTop: 32 },
 });

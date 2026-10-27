@@ -1,3 +1,3 @@
 kind: Changed
-body: The Biomarkers page now starts with your lab results (the latest three, with Show all for the rest), and the Out of range, In range and No range groups start collapsed. On desktop, a lab report shows the biomarker you pick beside it, and the Healthy logo in the sidebar takes you Home.
+body: On the Biomarkers page, the Out of range, In range and No range groups start collapsed. On desktop, a lab report shows the biomarker you pick beside it, and the Healthy logo in the sidebar takes you Home.
 time: 2026-10-26T17:55:01.000000000Z
