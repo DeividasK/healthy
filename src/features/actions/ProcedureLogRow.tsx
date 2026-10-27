@@ -2,18 +2,22 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   CalendarClock,
+  ClipboardList,
   ListChecks,
+  type LucideIcon,
   Minus,
   Plus,
   Timer,
-  type LucideIcon,
 } from 'lucide-react-native';
 import {
   ResourceRow,
   type ResourceMeta,
 } from '@/src/components/ResourceSection';
 import { FormTextInput } from '@/src/components/FormField';
-import { formatMinutes } from '@/src/features/service-requests/serviceRequestSchedule';
+import {
+  formatScheduleText,
+  getScheduleRepeat,
+} from '@/src/features/service-requests/serviceRequestSchedule';
 import { parseLocalDate } from '@/src/utils/dateUtils';
 import { getServiceRequestTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -44,11 +48,24 @@ export function formatDueWindow(due: { from: string; to?: string }): string {
   return `Due ${from} – ${to}`;
 }
 
-/** The row's meta line: due window, session and, until done, the planned duration. */
+/**
+ * The row's meta line: due window, session and, until done, the schedule
+ * worded like a treatment's dose (e.g. "30 min, once a day"), without the
+ * time of day under a time heading.
+ */
 export function getProcedureLogMeta(
   item: ProcedureItem,
-  testID?: (name: string) => string | undefined
+  testID?: (name: string) => string | undefined,
+  underTimeHeading = false
 ): ResourceMeta[] {
+  const repeat = getScheduleRepeat(item.request);
+  // Sessions are counted on their own meta item.
+  const schedule =
+    repeat &&
+    formatScheduleText(
+      { ...repeat, count: undefined },
+      { withoutTime: underTimeHeading }
+    );
   return [
     ...(item.due
       ? [
@@ -68,11 +85,11 @@ export function getProcedureLogMeta(
           },
         ]
       : []),
-    ...(item.answer !== 'taken' && item.plannedDuration !== undefined
+    ...(item.answer !== 'taken' && schedule
       ? [
           {
             icon: Timer,
-            text: formatMinutes(item.plannedDuration),
+            text: schedule,
             testID: testID?.('planned-duration'),
           },
         ]
@@ -89,6 +106,7 @@ export function ProcedureLogRow({
   item,
   disabled = false,
   isLeaving = false,
+  underTimeHeading = false,
   reorder,
   onAnswer,
   onDurationChange,
@@ -98,6 +116,8 @@ export function ProcedureLogRow({
   disabled?: boolean;
   /** Sliding out for another day's rows: a copy without test IDs. */
   isLeaving?: boolean;
+  /** Shown under a part of the day or clock time heading. */
+  underTimeHeading?: boolean;
   /** Set while the journal is reordered. */
   reorder?: ReorderHandlers;
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
@@ -113,7 +133,8 @@ export function ProcedureLogRow({
       <ResourceRow
         testID={testID('row')}
         title={title}
-        meta={getProcedureLogMeta(item, testID)}
+        typeIcon={ClipboardList}
+        meta={getProcedureLogMeta(item, testID, underTimeHeading)}
         accessibilityLabel={`View service request: ${title}`}
         onPress={onOpen}
         accessory={

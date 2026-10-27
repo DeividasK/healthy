@@ -122,6 +122,23 @@ export const OFFERED_WHEN: When[] = ['MORN', 'NOON', 'AFT', 'EVE', 'HS'];
 /** The Time of Day option for exact clock times (`Timing.repeat.timeOfDay`). */
 export const SPECIFIC_TIME = 'time';
 
+/**
+ * When a repeat is due in words, e.g. "in the morning and in the evening" or
+ * "at 07:30"; undefined without a time. Shared by doses and activities.
+ */
+export function formatTimePhrase(
+  repeat: Pick<TimingRepeat, 'when' | 'timeOfDay'> | undefined
+): string | undefined {
+  return (
+    repeat?.when
+      ?.map((code) => WHEN_LABELS[code]?.phrase || code)
+      .join(' and ') ||
+    (repeat?.timeOfDay?.length
+      ? `at ${repeat.timeOfDay.map(formatClockTime).join(' and ')}`
+      : undefined)
+  );
+}
+
 /** A part of the day's label, e.g. "Morning", or the code when unknown. */
 export const getWhenLabel = (code: string) =>
   WHEN_LABELS[code as When]?.label || code;
@@ -690,8 +707,14 @@ function formatFrequency(repeat: TimingRepeat): string | null {
   return `${times} ${unit.singular === 'hour' ? 'an' : 'a'} ${unit.singular}`;
 }
 
-/** One dose in words, e.g. "2 tablets oral, twice a day, for 7 days". */
-export function formatDose(dosage: Dosage): string {
+/**
+ * One dose in words, e.g. "2 tablets oral, twice a day, for 7 days".
+ * `withoutTime` leaves out the time of day, e.g. under a "Morning" heading.
+ */
+export function formatDose(
+  dosage: Dosage,
+  { withoutTime = false }: { withoutTime?: boolean } = {}
+): string {
   const dose = dosage.doseAndRate?.[0];
   const repeat = dosage.timing?.repeat;
   const range = dose?.doseRange;
@@ -704,24 +727,20 @@ export function formatDose(dosage: Dosage): string {
   const bounds = repeat?.boundsDuration;
   const boundsUnit =
     bounds?.code && isTimeUnit(bounds.code) ? TIME_UNITS[bounds.code] : null;
-  const when =
-    repeat?.when
-      ?.map((code) => WHEN_LABELS[code]?.phrase || code)
-      .join(' and ') ||
-    (repeat?.timeOfDay?.length
-      ? `at ${repeat.timeOfDay.map(formatClockTime).join(' and ')}`
-      : undefined);
+  const when = withoutTime ? undefined : formatTimePhrase(repeat);
   // A time of day implies once a day: "1 tablet in the morning".
   const isOnceDaily =
     repeat?.frequency === 1 &&
     !repeat.frequencyMax &&
     (repeat.period ?? 1) === 1 &&
     repeat.periodUnit === 'd';
+  // A time of day heading likewise implies once a day.
+  const isDailyAtTime = isOnceDaily && (Boolean(when) || withoutTime);
   const parts = [
     when && isOnceDaily
       ? [amount, route?.toLowerCase(), when].filter(Boolean).join(' ')
       : [amount, route?.toLowerCase()].filter(Boolean).join(' '),
-    !(when && isOnceDaily) && repeat && formatFrequency(repeat),
+    !isDailyAtTime && repeat && formatFrequency(repeat),
     !(when && isOnceDaily) && when,
     bounds?.value !== undefined &&
       `for ${bounds.value} ${
@@ -738,15 +757,19 @@ export function formatDose(dosage: Dosage): string {
     : summary;
 }
 
-/** The structured regimen as lines, prefixed by phase when there are several. */
+/**
+ * The structured regimen as lines, prefixed by phase when there are several.
+ * `withoutTime` leaves out the time of day, as for `formatDose`.
+ */
 export function formatRegimenLines(
-  request: Pick<MedicationRequest, 'dosageInstruction'>
+  request: Pick<MedicationRequest, 'dosageInstruction'>,
+  options: { withoutTime?: boolean } = {}
 ): string[] {
   const draft = getRegimenDraft(request);
   const dosages = request.dosageInstruction || [];
   return draft.phases.flatMap((phase, index) =>
     phase.doses.map((dose) => {
-      const text = formatDose(dosages[dose.sourceIndex!]);
+      const text = formatDose(dosages[dose.sourceIndex!], options);
       return draft.phases.length > 1 ? `Phase ${index + 1}: ${text}` : text;
     })
   );
@@ -756,10 +779,13 @@ export function formatRegimenLines(
  * Dosing in words: the text instructions, then the regimen's lines. Records
  * may carry both (e.g. imported).
  */
-export function formatDosingLines(dosages: Dosage[] = []): string[] {
+export function formatDosingLines(
+  dosages: Dosage[] = [],
+  options: { withoutTime?: boolean } = {}
+): string[] {
   return [
     dosages[0]?.text,
-    ...formatRegimenLines({ dosageInstruction: dosages }),
+    ...formatRegimenLines({ dosageInstruction: dosages }, options),
   ].filter((line): line is string => Boolean(line));
 }
 

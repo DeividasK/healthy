@@ -57,17 +57,23 @@ const newTime = (): TimeDraft => ({ choice: OFFERED_WHEN[0], time: '08:00' });
 export function BundleForm({
   initialValues,
   treatmentOptions,
+  activityOptions,
   isEditing = false,
   onSubmit,
 }: {
   initialValues?: Partial<BundleValues>;
   /** The active patient's treatments, offered as members. */
   treatmentOptions: AutocompleteItem[];
+  /** The active patient's scheduled activities, offered as members. */
+  activityOptions: AutocompleteItem[];
   isEditing?: boolean;
   onSubmit: (values: BundleValues) => Promise<void>;
 }) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [memberIds, setMemberIds] = useState(initialValues?.memberIds || []);
+  const [activityIds, setActivityIds] = useState(
+    initialValues?.activityIds || []
+  );
   const fields = useOptionalFields({
     times: {
       label: 'Times',
@@ -85,7 +91,7 @@ export function BundleForm({
   const [timeOptions, setTimeOptions] = useState<AddOptionItem[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const hasChanges = useHasChanges({ title, memberIds, times });
+  const hasChanges = useHasChanges({ title, memberIds, activityIds, times });
   const { reveal, scrollViewProps } = useFieldReveal();
 
   const options = fields.menuOptions;
@@ -101,8 +107,8 @@ export function BundleForm({
     const keys = bundleTimes.map(getBundleTimeKey);
     const error = !trimmed
       ? 'Bundle name is required'
-      : !memberIds.length
-        ? 'Choose at least one treatment'
+      : !memberIds.length && !activityIds.length
+        ? 'Choose at least one treatment or activity'
         : new Set(keys).size !== keys.length
           ? 'Each time can only be added once'
           : null;
@@ -110,7 +116,12 @@ export function BundleForm({
     if (error) return;
     try {
       setIsSubmitting(true);
-      await onSubmit({ title: trimmed, memberIds, times: bundleTimes });
+      await onSubmit({
+        title: trimmed,
+        memberIds,
+        activityIds,
+        times: bundleTimes,
+      });
     } catch (err: any) {
       console.error('Failed to save bundle:', err);
       setErrorMessage(err.message || 'Failed to save bundle');
@@ -148,7 +159,7 @@ export function BundleForm({
               testID: 'bundle-title-input',
               autoFocus: !isEditing,
               accessibilityLabel: 'Bundle Name',
-              placeholder: 'e.g. Morning supplements',
+              placeholder: 'e.g. Daily supplements',
               value: title,
               onChangeText: (text) => {
                 setTitle(text);
@@ -162,10 +173,19 @@ export function BundleForm({
             options={treatmentOptions}
             selectedIds={memberIds}
             onChange={setMemberIds}
-            required
             itemType="treatment"
             idPrefix="bundle-"
             testID="bundle-treatments-field"
+          />
+          <LinkedResourcesField
+            label="Activities"
+            searchLabel="Select activities"
+            options={activityOptions}
+            selectedIds={activityIds}
+            onChange={setActivityIds}
+            itemType="activity"
+            idPrefix="bundle-"
+            testID="bundle-activities-field"
           />
           {fields.shown.times && (
             <FormField

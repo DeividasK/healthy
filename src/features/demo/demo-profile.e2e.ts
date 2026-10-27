@@ -73,8 +73,12 @@ test.describe('Demo profile', () => {
         await countForActive(page, 'medication_administrations')
       ).toBeGreaterThan(40);
       await openRoute(page, '/journal');
-      await expect(page.getByText('Morning stack')).toBeVisible();
-      await expect(page.getByText('Evening medication')).toBeVisible();
+      await expect(page.getByText('Supplement stack')).toBeVisible();
+      await expect(page.getByText('Cholesterol medication')).toBeVisible();
+      for (const activity of ['Meditation', 'Hyperbaric oxygen therapy (HBOT)'])
+        await expect(
+          page.getByRole('checkbox', { name: `Mark ${activity} done` })
+        ).toBeVisible();
     });
 
     await test.step('The profile is the demo person', async () => {

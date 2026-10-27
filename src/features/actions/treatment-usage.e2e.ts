@@ -375,15 +375,18 @@ test('a new regimen starts a period, keeps earlier days on the old dose and flag
   // old one on a day the new one covers is flagged.
   const row = page.getByTestId('treatment-log-row-regimen-0');
   const warning = page.getByTestId('treatment-log-mismatch-regimen-0');
+  // Under the Morning heading, the dose leaves out the time of day.
   await openRoute(page, `/journal?date=${threeAgo}`);
-  await expect(row).toContainText('2 tablets in the morning');
+  await expect(row).toContainText('2 tablets');
+  await expect(row).not.toContainText('in the morning');
   await expect(warning).toHaveCount(0);
   await openRoute(page, `/journal?date=${yesterday}`);
   await expect(row).toContainText('2 tablets in the morning');
   await expect(warning).toHaveText("Doesn't match the current regimen");
   await checkA11y(page);
   await openRoute(page, `/journal?date=${today}`);
-  await expect(row).toContainText('1 tablet in the morning');
+  await expect(row).toContainText('1 tablet');
+  await expect(row).not.toContainText('in the morning');
   await expect(warning).toHaveCount(0);
   await page.getByTestId('treatment-log-taken-regimen-0').click();
   await expect

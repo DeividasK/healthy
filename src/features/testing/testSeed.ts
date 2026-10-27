@@ -145,6 +145,8 @@ export interface SeedBundleOptions {
   /** Parts of the day (e.g. MORN) or clock times (e.g. "07:30"). */
   times?: string[];
   memberIds: string[];
+  /** Scheduled service request ids. */
+  activityIds?: string[];
 }
 
 /** Seeds a treatment bundle (RequestOrchestration) through the real service. */
