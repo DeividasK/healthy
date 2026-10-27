@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
+import { expect } from '@playwright/test';
 
 test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
   page,
@@ -96,3 +97,30 @@ for (const [layout, viewport] of [
     );
   });
 }
+
+test('Biomarker detail - Switched to another unit', async ({
+  page,
+}, testInfo) => {
+  await seedTestPatient(page);
+  await seedTestReport(page, {
+    id: 'magnesium-visual-older',
+    date: '2026-05-01',
+    biomarkers: [{ name: 'Magnesium', value: 2.1, unit: 'mg/dL' }],
+  });
+  await seedTestReport(page, {
+    id: 'magnesium-visual-latest',
+    date: '2026-06-01',
+    biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
+  });
+  await page.goto('/biomarker/19123-9');
+  await page
+    .getByTestId('biomarker-unit-picker')
+    .locator('select')
+    .selectOption('mg/dL');
+  await expect(page.getByTestId('biomarker-latest-value')).toHaveText('2.2');
+  await takeSnapshot(
+    page,
+    'Biomarker detail - Switched to another unit',
+    testInfo
+  );
+});

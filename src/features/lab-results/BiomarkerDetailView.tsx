@@ -34,6 +34,7 @@ import { useIsWideLayout } from '@/src/theme/layout';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ResourceSection } from '@/src/components/ResourceSection';
+import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
 import {
   BiomarkerResultRow,
   BiomarkerValueRow,
@@ -42,6 +43,10 @@ import {
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
+import {
+  getProfileSettings,
+  saveProfileSettings,
+} from '@/src/features/settings/profileSettingsRepository';
 import { getConditionLabResultLinks } from '@/src/features/conditions/conditionService';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { latestBiomarkers } from '@/src/features/home/LabsSummary';
@@ -53,6 +58,7 @@ import {
   BIOMARKERS,
   type BiomarkerCalculation,
   type BiomarkerDefinition,
+  type UnitOption,
 } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
@@ -65,6 +71,7 @@ import {
   getObservationUnitCode,
   isSupportedObservation,
   RANGE_STATUS_LABELS,
+  roundConvertedValue,
   RANGE_STATUSES,
   toRangeStatus,
   type MeasurementReferenceRange,
@@ -92,6 +99,10 @@ type Measurement = {
   reportedRange: boolean;
   observation: Observation;
 };
+
+/** Whether a catalog unit is the one a result was recorded in. */
+const matchesUnit = (unit: UnitOption, code: string) =>
+  unit.ucum === code || unit.label === code;
 
 /** Resolves a readable name from the observation's coding or text. */
 function getObservationName(observation: Observation) {
@@ -166,6 +177,8 @@ export function BiomarkerDetailView({
     conditionLinks: [] as Awaited<
       ReturnType<typeof getConditionLabResultLinks>
     >,
+    /** The unit each biomarker was last shown in (UCUM, by biomarker id). */
+    units: {} as Record<string, string>,
     isLoading: true,
     hasError: false,
   });
@@ -194,20 +207,23 @@ export function BiomarkerDetailView({
             patientId,
             reports: [],
             conditionLinks: [],
+            units: {},
             isLoading: true,
             hasError: false,
           }
     );
     try {
-      const [loadedReports, conditionLinks] = await Promise.all([
+      const [loadedReports, conditionLinks, settings] = await Promise.all([
         getAllReports(patientId),
         getConditionLabResultLinks(patientId),
+        getProfileSettings(patientId),
       ]);
       if (generation !== loadGeneration.current) return;
       setHistory({
         patientId,
         reports: loadedReports,
         conditionLinks,
+        units: settings.biomarkerUnits ?? {},
         isLoading: false,
         hasError: false,
       });
@@ -218,6 +234,7 @@ export function BiomarkerDetailView({
         patientId,
         reports: [],
         conditionLinks: [],
+        units: {},
         isLoading: false,
         hasError: true,
       });
@@ -292,7 +309,51 @@ export function BiomarkerDetailView({
     return matches.sort((a, b) => a.date.localeCompare(b.date));
   }, [id, marker, reports, demographics]);
 
-  const latestMeasurement = measurements[measurements.length - 1];
+  const recordedLatest = measurements[measurements.length - 1];
+  /** Units the reader can switch the results to, when there is a choice. */
+  const unitOptions =
+    marker &&
+    marker.units.length > 1 &&
+    recordedLatest &&
+    marker.units.some((unit) => matchesUnit(unit, recordedLatest.unitCode))
+      ? marker.units
+      : [];
+  const displayUnit =
+    unitOptions.find((unit) => unit.ucum === history.units[marker!.id]) ||
+    unitOptions.find((unit) => matchesUnit(unit, recordedLatest.unitCode));
+  /** The results in the chosen unit, with their ranges worked out in it. */
+  const displayedMeasurements = useMemo(
+    () =>
+      displayUnit
+        ? measurements.map((measurement) => {
+            if (matchesUnit(displayUnit, measurement.unitCode))
+              return measurement;
+            const value = convertBiomarkerValue(
+              measurement.value,
+              measurement.unitCode,
+              displayUnit.ucum,
+              marker
+            );
+            return value === undefined
+              ? measurement
+              : {
+                  ...measurement,
+                  value: roundConvertedValue(value, measurement.value),
+                  unit: displayUnit.label,
+                  unitCode: displayUnit.ucum,
+                  range: getObservationReferenceRange(
+                    measurement.observation,
+                    marker,
+                    demographics,
+                    displayUnit.ucum
+                  ),
+                };
+          })
+        : measurements,
+    [measurements, displayUnit, marker, demographics]
+  );
+  const latestMeasurement =
+    displayedMeasurements[displayedMeasurements.length - 1];
   /** The recorded results the latest calculated value was worked out from. */
   const latestSources = useMemo(() => {
     const references = new Set(
@@ -307,7 +368,7 @@ export function BiomarkerDetailView({
   const chartMeasurements = useMemo(
     () =>
       latestMeasurement
-        ? measurements.flatMap((measurement) => {
+        ? displayedMeasurements.flatMap((measurement) => {
             const value = convertBiomarkerValue(
               measurement.value,
               measurement.unitCode,
@@ -319,7 +380,7 @@ export function BiomarkerDetailView({
               : [{ ...measurement, value, unit: latestMeasurement.unit }];
           })
         : [],
-    [measurements, latestMeasurement, marker]
+    [displayedMeasurements, latestMeasurement, marker]
   );
 
   /** Conditions whose lab results include this biomarker. */
@@ -376,13 +437,36 @@ export function BiomarkerDetailView({
     <>
       <View style={styles.section} testID="biomarker-latest">
         <Text style={styles.sectionTitle}>Latest</Text>
-        <View style={styles.latestValueGroup}>
+        <View
+          style={[
+            styles.latestValueGroup,
+            displayUnit && styles.latestValueWithPicker,
+          ]}
+        >
           <Text style={styles.latestValue} testID="biomarker-latest-value">
             {latestMeasurement.value}
           </Text>
-          <Text style={styles.latestUnit} testID="biomarker-latest-unit">
-            {latestMeasurement.unit}
-          </Text>
+          {displayUnit ? (
+            <NativeUnitPicker
+              testID="biomarker-unit-picker"
+              selectedUnit={displayUnit.label}
+              units={unitOptions}
+              onSelect={(_label, ucum) => {
+                const units = { ...history.units, [marker!.id]: ucum };
+                setHistory((previous) => ({ ...previous, units }));
+                if (activePatientId)
+                  void saveProfileSettings(activePatientId, {
+                    biomarkerUnits: units,
+                  }).catch((error) =>
+                    console.error('Failed to save the biomarker unit:', error)
+                  );
+              }}
+            />
+          ) : (
+            <Text style={styles.latestUnit} testID="biomarker-latest-unit">
+              {latestMeasurement.unit}
+            </Text>
+          )}
         </View>
         <BiomarkerRangeLine
           value={latestMeasurement.value}
@@ -478,7 +562,7 @@ export function BiomarkerDetailView({
         testID="biomarker-history"
       >
         <CollapsibleList
-          items={[...measurements].reverse()}
+          items={[...displayedMeasurements].reverse()}
           testID="biomarker-history-list"
           renderItem={(measurement) => (
             <View key={measurement.id}>
@@ -1045,6 +1129,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
   },
+  latestValueWithPicker: { alignItems: 'center', gap: 8 },
   latestUnit: { color: COLORS.light.muted, fontSize: 14 },
   legend: {
     flexDirection: 'row',

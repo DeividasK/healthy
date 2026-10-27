@@ -21,6 +21,11 @@ export interface ProfileSettings {
   timesOfDay: Record<PartOfDay, string>;
   /** The order the user gave the journal's rows. */
   journalOrder?: JournalOrder;
+  /**
+   * The unit (UCUM code) each biomarker's page was last shown in, by catalog
+   * biomarker id. Kept quietly, not shown in Settings.
+   */
+  biomarkerUnits?: Record<string, string>;
 }
 
 export const DEFAULT_TIMES_OF_DAY: Record<PartOfDay, string> = {
@@ -59,7 +64,17 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
       journalOrder[code] = keys.filter((key) => typeof key === 'string');
     else delete journalOrder[code];
   }
-  return { ...stored, timesOfDay, journalOrder } as ProfileSettings;
+  const biomarkerUnits: Record<string, string> = {};
+  const storedUnits = stored?.biomarkerUnits;
+  if (storedUnits && typeof storedUnits === 'object')
+    for (const [marker, unit] of Object.entries(storedUnits))
+      if (typeof unit === 'string') biomarkerUnits[marker] = unit;
+  return {
+    ...stored,
+    timesOfDay,
+    journalOrder,
+    biomarkerUnits,
+  } as ProfileSettings;
 }
 
 export const getProfileSettingsId = (patientId: string) =>
