@@ -689,7 +689,9 @@ test.describe('Add Treatment bundles', () => {
     await page.getByTestId('treatment-title-input').fill('Magnesium');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-bundle').click();
-    await page.getByTestId('link-bundle-search-input').click();
+    // Typing narrows the list to one option: a lower option can sit under
+    // the action dock, which then takes the click.
+    await page.getByTestId('link-bundle-search-input').fill('Morning');
     await page
       .getByTestId(`link-bundle-autocomplete-item-${morning.id}`)
       .click();
