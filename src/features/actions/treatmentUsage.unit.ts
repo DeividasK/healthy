@@ -302,6 +302,26 @@ test('each day follows the regimen of its period, counted from that regimen star
   expect(getLatestRegimen([], prescribed)).toEqual(ONE);
 });
 
+test('where taking periods overlap, the regimen of the latest one is followed', () => {
+  const prescribed = { ...treatment, dosageInstruction: ONE };
+  const [first, ...rest] = run([
+    ['start', '2026-10-01', ONE],
+    ['pause', '2026-10-04'],
+    ['resume', '2026-10-06', TWO],
+  ]);
+  // The first period left open, e.g. by an older copy from another device.
+  const reopened = {
+    ...first,
+    effectivePeriod: { start: first.effectivePeriod!.start },
+  };
+  const periods = getUsagePeriods([reopened, ...rest], 'vit-d');
+  expect(isTakingOn(periods, '2026-10-07')).toBe(true);
+  expect(getRegimenOn(periods, '2026-10-07', prescribed)).toEqual({
+    dosage: TWO,
+    start: '2026-10-06',
+  });
+});
+
 test('removing a period between two regimens keeps both', () => {
   const statements = run([
     ['start', '2026-10-01', ONE],
