@@ -23,16 +23,31 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await seedTestReport(page, {
     date: '2026-10-10',
     biomarkers: [
-      { name: 'Hemoglobin', value: 15.2 },
-      { name: 'White Blood Cells', value: 3.1 },
-      { name: 'Platelets', value: 480 },
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+      {
+        name: 'White Blood Cells',
+        value: 3.1,
+        referenceLow: 4.5,
+        referenceHigh: 11,
+      },
+      { name: 'Platelets', value: 480, referenceLow: 150, referenceHigh: 450 },
     ],
   });
   await seedTestReport(page, {
     date: '2020-10-01',
     biomarkers: [
-      { name: 'Hemoglobin', value: 8 },
-      { name: 'Red Blood Cells', value: 4.7 },
+      { name: 'Hemoglobin', value: 8, referenceLow: 11.6, referenceHigh: 16.6 },
+      {
+        name: 'Red Blood Cells',
+        value: 4.7,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
     ],
   });
   await seedTestCondition(page, {
@@ -183,8 +198,13 @@ test('the key and groups list only statuses with results; empty periods and inva
   const { observations } = await seedTestReport(page, {
     date: '2020-10-01',
     biomarkers: [
-      { name: 'Hemoglobin', value: 15.2 },
-      { name: 'Platelets', value: 250 },
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+      { name: 'Platelets', value: 250, referenceLow: 150, referenceHigh: 450 },
     ],
   });
   // An imported result without a value cannot be compared with its range.
@@ -255,16 +275,31 @@ test('summary Search filters the grouped latest results and respects the period'
   await seedTestReport(page, {
     date: '2026-10-10',
     biomarkers: [
-      { name: 'Hemoglobin', value: 15.2 },
-      { name: 'White Blood Cells', value: 3.1 },
-      { name: 'Platelets', value: 480 },
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+      {
+        name: 'White Blood Cells',
+        value: 3.1,
+        referenceLow: 4.5,
+        referenceHigh: 11,
+      },
+      { name: 'Platelets', value: 480, referenceLow: 150, referenceHigh: 450 },
     ],
   });
   await seedTestReport(page, {
     date: '2020-10-01',
     biomarkers: [
-      { name: 'Hemoglobin', value: 8 },
-      { name: 'Red Blood Cells', value: 4.7 },
+      { name: 'Hemoglobin', value: 8, referenceLow: 11.6, referenceHigh: 16.6 },
+      {
+        name: 'Red Blood Cells',
+        value: 4.7,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
     ],
   });
   await openRoute(page, '/labs-summary');
@@ -316,22 +351,44 @@ test('Sort ranks latest biomarkers within each status by deviation, value and cl
 }) => {
   await seedTestReport(page, {
     date: '2026-10-12',
-    biomarkers: [{ name: 'Hemoglobin', value: 15.2 }],
+    biomarkers: [
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+    ],
   });
   await seedTestReport(page, {
     date: '2026-10-10',
-    biomarkers: [{ name: 'Platelets', value: 480 }],
+    biomarkers: [
+      { name: 'Platelets', value: 480, referenceLow: 150, referenceHigh: 450 },
+    ],
   });
   await seedTestReport(page, {
     date: '2026-10-08',
-    biomarkers: [{ name: 'White Blood Cells', value: 2250, unit: '/uL' }],
+    biomarkers: [
+      {
+        name: 'White Blood Cells',
+        value: 2250,
+        unit: '/uL',
+        referenceLow: 4500,
+        referenceHigh: 11000,
+      },
+    ],
   });
   // Import order differs from measurement order, and the old hemoglobin must be excluded.
   await seedTestReport(page, {
     date: '2020-10-01',
     biomarkers: [
-      { name: 'Red Blood Cells', value: 5.5 },
-      { name: 'Hemoglobin', value: 8 },
+      {
+        name: 'Red Blood Cells',
+        value: 5.5,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
+      { name: 'Hemoglobin', value: 8, referenceLow: 11.6, referenceHigh: 16.6 },
     ],
   });
   await openRoute(page, '/labs-summary');

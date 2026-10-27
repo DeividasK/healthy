@@ -252,6 +252,29 @@ async function runDemoChecks(page: Page) {
     );
   });
 
+  await test.step('Results show the lab ranges and a range Alex set', async () => {
+    await openRoute(page, '/biomarker/62292-8');
+    await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
+      'In range'
+    );
+    await expect(page.getByTestId('biomarker-chart-legend')).toHaveText(
+      'Out of rangeSufficientIn range'
+    );
+    await expect(page.getByTestId('biomarker-range-list')).toContainText(
+      '30–80 ng/mL'
+    );
+    await expect(page.getByTestId('biomarker-range-list')).toContainText(
+      'Set by you'
+    );
+    await openRoute(page, '/');
+    await expect(
+      page.getByTestId('labs-summary-grid-cell-62292-8')
+    ).toHaveAccessibleName('Vitamin D, 25-Hydroxy: In range');
+    await expect(
+      page.getByTestId('labs-summary-grid-cell-2093-3')
+    ).toHaveAccessibleName(/: In range$/);
+  });
+
   await test.step('The journal has past answers and today to answer', async () => {
     expect(
       await countForActive(page, 'medication_administrations')

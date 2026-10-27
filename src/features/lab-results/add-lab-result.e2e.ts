@@ -123,10 +123,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(home.getByTestId('labs-summary-count')).toHaveText('2');
         await expect(
           home.getByTestId('labs-summary-grid-cell-718-7')
-        ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
+        ).toHaveAccessibleName('Hemoglobin (Hgb): No range');
+        // Entered without their printed ranges, the results have none yet.
         await expect(
           home.getByTestId('labs-summary-grid-cell-6690-2')
-        ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+        ).toHaveAccessibleName('White Blood Cells (WBC): No range');
         const stored = await page.evaluate(() =>
           (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
             'SELECT fhir_json FROM observations'
@@ -171,7 +172,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
           results.getByTestId('lab-result-grid-squares').getByRole('img')
         ).toHaveCount(2);
         await expect(
-          results.getByTestId('lab-result-groups-inRange-count')
+          results.getByTestId('lab-result-groups-noRange-count')
         ).toHaveText('2');
         await expandBiomarkerGroups(results);
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
@@ -383,13 +384,13 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(home.getByTestId('labs-summary-count')).toHaveText('5');
       await expect(
         home.getByTestId('labs-summary-grid-cell-6690-2')
-      ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+      ).toHaveAccessibleName('White Blood Cells (WBC): No range');
       await expect(
         home.getByTestId('labs-summary-grid-cell-2276-4')
-      ).toHaveAccessibleName('Ferritin: In range');
+      ).toHaveAccessibleName('Ferritin: No range');
       await expect(
         home.getByTestId('labs-summary-grid-cell-13457-7')
-      ).toHaveAccessibleName('LDL Cholesterol: In range');
+      ).toHaveAccessibleName('LDL Cholesterol: No range');
       // LDL in mmol/L is recorded under LOINC's moles-per-volume code.
       const codes = await page.evaluate(() =>
         (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
@@ -400,7 +401,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         codes.find((row: { name: string }) => row.name === 'LDL Cholesterol')
           .loinc_code
       ).toBe('39469-2');
-      // A LOINC test outside the catalog has no range of its own.
       await expect(
         home.getByTestId('labs-summary-grid-cell-2339-0')
       ).toHaveAccessibleName('Glucose [Mass/volume] in Blood: No range');

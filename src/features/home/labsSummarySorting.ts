@@ -1,6 +1,8 @@
 import type { Observation } from 'fhir/r5';
-import { getObservationReferenceRange } from '@/src/features/lab-results/biomarkerMeasurements';
-import type { RangeDemographics } from '@/src/features/lab-results/referenceRanges';
+import {
+  getObservationRange,
+  type BiomarkerRanges,
+} from '@/src/features/lab-results/biomarkerRanges';
 
 export const SUMMARY_SORT_OPTIONS = [
   { id: 'deviation', label: 'Largest deviations' },
@@ -18,16 +20,9 @@ type SortableBiomarker = {
 };
 
 /** Signed percentage deviation from the unit-aligned reference interval midpoint. */
-function signedDeviation(
-  observation: Observation,
-  demographics?: RangeDemographics
-) {
+function signedDeviation(observation: Observation, ranges?: BiomarkerRanges) {
   const value = observation.valueQuantity?.value;
-  const range = getObservationReferenceRange(
-    observation,
-    undefined,
-    demographics
-  );
+  const range = getObservationRange(observation, ranges);
   if (
     value === undefined ||
     !Number.isFinite(value) ||
@@ -45,10 +40,10 @@ function signedDeviation(
 export function sortSummaryBiomarkers<T extends SortableBiomarker>(
   biomarkers: T[],
   sort: SummarySort,
-  demographics?: RangeDemographics
+  ranges?: BiomarkerRanges
 ): T[] {
   const ranked = biomarkers.map((biomarker) => {
-    const deviation = signedDeviation(biomarker.observation, demographics);
+    const deviation = signedDeviation(biomarker.observation, ranges);
     return {
       biomarker,
       rank:

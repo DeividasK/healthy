@@ -19,11 +19,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
       { label: '/uL', ucum: '/uL', factor: 1000 },
     ],
-    referenceRange: {
-      low: 4.5,
-      high: 11.0,
-      text: '4.5 - 11.0 10*3/uL',
-    },
     description:
       'Total number of white blood cells; key indicator of infection, inflammation, or immune health.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -40,22 +35,11 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*6/uL', ucum: '10*6/uL', factor: 1 },
       { label: '10*12/L', ucum: '10*12/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 3.92,
-      high: 5.65,
-      text: '3.92 - 5.65 10*6/uL',
-    },
-    demographicRanges: [
-      { sex: 'male', low: 4.35, high: 5.65 },
-      { sex: 'female', low: 3.92, high: 5.13 },
-    ],
     description:
       'Number of oxygen-carrying red blood cells per volume of blood.',
     education: {
       about:
         'An RBC count measures how many red blood cells (erythrocytes) are present in a volume of blood. These cells are made in the bone marrow and contain hemoglobin.',
-      whyItMatters:
-        'Hemoglobin carries oxygen from the lungs to the body’s tissues. The RBC count helps assess oxygen-carrying capacity and is interpreted together with hemoglobin, hematocrit, and red blood cell indices.',
       whatItMayAffect:
         'When there are too few healthy red blood cells, less oxygen may reach tissues, which can contribute to fatigue, weakness, or shortness of breath. Symptoms and their causes vary from person to person.',
       whatMayBeRelatedToAChange:
@@ -76,15 +60,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: 'g/L', ucum: 'g/L', factor: 10 },
       { label: 'mmol/L', ucum: 'mmol/L', factor: 0.6206 },
     ],
-    referenceRange: {
-      low: 11.6,
-      high: 16.6,
-      text: '11.6 - 16.6 g/dL',
-    },
-    demographicRanges: [
-      { sex: 'male', low: 13.2, high: 16.6 },
-      { sex: 'female', low: 11.6, high: 15.0 },
-    ],
     description:
       'Iron-containing oxygen transport metalloprotein in red blood cells.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -100,15 +75,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     units: [
       { label: '%', ucum: '%', factor: 1 },
       { label: 'L/L', ucum: 'L/L', factor: 0.01 },
-    ],
-    referenceRange: {
-      low: 35.5,
-      high: 48.6,
-      text: '35.5 - 48.6 %',
-    },
-    demographicRanges: [
-      { sex: 'male', low: 38.3, high: 48.6 },
-      { sex: 'female', low: 35.5, high: 44.9 },
     ],
     description:
       'Percentage proportion of blood volume that is occupied by red blood cells.',
@@ -127,11 +93,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
       { label: '/uL', ucum: '/uL', factor: 1000 },
     ],
-    referenceRange: {
-      low: 150,
-      high: 450,
-      text: '150 - 450 10*3/uL',
-    },
     description:
       'Cell fragments essential for normal blood clotting and vessel repair.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -145,11 +106,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: 'fL',
     ucumCode: 'fL',
     units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
-    referenceRange: {
-      low: 80,
-      high: 100,
-      text: '80 - 100 fL',
-    },
     description: 'Average volume and size of individual red blood cells.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -165,11 +121,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: 'pg', ucum: 'pg', factor: 1 },
       { label: 'fmol', ucum: 'fmol', factor: 0.062 },
     ],
-    referenceRange: {
-      low: 27,
-      high: 33,
-      text: '27 - 33 pg',
-    },
     description: 'Average mass of hemoglobin inside a single red blood cell.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -185,11 +136,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: 'g/dL', ucum: 'g/dL', factor: 1 },
       { label: 'g/L', ucum: 'g/L', factor: 10 },
     ],
-    referenceRange: {
-      low: 32,
-      high: 36,
-      text: '32 - 36 g/dL',
-    },
     description:
       'Average concentration of hemoglobin within a given volume of packed red blood cells.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -203,11 +149,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 11.5,
-      high: 14.5,
-      text: '11.5 - 14.5 %',
-    },
     description:
       'Measurement of the variation in red blood cell volume and size (coefficient of variation).',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -221,11 +162,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: 'fL',
     ucumCode: 'fL',
     units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
-    referenceRange: {
-      low: 39,
-      high: 46,
-      text: '39 - 46 fL',
-    },
     description:
       'Actual measurement of the width of red blood cell volume distribution curve at 20% height.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -239,11 +175,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: 'fL',
     ucumCode: 'fL',
     units: [{ label: 'fL', ucum: 'fL', factor: 1 }],
-    referenceRange: {
-      low: 7.5,
-      high: 11.5,
-      text: '7.5 - 11.5 fL',
-    },
     description:
       'Average size of platelets; reflects platelet production and bone marrow function.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -264,11 +195,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 40,
-      high: 70,
-      text: '40 - 70 %',
-    },
     description:
       'Percentage of white blood cells that are neutrophils, vital for combating acute bacterial infections.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -291,11 +217,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*3/uL', ucum: '10*3/uL', factor: 1 },
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 1.8,
-      high: 7.7,
-      text: '1.8 - 7.7 10*3/uL',
-    },
     description: 'Absolute count of circulating neutrophils.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -308,11 +229,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 20,
-      high: 40,
-      text: '20 - 40 %',
-    },
     description:
       'Percentage of white blood cells that are lymphocytes (T cells, B cells, NK cells).',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -335,11 +251,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*3/uL', ucum: '10*3/uL', factor: 1 },
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 1.0,
-      high: 4.8,
-      text: '1.0 - 4.8 10*3/uL',
-    },
     description: 'Absolute count of circulating lymphocytes.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -352,11 +263,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 2,
-      high: 8,
-      text: '2 - 8 %',
-    },
     description:
       'Percentage of white blood cells that are monocytes, precursor cells to macrophages.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -379,11 +285,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*3/uL', ucum: '10*3/uL', factor: 1 },
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 0.2,
-      high: 0.8,
-      text: '0.2 - 0.8 10*3/uL',
-    },
     description: 'Absolute count of circulating monocytes.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -396,11 +297,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 1,
-      high: 4,
-      text: '1 - 4 %',
-    },
     description:
       'Percentage of white blood cells involved in allergic responses and parasitic defense.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -423,11 +319,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*3/uL', ucum: '10*3/uL', factor: 1 },
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 0.05,
-      high: 0.5,
-      text: '0.05 - 0.5 10*3/uL',
-    },
     description: 'Absolute count of circulating eosinophils.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },
@@ -440,11 +331,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     primaryUnit: '%',
     ucumCode: '%',
     units: [{ label: '%', ucum: '%', factor: 1 }],
-    referenceRange: {
-      low: 0.5,
-      high: 1.0,
-      text: '0.5 - 1.0 %',
-    },
     description:
       'Percentage of granulocytes releasing histamine and heparin during inflammatory reactions.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
@@ -467,11 +353,6 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
       { label: '10*3/uL', ucum: '10*3/uL', factor: 1 },
       { label: '10*9/L', ucum: '10*9/L', factor: 1 },
     ],
-    referenceRange: {
-      low: 0.01,
-      high: 0.2,
-      text: '0.01 - 0.2 10*3/uL',
-    },
     description: 'Absolute count of circulating basophils.',
     education: { ...EMPTY_BIOMARKER_EDUCATION },
   },

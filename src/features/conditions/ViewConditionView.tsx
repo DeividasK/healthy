@@ -15,7 +15,7 @@ import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { BiomarkerResultRow } from '@/src/features/home/BiomarkerResultRow';
 import { latestBiomarkers } from '@/src/features/home/LabsSummary';
 import { sortSummaryBiomarkers } from '@/src/features/home/labsSummarySorting';
-import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
 import type { DiagnosticReportRecord } from '@/src/database/types';
 import { ConditionTimeline } from './ConditionTimeline';
 import { buildTimelineItems } from './conditionTimeline';
@@ -120,7 +120,7 @@ export function ViewConditionView() {
     ],
     loadData
   );
-  const demographics = useRangeDemographics();
+  const ranges = useBiomarkerRanges();
   // The latest result of each biomarker in the condition's lab results,
   // largest deviation from the range first.
   const biomarkers = useMemo(() => {
@@ -129,12 +129,12 @@ export function ViewConditionView() {
       latestBiomarkers(
         reports.filter(({ report }) => linked.has(report.id)),
         -Infinity,
-        demographics
+        ranges
       ),
       'deviation',
-      demographics
+      ranges
     );
-  }, [labResults, reports, demographics]);
+  }, [labResults, reports, ranges]);
 
   if (
     isLoading ||

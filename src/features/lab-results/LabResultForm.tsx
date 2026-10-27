@@ -267,7 +267,6 @@ export function LabResultForm({
               description: name,
               education: {
                 about: '',
-                whyItMatters: '',
                 whatItMayAffect: '',
                 whatMayBeRelatedToAChange: '',
               },

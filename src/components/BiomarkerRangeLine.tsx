@@ -8,28 +8,41 @@ const ZONE_COLORS = {
     fill: COLORS.light.outOfRangeTint,
   },
   inRange: { line: COLORS.light.primary, fill: COLORS.light.inRangeTint },
+  sufficient: {
+    line: COLORS.light.sufficient,
+    fill: COLORS.light.sufficientTint,
+  },
 };
 
 /**
  * Places a result on a bar of out-of-range and in-range zones sized to the
- * reference range, marked by a triangle. The large bar also labels the limits.
+ * reference range, marked by a triangle. An optimal part shows as in range
+ * with sufficient zones around it. The large bar also labels the limits;
+ * without a value it shows the range alone.
  */
 export function BiomarkerRangeLine({
   value,
   low,
   high,
+  optimalLow,
+  optimalHigh,
+  limitText = String,
   width = 120,
   large = false,
   testID,
 }: {
-  value: number;
+  value?: number;
   low?: number;
   high?: number;
+  optimalLow?: number;
+  optimalHigh?: number;
+  /** How a limit is written, e.g. with the decimals it was given. */
+  limitText?: (limit: number) => string;
   width?: number | '100%';
   large?: boolean;
   testID?: string;
 }) {
-  const layout = getRangeZones(value, low, high);
+  const layout = getRangeZones(value, low, high, optimalLow, optimalHigh);
   if (!layout) return null;
 
   return (
@@ -54,13 +67,15 @@ export function BiomarkerRangeLine({
           />
         ))}
       </View>
-      <View
-        style={[
-          styles.marker,
-          large && styles.largeMarker,
-          { left: `${layout.marker}%` },
-        ]}
-      />
+      {layout.marker !== undefined && (
+        <View
+          style={[
+            styles.marker,
+            large && styles.largeMarker,
+            { left: `${layout.marker}%` },
+          ]}
+        />
+      )}
       {large && (
         <View style={styles.limits}>
           {layout.limits.map(({ value: limit, position }) => (
@@ -69,7 +84,7 @@ export function BiomarkerRangeLine({
               style={[styles.limit, { left: `${position}%` }]}
               testID={testID ? `${testID}-limit` : undefined}
             >
-              {limit}
+              {limitText(limit)}
             </Text>
           ))}
         </View>
