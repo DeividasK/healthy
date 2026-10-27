@@ -174,3 +174,18 @@ test('App - Loading placeholders', async ({ page }, testInfo) => {
     .waitFor();
   await takeSnapshot(page, 'App - Loading', testInfo);
 });
+
+test('App - Loading placeholders (desktop)', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Holds the SQLite worker so the database stays closed while capturing.
+  await page.route(/expo-sqlite\/web\/worker|wa-sqlite\.wasm/, () => {});
+
+  await page.goto('/');
+  await page.getByTestId('app-sidebar-placeholder').waitFor();
+  await page
+    .getByTestId('app-loading-skeleton')
+    .getByTestId('skeleton-row')
+    .first()
+    .waitFor();
+  await takeSnapshot(page, 'App - Loading (desktop)', testInfo);
+});

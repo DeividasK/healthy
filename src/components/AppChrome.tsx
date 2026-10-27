@@ -10,7 +10,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { AppHeader } from './AppHeader';
 import { ActionDock, getActionDockLayout, type DockAction } from './ActionDock';
-import { AppSidebar } from './AppSidebar';
+import { AppSidebar, AppSidebarPlaceholder } from './AppSidebar';
 import { KeyboardShortcutsProvider } from './KeyboardShortcuts';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
@@ -31,8 +31,11 @@ export const useDockMenuAnchor = () => useContext(DockMenuAnchorContext);
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const isWide = useIsWideLayout();
   // The sidebar navigates between a profile's sections, so it waits for one.
-  const { activePatient } = useActivePatient();
+  // Until the profile is known, wide windows keep the sidebar's place.
+  const { activePatient, isLoading } = useActivePatient();
   const showSidebar = isWide && Boolean(activePatient);
+  const showSidebarPlaceholder = isWide && isLoading;
+  const showHeader = !showSidebar && !showSidebarPlaceholder;
   const [overlays, setOverlays] = useState<Record<string, React.ReactNode>>({});
   const [dock, setActiveDock] = useState<{
     id: string;
@@ -93,15 +96,16 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
             {/* The screens keep their place in the tree in both layouts, so
               resizing the window never remounts them. */}
             <View style={styles.container}>
-              {!showSidebar && <AppHeader />}
+              {showHeader && <AppHeader />}
               <View style={styles.main}>
                 {showSidebar && <AppSidebar />}
+                {showSidebarPlaceholder && <AppSidebarPlaceholder />}
                 <View style={styles.container}>
                   {children}
-                  {showSidebar && overlayLayer}
+                  {!showHeader && overlayLayer}
                 </View>
               </View>
-              {!showSidebar && overlayLayer}
+              {showHeader && overlayLayer}
             </View>
           </KeyboardAvoidingView>
         </DockMenuAnchorContext.Provider>
