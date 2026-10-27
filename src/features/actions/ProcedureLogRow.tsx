@@ -134,8 +134,8 @@ export function ProcedureLogRow({
         testID={testID('row')}
         title={title}
         typeIcon={ClipboardList}
+        typeLabel="Service request"
         meta={getProcedureLogMeta(item, testID, underTimeHeading)}
-        accessibilityLabel={`View service request: ${title}`}
         onPress={onOpen}
         accessory={
           reorder ? (

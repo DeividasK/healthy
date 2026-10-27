@@ -141,7 +141,7 @@ test.describe('Profile Management & Patient Record Attachment Flow', () => {
       .grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.getByTestId('profile-id-copy-button').click();
     await expect(
-      page.getByRole('button', { name: 'Patient ID copied' })
+      page.getByRole('button', { name: /^Patient ID .+ copied$/ })
     ).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(id);
 

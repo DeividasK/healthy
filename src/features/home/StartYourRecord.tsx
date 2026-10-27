@@ -107,7 +107,6 @@ export function StartYourRecord({
               description={description}
               leading={<RowIconDisc icon={icon} />}
               onPress={() => open(href)}
-              accessibilityLabel={title}
               testID={`start-${id}`}
             />
           </Animated.View>

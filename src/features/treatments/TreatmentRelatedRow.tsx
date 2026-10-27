@@ -68,7 +68,6 @@ export function TreatmentRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View treatment: ${title}`}
       meta={[...getTreatmentMeta(treatment), ...extraMeta]}
       onPress={onPress}
       {...appearance}

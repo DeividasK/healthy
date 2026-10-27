@@ -28,7 +28,6 @@ export function LabResultRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View lab result: ${title}`}
       meta={[...getLabResultMeta(report), ...extraMeta]}
       onPress={onPress}
       {...appearance}

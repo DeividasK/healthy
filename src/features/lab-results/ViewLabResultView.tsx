@@ -139,7 +139,11 @@ function LabResultForPatient({
     [selectedId, router]
   );
   const isSplit = isWideWindow && Boolean(record) && Boolean(selectedId);
-  useListArrowKeys('lab-result-list', 'View biomarker:', isSplit);
+  useListArrowKeys(
+    'lab-result-list',
+    '[aria-label^="View biomarker:"]',
+    isSplit
+  );
 
   if (isLoading) {
     return <ResourceViewLayout testID="lab-result-view" isLoading />;

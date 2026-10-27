@@ -195,7 +195,7 @@ export function TreatmentsView() {
         <ListDetailLayout
           title="Treatments"
           listId="treatment-list"
-          rowLabel="View treatment:"
+          rowSelector='[data-testid^="treatments-row-"][role="button"]'
           testID="treatments-view"
           list={list}
           detail={
