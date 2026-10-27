@@ -108,13 +108,18 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
       'Typical Hemoglobin (Hgb) levels differ by sex. This range is for men. Laboratories set their own ranges, so yours may differ a little.'
     );
+    await page.getByTestId('learn-toggle-range-source').click();
+    await expect(page.getByTestId('biomarker-range-region')).toHaveText(
+      'This range is used for every region. Change region'
+    );
     await expect(page.getByTestId('biomarker-range-notice')).toHaveCount(0);
     const chart = page.getByTestId('biomarker-chart');
     await expect(chart.getByText('132', { exact: true })).toBeVisible();
     await expect(chart.getByText('166', { exact: true })).toBeVisible();
     const history = page.getByTestId('biomarker-history-list');
-    await expect(history.getByText('14.5', { exact: true })).toBeVisible();
-    await expect(history.getByText('g/dL', { exact: true })).toBeVisible();
+    // Every result is listed in the unit shown above.
+    await expect(history.getByText('145', { exact: true })).toBeVisible();
+    await expect(history.getByText('g/dL', { exact: true })).toHaveCount(0);
     await expect(
       history.locator('[data-testid^="biomarker-history-range-"]')
     ).toHaveCount(2);
@@ -177,6 +182,7 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
       'This range comes from your laboratory report.'
     );
+    await expect(page.getByTestId('learn-toggle-range-source')).toHaveCount(0);
 
     // Unsupported stored measurements are excluded from history and trends.
     await page.evaluate(async () => {
@@ -232,6 +238,54 @@ test.describe('Biomarker detail', () => {
       0
     );
     await expect(chart).toBeHidden();
+  });
+
+  test('switches the page to another unit and remembers it', async ({
+    page,
+  }) => {
+    await seedTestPatient(page);
+    await seedTestReport(page, {
+      date: '2026-05-01',
+      biomarkers: [{ name: 'Magnesium', value: 2.1, unit: 'mg/dL' }],
+    });
+    await seedTestReport(page, {
+      date: '2026-06-01',
+      biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
+    });
+    await openRoute(page, '/biomarker/19123-9');
+    const unit = page.getByTestId('biomarker-latest-unit');
+    const unitSwitch = page.getByTestId('biomarker-unit-switch');
+    const value = page.getByTestId('biomarker-latest-value');
+    const limits = page.getByTestId('biomarker-latest-range-limit');
+    const history = page.getByTestId('biomarker-history-list');
+    // The latest result's unit, with the catalog's mg/dL range converted.
+    await expect(unit).toHaveText('mmol/L');
+    await expect(unitSwitch).toHaveAccessibleName(
+      'Unit: mmol/L. Switch to mEq/L'
+    );
+    await expect(value).toHaveText('0.91');
+    await expect(limits).toHaveText(['0.7', '0.91']);
+    await expect(history.getByText('0.86', { exact: true })).toBeVisible();
+
+    // Each press moves to the next unit, wrapping to the first.
+    await unitSwitch.click();
+    await expect(unit).toHaveText('mEq/L');
+    await expect(value).toHaveText('1.8');
+    await unitSwitch.click();
+    await expect(unit).toHaveText('mg/dL');
+    await expect(value).toHaveText('2.2');
+    await expect(limits).toHaveText(['1.7', '2.2']);
+    await expect(history.getByText('2.1', { exact: true })).toBeVisible();
+    await expect(history.getByText('mmol/L', { exact: true })).toHaveCount(0);
+    // The status is still judged in the unit the laboratory reported.
+    await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
+      'In range'
+    );
+
+    // Coming back shows the unit last chosen.
+    await reopenRoute(page);
+    await expect(unit).toHaveText('mg/dL');
+    await expect(value).toHaveText('2.2');
   });
 
   test('opens a biomarker and shows its description, history, and trend', async ({

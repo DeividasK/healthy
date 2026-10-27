@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  ArrowLeftRight,
   Calculator,
   Calendar,
   ChevronDown,
@@ -42,6 +43,10 @@ import {
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllReports } from './diagnosticReportService';
+import {
+  getProfileSettings,
+  saveProfileSettings,
+} from '@/src/features/settings/profileSettingsRepository';
 import { getConditionLabResultLinks } from '@/src/features/conditions/conditionService';
 import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
 import { latestBiomarkers } from '@/src/features/home/LabsSummary';
@@ -51,9 +56,11 @@ import {
 } from './calculatedBiomarkers';
 import {
   BIOMARKERS,
+  getUnitLoinc,
   hasLoincCode,
   type BiomarkerCalculation,
   type BiomarkerDefinition,
+  type UnitOption,
 } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
@@ -66,6 +73,7 @@ import {
   getObservationUnitCode,
   isSupportedObservation,
   RANGE_STATUS_LABELS,
+  roundConvertedValue,
   RANGE_STATUSES,
   toRangeStatus,
   type MeasurementReferenceRange,
@@ -75,6 +83,7 @@ import {
   explainReferenceRange,
   resolveReferenceRange,
 } from './referenceRanges';
+import { RangeRegionLine } from './RangeRegionLine';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { getChartScale } from './chartScale';
 import { useRangeDemographics } from './useRangeDemographics';
@@ -93,6 +102,10 @@ type Measurement = {
   reportedRange: boolean;
   observation: Observation;
 };
+
+/** Whether a catalog unit is the one a result was recorded in. */
+const matchesUnit = (unit: UnitOption, code: string) =>
+  unit.ucum === code || unit.label === code;
 
 /** Resolves a readable name from the observation's coding or text. */
 function getObservationName(observation: Observation) {
@@ -167,6 +180,8 @@ export function BiomarkerDetailView({
     conditionLinks: [] as Awaited<
       ReturnType<typeof getConditionLabResultLinks>
     >,
+    /** The unit each biomarker was last shown in (UCUM, by biomarker id). */
+    units: {} as Record<string, string>,
     isLoading: true,
     hasError: false,
   });
@@ -195,20 +210,23 @@ export function BiomarkerDetailView({
             patientId,
             reports: [],
             conditionLinks: [],
+            units: {},
             isLoading: true,
             hasError: false,
           }
     );
     try {
-      const [loadedReports, conditionLinks] = await Promise.all([
+      const [loadedReports, conditionLinks, settings] = await Promise.all([
         getAllReports(patientId),
         getConditionLabResultLinks(patientId),
+        getProfileSettings(patientId),
       ]);
       if (generation !== loadGeneration.current) return;
       setHistory({
         patientId,
         reports: loadedReports,
         conditionLinks,
+        units: settings.biomarkerUnits ?? {},
         isLoading: false,
         hasError: false,
       });
@@ -219,6 +237,7 @@ export function BiomarkerDetailView({
         patientId,
         reports: [],
         conditionLinks: [],
+        units: {},
         isLoading: false,
         hasError: true,
       });
@@ -293,12 +312,73 @@ export function BiomarkerDetailView({
     return matches.sort((a, b) => a.date.localeCompare(b.date));
   }, [id, marker, reports, demographics]);
 
-  const latestMeasurement = measurements[measurements.length - 1];
-  /** The latest result's own code: a test's units can have codes of their own. */
+  const recordedLatest = measurements[measurements.length - 1];
+  /** Units the reader can switch the results to, when there is a choice. */
+  const unitOptions =
+    marker &&
+    marker.units.length > 1 &&
+    recordedLatest &&
+    marker.units.some((unit) => matchesUnit(unit, recordedLatest.unitCode))
+      ? marker.units
+      : [];
+  const displayUnit =
+    unitOptions.find((unit) => unit.ucum === history.units[marker!.id]) ||
+    unitOptions.find((unit) => matchesUnit(unit, recordedLatest.unitCode));
+  /** The results in the chosen unit, with their ranges worked out in it. */
+  const displayedMeasurements = useMemo(
+    () =>
+      displayUnit
+        ? measurements.map((measurement) => {
+            if (matchesUnit(displayUnit, measurement.unitCode))
+              return measurement;
+            const value = convertBiomarkerValue(
+              measurement.value,
+              measurement.unitCode,
+              displayUnit.ucum,
+              marker
+            );
+            return value === undefined
+              ? measurement
+              : {
+                  ...measurement,
+                  value: roundConvertedValue(value, measurement.value),
+                  unit: displayUnit.label,
+                  unitCode: displayUnit.ucum,
+                  range: getObservationReferenceRange(
+                    measurement.observation,
+                    marker,
+                    demographics,
+                    displayUnit.ucum
+                  ),
+                };
+          })
+        : measurements,
+    [measurements, displayUnit, marker, demographics]
+  );
+  const latestMeasurement =
+    displayedMeasurements[displayedMeasurements.length - 1];
+  /** The unit the switch moves to: the next one, wrapping to the first. */
+  const nextUnit = displayUnit
+    ? unitOptions[(unitOptions.indexOf(displayUnit) + 1) % unitOptions.length]
+    : undefined;
+  /** Shows the page in a unit and remembers it for this biomarker. */
+  const chooseUnit = (ucum: string) => {
+    const units = { ...history.units, [marker!.id]: ucum };
+    setHistory((previous) => ({ ...previous, units }));
+    if (activePatientId)
+      void saveProfileSettings(activePatientId, {
+        biomarkerUnits: units,
+      }).catch((error) =>
+        console.error('Failed to save the biomarker unit:', error)
+      );
+  };
+  /** The code of the results as shown: a test's units can have codes of their own. */
   const latestCode =
-    latestMeasurement?.observation.code.coding?.find(
-      (coding) => coding.system === 'http://loinc.org'
-    )?.code ?? marker?.loinc;
+    marker && displayUnit
+      ? getUnitLoinc(marker, displayUnit.ucum)
+      : (recordedLatest?.observation.code.coding?.find(
+          (coding) => coding.system === 'http://loinc.org'
+        )?.code ?? marker?.loinc);
   /** The recorded results the latest calculated value was worked out from. */
   const latestSources = useMemo(() => {
     const references = new Set(
@@ -313,7 +393,7 @@ export function BiomarkerDetailView({
   const chartMeasurements = useMemo(
     () =>
       latestMeasurement
-        ? measurements.flatMap((measurement) => {
+        ? displayedMeasurements.flatMap((measurement) => {
             const value = convertBiomarkerValue(
               measurement.value,
               measurement.unitCode,
@@ -325,7 +405,7 @@ export function BiomarkerDetailView({
               : [{ ...measurement, value, unit: latestMeasurement.unit }];
           })
         : [],
-    [measurements, latestMeasurement, marker]
+    [displayedMeasurements, latestMeasurement, marker]
   );
 
   /** Conditions whose lab results include this biomarker. */
@@ -386,9 +466,27 @@ export function BiomarkerDetailView({
           <Text style={styles.latestValue} testID="biomarker-latest-value">
             {latestMeasurement.value}
           </Text>
-          <Text style={styles.latestUnit} testID="biomarker-latest-unit">
-            {latestMeasurement.unit}
-          </Text>
+          {displayUnit ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Unit: ${displayUnit.label}. Switch to ${nextUnit!.label}`}
+              testID="biomarker-unit-switch"
+              onPress={() => chooseUnit(nextUnit!.ucum)}
+              style={({ hovered }: { hovered?: boolean }) => [
+                styles.unitSwitch,
+                hovered && styles.unitSwitchHovered,
+              ]}
+            >
+              <Text style={styles.latestUnit} testID="biomarker-latest-unit">
+                {displayUnit.label}
+              </Text>
+              <ArrowLeftRight size={16} color={COLORS.light.primary} />
+            </Pressable>
+          ) : (
+            <Text style={styles.latestUnit} testID="biomarker-latest-unit">
+              {latestMeasurement.unit}
+            </Text>
+          )}
         </View>
         <BiomarkerRangeLine
           value={latestMeasurement.value}
@@ -484,7 +582,7 @@ export function BiomarkerDetailView({
         testID="biomarker-history"
       >
         <CollapsibleList
-          items={[...measurements].reverse()}
+          items={[...displayedMeasurements].reverse()}
           testID="biomarker-history-list"
           renderItem={(measurement) => (
             <View key={measurement.id}>
@@ -554,7 +652,6 @@ export function BiomarkerDetailView({
   const learn = (
     <>
       <View style={styles.learnSection} testID="biomarker-learn">
-        <Text style={styles.sectionTitle}>Learn</Text>
         <LearnItem title="About this biomarker">
           {marker?.education?.about ||
             marker?.description ||
@@ -570,6 +667,16 @@ export function BiomarkerDetailView({
         <LearnItem title="What may be related to a change">
           {marker?.education?.whatMayBeRelatedToAChange || ''}
         </LearnItem>
+        {latestRange &&
+          (latestRange.low !== undefined || latestRange.high !== undefined) && (
+            <LearnItem title="Range source">
+              <RangeRegionLine
+                resolved={latestRange}
+                testID="biomarker-range-region"
+                style={styles.learnText}
+              />
+            </LearnItem>
+          )}
       </View>
     </>
   );
@@ -680,9 +787,16 @@ export function BiomarkerDetailView({
  * A full-width row, divided like resource rows, that expands its educational
  * text below the title; the chevron on the right turns when open.
  */
-function LearnItem({ title, children }: { title: string; children: string }) {
+function LearnItem({
+  title,
+  children,
+}: {
+  title: string;
+  /** Text, or a ready-styled element. Empty text leaves the item out. */
+  children: string | React.ReactElement;
+}) {
   const [expanded, setExpanded] = useState(false);
-  if (!children.trim()) return null;
+  if (typeof children === 'string' && !children.trim()) return null;
 
   return (
     <View style={styles.learnItem}>
@@ -704,7 +818,12 @@ function LearnItem({ title, children }: { title: string; children: string }) {
           <ChevronDown size={18} color={COLORS.light.muted} />
         </View>
       </Pressable>
-      {expanded && <Text style={styles.learnText}>{children}</Text>}
+      {expanded &&
+        (typeof children === 'string' ? (
+          <Text style={styles.learnText}>{children}</Text>
+        ) : (
+          children
+        ))}
     </View>
   );
 }
@@ -1051,6 +1170,16 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
   },
+  unitSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: -4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  unitSwitchHovered: { backgroundColor: COLORS.light.pillBackground },
   latestUnit: { color: COLORS.light.muted, fontSize: 14 },
   legend: {
     flexDirection: 'row',

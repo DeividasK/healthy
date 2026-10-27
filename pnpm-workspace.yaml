@@ -11,6 +11,7 @@ allowBuilds:
 
 patchedDependencies:
   '@expo/metro-config': patches/@expo__metro-config.patch
+  expo-sqlite: patches/expo-sqlite.patch
 
 minimumReleaseAgeExclude:
   - '@expo/cli@57.0.32'

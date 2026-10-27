@@ -382,7 +382,9 @@ export const isSameRegimen = (a?: Dosage[], b?: Dosage[]) =>
  * taking period covering it, or the prescribed one when that period has
  * none. `start` is the first day of that regimen, counting back over taking
  * periods with the same one (pauses do not interrupt it), so its phases
- * continue across a pause and restart after a new regimen.
+ * continue across a pause and restart after a new regimen. Where taking
+ * periods overlap, e.g. an earlier one left open, the one that started last
+ * decides, as in `getUsageStateOn`.
  */
 export function getRegimenOn(
   periods: UsagePeriod[],
@@ -392,9 +394,11 @@ export function getRegimenOn(
   const taking = periods.filter((period) => period.state === 'taking');
   const regimenOf = (period: UsagePeriod) =>
     period.dosage ?? treatment.dosageInstruction;
-  const index = taking.findIndex(
-    (period) => period.start <= date && (!period.end || date <= period.end)
-  );
+  const index = taking
+    .map(
+      (period) => period.start <= date && (!period.end || date <= period.end)
+    )
+    .lastIndexOf(true);
   if (index < 0) return { dosage: treatment.dosageInstruction };
   const dosage = regimenOf(taking[index]);
   let first = index;

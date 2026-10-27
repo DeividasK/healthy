@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { BIOMARKERS, getBiomarker, getUnitLoinc, hasLoincCode } from '.';
+import {
+  BIOMARKERS,
+  getBiomarker,
+  getUnitLoinc,
+  hasLoincCode,
+  REGIONAL_RANGES,
+} from '.';
 
 /** LOINC codes end in a mod-10 (Luhn) check digit. */
 function hasValidLoincCheckDigit(loinc: string): boolean {
@@ -96,4 +102,15 @@ test('records units of another kind under their own LOINC codes', () => {
       expect(hasValidLoincCheckDigit(code)).toBe(true);
     }
   }
+});
+
+test('regional ranges name catalog biomarkers and cite a source', () => {
+  for (const ranges of Object.values(REGIONAL_RANGES))
+    for (const [id, range] of Object.entries(ranges ?? {})) {
+      expect(
+        BIOMARKERS.some((marker) => marker.id === id),
+        id
+      ).toBe(true);
+      expect(range.source.url, id).toMatch(/^https:\/\//);
+    }
 });
