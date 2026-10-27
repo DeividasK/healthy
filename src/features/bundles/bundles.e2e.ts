@@ -431,6 +431,44 @@ test.describe('Treatment bundles', () => {
     ).toHaveCount(0);
   });
 
+  test('offers only treatments with a bundle place left', async ({ page }) => {
+    await seedTestResources(page, {
+      treatments: [
+        { id: 'f-vit-d', title: 'Vitamin D' },
+        { id: 'f-omega', title: 'Omega-3' },
+      ],
+    });
+    // Without a regimen, a treatment fits one bundle.
+    const bundle = await seedTestBundle(page, {
+      title: 'Morning',
+      memberIds: ['f-vit-d'],
+    });
+
+    await openRoute(page, '/bundle/add');
+    await page.getByTestId('bundle-treatment-search-input').click();
+    await expect(
+      page.getByTestId('bundle-treatment-autocomplete-item-f-omega')
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('bundle-treatment-autocomplete-item-f-vit-d')
+    ).toHaveCount(0);
+
+    // Its own bundle keeps it.
+    await openRoute(page, `/bundle/${bundle.id}/edit`);
+    await expect(
+      page.getByTestId('bundle-selected-treatment-f-vit-d')
+    ).toBeVisible();
+
+    // Saving refuses a treatment that has no place left.
+    await expect(
+      bridge(page, (b) =>
+        b.seedBundle({ title: 'Evening', times: [], memberIds: ['f-vit-d'] })
+      )
+    ).rejects.toThrow(
+      'Vitamin D is already in as many bundles as it has doses'
+    );
+  });
+
   test('links bundles from the treatment form and cleans up on delete', async ({
     page,
   }) => {

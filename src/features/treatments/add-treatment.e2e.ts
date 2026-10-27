@@ -674,11 +674,16 @@ test.describe('Add Treatment bundles', () => {
   });
 
   test('adds a new treatment to existing bundles', async ({ page }) => {
-    const existing = await seedTestTreatment(page, { title: 'Vitamin D' });
-    const [morning, evening] = await Promise.all(
-      ['Morning stack', 'Evening stack'].map((title) =>
-        seedTestBundle(page, { title, memberIds: [existing.id] })
+    const [vitaminD, omega3] = await Promise.all(
+      ['Vitamin D', 'Omega-3'].map((title) =>
+        seedTestTreatment(page, { title })
       )
+    );
+    const [morning, evening] = await Promise.all(
+      [
+        ['Morning stack', vitaminD.id],
+        ['Evening stack', omega3.id],
+      ].map(([title, id]) => seedTestBundle(page, { title, memberIds: [id] }))
     );
     await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Magnesium');
@@ -707,8 +712,8 @@ test.describe('Add Treatment bundles', () => {
       )
     );
     expect(stored.map(getBundleMemberIds)).toEqual([
-      [existing.id, id],
-      [existing.id],
+      [vitaminD.id, id],
+      [omega3.id],
     ]);
   });
 
@@ -722,11 +727,16 @@ test.describe('Add Treatment bundles', () => {
   test('allows one bundle per dose of the regimen', async ({ page }) => {
     // Tall enough for the whole form, so its lists never open behind the dock.
     await page.setViewportSize({ width: 1280, height: 1600 });
-    const existing = await seedTestTreatment(page, { title: 'Vitamin D' });
-    const [morning, evening] = await Promise.all(
-      ['Morning stack', 'Evening stack'].map((title) =>
-        seedTestBundle(page, { title, memberIds: [existing.id] })
+    const [vitaminD, omega3] = await Promise.all(
+      ['Vitamin D', 'Omega-3'].map((title) =>
+        seedTestTreatment(page, { title })
       )
+    );
+    const [morning, evening] = await Promise.all(
+      [
+        ['Morning stack', vitaminD.id],
+        ['Evening stack', omega3.id],
+      ].map(([title, id]) => seedTestBundle(page, { title, memberIds: [id] }))
     );
     await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Magnesium');
