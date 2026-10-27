@@ -170,6 +170,7 @@ export function LabsSummary({
           return [
             name,
             marker.loinc ?? '',
+            ...Object.values(marker.unitLoinc ?? {}),
             ...marker.aliases,
             observation.code.text || '',
             ...(observation.code.coding?.map(

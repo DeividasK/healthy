@@ -1,10 +1,11 @@
 import {
   findBiomarkerByName,
+  hasLoincCode,
   RECORDABLE_BIOMARKERS,
   type RecordableBiomarker,
   type UnitOption,
 } from '@/src/data/biomarkers';
-import type { LoincLabTests } from '@/src/data/loinc';
+import { unitKind, type LoincLabTests } from '@/src/data/loinc';
 import {
   parseAIValue,
   readAIDate,
@@ -66,7 +67,7 @@ Rules:
 - "date" is the day the sample was collected. If the report doesn't show it, use the report date.
 - "time" is the 24-hour time the sample was collected. Leave "time" out if the report doesn't show it.
 - "serviceProvider" is the laboratory or clinic that did the tests. Leave it out if the report doesn't show it.
-- Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported.
+- Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported. LOINC has separate codes for each kind of unit, so use the code for the unit the report gives: mass, like mg/dL, or amount of substance, like mmol/L.
 - "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
 - For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
 - Leave out tests in the list whose unit doesn't match one listed for them, and other tests whose LOINC code you aren't sure of. List the tests you leave out in a short note before the code block.
@@ -92,7 +93,7 @@ function findMarker(test: string): RecordableBiomarker | undefined {
   const clean = test.trim().toLowerCase();
   return (
     RECORDABLE_BIOMARKERS.find(
-      (marker) => marker.id === clean || marker.loinc === clean
+      (marker) => marker.id === clean || hasLoincCode(marker, clean)
     ) ?? findBiomarkerByName(test, RECORDABLE_BIOMARKERS)
   );
 }
@@ -165,7 +166,13 @@ export function parseLabResultsAIReply(
       const reportedUnit = unitText.trim();
       const unit =
         findUnit(marker, unitText) ??
-        (!catalogMarker && reportedUnit
+        // LOINC codes each kind of unit separately, so another test's
+        // unit only fits if it measures the same kind of quantity.
+        (!catalogMarker &&
+        reportedUnit &&
+        marker.units.some(
+          (option) => unitKind(option.ucum) === unitKind(reportedUnit)
+        )
           ? { label: reportedUnit, ucum: reportedUnit }
           : undefined);
       if (!unit) {

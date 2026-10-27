@@ -51,6 +51,7 @@ import {
 } from './calculatedBiomarkers';
 import {
   BIOMARKERS,
+  hasLoincCode,
   type BiomarkerCalculation,
   type BiomarkerDefinition,
 } from '@/src/data/biomarkers';
@@ -240,7 +241,7 @@ export function BiomarkerDetailView({
   const marker = BIOMARKERS.find(
     (candidate) =>
       candidate.id === id ||
-      candidate.loinc === id ||
+      hasLoincCode(candidate, id) ||
       candidate.name.toLowerCase() === (id || '').toLowerCase() ||
       candidate.aliases.some(
         (alias) => alias.toLowerCase() === (id || '').toLowerCase()
@@ -257,7 +258,7 @@ export function BiomarkerDetailView({
         const displayName = getObservationName(observation);
         const name = displayName.toLowerCase();
         const isMatch = marker
-          ? (marker.loinc !== undefined && code === marker.loinc) ||
+          ? hasLoincCode(marker, code) ||
             marker.aliases.some((alias) => name === alias.toLowerCase()) ||
             name === marker.name.toLowerCase()
           : (code !== 'custom' && code === id) ||
@@ -293,6 +294,11 @@ export function BiomarkerDetailView({
   }, [id, marker, reports, demographics]);
 
   const latestMeasurement = measurements[measurements.length - 1];
+  /** The latest result's own code: a test's units can have codes of their own. */
+  const latestCode =
+    latestMeasurement?.observation.code.coding?.find(
+      (coding) => coding.system === 'http://loinc.org'
+    )?.code ?? marker?.loinc;
   /** The recorded results the latest calculated value was worked out from. */
   const latestSources = useMemo(() => {
     const references = new Set(
@@ -589,8 +595,8 @@ export function BiomarkerDetailView({
               },
             ]
           : []),
-        ...(marker?.loinc
-          ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
+        ...(latestCode
+          ? [{ icon: Hash, text: latestCode, testID: 'biomarker-loinc' }]
           : []),
         ...(isCalculatedObservation(latestMeasurement.observation)
           ? [

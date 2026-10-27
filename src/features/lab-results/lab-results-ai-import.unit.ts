@@ -55,6 +55,14 @@ test('reads results from a reply with a note and a fenced code block', () => {
   ]);
 });
 
+test('finds catalog tests by the LOINC code of any of their units', () => {
+  const result = parseLabResultsAIReply(
+    '{"date":"2026-10-20","results":[{"test":"14749-6","value":5.1,"unit":"mmol/L"}]}',
+    today
+  );
+  expect(result.ok && result.data.results[0].marker.loinc).toBe('2345-7');
+});
+
 test('reads bare JSON and leaves out a missing time and provider', () => {
   const result = parseLabResultsAIReply(
     '{"date":"2026-10-22","results":[{"test":"cbc_rdw_cv","value":12.1,"unit":"%"}]}',
@@ -117,6 +125,8 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
       { test: '2339-0 ', value: 5.1, unit: 'mmol/L' },
       { test: '9999-9', value: 1, unit: 'mg/dL' },
       { test: '1558-6', value: 90, unit: '' },
+      // Moles per volume have a code of their own (15074-8 in blood).
+      { test: '41653-7', value: 5.1, unit: 'mmol/L' },
     ],
   });
   expect(parseLabResultsAIReply(reply, today, loincTests)).toEqual({
@@ -125,6 +135,7 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
       'Glucose [Mass/volume] in Blood is listed more than once.',
       '"9999-9" is not a supported test.',
       'Fasting glucose [Mass/volume] in Serum or Plasma has an unsupported unit "". Supported units: mg/dL.',
+      'Glucose [Mass/volume] in Capillary blood by Glucometer has an unsupported unit "mmol/L". Supported units: mg/dL.',
     ],
   });
 
@@ -133,7 +144,8 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
       date: '2026-10-20',
       results: [
         { test: '1558-6', value: 92, unit: 'mg/dl' },
-        { test: '2339-0', value: 5.1, unit: 'mmol/L' },
+        { test: '2339-0', value: 0.92, unit: 'g/L' },
+        { test: '15074-8', value: 5.1, unit: 'mmol/L' },
       ],
     }),
     today,
@@ -149,7 +161,8 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
     ])
   ).toEqual([
     ['1558-6', 'mg/dL', ['mg/dL']],
-    ['2339-0', 'mmol/L', ['mg/dL', 'mmol/L']],
+    ['2339-0', 'g/L', ['mg/dL', 'g/L']],
+    ['15074-8', 'mmol/L', ['mmol/L']],
   ]);
   // Without the LOINC list, only catalog tests are recognised.
   expect(

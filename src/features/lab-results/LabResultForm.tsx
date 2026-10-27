@@ -36,6 +36,8 @@ import {
 } from '@/src/features/organizations/organizationService';
 import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import {
+  getUnitLoinc,
+  hasLoincCode,
   RECORDABLE_BIOMARKERS,
   searchBiomarkers,
   type RecordableBiomarker,
@@ -251,8 +253,8 @@ export function LabResultForm({
               obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
             const ucum = obs.valueQuantity?.code || unit;
 
-            const def: RecordableBiomarker = RECORDABLE_BIOMARKERS.find(
-              (m) => m.loinc === loinc
+            const def: RecordableBiomarker = RECORDABLE_BIOMARKERS.find((m) =>
+              hasLoincCode(m, loinc)
             ) || {
               id: `marker_${loinc}`,
               name,
@@ -416,7 +418,7 @@ export function LabResultForm({
       const biomarkers: BiomarkerInputItem[] = activeItems.map((item) => ({
         id: item.definition.id,
         name: item.definition.name,
-        loinc: item.definition.loinc,
+        loinc: getUnitLoinc(item.definition, item.selectedUcum),
         value: parseFloat(item.valueStr),
         unit: item.selectedUnit,
         ucumCode: item.selectedUcum,

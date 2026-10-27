@@ -1,5 +1,9 @@
 import type { Observation } from 'fhir/r5';
-import { BIOMARKERS, type BiomarkerDefinition } from '@/src/data/biomarkers';
+import {
+  BIOMARKERS,
+  hasLoincCode,
+  type BiomarkerDefinition,
+} from '@/src/data/biomarkers';
 import { LOINC_CODE_PATTERN, loincTestBiomarker } from '@/src/data/loinc';
 import {
   resolveReferenceRange,
@@ -49,7 +53,7 @@ export function getObservationMarker(
     marker.name.toLowerCase() === name ||
     marker.aliases.some((alias) => alias.toLowerCase() === name);
   const byCode = (marker: BiomarkerDefinition) =>
-    Boolean(coding?.code) && marker.loinc === coding?.code;
+    hasLoincCode(marker, coding?.code);
   return (
     BIOMARKERS.find((marker) => byCode(marker) && byName(marker)) ??
     BIOMARKERS.find(byName) ??

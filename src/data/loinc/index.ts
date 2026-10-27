@@ -36,6 +36,30 @@ export function ucumLabel(ucum: string): string {
     .replace(/[[\]]/g, '');
 }
 
+const MASS = /^[munpfk]?g$/i;
+const SUBSTANCE = /^[munpfk]?(mol|eq)$/i;
+const VOLUME = /^[munpfd]?l$/i;
+
+function quantityKind(unit: string) {
+  if (MASS.test(unit)) return 'mass';
+  if (SUBSTANCE.test(unit)) return 'substance';
+  if (VOLUME.test(unit)) return 'volume';
+  return unit.toLowerCase();
+}
+
+/**
+ * What a unit measures, e.g. mass per volume for mg/dL and g/L, or amount
+ * of substance per volume for mmol/L. LOINC gives each kind its own code.
+ */
+export function unitKind(ucum: string): string {
+  const [numerator, ...denominator] = ucum
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/[\s[\]]/g, '')
+    .replace(/[µμ]/g, 'u')
+    .split('/');
+  return [numerator, ...denominator].map(quantityKind).join('/');
+}
+
 /**
  * A recordable biomarker for a LOINC test outside the catalog. Its units
  * don't convert into each other, and it has no catalog reference range.

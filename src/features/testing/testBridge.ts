@@ -117,7 +117,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
-import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
+import { getUnitLoinc, RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 
 async function connectedProvider() {
   const config = await loadGoogleDriveConfig();
@@ -448,7 +448,7 @@ export function setupTestBridge(
           return {
             id: def.id,
             name: def.name,
-            loinc: def.loinc,
+            loinc: getUnitLoinc(def, ucumCode),
             value: val,
             unit: b.unit || def.primaryUnit,
             ucumCode,

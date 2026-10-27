@@ -79,7 +79,8 @@ async function catalogCodes() {
   const codes = new Set();
   for (const file of files) {
     const source = await readFile(join(dir, file), 'utf8');
-    for (const [, code] of source.matchAll(/loinc: '([0-9]+-[0-9])'/g))
+    // Codes of tests and of their units (`unitLoinc`).
+    for (const [, code] of source.matchAll(/'([0-9]+-[0-9])'/g))
       codes.add(code);
   }
   return codes;

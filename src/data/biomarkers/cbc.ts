@@ -67,6 +67,7 @@ export const CBC_MARKERS: BiomarkerDefinition[] = [
     name: 'Hemoglobin (Hgb)',
     aliases: ['Hgb', 'Hb', 'Hemoglobin'],
     loinc: '718-7',
+    unitLoinc: { 'mmol/L': '59260-0' },
     category: 'Complete Blood Count',
     primaryUnit: 'g/dL',
     ucumCode: 'g/dL',

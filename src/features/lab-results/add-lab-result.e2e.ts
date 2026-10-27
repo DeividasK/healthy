@@ -390,6 +390,16 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(
         home.getByTestId('labs-summary-grid-cell-13457-7')
       ).toHaveAccessibleName('LDL Cholesterol: In range');
+      // LDL in mmol/L is recorded under LOINC's moles-per-volume code.
+      const codes = await page.evaluate(() =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+          'SELECT name, loinc_code FROM observations'
+        )
+      );
+      expect(
+        codes.find((row: { name: string }) => row.name === 'LDL Cholesterol')
+          .loinc_code
+      ).toBe('39469-2');
       // A LOINC test outside the catalog has no range of its own.
       await expect(
         home.getByTestId('labs-summary-grid-cell-2339-0')
