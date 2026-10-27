@@ -182,10 +182,10 @@ test('edits verification independently and roundtrips source and standard catego
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-category-0')).toHaveText(
-    'Category: ESI kontekstas'
+    'ESI kontekstas'
   );
   await expect(page.getByTestId('condition-verification-status')).toHaveText(
-    'Verification status: Confirmed'
+    'Confirmed'
   );
   await openRoute(page, `/condition/${condition.id}/edit`);
   await expect(page.getByTestId('condition-category-input')).toHaveValue(
@@ -197,7 +197,7 @@ test('edits verification independently and roundtrips source and standard catego
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-category-0')).toHaveText(
-    'Category: Temporary'
+    'Temporary'
   );
   let saved = await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
@@ -224,7 +224,7 @@ test('edits verification independently and roundtrips source and standard catego
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await openRoute(page, `/condition/${condition.id}`);
   await expect(page.getByTestId('condition-verification-status')).toHaveText(
-    'Verification status: Differential'
+    'Differential'
   );
   saved = await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),

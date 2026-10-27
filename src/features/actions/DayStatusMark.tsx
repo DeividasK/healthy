@@ -7,17 +7,21 @@ import type { DayStatus } from './actionDays';
 /**
  * A day's logging state: a check once everything is answered, a dash while
  * some answers are missing, a cross before any answer, a small dot when
- * nothing is due and an empty circle for days still to come.
+ * nothing is due and an empty circle for days still to come. Today has no
+ * cross before its first answer: the day is still going, not missed.
  */
 export function DayStatusMark({
   status,
   highlighted = false,
+  isToday = false,
   size = 28,
   testID,
 }: {
   status: DayStatus;
   /** Outlines the circle in the brand colour, e.g. for today. */
   highlighted?: boolean;
+  /** Leaves out the cross while nothing is logged yet. */
+  isToday?: boolean;
   size?: number;
   testID?: string;
 }) {
@@ -58,7 +62,7 @@ export function DayStatusMark({
       {status === 'partial' && (
         <Minus color={COLORS.light.primary} size={iconSize} strokeWidth={3} />
       )}
-      {status === 'empty' && (
+      {status === 'empty' && !isToday && (
         <X color={COLORS.light.primary} size={iconSize} strokeWidth={3} />
       )}
     </View>
