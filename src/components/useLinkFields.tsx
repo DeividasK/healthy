@@ -17,6 +17,8 @@ export interface LinkFieldConfig {
   icon: LucideIcon;
   options: AutocompleteItem[];
   initialIds: string[];
+  /** Most links allowed; the search hides once reached. */
+  max?: number;
   /** How each link is recorded, chosen per link with a native select. */
   roles?: {
     options: NativeSelectOption[];
@@ -78,6 +80,7 @@ export function useLinkFields(configs: LinkFieldConfig[]) {
         searchLabel={`Link ${config.label.toLowerCase()}`}
         options={config.options}
         selectedIds={ids}
+        max={config.max}
         onChange={(next) =>
           setSelected((current) => ({ ...current, [config.type]: next }))
         }

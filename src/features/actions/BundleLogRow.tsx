@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ChevronDown, ChevronUp, Group, ListChecks } from 'lucide-react-native';
+import {
+  ChevronDown,
+  ChevronUp,
+  Group,
+  TriangleAlert,
+} from 'lucide-react-native';
 import {
   ResourceRow,
   type ResourceMeta,
@@ -21,8 +26,8 @@ import { TreatmentLogRow, type ReorderHandlers } from './TreatmentLogRow';
 /**
  * One time of a bundle in the journal: its buttons answer every dose and
  * activity it groups. The chevron shows them, each with its own buttons; the
- * row opens the bundle. Closed on every day until toggled; once every one is
- * answered both ways, both buttons are tinted. While the journal is
+ * row opens the bundle. Closed on every day until toggled; answered in part,
+ * the buttons for the answers given are tinted. While the journal is
  * reordered, move buttons replace the chevron and answers, and the members
  * stay hidden.
  */
@@ -73,18 +78,23 @@ export function BundleLogRow({
       ? 'treatments and activities'
       : 'activities';
   // The time is left out: the journal's group heading already shows it.
-  const meta: ResourceMeta[] = isMixed
-    ? [
-        {
-          icon: ListChecks,
-          text: `${taken} of ${entries.length} ${row.procedures.length ? 'done' : 'taken'}`,
-          testID: testID('progress'),
-        },
-      ]
-    : getMemberCountMeta(treatmentCount, row.procedures.length, {
-        treatments: testID('count'),
-        activities: testID('activity-count'),
-      });
+  const meta: ResourceMeta[] = [
+    ...getMemberCountMeta(treatmentCount, row.procedures.length, {
+      treatments: testID('count'),
+      activities: testID('activity-count'),
+    }),
+    // Answered in part, the bundle also shows how far along it is.
+    ...(isMixed
+      ? [
+          {
+            icon: TriangleAlert,
+            tone: 'warning' as const,
+            text: `${taken} of ${entries.length} ${row.procedures.length ? 'done' : 'taken'}`,
+            testID: testID('progress'),
+          },
+        ]
+      : []),
+  ];
   const name = row.time ? `${title}, ${formatBundleTime(row.time)}` : title;
   const Chevron = isOpen ? ChevronUp : ChevronDown;
 
@@ -120,7 +130,9 @@ export function BundleLogRow({
               </TouchableOpacity>
               <AnswerButtons
                 answer={answer}
-                mixed={isMixed && answered.length === entries.length}
+                partial={[
+                  ...new Set(answered.flatMap((item) => item.answer ?? [])),
+                ]}
                 name={name}
                 disabled={isLeaving || entries.some(isSaving)}
                 testIDPrefix={
