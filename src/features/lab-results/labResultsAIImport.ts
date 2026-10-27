@@ -41,14 +41,23 @@ export type LabResultsAIParseResult = AIImportResult<ImportedLabResults>;
 /**
  * Instructions the user gives their own AI assistant together with a lab
  * report, so it replies with results in the format `parseLabResultsAIReply`
- * reads. Lists every test the app supports with its accepted units.
+ * reads. Lists every test the app supports with its accepted units, and
+ * the user's own tests so the AI reuses their names.
  */
-export function buildLabResultsAIInstructions(): string {
+export function buildLabResultsAIInstructions(
+  ownTests: RecordableBiomarker[] = []
+): string {
   const tests = RECORDABLE_BIOMARKERS.map((marker) => {
     const names = [marker.name, ...marker.aliases].join(', ');
     const units = marker.units.map((unit) => unit.label).join(', ');
     return `- ${marker.id}: ${names}. Units: ${units}`;
   }).join('\n');
+  const ownTestList = ownTests.length
+    ? `
+
+My own tests, already in the app. For the same test, use "${OWN_TEST_ID}" with exactly this name:
+${ownTests.map((test) => `- ${test.name}. Unit: ${test.primaryUnit}`).join('\n')}`
+    : '';
 
   return `I want to add the results of my lab report to my health app. Read the lab report I'm sharing with you and convert it into the format below.
 
@@ -78,7 +87,7 @@ Rules:
 - Don't add reference ranges, flags, comments or any other fields.
 
 Tests and units:
-${tests}`;
+${tests}${ownTestList}`;
 }
 
 /** Lowercases a unit and writes powers of ten and micro the way the catalog does. */

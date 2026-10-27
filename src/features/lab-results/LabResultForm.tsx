@@ -910,7 +910,7 @@ export function LabResultForm({
           {showAIImport && (
             <AIImportModal
               document="lab report"
-              instructions={buildLabResultsAIInstructions}
+              instructions={() => buildLabResultsAIInstructions(customTests)}
               parse={async (reply) =>
                 parseLabResultsAIReply(
                   reply,

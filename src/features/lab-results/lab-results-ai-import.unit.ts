@@ -5,7 +5,10 @@ import {
   parseLabResultsAIReply,
 } from './labResultsAIImport';
 import { loadLoincLabTests } from '@/src/data/loinc';
-import { CUSTOM_TEST_SYSTEM } from '@/src/data/biomarkers/customTests';
+import {
+  CUSTOM_TEST_SYSTEM,
+  customTestBiomarker,
+} from '@/src/data/biomarkers/customTests';
 
 const today = new Date(2026, 9, 22);
 
@@ -206,4 +209,15 @@ test('keeps a test with no LOINC code as the user’s own test', () => {
     ['NAD+', 'x-nad-plus', CUSTOM_TEST_SYSTEM, '38.2', 'µM'],
     ['Telomere length', 'x-telomere-length', CUSTOM_TEST_SYSTEM, '6.8', 'kb'],
   ]);
+});
+
+test('instructions list the user’s own tests so the AI reuses their names', () => {
+  expect(buildLabResultsAIInstructions()).not.toContain('My own tests');
+  const instructions = buildLabResultsAIInstructions([
+    customTestBiomarker('NAD+', 'µM'),
+    customTestBiomarker('Telomere length', 'kb'),
+  ]);
+  expect(instructions).toContain(
+    'My own tests, already in the app. For the same test, use "own" with exactly this name:\n- NAD+. Unit: µM\n- Telomere length. Unit: kb'
+  );
 });
