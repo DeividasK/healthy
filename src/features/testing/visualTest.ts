@@ -189,4 +189,5 @@ export {
   getTestTreatment,
   seedTestServiceRequest,
   seedTestBundle,
+  evaluateBridge,
 } from './testStorage';

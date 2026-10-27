@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { BIOMARKERS } from '.';
+import { BIOMARKERS, REGIONAL_RANGES } from '.';
 
 /** LOINC codes end in a mod-10 (Luhn) check digit. */
 function hasValidLoincCheckDigit(loinc: string): boolean {
@@ -77,4 +77,15 @@ test('units start with the primary unit and ranges are ordered', () => {
     if (low !== undefined && high !== undefined)
       expect(high, marker.id).toBeGreaterThan(low);
   }
+});
+
+test('regional ranges name catalog biomarkers and cite a source', () => {
+  for (const ranges of Object.values(REGIONAL_RANGES))
+    for (const [id, range] of Object.entries(ranges ?? {})) {
+      expect(
+        BIOMARKERS.some((marker) => marker.id === id),
+        id
+      ).toBe(true);
+      expect(range.source.url, id).toMatch(/^https:\/\//);
+    }
 });

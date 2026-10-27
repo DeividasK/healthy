@@ -122,3 +122,17 @@ test('lists what the profile lacks for results without a laboratory range', () =
     )
   ).toEqual([]);
 });
+
+test('a region with its own range uses it, others keep International', () => {
+  const alt = getBiomarker('alt')!;
+  const women = { sex: 'female' as const };
+  expect(resolveReferenceRange(alt, { ...women, region: 'anz' })).toMatchObject(
+    { low: 5, high: 35, region: 'anz', source: { evidence: 'consensus' } }
+  );
+  const europe = resolveReferenceRange(alt, { ...women, region: 'europe' });
+  expect(europe).toMatchObject({ low: 7, high: 45 });
+  expect(europe.region).toBeUndefined();
+  expect(
+    resolveReferenceRange(getBiomarker('potassium')!, { region: 'anz' })
+  ).toMatchObject({ low: 3.5, high: 5.2 });
+});
