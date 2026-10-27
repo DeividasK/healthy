@@ -8,8 +8,6 @@ export type RangeRegion = 'international' | 'europe' | 'anz' | 'us';
 export interface RangeRegionInfo {
   id: RangeRegion;
   name: string;
-  /** The bodies whose ranges the region uses before falling back to International. */
-  bodies: string;
   /** ISO 3166-1 alpha-2 codes of the device regions it is the default for. */
   countries: string[];
 }
@@ -18,30 +16,55 @@ export const RANGE_REGIONS: RangeRegionInfo[] = [
   {
     id: 'international',
     name: 'International',
-    bodies: 'WHO, KDIGO, IFCC, IZiNCG, Universal MI Definition',
     countries: [],
   },
   {
     id: 'europe',
     name: 'Europe',
-    bodies: 'ESC/EAS, EAU, Nordic NORIP, UK Pathology Harmony',
     // EU, EEA, UK and Switzerland.
     countries: [
-      'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
-      'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
-      'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH',
+      'AT',
+      'BE',
+      'BG',
+      'HR',
+      'CY',
+      'CZ',
+      'DK',
+      'EE',
+      'FI',
+      'FR',
+      'DE',
+      'GR',
+      'HU',
+      'IE',
+      'IT',
+      'LV',
+      'LT',
+      'LU',
+      'MT',
+      'NL',
+      'PL',
+      'PT',
+      'RO',
+      'SK',
+      'SI',
+      'ES',
+      'SE',
+      'IS',
+      'LI',
+      'NO',
+      'GB',
+      'CH',
     ],
   },
   {
     id: 'anz',
     name: 'Australia and New Zealand',
-    bodies: 'AACB/RCPA harmonised intervals',
     countries: ['AU', 'NZ'],
   },
   {
     id: 'us',
     name: 'United States',
-    bodies: 'ADA, ACC/AHA, Endocrine Society',
     countries: ['US'],
   },
 ];

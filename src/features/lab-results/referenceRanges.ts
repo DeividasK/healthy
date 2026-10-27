@@ -3,14 +3,21 @@ import type {
   BiomarkerDefinition,
   BiomarkerSex,
   DemographicRange,
+  RangeSource,
 } from '@/src/data/biomarkers';
+import type { RangeRegion } from '@/src/data/biomarkers/rangeRegions';
 import { getAgeInYears } from '@/src/utils/dateUtils';
 
-/** What reference ranges depend on: the patient's sex and date of birth. */
+/**
+ * What reference ranges depend on: the patient's sex and date of birth, and
+ * the region whose ranges the profile uses.
+ */
 export interface RangeDemographics {
   /** Unset when the profile has no gender, or one ranges cannot use. */
   sex?: BiomarkerSex;
   birthDate?: string;
+  /** Unset for International. */
+  region?: RangeRegion;
 }
 
 export type MissingDemographic = 'sex' | 'age';
@@ -24,6 +31,10 @@ export interface ResolvedReferenceRange {
   variesBy: MissingDemographic[];
   /** What it varies by that the profile does not say, or not for this date. */
   missing: MissingDemographic[];
+  /** The region whose own range applied; unset for International. */
+  region?: RangeRegion;
+  /** Where the regional range comes from. */
+  source?: RangeSource;
 }
 
 /** The profile's sex and date of birth as ranges use them. */
@@ -74,7 +85,11 @@ export function resolveReferenceRange(
   demographics: RangeDemographics = {},
   date?: string
 ): ResolvedReferenceRange {
-  const rules = marker.demographicRanges ?? [];
+  const regional = demographics.region
+    ? marker.regionalRanges?.[demographics.region]
+    : undefined;
+  const general = regional ?? marker.referenceRange;
+  const rules = (regional ? regional.ranges : marker.demographicRanges) ?? [];
   const variesBy: MissingDemographic[] = [];
   if (rules.some((rule) => rule.sex)) variesBy.push('sex');
   if (
@@ -88,8 +103,15 @@ export function resolveReferenceRange(
   const rule = rules.find((candidate) =>
     appliesTo(candidate, demographics.sex, age)
   );
-  const { low, high } = rule ?? marker.referenceRange ?? {};
-  return { low, high, rule, variesBy, missing };
+  const { low, high } = rule ?? general ?? {};
+  return {
+    low,
+    high,
+    rule,
+    variesBy,
+    missing,
+    ...(regional && { region: demographics.region, source: regional.source }),
+  };
 }
 
 const SEX_GROUP: Record<BiomarkerSex, string> = {

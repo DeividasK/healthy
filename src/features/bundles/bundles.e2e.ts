@@ -269,6 +269,7 @@ test.describe('Treatment bundles', () => {
     // Moving Morning to 07:30 brings the morning doses into the bundle.
     await page.getByTestId('settings-header-button').click();
     await expect(page).toHaveURL(/\/settings$/);
+    await page.getByTestId('settings-times-of-day-toggle').click();
     await page.locator('#settings-time-MORN').fill('07:30');
     await expect(page.getByTestId('settings-time-MORN')).toContainText('07:30');
     await page.getByTestId('save-settings-button').click();

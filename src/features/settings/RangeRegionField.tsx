@@ -1,10 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Check } from 'lucide-react-native';
+import { StyleSheet, Text } from 'react-native';
 import { FormField } from '@/src/components/FormField';
-import { GroupHeader } from '@/src/components/GroupHeader';
 import { NativeSelect } from '@/src/components/NativeSelect';
-import { SelectedRowMarker } from '@/src/components/SelectedRowMarker';
+import { REGIONAL_RANGES } from '@/src/data/biomarkers';
 import {
   RANGE_REGIONS,
   getRangeRegionInfo,
@@ -20,88 +18,49 @@ export function RangeRegionField({
   value,
   pickedFromDevice,
   onChange,
-  variant = 'a',
 }: {
   value: RangeRegion;
   /** True until the user picks a region themselves. */
   pickedFromDevice: boolean;
   onChange: (region: RangeRegion) => void;
-  variant?: 'a' | 'b' | 'c';
 }) {
   const chosen = getRangeRegionInfo(value);
-  const deviceNote = pickedFromDevice
-    ? ` We picked ${chosen.name} from your device.`
-    : '';
   return (
-    <View style={styles.group}>
-      <GroupHeader title="Biomarker Ranges" idPrefix="settings-ranges" />
-      <Text style={styles.explanation} testID="settings-range-region-explanation">
+    <>
+      <Text
+        style={styles.explanation}
+        testID="settings-range-region-explanation"
+      >
         {EXPLANATION}
-        {deviceNote}
+        {pickedFromDevice && ` We picked ${chosen.name} from your device.`}
       </Text>
-      {variant !== 'c' && (
-        <FormField label="Region" nativeID="settings-range-region" required>
-          <NativeSelect
-            value={value}
-            options={RANGE_REGIONS.map(({ id, name }) => ({ id, label: name }))}
-            onChange={(region) => onChange(region as RangeRegion)}
-            label="Region"
-            testID="settings-range-region"
-            name="rangeRegion"
-          />
-        </FormField>
-      )}
-      {variant === 'a' && (
-        <Text style={styles.bodies} testID="settings-range-region-bodies">
-          Uses ranges from {chosen.bodies}, then International.
-        </Text>
-      )}
-      {variant !== 'a' &&
-        RANGE_REGIONS.map((region) => {
-          const isChosen = region.id === value;
-          const row = (
-            <>
-              {isChosen && <SelectedRowMarker />}
-              <View style={styles.rowText}>
-                <Text style={[styles.rowName, isChosen && styles.rowNameChosen]}>
-                  {region.name}
-                </Text>
-                <Text style={styles.rowBodies}>{region.bodies}</Text>
-              </View>
-              {variant === 'c' && isChosen && (
-                <Check size={18} color={COLORS.light.primary} />
-              )}
-            </>
-          );
-          return variant === 'c' ? (
-            <Pressable
-              key={region.id}
-              onPress={() => onChange(region.id)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: isChosen }}
-              testID={`settings-range-region-${region.id}`}
-              style={styles.row}
-            >
-              {row}
-            </Pressable>
-          ) : (
-            <View
-              key={region.id}
-              style={styles.row}
-              aria-current={isChosen || undefined}
-            >
-              {row}
-            </View>
-          );
-        })}
-    </View>
+      <FormField label="Region" nativeID="settings-range-region" required>
+        <NativeSelect
+          value={value}
+          options={RANGE_REGIONS.map(({ id, name }) => ({ id, label: name }))}
+          onChange={(region) => onChange(region as RangeRegion)}
+          label="Region"
+          testID="settings-range-region"
+          name="rangeRegion"
+        />
+      </FormField>
+      <Text style={styles.bodies} testID="settings-range-region-bodies">
+        {describeRegionRanges(value)}
+      </Text>
+    </>
   );
 }
 
+/** How many of a region's ranges are its own, and whose they are. */
+function describeRegionRanges(region: RangeRegion) {
+  const ranges = Object.values(REGIONAL_RANGES[region] ?? {});
+  if (ranges.length === 0)
+    return 'Uses the general ranges for every biomarker.';
+  const sources = [...new Set(ranges.map(({ source }) => source.title))];
+  return `Uses its own ranges for ${ranges.length} biomarkers, from ${sources.join(', ')}. Others use the general ranges.`;
+}
+
 const styles = StyleSheet.create({
-  group: {
-    marginTop: 24,
-  },
   explanation: {
     fontSize: 15,
     lineHeight: 22,
@@ -111,33 +70,8 @@ const styles = StyleSheet.create({
   bodies: {
     fontSize: 13,
     lineHeight: 18,
-    color: COLORS.light.muted,
+    color: COLORS.light.textSecondary,
     marginTop: -8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingLeft: 14,
-    paddingRight: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.divider,
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
-  },
-  rowName: {
-    fontSize: 15,
-    color: COLORS.light.foreground,
-  },
-  rowNameChosen: {
-    fontWeight: '600',
-  },
-  rowBodies: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.light.muted,
+    marginBottom: 20,
   },
 });

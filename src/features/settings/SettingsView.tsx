@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField } from '@/src/components/FormField';
-import { GroupHeader } from '@/src/components/GroupHeader';
+import { FoldingSection } from '@/src/components/FoldingSection';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import { useHasChanges } from '@/src/components/useHasChanges';
@@ -21,7 +21,12 @@ import { CONTENT_COLUMN } from '@/src/theme/layout';
 import { getDeviceRangeRegion } from './deviceRangeRegion';
 import { RangeRegionField } from './RangeRegionField';
 
-/** The active profile's settings: the clock time of each part of the day. */
+type Section = 'timesOfDay' | 'ranges';
+
+/**
+ * The active profile's settings, in sections that start folded: the clock
+ * time of each part of the day, and the region for biomarker ranges.
+ */
 export function SettingsView() {
   const { activePatientId, isLoading } = useActivePatient();
   const [settings, setSettings] = useState<ProfileSettings | null>(null);
@@ -64,10 +69,16 @@ function SettingsForm({
   initial: ProfileSettings;
 }) {
   const router = useRouter();
-  const { variant } = useLocalSearchParams<{ variant?: 'a' | 'b' | 'c' }>();
   const [timesOfDay, setTimesOfDay] = useState(initial.timesOfDay);
   const [deviceRegion] = useState(getDeviceRangeRegion);
   const [rangeRegion, setRangeRegion] = useState(initial.rangeRegion);
+  const [openSections, setOpenSections] = useState<Section[]>([]);
+  const toggleSection = (section: Section) =>
+    setOpenSections((current) =>
+      current.includes(section)
+        ? current.filter((open) => open !== section)
+        : [...current, section]
+    );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasChanges = useHasChanges({ timesOfDay, rangeRegion });
@@ -96,29 +107,41 @@ function SettingsForm({
       >
         <ScreenHeading testID="settings-title">Settings</ScreenHeading>
         {error && <FormErrorBanner message={error} testID="settings-error" />}
-        <GroupHeader title="Times of Day" idPrefix="settings-times-of-day" />
-        {PARTS_OF_DAY.map(({ code, label }) => {
-          const id = `settings-time-${code}`;
-          return (
-            <FormField key={code} label={label} nativeID={id} required>
-              <NativeTimePicker
-                value={timesOfDay[code]}
-                onChange={(time) =>
-                  setTimesOfDay((current) => ({ ...current, [code]: time }))
-                }
-                testID={id}
-                id={id}
-                name={`timeOfDay-${code}`}
-              />
-            </FormField>
-          );
-        })}
-        <RangeRegionField
-          value={rangeRegion ?? deviceRegion}
-          pickedFromDevice={!rangeRegion}
-          onChange={setRangeRegion}
-          variant={variant}
-        />
+        <FoldingSection
+          title="Times of Day"
+          isOpen={openSections.includes('timesOfDay')}
+          onToggle={() => toggleSection('timesOfDay')}
+          testID="settings-times-of-day"
+        >
+          {PARTS_OF_DAY.map(({ code, label }) => {
+            const id = `settings-time-${code}`;
+            return (
+              <FormField key={code} label={label} nativeID={id} required inline>
+                <NativeTimePicker
+                  value={timesOfDay[code]}
+                  onChange={(time) =>
+                    setTimesOfDay((current) => ({ ...current, [code]: time }))
+                  }
+                  testID={id}
+                  id={id}
+                  name={`timeOfDay-${code}`}
+                />
+              </FormField>
+            );
+          })}
+        </FoldingSection>
+        <FoldingSection
+          title="Biomarker Ranges"
+          isOpen={openSections.includes('ranges')}
+          onToggle={() => toggleSection('ranges')}
+          testID="settings-ranges"
+        >
+          <RangeRegionField
+            value={rangeRegion ?? deviceRegion}
+            pickedFromDevice={!rangeRegion}
+            onChange={setRangeRegion}
+          />
+        </FoldingSection>
       </ScrollView>
       <FormActionDock
         onSave={handleSave}

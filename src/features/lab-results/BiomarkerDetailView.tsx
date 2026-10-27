@@ -74,6 +74,7 @@ import {
   explainReferenceRange,
   resolveReferenceRange,
 } from './referenceRanges';
+import { RangeRegionLine } from './RangeRegionLine';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { getChartScale } from './chartScale';
 import { useRangeDemographics } from './useRangeDemographics';
@@ -430,6 +431,14 @@ export function BiomarkerDetailView({
               ? explainReferenceRange(marker, latestRange)
               : 'This range comes from your laboratory report.'}
           </Text>
+          {latestRange &&
+            (latestRange.low !== undefined ||
+              latestRange.high !== undefined) && (
+              <RangeRegionLine
+                resolved={latestRange}
+                testID="biomarker-range-region"
+              />
+            )}
           <RangeProfileNotice
             missing={latestRange?.missing ?? []}
             testID="biomarker-range-notice"
