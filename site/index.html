@@ -189,6 +189,23 @@
         transform: translate(-1px, -1px);
         box-shadow: 4px 4px 0 var(--foreground);
       }
+      .button.secondary {
+        background: var(--paper);
+        color: var(--primary);
+        box-shadow:
+          inset 0 0 0 1.5px var(--primary),
+          3px 3px 0 var(--primary);
+      }
+      .button.secondary:hover {
+        box-shadow:
+          inset 0 0 0 1.5px var(--primary),
+          4px 4px 0 var(--primary);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
       .button:focus-visible,
       a:focus-visible {
         outline: 3px solid var(--primary);
@@ -417,7 +434,10 @@
             Your blood tests, supplements, medications, and medical history in
             one convenient place so you can see the big picture.
           </p>
-          <a class="button" href="a/">Open Healthy</a>
+          <div class="actions">
+            <a class="button" href="a/">Open Healthy</a>
+            <a class="button secondary" href="d/">Explore a demo</a>
+          </div>
           <span class="hand note"
             >Free, forever. Private, on your device. Works in your
             browser.</span

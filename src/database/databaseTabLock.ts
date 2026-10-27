@@ -7,8 +7,11 @@
  * therefore claim a Web Lock before anything opens the database, and hold it
  * until the page unloads. A tab without the lock never touches OPFS.
  *
- * Native platforms (and browsers without Web Locks) own the database outright.
+ * Native platforms (and browsers without Web Locks) own the database outright,
+ * as does the demo build, whose database lives in memory.
  */
+
+import { IS_DEMO_BUILD } from '@/src/features/demo/demoBuild';
 
 const LOCK_NAME = 'healthy-database';
 
@@ -18,7 +21,7 @@ let resolveOwned: (() => void) | null = null;
 let waiting = false;
 
 function getLocks(): LockManager | null {
-  if (typeof navigator === 'undefined') return null;
+  if (IS_DEMO_BUILD || typeof navigator === 'undefined') return null;
   return navigator.locks ?? null;
 }
 

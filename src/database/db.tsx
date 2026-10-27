@@ -10,10 +10,12 @@ import { notifyDatabaseChanged } from './dbEvents';
 import { claimDatabaseTab, whenDatabaseTabOwned } from './databaseTabLock';
 import { DatabaseInUseView } from '@/src/features/app/DatabaseInUseView';
 import { namespaced } from '@/src/services/storageNamespace';
+import { IS_DEMO_BUILD } from '@/src/features/demo/demoBuild';
 
 export * from './migrations';
 
-export const DB_NAME = namespaced('healthy.db');
+// The demo build keeps nothing between visits.
+export const DB_NAME = IS_DEMO_BUILD ? ':memory:' : namespaced('healthy.db');
 let dbInstance: SQLiteDatabase | null = null;
 let initPromise: Promise<SQLiteDatabase> | null = null;
 
