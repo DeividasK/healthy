@@ -8,6 +8,7 @@ import {
 } from './bundlesRepository';
 import {
   buildBundle,
+  getBundleActivityIds,
   getBundleMemberIds,
   getBundleTimes,
   getBundleTitle,
@@ -20,6 +21,16 @@ export const getBundleById = (id: string, patientId: string) =>
 
 export const getAllBundles = (patientId: string) =>
   fetchRequestOrchestrationsByPatientId(patientId);
+
+/** The patient's bundles that include the activity (service request). */
+export async function getBundlesWithActivity(
+  requestId: string,
+  patientId: string
+): Promise<RequestOrchestration[]> {
+  return (await getAllBundles(patientId)).filter((bundle) =>
+    getBundleActivityIds(bundle).includes(requestId)
+  );
+}
 
 /** The patient's bundles that include the treatment. */
 export async function getBundlesWithTreatment(
@@ -43,22 +54,27 @@ export async function saveBundle(
   values: BundleValues & { id?: string; patientId: string }
 ): Promise<string> {
   if (!values.title.trim()) throw new Error('Bundle name is required');
-  if (!values.memberIds.length)
-    throw new Error('Choose at least one treatment');
   const id = values.id || `bundle-${Crypto.randomUUID()}`;
   const existing = values.id
     ? await fetchRequestOrchestrationById(values.id, values.patientId)
     : null;
-  await insertRequestOrchestrationRecord(
-    buildBundle(values, { id, patientId: values.patientId, existing }),
-    values.patientId
-  );
+  const bundle = buildBundle(values, {
+    id,
+    patientId: values.patientId,
+    existing,
+  });
+  if (
+    !getBundleMemberIds(bundle).length &&
+    !getBundleActivityIds(bundle).length
+  )
+    throw new Error('Choose at least one treatment or activity');
+  await insertRequestOrchestrationRecord(bundle, values.patientId);
   return id;
 }
 
 /**
  * Adds a treatment to a bundle or removes it. A bundle left without
- * treatments is deleted.
+ * treatments or activities is deleted.
  */
 export async function setTreatmentInBundle(
   treatmentId: string,
@@ -71,7 +87,7 @@ export async function setTreatmentInBundle(
   const memberIds = getBundleMemberIds(bundle);
   if (memberIds.includes(treatmentId) === included) return;
   if (!included) {
-    const next = withoutMember(bundle, treatmentId);
+    const next = withoutMember(bundle, `MedicationRequest/${treatmentId}`);
     if (!next) return deleteBundle(bundleId, patientId);
   }
   await saveBundle({

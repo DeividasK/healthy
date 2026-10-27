@@ -2,6 +2,7 @@ import type { ServiceRequest, TimingRepeat } from 'fhir/r5';
 import {
   SPECIFIC_TIME,
   formatClockTime,
+  formatTimePhrase,
   getWhenLabel,
 } from '@/src/features/treatments/regimen';
 
@@ -89,6 +90,45 @@ export const formatMinutes = (minutes: number) => `${minutes} min`;
 export function formatScheduleDuration(repeat: TimingRepeat): string | null {
   const minutes = toMinutes(repeat);
   return minutes === undefined ? null : formatMinutes(minutes);
+}
+
+/**
+ * The schedule in words, worded like a treatment's dose: e.g. "10 min in the
+ * evening", "45 min, every 2 days" or "3 sessions, every 4–6 weeks".
+ * `withoutTime` leaves out the time of day, e.g. under a bundle's time.
+ */
+export function formatScheduleText(
+  repeat: TimingRepeat,
+  { withoutTime = false }: { withoutTime?: boolean } = {}
+): string | null {
+  const { period, periodMax, periodUnit, count } = repeat;
+  if (!period || !isScheduleUnit(periodUnit)) return null;
+  const [singular, plural] = UNIT_LABELS[periodUnit];
+  const duration = formatScheduleDuration(repeat);
+  const time = withoutTime ? undefined : formatTimePhrase(repeat);
+  const frequency =
+    periodMax && periodMax !== period
+      ? `every ${period}–${periodMax} ${plural}`
+      : period === 1
+        ? `once a ${singular}`
+        : `every ${period} ${plural}`;
+  // A time of day, or a heading showing one, implies once a day:
+  // "10 min in the evening", or "10 min" under an Evening bundle.
+  const isDailyAtTime =
+    period === 1 && periodUnit === 'd' && !periodMax && (!!time || withoutTime);
+  const parts = isDailyAtTime
+    ? [
+        count && `${count} ${count === 1 ? 'session' : 'sessions'}`,
+        [duration, time].filter(Boolean).join(' '),
+      ]
+    : [
+        count && `${count} ${count === 1 ? 'session' : 'sessions'}`,
+        duration,
+        frequency,
+        time,
+      ];
+  const text = parts.filter(Boolean).join(', ') || frequency;
+  return text[0].toUpperCase() + text.slice(1);
 }
 
 /** e.g. "Before bed" or "07:30". */

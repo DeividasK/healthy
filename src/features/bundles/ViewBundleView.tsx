@@ -1,17 +1,52 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Pencil, Pill } from 'lucide-react-native';
-import type { MedicationRequest, RequestOrchestration } from 'fhir/r5';
+import { ClipboardList, Pencil, Pill } from 'lucide-react-native';
+import type {
+  MedicationRequest,
+  RequestOrchestration,
+  ServiceRequest,
+} from 'fhir/r5';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { ResourceSection } from '@/src/components/ResourceSection';
+import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
-import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
+import { formatDosingLines } from '@/src/features/treatments/regimen';
 import { getTreatmentById } from '@/src/features/treatments/treatmentService';
+import {
+  formatScheduleText,
+  getScheduleRepeat,
+} from '@/src/features/service-requests/serviceRequestSchedule';
+import { getServiceRequestById } from '@/src/features/service-requests/serviceRequestService';
+import {
+  getServiceRequestTitle,
+  getTreatmentTitle,
+} from '@/src/utils/fhirUtils';
 import { getBundleMeta } from './BundleRelatedRow';
-import { getBundleMemberIds, getBundleTitle } from './bundleModel';
+import {
+  getBundleActivityIds,
+  getBundleMemberIds,
+  getBundleTimes,
+  getBundleTitle,
+} from './bundleModel';
 import { deleteBundle, getBundleById } from './bundleService';
+
+/**
+ * A treatment's dosing in words, e.g. "1 capsule oral", leaving out the time
+ * of day when the bundle's own times show it.
+ */
+const formatTreatmentRegimen = (
+  treatment: MedicationRequest,
+  withoutTime: boolean
+) =>
+  formatDosingLines(treatment.dosageInstruction, { withoutTime }).join('\n') ||
+  undefined;
+
+/** An activity's schedule in words, e.g. "10 min, once a day". */
+function formatActivitySchedule(request: ServiceRequest, withoutTime: boolean) {
+  const repeat = getScheduleRepeat(request);
+  return (repeat && formatScheduleText(repeat, { withoutTime })) || undefined;
+}
 
 export function ViewBundleView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,6 +71,7 @@ function BundleForPatient({
   const router = useRouter();
   const [bundle, setBundle] = useState<RequestOrchestration | null>(null);
   const [treatments, setTreatments] = useState<MedicationRequest[]>([]);
+  const [activities, setActivities] = useState<ServiceRequest[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>(
     'loading'
   );
@@ -52,10 +88,22 @@ function BundleForPatient({
             )
           )
         : [];
+      const activityMembers = loaded
+        ? await Promise.all(
+            getBundleActivityIds(loaded).map((requestId) =>
+              getServiceRequestById(requestId, activePatientId)
+            )
+          )
+        : [];
       if (sequence !== loadSequence.current) return;
       setBundle(loaded);
       setTreatments(
         members.filter((member): member is MedicationRequest => Boolean(member))
+      );
+      setActivities(
+        activityMembers.filter((member): member is ServiceRequest =>
+          Boolean(member)
+        )
       );
       setState(loaded ? 'ready' : 'missing');
     } catch (err) {
@@ -67,7 +115,7 @@ function BundleForPatient({
 
   useFocusEffect(useCallback(() => void loadData(), [loadData]));
   useDatabaseSubscription(
-    ['request_orchestrations', 'medication_requests'],
+    ['request_orchestrations', 'medication_requests', 'service_requests'],
     loadData
   );
 
@@ -84,6 +132,7 @@ function BundleForPatient({
     );
   }
 
+  const hasTimes = getBundleTimes(bundle).length > 0;
   return (
     <ResourceViewLayout
       testID="bundle-view"
@@ -106,7 +155,7 @@ function BundleForPatient({
           deleteConfirmation={{
             title: 'Delete Bundle',
             message:
-              'Delete this bundle? Its treatments and their journal answers are kept.',
+              'Delete this bundle? Its treatments, activities and their journal answers are kept.',
             onConfirm: async () => {
               await deleteBundle(id, activePatientId);
               if (router.canGoBack()) router.back();
@@ -122,14 +171,39 @@ function BundleForPatient({
         count={treatments.length}
         testID="bundle-treatments-section"
       >
-        {treatments.map((treatment) => (
-          <TreatmentRelatedRow
-            key={treatment.id}
-            treatment={treatment}
-            testID={`bundle-treatment-${treatment.id}`}
-            onPress={() => router.push(`/treatment/${treatment.id}`)}
-          />
-        ))}
+        {treatments.map((treatment) => {
+          const title = getTreatmentTitle(treatment);
+          return (
+            <ResourceRow
+              key={treatment.id}
+              testID={`bundle-treatment-${treatment.id}`}
+              title={title}
+              description={formatTreatmentRegimen(treatment, hasTimes)}
+              accessibilityLabel={`View treatment: ${title}`}
+              onPress={() => router.push(`/treatment/${treatment.id}`)}
+            />
+          );
+        })}
+      </ResourceSection>
+      <ResourceSection
+        icon={ClipboardList}
+        title="Activities"
+        count={activities.length}
+        testID="bundle-activities-section"
+      >
+        {activities.map((request) => {
+          const title = getServiceRequestTitle(request);
+          return (
+            <ResourceRow
+              key={request.id}
+              testID={`bundle-activity-${request.id}`}
+              title={title}
+              description={formatActivitySchedule(request, hasTimes)}
+              accessibilityLabel={`View service request: ${title}`}
+              onPress={() => router.push(`/service-request/${request.id}`)}
+            />
+          );
+        })}
       </ResourceSection>
     </ResourceViewLayout>
   );

@@ -123,6 +123,11 @@ interface ResourceRowProps extends ResourceRowAppearance {
   accessibilityLabel?: string;
   /** Test ID of the pressable row (or of the plain row when it cannot be opened). */
   testID?: string;
+  /**
+   * The row's kind, drawn before the title, e.g. a bundle in the journal.
+   * Decorative: `accessibilityLabel` names the kind.
+   */
+  typeIcon?: LucideIcon;
 }
 
 /**
@@ -174,8 +179,10 @@ export function ResourceRow({
   backgroundColor,
   dimmed = false,
   selected = false,
+  typeIcon: TypeIcon,
 }: ResourceRowProps) {
   if (onPress && accessory) {
+    const titleText = <Text style={styles.rowTitle}>{title}</Text>;
     return (
       <View style={styles.row} testID={testID}>
         <TouchableOpacity
@@ -186,7 +193,14 @@ export function ResourceRow({
           activeOpacity={0.6}
           onPress={onPress}
         >
-          <Text style={styles.rowTitle}>{title}</Text>
+          {TypeIcon ? (
+            <View style={styles.titleLine}>
+              <TypeIcon size={16} color={COLORS.light.primary} />
+              {titleText}
+            </View>
+          ) : (
+            titleText
+          )}
           <ResourceMetaLine meta={meta} />
         </TouchableOpacity>
         {accessory}
@@ -343,6 +357,11 @@ const styles = StyleSheet.create({
   mainPressable: {
     alignSelf: 'stretch',
     justifyContent: 'center',
+  },
+  titleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   rowTitle: {
     fontSize: 14,

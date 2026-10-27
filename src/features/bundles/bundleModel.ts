@@ -9,11 +9,12 @@ import {
 } from '@/src/features/treatments/regimen';
 
 /**
- * A treatment bundle is a FHIR R5 RequestOrchestration with one action, the
- * bundle (`title`, `groupingBehavior: visual-group`), holding one sub-action
- * per time it is taken ("slot", with `timingTiming`), each holding one
- * sub-action per treatment (`resource`). A bundle without a time has a single
- * slot without timing. Every slot lists the same treatments.
+ * A bundle is a FHIR R5 RequestOrchestration with one action, the bundle
+ * (`title`, `groupingBehavior: visual-group`), holding one sub-action per
+ * time it is taken ("slot", with `timingTiming`), each holding one sub-action
+ * per member (`resource`): a treatment (MedicationRequest) or a scheduled
+ * activity (ServiceRequest). A bundle without a time has a single slot
+ * without timing. Every slot lists the same members.
  */
 
 export type BundleWhen = NonNullable<TimingRepeat['when']>[number];
@@ -49,23 +50,32 @@ export const getBundleTimes = (bundle: RequestOrchestration): BundleTime[] =>
     return time ? [time] : [];
   });
 
-const memberId = (action: RequestOrchestrationAction) => {
+type MemberType = 'MedicationRequest' | 'ServiceRequest';
+
+const memberId = (action: RequestOrchestrationAction, type: MemberType) => {
   const reference = action.resource?.reference;
-  return reference?.startsWith('MedicationRequest/')
-    ? reference.slice(18)
+  return reference?.startsWith(`${type}/`)
+    ? reference.slice(type.length + 1)
     : null;
 };
 
-/** The bundle's treatment ids, in order and without repeats. */
-export function getBundleMemberIds(bundle: RequestOrchestration): string[] {
+const getMemberIds = (bundle: RequestOrchestration, type: MemberType) => {
   const ids: string[] = [];
   for (const slot of getBundleSlots(bundle))
     for (const action of slot.action || []) {
-      const id = memberId(action);
+      const id = memberId(action, type);
       if (id && !ids.includes(id)) ids.push(id);
     }
   return ids;
-}
+};
+
+/** The bundle's treatment ids, in order and without repeats. */
+export const getBundleMemberIds = (bundle: RequestOrchestration) =>
+  getMemberIds(bundle, 'MedicationRequest');
+
+/** The bundle's activity (service request) ids, in order and without repeats. */
+export const getBundleActivityIds = (bundle: RequestOrchestration) =>
+  getMemberIds(bundle, 'ServiceRequest');
 
 /** e.g. "Morning" or "07:30". */
 export const formatBundleTime = (time: BundleTime) =>
@@ -88,13 +98,16 @@ const timingOf = (
 export interface BundleValues {
   title: string;
   times: BundleTime[];
+  /** Treatment ids. */
   memberIds: string[];
+  /** Activity (service request) ids; undefined keeps the stored ones. */
+  activityIds?: string[];
 }
 
 /**
  * The bundle with the form's values, keeping elements the form does not
  * show: other RequestOrchestration elements, the bundle and slot actions'
- * other elements, and each kept treatment's action.
+ * other elements, and each kept member's action.
  */
 export function buildBundle(
   values: BundleValues,
@@ -112,18 +125,23 @@ export function buildBundle(
 ): RequestOrchestration {
   const action = bundleAction(existing ?? ({} as RequestOrchestration));
   const slots = existing ? getBundleSlots(existing) : [];
-  const members = (slot?: RequestOrchestrationAction) =>
-    values.memberIds.map(
-      (memberIdValue) =>
-        slot?.action?.find(
-          (candidate) => memberId(candidate) === memberIdValue
-        ) ?? {
-          resource: {
-            reference: `MedicationRequest/${memberIdValue}`,
-            type: 'MedicationRequest',
-          },
+  const activityIds =
+    values.activityIds ?? (existing ? getBundleActivityIds(existing) : []);
+  const membersOf = (
+    slot: RequestOrchestrationAction | undefined,
+    ids: string[],
+    type: MemberType
+  ) =>
+    ids.map(
+      (id) =>
+        slot?.action?.find((candidate) => memberId(candidate, type) === id) ?? {
+          resource: { reference: `${type}/${id}`, type },
         }
     );
+  const members = (slot?: RequestOrchestrationAction) => [
+    ...membersOf(slot, values.memberIds, 'MedicationRequest'),
+    ...membersOf(slot, activityIds, 'ServiceRequest'),
+  ];
   const slotFor = (time: BundleTime | null, index: number) => {
     const source =
       slots.find((slot) => isSameBundleTime(getSlotTime(slot), time)) ??
@@ -158,15 +176,23 @@ export function buildBundle(
   };
 }
 
-/** The bundle without a treatment, or null when none would be left. */
+/**
+ * The bundle without a member, e.g. `MedicationRequest/<id>`, or null when no
+ * treatment or activity would be left.
+ */
 export function withoutMember(
   bundle: RequestOrchestration,
-  treatmentId: string
+  reference: string
 ): RequestOrchestration | null {
-  const memberIds = getBundleMemberIds(bundle).filter(
-    (id) => id !== treatmentId
+  const isLeft = getBundleSlots(bundle).some((slot) =>
+    (slot.action || []).some(
+      (candidate) =>
+        candidate.resource?.reference !== reference &&
+        (memberId(candidate, 'MedicationRequest') ||
+          memberId(candidate, 'ServiceRequest'))
+    )
   );
-  if (!memberIds.length) return null;
+  if (!isLeft) return null;
   const [action, ...others] = bundle.action || [];
   return {
     ...bundle,
@@ -176,7 +202,7 @@ export function withoutMember(
         action: (action?.action || []).map((slot) => ({
           ...slot,
           action: (slot.action || []).filter(
-            (candidate) => memberId(candidate) !== treatmentId
+            (candidate) => candidate.resource?.reference !== reference
           ),
         })),
       },

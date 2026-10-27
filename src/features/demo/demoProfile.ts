@@ -26,8 +26,9 @@ import { addDays, formatLocalDate } from '@/src/utils/dateUtils';
 /**
  * A sample person whose records use every feature: lab results over three
  * years, a permanent and a temporary condition, consultations, treatments in
- * bundles, a planned retest and a repeating activity with recent logs. Dates
- * count back from today, so the journal and timelines always look current.
+ * bundles (one with an activity), a planned retest and repeating activities
+ * with recent logs. Dates count back from today, so the journal and
+ * timelines always look current.
  */
 
 const GP = 'Dr. Sarah Lee';
@@ -157,7 +158,7 @@ function reportItems(values: LabValues) {
   });
 }
 
-/** A one-dose daily regimen, e.g. 1 tablet in the evening. */
+/** A one-dose daily regimen, e.g. 1 tablet in the evening; '' leaves the time open. */
 function daily(amount: string, unit: string, when: string): RegimenDraft {
   const dose = createDoseDraft();
   return {
@@ -345,9 +346,55 @@ async function addDemoRecords(patientId: string): Promise<void> {
     regimen: daily('2', '{capsule}', 'MORN'),
     reason: 'Heart health',
   });
+  // Supplements taken on their own, outside any bundle.
+  const collagen = await createOrUpdateTreatment({
+    patientId,
+    title: 'Collagen',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-8),
+    regimen: daily('10', 'g', 'MORN'),
+    reason: 'Skin and joints',
+  });
+  const creatine = await createOrUpdateTreatment({
+    patientId,
+    title: 'Creatine',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-5),
+    regimen: daily('5', 'g', ''),
+    reason: 'Strength and energy',
+  });
+  const inulin = await createOrUpdateTreatment({
+    patientId,
+    title: 'Inulin',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-4),
+    regimen: daily('5', 'g', 'EVE'),
+    reason: 'Gut health',
+  });
+  const magnesium = await createOrUpdateTreatment({
+    patientId,
+    title: 'Magnesium glycinate 200 mg',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-2),
+    regimen: daily('1', '{capsule}', 'EVE'),
+    reason: 'Sleep',
+  });
   await changeTreatmentUsage(iron, patientId, 'start', fromToday(-36, 5));
   await changeTreatmentUsage(iron, patientId, 'stop', fromToday(-26, 5));
-  for (const treatment of [atorvastatin, ezetimibe, vitaminD, omega3])
+  for (const treatment of [
+    atorvastatin,
+    ezetimibe,
+    vitaminD,
+    omega3,
+    collagen,
+    creatine,
+    inulin,
+    magnesium,
+  ])
     await changeTreatmentUsage(
       treatment,
       patientId,
@@ -357,18 +404,18 @@ async function addDemoRecords(patientId: string): Promise<void> {
 
   await saveBundle({
     patientId,
-    title: 'Morning stack',
+    title: 'Supplement stack',
     times: [{ kind: 'when', code: 'MORN' }],
     memberIds: [vitaminD.id!, omega3.id!],
   });
   await saveBundle({
     patientId,
-    title: 'Evening medication',
+    title: 'Cholesterol medication',
     times: [{ kind: 'when', code: 'EVE' }],
     memberIds: [atorvastatin.id!, ezetimibe.id!],
   });
 
-  // Service requests: a planned retest and a repeating activity.
+  // Service requests: a planned retest and repeating activities.
   const retest = await createOrUpdateServiceRequest({
     patientId,
     consultationId: followUp.id,
@@ -394,6 +441,46 @@ async function addDemoRecords(patientId: string): Promise<void> {
     instructions: 'Brisk cycling or walking, able to hold a conversation.',
     reasonConditionIds: [cholesterol.id!],
     requesterName: CARDIOLOGIST,
+  });
+  // Daily activities the demo person chose for themselves.
+  await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Meditation',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-6),
+    schedule: { period: 1, periodUnit: 'd', duration: 15, when: 'MORN' },
+    instructions: 'Sit quietly and follow the breath.',
+  });
+  await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Hyperbaric oxygen therapy (HBOT)',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-3),
+    schedule: { period: 1, periodUnit: 'd', duration: 60 },
+    instructions: 'One session in the chamber.',
+  });
+
+  // A bundle with a treatment and an activity.
+  const stretching = await createOrUpdateServiceRequest({
+    patientId,
+    title: 'Stretching',
+    category: '71388002',
+    intent: 'plan',
+    status: 'active',
+    authoredDate: fromToday(-2),
+    schedule: { period: 1, periodUnit: 'd', duration: 10, when: 'EVE' },
+    instructions: 'Gentle stretches before bed.',
+  });
+  await saveBundle({
+    patientId,
+    title: 'Wind-down',
+    times: [{ kind: 'when', code: 'EVE' }],
+    memberIds: [magnesium.id!],
+    activityIds: [stretching.id!],
   });
 
   // A planned annual review, based on the retest.
@@ -439,11 +526,12 @@ async function addDemoRecords(patientId: string): Promise<void> {
           patientId,
           true
         );
-      for (const item of day.procedures ?? [])
+      // Each activity is skipped on a different day.
+      for (const [order, item] of (day.procedures ?? []).entries())
         await setProcedureLog(
           item,
           day.date,
-          index === 8 ? 'not-taken' : 'taken',
+          index === 8 - order * 3 ? 'not-taken' : 'taken',
           patientId,
           true
         );

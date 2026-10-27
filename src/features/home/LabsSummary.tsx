@@ -273,6 +273,7 @@ export function LabsSummary({
         <BiomarkerStatusGroups
           biomarkers={listed}
           testID="labs-summary-groups"
+          expanded={Boolean(query)}
           rowTestID={({ id }) => `labs-summary-result-${id}`}
         />
       )}

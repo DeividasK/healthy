@@ -9,6 +9,7 @@ import {
   openRoute,
   evaluateBridge as bridge,
   TEST_PHOTO_PNG,
+  expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Profile Management & Patient Record Attachment Flow', () => {
@@ -355,11 +356,13 @@ test('keeps every record to its own profile on every screen', async ({
   await openRoute(page, '/labs-summary');
   const summary = page.getByTestId('labs-summary-view');
   await expect(summary.getByTestId('labs-summary-total')).toHaveText('2');
+  await expandBiomarkerGroups(summary);
   await expect(summary.getByTestId('labs-summary-result-789-8')).toContainText(
     '4.5'
   );
   await switchTo('other-patient');
   await expect(summary.getByTestId('labs-summary-total')).toHaveText('1');
+  await expandBiomarkerGroups(summary);
   await expect(summary.getByTestId('labs-summary-result-789-8')).toContainText(
     '6.1'
   );

@@ -4,9 +4,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { AutocompleteItem } from '@/src/components/AutocompleteDropdown';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getTreatmentLinkOptions } from '@/src/features/treatments/treatmentService';
+import { getActivityLinkOptions } from '@/src/features/service-requests/serviceRequestService';
 import { COLORS } from '@/src/theme/colors';
 import { BundleForm } from './BundleForm';
 import {
+  getBundleActivityIds,
   getBundleMemberIds,
   getBundleTimes,
   getBundleTitle,
@@ -22,6 +24,7 @@ export function EditBundleView() {
   const [loaded, setLoaded] = useState<{
     values: BundleValues | null;
     treatmentOptions: AutocompleteItem[];
+    activityOptions: AutocompleteItem[];
   } | null>(null);
 
   useEffect(() => {
@@ -30,14 +33,17 @@ export function EditBundleView() {
     void Promise.all([
       getBundleById(id, activePatientId),
       getTreatmentLinkOptions(activePatientId),
-    ]).then(([bundle, treatmentOptions]) => {
+      getActivityLinkOptions(activePatientId),
+    ]).then(([bundle, treatmentOptions, activityOptions]) => {
       if (!isMounted) return;
       setLoaded({
         treatmentOptions,
+        activityOptions,
         values: bundle && {
           title: getBundleTitle(bundle),
           times: getBundleTimes(bundle),
           memberIds: getBundleMemberIds(bundle),
+          activityIds: getBundleActivityIds(bundle),
         },
       });
     });
@@ -63,6 +69,7 @@ export function EditBundleView() {
       isEditing
       initialValues={loaded.values}
       treatmentOptions={loaded.treatmentOptions}
+      activityOptions={loaded.activityOptions}
       onSubmit={async (values) => {
         await saveBundle({ ...values, id, patientId: activePatientId });
         router.dismissTo(`/bundle/${id}`);
