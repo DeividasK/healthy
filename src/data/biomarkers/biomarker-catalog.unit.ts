@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { BIOMARKERS, REGIONAL_RANGES } from '.';
+import {
+  BIOMARKERS,
+  getBiomarker,
+  getUnitLoinc,
+  hasLoincCode,
+  REGIONAL_RANGES,
+} from '.';
 
 /** LOINC codes end in a mod-10 (Luhn) check digit. */
 function hasValidLoincCheckDigit(loinc: string): boolean {
@@ -76,6 +82,25 @@ test('units start with the primary unit and ranges are ordered', () => {
     const { low, high } = marker.referenceRange ?? {};
     if (low !== undefined && high !== undefined)
       expect(high, marker.id).toBeGreaterThan(low);
+  }
+});
+
+test('records units of another kind under their own LOINC codes', () => {
+  const glucose = getBiomarker('glucose')!;
+  expect(getUnitLoinc(glucose, 'mg/dL')).toBe('2345-7');
+  expect(getUnitLoinc(glucose, 'mmol/L')).toBe('14749-6');
+  expect(getBiomarker('14749-6')).toBe(glucose);
+  expect(hasLoincCode(glucose, '14749-6')).toBe(true);
+  expect(hasLoincCode(glucose, undefined)).toBe(false);
+
+  const codes = BIOMARKERS.flatMap(({ loinc }) => (loinc ? [loinc] : []));
+  for (const marker of BIOMARKERS) {
+    for (const [ucum, code] of Object.entries(marker.unitLoinc ?? {})) {
+      expect(marker.units.map((unit) => unit.ucum)).toContain(ucum);
+      expect(codes).not.toContain(code);
+      expect(code).not.toBe(marker.loinc);
+      expect(hasValidLoincCheckDigit(code)).toBe(true);
+    }
   }
 });
 

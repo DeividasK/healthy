@@ -97,6 +97,7 @@
     "test:visual": "playwright test --project=visual",
     "site:screens": "VISUAL_PNG_SCALE=2 VISUAL_PNG_DIR=.site-screens playwright test --project=visual biomarker-detail lab-result-view add-report-view my-actions && node scripts/site-screens.mjs",
     "chromatic:publish": "chromatic --playwright",
+    "loinc:update": "node scripts/loinc-update.mjs",
     "lint": "expo lint",
     "format:check": "prettier --check .",
     "format": "prettier --write ."

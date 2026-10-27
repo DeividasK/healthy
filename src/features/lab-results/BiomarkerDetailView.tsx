@@ -56,6 +56,8 @@ import {
 } from './calculatedBiomarkers';
 import {
   BIOMARKERS,
+  getUnitLoinc,
+  hasLoincCode,
   type BiomarkerCalculation,
   type BiomarkerDefinition,
   type UnitOption,
@@ -258,7 +260,7 @@ export function BiomarkerDetailView({
   const marker = BIOMARKERS.find(
     (candidate) =>
       candidate.id === id ||
-      candidate.loinc === id ||
+      hasLoincCode(candidate, id) ||
       candidate.name.toLowerCase() === (id || '').toLowerCase() ||
       candidate.aliases.some(
         (alias) => alias.toLowerCase() === (id || '').toLowerCase()
@@ -275,7 +277,7 @@ export function BiomarkerDetailView({
         const displayName = getObservationName(observation);
         const name = displayName.toLowerCase();
         const isMatch = marker
-          ? (marker.loinc !== undefined && code === marker.loinc) ||
+          ? hasLoincCode(marker, code) ||
             marker.aliases.some((alias) => name === alias.toLowerCase()) ||
             name === marker.name.toLowerCase()
           : (code !== 'custom' && code === id) ||
@@ -370,6 +372,13 @@ export function BiomarkerDetailView({
         console.error('Failed to save the biomarker unit:', error)
       );
   };
+  /** The code of the results as shown: a test's units can have codes of their own. */
+  const latestCode =
+    marker && displayUnit
+      ? getUnitLoinc(marker, displayUnit.ucum)
+      : (recordedLatest?.observation.code.coding?.find(
+          (coding) => coding.system === 'http://loinc.org'
+        )?.code ?? marker?.loinc);
   /** The recorded results the latest calculated value was worked out from. */
   const latestSources = useMemo(() => {
     const references = new Set(
@@ -644,13 +653,18 @@ export function BiomarkerDetailView({
     <>
       <View style={styles.learnSection} testID="biomarker-learn">
         <LearnItem title="About this biomarker">
-          {marker?.education?.about ||
-            marker?.description ||
-            'This biomarker is one part of your laboratory result and is interpreted together with other findings.'}
+          {marker
+            ? marker.education?.about ||
+              marker.description ||
+              'This biomarker is one part of your laboratory result and is interpreted together with other findings.'
+            : // A LOINC test outside the catalog: say what the page is based on.
+              `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.${latestMeasurement?.reportedRange ? ' Its range is the one your laboratory reported.' : ''}`}
         </LearnItem>
         <LearnItem title="Why it matters">
-          {marker?.education?.whyItMatters ||
-            'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'}
+          {marker
+            ? marker.education?.whyItMatters ||
+              'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'
+            : ''}
         </LearnItem>
         <LearnItem title="What it may affect">
           {marker?.education?.whatItMayAffect || ''}
@@ -693,8 +707,8 @@ export function BiomarkerDetailView({
               },
             ]
           : []),
-        ...(marker?.loinc
-          ? [{ icon: Hash, text: marker.loinc, testID: 'biomarker-loinc' }]
+        ...(latestCode
+          ? [{ icon: Hash, text: latestCode, testID: 'biomarker-loinc' }]
           : []),
         ...(isCalculatedObservation(latestMeasurement.observation)
           ? [

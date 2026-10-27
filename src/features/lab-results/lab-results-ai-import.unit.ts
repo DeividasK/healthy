@@ -4,6 +4,7 @@ import {
   buildLabResultsAIInstructions,
   parseLabResultsAIReply,
 } from './labResultsAIImport';
+import { loadLoincLabTests } from '@/src/data/loinc';
 
 const today = new Date(2026, 9, 22);
 
@@ -52,6 +53,14 @@ test('reads results from a reply with a note and a fenced code block', () => {
     ['cbc_wbc', '6.8', '10*9/L'],
     ['cbc_platelets', '250', '10*3/uL'],
   ]);
+});
+
+test('finds catalog tests by the LOINC code of any of their units', () => {
+  const result = parseLabResultsAIReply(
+    '{"date":"2026-10-20","results":[{"test":"14749-6","value":5.1,"unit":"mmol/L"}]}',
+    today
+  );
+  expect(result.ok && result.data.results[0].marker.loinc).toBe('2345-7');
 });
 
 test('reads bare JSON and leaves out a missing time and provider', () => {
@@ -105,4 +114,61 @@ test('rejects text without lab results', () => {
       'No test results were found.',
     ],
   });
+});
+
+test('reads tests outside the catalog by LOINC code, keeping the reported unit', async () => {
+  const loincTests = await loadLoincLabTests();
+  const reply = JSON.stringify({
+    date: '2026-10-20',
+    results: [
+      { test: '2339-0', value: 92, unit: 'mg/dL' },
+      { test: '2339-0 ', value: 5.1, unit: 'mmol/L' },
+      { test: '9999-9', value: 1, unit: 'mg/dL' },
+      { test: '1558-6', value: 90, unit: '' },
+      // Moles per volume have a code of their own (15074-8 in blood).
+      { test: '41653-7', value: 5.1, unit: 'mmol/L' },
+    ],
+  });
+  expect(parseLabResultsAIReply(reply, today, loincTests)).toEqual({
+    ok: false,
+    errors: [
+      'Glucose [Mass/volume] in Blood is listed more than once.',
+      '"9999-9" is not a supported test.',
+      'Fasting glucose [Mass/volume] in Serum or Plasma has an unsupported unit "". Supported units: mg/dL.',
+      'Glucose [Mass/volume] in Capillary blood by Glucometer has an unsupported unit "mmol/L". Supported units: mg/dL.',
+    ],
+  });
+
+  const result = parseLabResultsAIReply(
+    JSON.stringify({
+      date: '2026-10-20',
+      results: [
+        { test: '1558-6', value: 92, unit: 'mg/dl' },
+        { test: '2339-0', value: 0.92, unit: 'g/L' },
+        { test: '15074-8', value: 5.1, unit: 'mmol/L' },
+      ],
+    }),
+    today,
+    loincTests
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(
+    result.data.results.map(({ marker, unit }) => [
+      marker.loinc,
+      unit.ucum,
+      marker.units.map(({ ucum }) => ucum),
+    ])
+  ).toEqual([
+    ['1558-6', 'mg/dL', ['mg/dL']],
+    ['2339-0', 'g/L', ['mg/dL', 'g/L']],
+    ['15074-8', 'mmol/L', ['mmol/L']],
+  ]);
+  // Without the LOINC list, only catalog tests are recognised.
+  expect(
+    parseLabResultsAIReply(
+      '{"date":"2026-10-20","results":[{"test":"2339-0","value":92,"unit":"mg/dL"}]}',
+      today
+    ).ok
+  ).toBe(false);
 });

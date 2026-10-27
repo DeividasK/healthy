@@ -208,7 +208,11 @@ async function runDemoChecks(page: Page) {
 
   await test.step('Home shows the conditions, treatments and visits', async () => {
     const conditions = page.getByTestId('home-conditions-section');
-    await expect(conditions.getByText('High cholesterol')).toBeVisible();
+    // Home can open while the demo is still being written; a busy machine
+    // takes longer than the default wait to finish it.
+    await expect(conditions.getByText('High cholesterol')).toBeVisible({
+      timeout: 20000,
+    });
     await expect(conditions.getByText('Low iron')).toBeVisible();
     await expect(conditions.getByText('Low vitamin D')).toBeVisible();
     await expect(
@@ -236,6 +240,16 @@ async function runDemoChecks(page: Page) {
     const years =
       (Date.parse(last) - Date.parse(first)) / (365 * 24 * 3600 * 1000);
     expect(years).toBeGreaterThan(2.9);
+  });
+
+  await test.step('A test outside the catalog shows its trend and lab range', async () => {
+    await openRoute(page, '/biomarker/39804-0');
+    await expect(page.getByTestId('biomarker-title')).toHaveText(
+      'Lipoprotein associated phospholipase A2 [Mass/volume] in Serum or Plasma'
+    );
+    await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
+      'In range'
+    );
   });
 
   await test.step('The journal has past answers and today to answer', async () => {

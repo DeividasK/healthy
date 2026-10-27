@@ -1,0 +1,9 @@
+This material contains content from LOINC (http://loinc.org). LOINC is
+copyright © Regenstrief Institute, Inc. and the Logical Observation
+Identifiers Names and Codes (LOINC) Committee and is available at no cost
+under the license at http://loinc.org/license. LOINC® is a registered United
+States trademark of Regenstrief Institute, Inc.
+
+loincLabTests.js lists LOINC codes with their long common names
+(LONG_COMMON_NAME) and example UCUM units (EXAMPLE_UCUM_UNITS). release.json
+names the LOINC version and release date the list was generated from.

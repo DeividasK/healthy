@@ -111,3 +111,59 @@ test('migration v21 corrects stored codes and drops copied default ranges', asyn
     'Neutrophils (%)'
   );
 });
+
+test("migration v22 records results under their unit's code and moves RDW-SD to its new code", async ({
+  page,
+}) => {
+  await seedTestPatient(page, { id: 'legacy-rdw-patient' });
+  await seedTestReport(page, {
+    id: 'legacy-rdw-report',
+    date: '2026-09-01',
+    biomarkers: [
+      { name: 'RDW-SD', value: 42 },
+      { name: 'Glucose', value: 5.1, unit: 'mmol/L' },
+      { name: 'Cholesterol, Total', value: 190, unit: 'mg/dL' },
+    ],
+  });
+  await openRoute(page, '/');
+  await expect(page.getByTestId('labs-summary')).toBeVisible();
+  await page.evaluate(async () => {
+    const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
+    // As the previous version stored them: every unit under the test's code.
+    const legacy = (code: string, name: string) =>
+      bridge.executeSql(
+        `UPDATE observations SET loinc_code = ?,
+           fhir_json = json_set(fhir_json, '$.code.coding[0].code', ?)
+         WHERE name = ?`,
+        [code, code, name]
+      );
+    await legacy('21000-5', 'RDW-SD');
+    await legacy('2345-7', 'Glucose');
+    await bridge.executeSql('PRAGMA user_version = 21');
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('labs-summary')).toBeVisible();
+  const rows: { loinc_code: string; name: string; fhir_json: string }[] =
+    await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT loinc_code, name, fhir_json FROM observations'
+      )
+    );
+  const codes = Object.fromEntries(
+    rows.map((row) => [
+      row.name,
+      [row.loinc_code, JSON.parse(row.fhir_json).code.coding[0].code],
+    ])
+  );
+  expect(codes).toEqual({
+    'RDW-SD': ['115742-9', '115742-9'],
+    Glucose: ['14749-6', '14749-6'],
+    'Cholesterol, Total': ['2093-3', '2093-3'],
+  });
+  // Glucose keeps one page, whichever unit its results are in.
+  await openRoute(page, '/biomarker/2345-7');
+  await expect(page.getByTestId('biomarker-loinc')).toHaveText('14749-6');
+  await openRoute(page, '/biomarker/115742-9');
+  await expect(page.getByTestId('biomarker-title')).toHaveText('RDW-SD');
+});

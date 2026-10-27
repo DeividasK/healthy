@@ -50,6 +50,26 @@ export function getBiomarkerKey(marker: BiomarkerDefinition): string {
   return marker.loinc ?? marker.id;
 }
 
+/** The LOINC code a result in the unit with UCUM code `ucum` is recorded under. */
+export function getUnitLoinc<T extends BiomarkerDefinition>(
+  marker: T,
+  ucum: string
+): T['loinc'] {
+  return marker.unitLoinc?.[ucum] ?? marker.loinc;
+}
+
+/** Whether `code` is one of a biomarker's LOINC codes, for any of its units. */
+export function hasLoincCode(
+  marker: BiomarkerDefinition,
+  code: string | undefined
+): boolean {
+  if (!code) return false;
+  return (
+    marker.loinc === code ||
+    Object.values(marker.unitLoinc ?? {}).includes(code)
+  );
+}
+
 /**
  * Searches recordable biomarkers by name, alias, or LOINC code.
  */
@@ -59,7 +79,12 @@ export function searchBiomarkers(query: string): RecordableBiomarker[] {
 
   return RECORDABLE_BIOMARKERS.filter((marker) => {
     if (marker.name.toLowerCase().includes(clean)) return true;
-    if (marker.loinc.includes(clean)) return true;
+    if (
+      [marker.loinc, ...Object.values(marker.unitLoinc ?? {})].some((code) =>
+        code.includes(clean)
+      )
+    )
+      return true;
     return marker.aliases.some((alias) => alias.toLowerCase().includes(clean));
   });
 }
@@ -70,7 +95,9 @@ export function searchBiomarkers(query: string): RecordableBiomarker[] {
 export function getBiomarker(
   idOrLoinc: string
 ): BiomarkerDefinition | undefined {
-  return BIOMARKERS.find((m) => m.id === idOrLoinc || m.loinc === idOrLoinc);
+  return BIOMARKERS.find(
+    (m) => m.id === idOrLoinc || hasLoincCode(m, idOrLoinc)
+  );
 }
 
 const matchesName = (marker: BiomarkerDefinition, name: string) =>

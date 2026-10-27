@@ -90,6 +90,13 @@ export interface BiomarkerDefinition {
   aliases: string[];
   /** Absent for calculated biomarkers that LOINC has no code for. */
   loinc?: string;
+  /**
+   * LOINC codes for results in units of another kind than `loinc`'s, by UCUM
+   * code. LOINC codes mass and amount of substance separately: glucose in
+   * mg/dL is 2345-7 but in mmol/L 14749-6. They convert into each other, so
+   * the app shows them as one test and records each under its own code.
+   */
+  unitLoinc?: Record<string, string>;
   category: BiomarkerCategory;
   primaryUnit: string;
   ucumCode: string;

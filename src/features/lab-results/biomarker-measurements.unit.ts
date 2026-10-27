@@ -4,6 +4,7 @@ import { BIOMARKERS, getBiomarker } from '@/src/data/biomarkers';
 import {
   assertCatalogObservation,
   convertBiomarkerValue,
+  getObservationMarker,
   getObservationReferenceRange,
   getObservationStatus,
   isSupportedObservation,
@@ -94,6 +95,40 @@ test('validates catalog identity, missing units, and mismatched labels/codes', (
     expect(() => assertCatalogObservation(value)).toThrow(message);
     expect(isSupportedObservation(value)).toBe(false);
   }
+});
+
+test('reads LOINC tests outside the catalog from the result itself', () => {
+  const glucose = observation({
+    code: {
+      coding: [
+        {
+          system: 'http://loinc.org',
+          code: '2339-0',
+          display: 'Glucose [Mass/volume] in Blood',
+        },
+      ],
+    },
+    valueQuantity: { value: 92, unit: 'mg/dL', code: 'mg/dL' },
+  });
+  expect(getObservationMarker(glucose)).toMatchObject({
+    id: '2339-0',
+    loinc: '2339-0',
+    name: 'Glucose [Mass/volume] in Blood',
+    units: [{ label: 'mg/dL', ucum: 'mg/dL' }],
+  });
+  expect(isSupportedObservation(glucose)).toBe(true);
+  // Not LOINC, not a LOINC code, or without a unit: not a test the app knows.
+  for (const value of [
+    observation({ code: { coding: [{ system: 'urn:x', code: '2339-0' }] } }),
+    observation({
+      code: { coding: [{ system: 'http://loinc.org', code: 'custom' }] },
+    }),
+    observation({
+      code: { coding: [{ system: 'http://loinc.org', code: '2339-0' }] },
+      valueQuantity: { value: 92 },
+    }),
+  ])
+    expect(isSupportedObservation(value)).toBe(false);
 });
 
 test('uses unit-aligned catalog ranges and gives laboratory bounds precedence', () => {

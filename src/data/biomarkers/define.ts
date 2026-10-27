@@ -20,6 +20,7 @@ export interface BiomarkerEntry {
   name: string;
   aliases?: string[];
   loinc?: string;
+  unitLoinc?: Record<string, string>;
   /** The first unit is the primary one, in which `range` is given. */
   units: UnitOption[];
   /** The general adult range, used when no `ranges` entry applies. */
@@ -51,6 +52,7 @@ export function defineBiomarkers(
       name,
       aliases = [],
       loinc,
+      unitLoinc,
       units,
       range,
       ranges,
@@ -62,6 +64,7 @@ export function defineBiomarkers(
       name,
       aliases,
       ...(loinc && { loinc }),
+      ...(unitLoinc && { unitLoinc }),
       category,
       primaryUnit: units[0].label,
       ucumCode: units[0].ucum,

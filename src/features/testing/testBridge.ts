@@ -117,7 +117,7 @@ import { createOrUpdateCondition } from '@/src/features/conditions/conditionServ
 import { createOrUpdateConsultation } from '@/src/features/consultations/consultationService';
 import { createAndSaveDiagnosticReport } from '@/src/features/lab-results/diagnosticReportService';
 import { deleteDiagnosticReportRecord } from '@/src/features/lab-results/labResultsRepository';
-import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
+import { getUnitLoinc, RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 
 async function connectedProvider() {
   const config = await loadGoogleDriveConfig();
@@ -417,6 +417,8 @@ export function setupTestBridge(
         name: string;
         value: number | string;
         unit?: string;
+        /** A LOINC test outside the catalog: `name` is its LOINC name. */
+        loinc?: string;
         /** A laboratory-reported range, in `unit`. */
         referenceLow?: number;
         referenceHigh?: number;
@@ -425,12 +427,14 @@ export function setupTestBridge(
       const patientId = await resolvePatientId(input.patientId);
       const items = input.biomarkers.map((b) => {
         const query = b.name.toLowerCase().trim();
-        const def = RECORDABLE_BIOMARKERS.find(
-          (m) =>
-            m.name.toLowerCase() === query ||
-            m.aliases.some((a) => a.toLowerCase() === query) ||
-            m.name.toLowerCase().includes(query)
-        );
+        const def = b.loinc
+          ? undefined
+          : RECORDABLE_BIOMARKERS.find(
+              (m) =>
+                m.name.toLowerCase() === query ||
+                m.aliases.some((a) => a.toLowerCase() === query) ||
+                m.name.toLowerCase().includes(query)
+            );
 
         const val = typeof b.value === 'string' ? parseFloat(b.value) : b.value;
         if (def) {
@@ -444,11 +448,23 @@ export function setupTestBridge(
           return {
             id: def.id,
             name: def.name,
-            loinc: def.loinc,
+            loinc: getUnitLoinc(def, ucumCode),
             value: val,
             unit: b.unit || def.primaryUnit,
             ucumCode,
             // Saved results carry no range unless a laboratory reported one.
+            referenceLow: b.referenceLow,
+            referenceHigh: b.referenceHigh,
+          };
+        }
+        if (b.loinc && b.unit) {
+          return {
+            id: b.loinc,
+            name: b.name,
+            loinc: b.loinc,
+            value: val,
+            unit: b.unit,
+            ucumCode: b.unit,
             referenceLow: b.referenceLow,
             referenceHigh: b.referenceHigh,
           };
