@@ -1,9 +1,8 @@
 import type { Observation } from 'fhir/r5';
 import { useContext, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ChevronDown } from 'lucide-react-native';
+import { View } from 'react-native';
 import { CountBadge } from '@/src/components/CountBadge';
-import { COLORS } from '@/src/theme/colors';
+import { FoldingSection } from '@/src/components/FoldingSection';
 import {
   RANGE_STATUS_LABELS,
   RANGE_STATUSES,
@@ -68,75 +67,34 @@ export function BiomarkerStatusGroups({
           (toggled[key] ??
             (key === selectedGroup || selectedGroups.includes(key)));
         return (
-          <View key={key} style={styles.group} testID={`${testID}-${key}`}>
-            <TouchableOpacity
-              style={styles.heading}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}: ${items.length} biomarkers`}
-              aria-expanded={isOpen}
-              disabled={expanded}
-              activeOpacity={0.6}
-              onPress={() =>
-                setToggled((current) => ({ ...current, [key]: !isOpen }))
-              }
-              testID={`${testID}-${key}-toggle`}
-            >
-              <Text style={styles.title} accessibilityRole="header">
-                {label}
-              </Text>
+          <FoldingSection
+            key={key}
+            title={label}
+            isOpen={isOpen}
+            accessibilityLabel={`${label}: ${items.length} biomarkers`}
+            disabled={expanded}
+            onToggle={() =>
+              setToggled((current) => ({ ...current, [key]: !isOpen }))
+            }
+            badge={
               <CountBadge
                 count={items.length}
                 accessibilityLabel={`${label}: ${items.length} biomarkers`}
                 testID={`${testID}-${key}-count`}
               />
-              {!expanded && (
-                <View
-                  style={[styles.chevron, isOpen && styles.chevronExpanded]}
-                >
-                  <ChevronDown color={COLORS.light.muted} size={18} />
-                </View>
-              )}
-            </TouchableOpacity>
-            {isOpen &&
-              items.map((biomarker) => (
-                <BiomarkerResultRow
-                  key={biomarker.id}
-                  observation={biomarker.observation}
-                  testID={rowTestID?.(biomarker)}
-                />
-              ))}
-          </View>
+            }
+            testID={`${testID}-${key}`}
+          >
+            {items.map((biomarker) => (
+              <BiomarkerResultRow
+                key={biomarker.id}
+                observation={biomarker.observation}
+                testID={rowTestID?.(biomarker)}
+              />
+            ))}
+          </FoldingSection>
         );
       })}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  // Closes the last row with the same full-width hairline.
-  group: {
-    marginTop: 24,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.light.cardBorder,
-  },
-  // Spans the group, so pressing anywhere on the heading line toggles it.
-  heading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 44,
-    marginBottom: 4,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.light.foreground,
-  },
-  // Lines up with the chevrons of the rows.
-  chevron: { marginLeft: 'auto' },
-  chevronExpanded: { transform: [{ rotate: '180deg' }] },
-});

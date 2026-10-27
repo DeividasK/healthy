@@ -1,3 +1,7 @@
+import {
+  isRangeRegion,
+  type RangeRegion,
+} from '@/src/data/biomarkers/rangeRegions';
 import { getWhenLabel } from '@/src/features/treatments/regimen';
 
 /** A part of the day offered in forms (FHIR `Timing.repeat.when`). */
@@ -26,6 +30,11 @@ export interface ProfileSettings {
    * biomarker id. Kept quietly, not shown in Settings.
    */
   biomarkerUnits?: Record<string, string>;
+  /**
+   * The region whose biomarker ranges apply when a lab report has none of
+   * its own. Unset until the user picks one: the device's region applies.
+   */
+  rangeRegion?: RangeRegion;
 }
 
 export const DEFAULT_TIMES_OF_DAY: Record<PartOfDay, string> = {
@@ -69,11 +78,15 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
   if (storedUnits && typeof storedUnits === 'object')
     for (const [marker, unit] of Object.entries(storedUnits))
       if (typeof unit === 'string') biomarkerUnits[marker] = unit;
+  const rangeRegion = isRangeRegion(stored?.rangeRegion)
+    ? stored.rangeRegion
+    : undefined;
   return {
     ...stored,
     timesOfDay,
     journalOrder,
     biomarkerUnits,
+    rangeRegion,
   } as ProfileSettings;
 }
 
