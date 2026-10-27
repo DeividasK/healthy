@@ -59,7 +59,7 @@
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.14.0",
+    "@axe-core/playwright": "4.13.0",
     "@chromatic-com/playwright": "^1.0.0",
     "@eslint/config-helpers": "^0.7.0",
     "@playwright/test": "^1.64.1",
