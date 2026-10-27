@@ -5,7 +5,7 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getTreatmentLinkOptions } from '@/src/features/treatments/treatmentService';
 import { getActivityLinkOptions } from '@/src/features/service-requests/serviceRequestService';
 import { BundleForm } from './BundleForm';
-import { saveBundle } from './bundleService';
+import { getTreatmentsAtBundleLimit, saveBundle } from './bundleService';
 import { LoadingView } from '@/src/components/LoadingView';
 
 /** Creates a bundle, optionally starting with a treatment (`treatmentId`). */
@@ -24,8 +24,16 @@ export function AddBundleView() {
     void Promise.all([
       getTreatmentLinkOptions(activePatientId),
       getActivityLinkOptions(activePatientId),
-    ]).then(([treatments, activities]) => {
-      if (isMounted) setOptions({ treatments, activities });
+      getTreatmentsAtBundleLimit(activePatientId),
+    ]).then(([treatments, activities, full]) => {
+      // Treatments already in as many bundles as they have doses can't join.
+      if (isMounted)
+        setOptions({
+          treatments: treatments.filter(
+            (option) => !full.some((treatment) => treatment.id === option.id)
+          ),
+          activities,
+        });
     });
     return () => {
       isMounted = false;

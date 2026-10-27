@@ -155,6 +155,17 @@ test.describe('My actions - Visual Regression', () => {
     await page.getByTestId(`bundle-log-toggle-${bundle.id}:0`).click();
     await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
     await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
+    // With one treatment unanswered, only the answer given is tinted.
+    await page.getByTestId('treatment-log-not-taken-visual-log-iron').click();
+    await page
+      .getByTestId(`bundle-log-not-taken-${bundle.id}:0`)
+      .and(page.locator('[aria-checked="false"]'))
+      .waitFor();
+    await takeSnapshot(
+      page,
+      'My actions - Bundle with one unanswered',
+      testInfo
+    );
   });
 
   test('Treatments grouped by time of day, then reordered', async ({

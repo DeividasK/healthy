@@ -14,7 +14,11 @@ import {
   getBundleTitle,
   type BundleValues,
 } from './bundleModel';
-import { getBundleById, saveBundle } from './bundleService';
+import {
+  getBundleById,
+  getTreatmentsAtBundleLimit,
+  saveBundle,
+} from './bundleService';
 import { LoadingView } from '@/src/components/LoadingView';
 
 export function EditBundleView() {
@@ -34,15 +38,23 @@ export function EditBundleView() {
       getBundleById(id, activePatientId),
       getTreatmentLinkOptions(activePatientId),
       getActivityLinkOptions(activePatientId),
-    ]).then(([bundle, treatmentOptions, activityOptions]) => {
+      getTreatmentsAtBundleLimit(activePatientId, id),
+    ]).then(([bundle, treatmentOptions, activityOptions, full]) => {
       if (!isMounted) return;
+      const memberIds = bundle ? getBundleMemberIds(bundle) : [];
       setLoaded({
-        treatmentOptions,
+        // Treatments already in as many bundles as they have doses can't
+        // join; this bundle's own members stay.
+        treatmentOptions: treatmentOptions.filter(
+          (option) =>
+            memberIds.includes(option.id) ||
+            !full.some((treatment) => treatment.id === option.id)
+        ),
         activityOptions,
         values: bundle && {
           title: getBundleTitle(bundle),
           times: getBundleTimes(bundle),
-          memberIds: getBundleMemberIds(bundle),
+          memberIds,
           activityIds: getBundleActivityIds(bundle),
         },
       });

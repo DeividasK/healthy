@@ -49,6 +49,8 @@ import {
   hasRegimen,
   validateQuantity,
   validateRegimen,
+  getMaxBundles,
+  getMaxBundlesError,
   type QuantityDraft,
   type RegimenDraft,
 } from './regimen';
@@ -106,7 +108,6 @@ export function TreatmentForm({
   specialistSuggestions = [],
   linkFields = [],
 }: TreatmentFormProps) {
-  const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
   const [intent, setIntent] = useState<MedicationRequest['intent']>(
     initialValues?.intent || 'plan'
@@ -206,6 +207,14 @@ export function TreatmentForm({
     usageStart,
   } = fields.values;
   const visibleFields = fields.shown;
+  // Each bundle holds one of the treatment's doses, so it can be in as many
+  // bundles as a phase of its regimen has doses, or one without a regimen.
+  const maxBundles = visibleFields.regimen ? getMaxBundles(regimen) : 1;
+  const links = useLinkFields(
+    linkFields.map((config) =>
+      config.type === 'bundle' ? { ...config, max: maxBundles } : config
+    )
+  );
   const hasChanges = useHasChanges({
     title,
     intent,
@@ -268,7 +277,9 @@ export function TreatmentForm({
         validateQuantity(dispenseQuantity, 'Quantity to dispense')) ||
       (usageStart &&
         formatLocalDate(usageStart) < formatLocalDate(authoredDate) &&
-        "Start taking cannot be before the treatment's date");
+        "Start taking cannot be before the treatment's date") ||
+      ((links.values.bundle?.ids.length ?? 0) > maxBundles &&
+        getMaxBundlesError(maxBundles));
     if (fieldError) {
       setErrorMessage(fieldError);
       return;
