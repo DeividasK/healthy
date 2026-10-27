@@ -26,6 +26,11 @@ export interface ProfileSettings {
   /** The order the user gave the journal's rows. */
   journalOrder?: JournalOrder;
   /**
+   * The unit (UCUM code) each biomarker's page was last shown in, by catalog
+   * biomarker id. Kept quietly, not shown in Settings.
+   */
+  biomarkerUnits?: Record<string, string>;
+  /**
    * The region whose biomarker ranges apply when a lab report has none of
    * its own. Unset until the user picks one: the device's region applies.
    */
@@ -68,6 +73,11 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
       journalOrder[code] = keys.filter((key) => typeof key === 'string');
     else delete journalOrder[code];
   }
+  const biomarkerUnits: Record<string, string> = {};
+  const storedUnits = stored?.biomarkerUnits;
+  if (storedUnits && typeof storedUnits === 'object')
+    for (const [marker, unit] of Object.entries(storedUnits))
+      if (typeof unit === 'string') biomarkerUnits[marker] = unit;
   const rangeRegion = isRangeRegion(stored?.rangeRegion)
     ? stored.rangeRegion
     : undefined;
@@ -75,6 +85,7 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
     ...stored,
     timesOfDay,
     journalOrder,
+    biomarkerUnits,
     rangeRegion,
   } as ProfileSettings;
 }
