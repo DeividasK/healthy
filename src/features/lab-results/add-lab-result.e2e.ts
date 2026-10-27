@@ -5,6 +5,8 @@ import {
   seedTestPatient,
   checkA11y,
   openRoute,
+  useSingleColumnLayout,
+  expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
@@ -16,6 +18,9 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     'adds CBC lab results, then views, edits and deletes them',
     { tag: ['@smoke', '@critical'] },
     async ({ page }) => {
+      // Rows open each biomarker's page; on desktop they choose it beside
+      // the report instead (desktop.e2e.ts).
+      await useSingleColumnLayout(page);
       await test.step('Open Add Lab Results screen from the empty Home and audit a11y', async () => {
         const addLabResultsMenuBtn = page.getByTestId('start-lab-result');
         await expect(addLabResultsMenuBtn).toBeVisible();
@@ -168,6 +173,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(
           results.getByTestId('lab-result-groups-inRange-count')
         ).toHaveText('2');
+        await expandBiomarkerGroups(results);
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
           '14.5'
         );
@@ -186,6 +192,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await page.getByTestId('remove-notes-button').click();
         await page.getByTestId('save-button').click();
         await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}$`));
+        // The edit can move a result to another group, so open the groups
+        // once the saved values show.
+        await expect(results).not.toContainText('14.5');
+        await expandBiomarkerGroups(results);
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
           '11.2'
         );

@@ -128,7 +128,9 @@ export function LabsSummaryView() {
               {labResults}
             </>
           }
-          detail={<BiomarkerDetailView key={selectedId} id={selectedId} />}
+          // Not keyed by the biomarker: a remount would reload every report
+          // and flash the skeleton on each step.
+          detail={<BiomarkerDetailView id={selectedId} />}
           dock={<ResourceActionDock actions={[]} />}
         />
       </BiomarkerSelectionContext.Provider>
