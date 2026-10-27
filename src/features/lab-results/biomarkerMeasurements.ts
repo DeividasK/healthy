@@ -4,6 +4,10 @@ import {
   hasLoincCode,
   type BiomarkerDefinition,
 } from '@/src/data/biomarkers';
+import {
+  CUSTOM_TEST_SYSTEM,
+  customTestBiomarker,
+} from '@/src/data/biomarkers/customTests';
 import { LOINC_CODE_PATTERN, loincTestBiomarker } from '@/src/data/loinc';
 import {
   resolveReferenceRange,
@@ -58,7 +62,19 @@ export function getObservationMarker(
     BIOMARKERS.find((marker) => byCode(marker) && byName(marker)) ??
     BIOMARKERS.find(byName) ??
     BIOMARKERS.find(byCode) ??
-    getLoincTestMarker(observation)
+    getLoincTestMarker(observation) ??
+    getCustomTestMarker(observation)
+  );
+}
+
+function getCustomTestMarker(observation: Observation) {
+  const coding = observation.code.coding?.[0];
+  const unit =
+    observation.valueQuantity?.unit || observation.valueQuantity?.code;
+  if (coding?.system !== CUSTOM_TEST_SYSTEM || !unit) return undefined;
+  return customTestBiomarker(
+    coding.display || observation.code.text || '',
+    unit
   );
 }
 

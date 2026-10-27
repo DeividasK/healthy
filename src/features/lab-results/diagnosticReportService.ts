@@ -30,6 +30,8 @@ export interface BiomarkerInputItem {
   id: string; // marker canonical id or loinc
   name: string;
   loinc: string;
+  /** Code system of `loinc` when it isn't LOINC. */
+  codeSystem?: string;
   value: number;
   unit: string;
   ucumCode: string;
@@ -112,7 +114,7 @@ export function buildFHIRObservation(
     code: {
       coding: [
         {
-          system: 'http://loinc.org',
+          system: item.codeSystem ?? 'http://loinc.org',
           code: item.loinc,
           display: item.name,
         },

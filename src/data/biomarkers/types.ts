@@ -90,6 +90,8 @@ export interface BiomarkerDefinition {
   aliases: string[];
   /** Absent for calculated biomarkers that LOINC has no code for. */
   loinc?: string;
+  /** The code system `loinc` belongs to when it isn't LOINC, e.g. the user's own tests. */
+  codeSystem?: string;
   /**
    * LOINC codes for results in units of another kind than `loinc`'s, by UCUM
    * code. LOINC codes mass and amount of substance separately: glucose in

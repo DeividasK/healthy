@@ -5,6 +5,7 @@ import {
   type RecordableBiomarker,
   type UnitOption,
 } from '@/src/data/biomarkers';
+import { customTestBiomarker } from '@/src/data/biomarkers/customTests';
 import { unitKind, type LoincLabTests } from '@/src/data/loinc';
 import {
   parseAIValue,
@@ -18,6 +19,8 @@ import {
 /** Version marker the AI puts in its reply, so other JSON is not mistaken for it. */
 export const LAB_RESULTS_AI_FORMAT_KEY = 'healthyLabResults';
 export const LAB_RESULTS_AI_FORMAT_VERSION = 1;
+/** Test id the AI gives a test that has no LOINC code, kept as the user's own test. */
+export const OWN_TEST_ID = 'own';
 
 export interface ImportedLabResultItem {
   marker: RecordableBiomarker;
@@ -70,6 +73,7 @@ Rules:
 - Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported. LOINC has separate codes for each kind of unit, so use the code for the unit the report gives: mass, like mg/dL, or amount of substance, like mmol/L.
 - "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
 - For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
+- For a test that has no LOINC code, like NAD+ or telomere length, use "${OWN_TEST_ID}" as the test id, add "name" with the test's name as reported, and copy its unit as reported.
 - Leave out tests in the list whose unit doesn't match one listed for them, and other tests whose LOINC code you aren't sure of. List the tests you leave out in a short note before the code block.
 - Don't add reference ranges, flags, comments or any other fields.
 
@@ -139,13 +143,28 @@ export function parseLabResultsAIReply(
         typeof item.test === 'string' && item.test.trim()
           ? item.test.trim()
           : `Result ${index + 1}`;
+      const unitText = typeof item.unit === 'string' ? item.unit : '';
+      const reportedUnit = unitText.trim();
+      const ownName = readText(item.name);
+      const isOwnTest =
+        typeof item.test === 'string' &&
+        item.test.trim().toLowerCase() === OWN_TEST_ID;
+      if (isOwnTest && (!ownName || !reportedUnit)) {
+        errors.push(
+          `${ownName ?? `Result ${index + 1}`} needs a name and a unit.`
+        );
+        return;
+      }
       const catalogMarker =
-        typeof item.test === 'string' ? findMarker(item.test) : undefined;
-      const marker =
-        catalogMarker ??
-        (typeof item.test === 'string'
-          ? loincTests?.get(item.test)
-          : undefined);
+        typeof item.test === 'string' && !isOwnTest
+          ? findMarker(item.test)
+          : undefined;
+      const marker = isOwnTest
+        ? customTestBiomarker(ownName!, reportedUnit)
+        : (catalogMarker ??
+          (typeof item.test === 'string'
+            ? loincTests?.get(item.test)
+            : undefined));
       if (!marker) {
         errors.push(`"${label}" is not a supported test.`);
         return;
@@ -162,8 +181,6 @@ export function parseLabResultsAIReply(
         return;
       }
 
-      const unitText = typeof item.unit === 'string' ? item.unit : '';
-      const reportedUnit = unitText.trim();
       const unit =
         findUnit(marker, unitText) ??
         // LOINC codes each kind of unit separately, so another test's

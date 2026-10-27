@@ -1,4 +1,5 @@
 import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
+import { customTestBiomarker } from '@/src/data/biomarkers/customTests';
 import {
   createOrUpdatePatient,
   deletePatient,
@@ -68,11 +69,19 @@ const LP_PLA2 = {
   referenceHigh: 200,
 };
 
+/** A result for one of the user's own tests, which LOINC has no code for. */
+interface OwnTestResult {
+  name: string;
+  value: number;
+  unit: string;
+}
+
 const REPORTS: {
   monthsAgo: number;
   notes?: string;
   values: LabValues;
   loincResults?: LoincResult[];
+  ownTests?: OwnTestResult[];
 }[] = [
   {
     monthsAgo: 36,
@@ -144,6 +153,10 @@ const REPORTS: {
       creatinine: 0.99,
     },
     loincResults: [{ ...LP_PLA2, value: 236 }],
+    ownTests: [
+      { name: 'NAD+', value: 31.5, unit: 'µM' },
+      { name: 'Telomere length', value: 6.9, unit: 'kb' },
+    ],
   },
   {
     monthsAgo: 1,
@@ -170,10 +183,18 @@ const REPORTS: {
       creatinine: 0.97,
     },
     loincResults: [{ ...LP_PLA2, value: 164 }],
+    ownTests: [
+      { name: 'NAD+', value: 38.2, unit: 'µM' },
+      { name: 'Telomere length', value: 6.8, unit: 'kb' },
+    ],
   },
 ];
 
-function reportItems(values: LabValues, loincResults: LoincResult[] = []) {
+function reportItems(
+  values: LabValues,
+  loincResults: LoincResult[] = [],
+  ownTests: OwnTestResult[] = []
+) {
   const catalogItems = Object.entries(values).map(([id, value]) => {
     const marker = RECORDABLE_BIOMARKERS.find((m) => m.id === id);
     if (!marker) throw new Error(`Demo biomarker ${id} is not in the catalog`);
@@ -197,6 +218,18 @@ function reportItems(values: LabValues, loincResults: LoincResult[] = []) {
       ucumCode: unit,
       referenceHigh,
     })),
+    ...ownTests.map(({ name, value, unit }) => {
+      const test = customTestBiomarker(name, unit);
+      return {
+        id: test.id,
+        name: test.name,
+        loinc: test.loinc,
+        codeSystem: test.codeSystem,
+        value,
+        unit,
+        ucumCode: unit,
+      };
+    }),
   ];
 }
 
@@ -546,7 +579,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
       time: '08:15',
       notes: report.notes,
       serviceProviderName: LAB,
-      items: reportItems(report.values, report.loincResults),
+      items: reportItems(report.values, report.loincResults, report.ownTests),
     });
 
   // Up to three months of journal answers in one write, from the day each

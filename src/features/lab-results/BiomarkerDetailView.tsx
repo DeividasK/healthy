@@ -86,6 +86,7 @@ import {
 import { RangeRegionLine } from './RangeRegionLine';
 import { RangeProfileNotice } from './RangeProfileNotice';
 import { getChartScale } from './chartScale';
+import { CUSTOM_TEST_SYSTEM } from '@/src/data/biomarkers/customTests';
 import { useRangeDemographics } from './useRangeDemographics';
 
 type Measurement = {
@@ -372,6 +373,9 @@ export function BiomarkerDetailView({
         console.error('Failed to save the biomarker unit:', error)
       );
   };
+  /** One of the user's own tests, which neither the catalog nor LOINC codes. */
+  const isOwnTest =
+    recordedLatest?.observation.code.coding?.[0]?.system === CUSTOM_TEST_SYSTEM;
   /** The code of the results as shown: a test's units can have codes of their own. */
   const latestCode =
     marker && displayUnit
@@ -547,22 +551,25 @@ export function BiomarkerDetailView({
     <>
       {chartMeasurements.length > 1 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Value history</Text>
-          <View style={styles.legend} testID="biomarker-chart-legend">
-            {RANGE_STATUSES.map((status) => (
-              <View key={status} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: STATUS_COLORS[status] },
-                  ]}
-                />
-                <Text style={styles.legendLabel}>
-                  {RANGE_STATUS_LABELS[status]}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>History</Text>
+          {/* Without a range no result has a status for the legend to explain. */}
+          {chartMeasurements.some((measurement) => measurement.status) && (
+            <View style={styles.legend} testID="biomarker-chart-legend">
+              {RANGE_STATUSES.map((status) => (
+                <View key={status} style={styles.legendItem}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      { backgroundColor: STATUS_COLORS[status] },
+                    ]}
+                  />
+                  <Text style={styles.legendLabel}>
+                    {RANGE_STATUS_LABELS[status]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
           <BiomarkerChart
             measurements={chartMeasurements}
             low={latestMeasurement.range?.low}
@@ -657,8 +664,10 @@ export function BiomarkerDetailView({
             ? marker.education?.about ||
               marker.description ||
               'This biomarker is one part of your laboratory result and is interpreted together with other findings.'
-            : // A LOINC test outside the catalog: say what the page is based on.
-              `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.${latestMeasurement?.reportedRange ? ' Its range is the one your laboratory reported.' : ''}`}
+            : isOwnTest
+              ? 'This is your own test, so Healthy has no guide for it.'
+              : // A LOINC test outside the catalog: say what the page is based on.
+                `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.${latestMeasurement?.reportedRange ? ' Its range is the one your laboratory reported.' : ''}`}
         </LearnItem>
         <LearnItem title="Why it matters">
           {marker

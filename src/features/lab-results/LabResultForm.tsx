@@ -12,10 +12,27 @@ import {
   ScrollView,
   Platform,
   Alert,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Clock, FileText, Hospital, Sparkles } from 'lucide-react-native';
+import {
+  X,
+  Clock,
+  FileText,
+  Hospital,
+  Sparkles,
+  Plus,
+  FlaskConical,
+} from 'lucide-react-native';
+import {
+  CUSTOM_TEST_SYSTEM,
+  collectCustomTests,
+  customTestBiomarker,
+  customTestCode,
+  searchCustomTests,
+} from '@/src/data/biomarkers/customTests';
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
@@ -42,6 +59,7 @@ import {
   searchBiomarkers,
   type RecordableBiomarker,
 } from '@/src/data/biomarkers';
+import { fetchAllDiagnosticReportRecords } from './labResultsRepository';
 import { loadLoincLabTests, type LoincLabTests } from '@/src/data/loinc';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -66,6 +84,16 @@ export interface ActiveMarkerItem {
   valueStr: string;
   selectedUnit: string;
   selectedUcum: string;
+}
+
+/** Marks one of the user's own tests, which the app has no code for. */
+function OwnTestLabel({ style }: { style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[styles.customTag, style]}>
+      <FlaskConical color={COLORS.light.mutedForeground} size={13} />
+      <Text style={styles.customTagText}>Your own test</Text>
+    </View>
+  );
 }
 
 /** Checks the selected local date and optional time against the current time. */
@@ -253,9 +281,10 @@ export function LabResultForm({
               obs.valueQuantity?.unit || obs.valueQuantity?.code || '';
             const ucum = obs.valueQuantity?.code || unit;
 
-            const def: RecordableBiomarker = RECORDABLE_BIOMARKERS.find((m) =>
-              hasLoincCode(m, loinc)
-            ) || {
+            const def: RecordableBiomarker = (obs.code.coding?.[0]?.system ===
+            CUSTOM_TEST_SYSTEM
+              ? customTestBiomarker(name, unit)
+              : RECORDABLE_BIOMARKERS.find((m) => hasLoincCode(m, loinc))) || {
               id: `marker_${loinc}`,
               name,
               aliases: [name],
@@ -308,6 +337,23 @@ export function LabResultForm({
     };
   }, [activePatientId]);
 
+  // The user's own tests from earlier results, offered in the search.
+  const [customTests, setCustomTests] = useState<RecordableBiomarker[]>([]);
+  useEffect(() => {
+    let isMounted = true;
+    fetchAllDiagnosticReportRecords(activePatientId)
+      .then((records) => {
+        if (isMounted)
+          setCustomTests(
+            collectCustomTests(records.flatMap((record) => record.observations))
+          );
+      })
+      .catch((err) => console.warn('Failed to load own tests:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [activePatientId]);
+
   // Autocomplete matching items
   const autocompleteResults = useMemo(() => {
     const existingLoincs = new Set(
@@ -317,13 +363,29 @@ export function LabResultForm({
       (m) => !existingLoincs.has(m.loinc)
     );
     if (!searchQuery.trim()) {
-      return available;
+      return [
+        ...customTests.filter((m) => !existingLoincs.has(m.loinc)),
+        ...available,
+      ];
     }
     return [
+      ...searchCustomTests(customTests, searchQuery),
       ...searchBiomarkers(searchQuery),
       ...(loincTests?.search(searchQuery) ?? []),
     ].filter((m) => !existingLoincs.has(m.loinc));
-  }, [searchQuery, activeItems, loincTests]);
+  }, [searchQuery, activeItems, loincTests, customTests]);
+
+  // A test the search doesn't find can be added as the user's own test.
+  const canAddOwnTest = useMemo(() => {
+    const name = searchQuery.trim().toLowerCase();
+    if (!name) return false;
+    const code = customTestCode(name);
+    return (
+      !autocompleteResults.some(
+        (marker) => marker.name.toLowerCase() === name
+      ) && !activeItems.some((item) => item.definition.loinc === code)
+    );
+  }, [searchQuery, autocompleteResults, activeItems]);
 
   const menuOptions = [...fields.menuOptions, ...links.menuOptions];
 
@@ -360,6 +422,26 @@ export function LabResultForm({
     setActiveItems((prev) => [...prev, newItem]);
     setSearchQuery('');
     setIsSearchFocused(false);
+  };
+
+  const addCustomItem = (name: string, unit: string) => {
+    const definition = customTestBiomarker(name, unit);
+    setActiveItems((prev) => [
+      ...prev,
+      {
+        id: definition.id,
+        definition,
+        valueStr: '',
+        selectedUnit: unit,
+        selectedUcum: unit,
+      },
+    ]);
+    setSearchQuery('');
+    setIsSearchFocused(false);
+  };
+
+  const handleAddCustom = () => {
+    addCustomItem(searchQuery.trim(), '');
   };
 
   const handleRemoveMarker = (index: number) => {
@@ -401,6 +483,13 @@ export function LabResultForm({
         );
         return;
       }
+      if (!item.selectedUnit.trim()) {
+        showAlert(
+          'Missing Unit',
+          `Please enter the unit for ${item.definition.name}.`
+        );
+        return;
+      }
     }
 
     if (isDateTimeInFuture(selectedDate, testTime)) {
@@ -419,9 +508,10 @@ export function LabResultForm({
         id: item.definition.id,
         name: item.definition.name,
         loinc: getUnitLoinc(item.definition, item.selectedUcum),
+        codeSystem: item.definition.codeSystem,
         value: parseFloat(item.valueStr),
-        unit: item.selectedUnit,
-        ucumCode: item.selectedUcum,
+        unit: item.selectedUnit.trim(),
+        ucumCode: item.selectedUcum.trim(),
       }));
 
       await createAndSaveDiagnosticReport({
@@ -615,6 +705,10 @@ export function LabResultForm({
                     </TouchableOpacity>
                   </View>
 
+                  {item.definition.codeSystem === CUSTOM_TEST_SYSTEM && (
+                    <OwnTestLabel style={styles.cardOwnTestLabel} />
+                  )}
+
                   {/* Input Row: = [value] [unit v] */}
                   <View style={styles.valueRow}>
                     <Text style={styles.equalsSign}>=</Text>
@@ -631,14 +725,28 @@ export function LabResultForm({
                       value={item.valueStr}
                       onChangeText={(val) => handleValueChange(index, val)}
                     />
-                    <NativeUnitPicker
-                      testID={`unit-picker-button-${index}`}
-                      selectedUnit={item.selectedUnit}
-                      units={item.definition.units}
-                      onSelect={(unitLabel, ucum) =>
-                        handleSelectUnit(index, unitLabel, ucum)
-                      }
-                    />
+                    {item.definition.codeSystem === CUSTOM_TEST_SYSTEM ? (
+                      <TextInput
+                        testID={`marker-unit-input-${index}`}
+                        accessibilityLabel={`${item.definition.name} unit`}
+                        style={styles.unitInput}
+                        placeholder="Unit, e.g. µM"
+                        placeholderTextColor={COLORS.light.placeholderInput}
+                        value={item.selectedUnit}
+                        onChangeText={(unit) =>
+                          handleSelectUnit(index, unit, unit)
+                        }
+                      />
+                    ) : (
+                      <NativeUnitPicker
+                        testID={`unit-picker-button-${index}`}
+                        selectedUnit={item.selectedUnit}
+                        units={item.definition.units}
+                        onSelect={(unitLabel, ucum) =>
+                          handleSelectUnit(index, unitLabel, ucum)
+                        }
+                      />
+                    )}
                   </View>
                 </View>
               ))}
@@ -681,49 +789,70 @@ export function LabResultForm({
               </View>
 
               {/* Autocomplete Dropdown */}
-              {isSearchFocused && autocompleteResults.length > 0 && (
-                <View
-                  style={styles.autocompleteCard}
-                  testID="autocomplete-list"
-                >
-                  <ScrollView
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled
-                    style={styles.autocompleteScroll}
+              {isSearchFocused &&
+                (autocompleteResults.length > 0 || canAddOwnTest) && (
+                  <View
+                    style={styles.autocompleteCard}
+                    testID="autocomplete-list"
                   >
-                    {autocompleteResults.map((marker) => {
-                      const isFocused = focusedMarkerId === marker.id;
-                      return (
-                        <TouchableOpacity
-                          key={marker.id}
-                          testID={`autocomplete-item-${marker.id}`}
-                          style={[
-                            styles.autocompleteItem,
-                            isFocused && styles.autocompleteItemFocused,
-                          ]}
-                          onFocus={() => setFocusedMarkerId(marker.id)}
-                          onBlur={() => {
-                            if (focusedMarkerId === marker.id) {
-                              setFocusedMarkerId(null);
-                            }
-                          }}
-                          onPress={() => handleSelectBiomarker(marker)}
-                          activeOpacity={0.7}
-                        >
-                          <Text
+                    <ScrollView
+                      keyboardShouldPersistTaps="handled"
+                      nestedScrollEnabled
+                      style={styles.autocompleteScroll}
+                    >
+                      {autocompleteResults.map((marker) => {
+                        const isFocused = focusedMarkerId === marker.id;
+                        return (
+                          <TouchableOpacity
+                            key={marker.id}
+                            testID={`autocomplete-item-${marker.id}`}
                             style={[
-                              styles.autocompleteItemName,
-                              isFocused && styles.autocompleteItemNameFocused,
+                              styles.autocompleteItem,
+                              isFocused && styles.autocompleteItemFocused,
                             ]}
+                            onFocus={() => setFocusedMarkerId(marker.id)}
+                            onBlur={() => {
+                              if (focusedMarkerId === marker.id) {
+                                setFocusedMarkerId(null);
+                              }
+                            }}
+                            onPress={() => handleSelectBiomarker(marker)}
+                            activeOpacity={0.7}
                           >
-                            {marker.name}
-                          </Text>
+                            <Text
+                              style={[
+                                styles.autocompleteItemName,
+                                isFocused && styles.autocompleteItemNameFocused,
+                              ]}
+                            >
+                              {marker.name}
+                            </Text>
+                            {marker.codeSystem === CUSTOM_TEST_SYSTEM && (
+                              <OwnTestLabel />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {canAddOwnTest && (
+                        <TouchableOpacity
+                          testID="autocomplete-add-custom"
+                          style={[styles.autocompleteItem, styles.customRow]}
+                          onPress={handleAddCustom}
+                        >
+                          <Plus color={COLORS.light.primary} size={16} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.customRowTitle}>
+                              Add “{searchQuery.trim()}” as your own test
+                            </Text>
+                            <Text style={styles.customRowHint}>
+                              For tests not in the list, like telomere length
+                            </Text>
+                          </View>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
             </View>
           </ScrollView>
 
@@ -936,6 +1065,47 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.light.foreground,
+  },
+  customTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  cardOwnTestLabel: {
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  customTagText: {
+    fontSize: 12,
+    color: COLORS.light.mutedForeground,
+  },
+  unitInput: {
+    width: 110,
+    height: 44,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: COLORS.light.foreground,
+    backgroundColor: COLORS.light.card,
+  },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: 0,
+  },
+  customRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.light.primary,
+  },
+  customRowHint: {
+    fontSize: 13,
+    color: COLORS.light.mutedForeground,
+    marginTop: 2,
   },
   autocompleteItemNameFocused: {
     color: COLORS.light.primary,
