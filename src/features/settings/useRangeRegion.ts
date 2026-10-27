@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import type { RangeRegion } from '@/src/data/biomarkers/rangeRegions';
 import { getDeviceRangeRegion } from './deviceRangeRegion';
@@ -15,12 +15,16 @@ export function useRangeRegion(patientId: string | null | undefined) {
     region?: RangeRegion;
   } | null>(null);
 
+  // Only the latest load counts, so an earlier slow read cannot win.
+  const loadSequence = useRef(0);
   const load = useCallback(() => {
     if (!patientId) return;
+    const sequence = ++loadSequence.current;
     void getProfileSettings(patientId)
-      .then((settings) =>
-        setStored({ patientId, region: settings.rangeRegion })
-      )
+      .then((settings) => {
+        if (sequence === loadSequence.current)
+          setStored({ patientId, region: settings.rangeRegion });
+      })
       .catch((err) => console.error('Failed to load range region:', err));
   }, [patientId]);
 

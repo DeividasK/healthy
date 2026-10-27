@@ -108,11 +108,11 @@ test.describe('Settings', () => {
       )
       .toBe('anz');
 
-    await openRoute(page, '/biomarker/2823-3');
+    // Saving returns to the biomarker page, which follows the new region.
+    await expect(page).toHaveURL(/\/biomarker\/2823-3$/);
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
       'In range'
     );
-    await page.getByTestId('learn-toggle-range-source').click();
     await expect(page.getByTestId('biomarker-range-region')).toHaveText(
       'Australia and New Zealand range, from AACB/RCPA harmonised reference intervals (2016). Change region'
     );
