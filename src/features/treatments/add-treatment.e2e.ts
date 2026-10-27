@@ -11,7 +11,11 @@ import {
   getBrowserLocalDate,
   checkA11y,
   openRoute,
+  seedTestTreatment,
+  seedTestBundle,
+  evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
+import { getBundleMemberIds } from '@/src/features/bundles/bundleModel';
 
 test.describe('Add Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -661,5 +665,107 @@ test.describe('Treatment form keyboard support', () => {
     expect(statements).toHaveLength(1);
     expect(statements[0].effectivePeriod).toEqual({ start: nextWeek });
     expect(statements[0].adherence.code.coding[0].code).toBe('taking');
+  });
+});
+
+test.describe('Add Treatment bundles', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedTestPatient(page);
+  });
+
+  test('adds a new treatment to existing bundles', async ({ page }) => {
+    const [vitaminD, omega3] = await Promise.all(
+      ['Vitamin D', 'Omega-3'].map((title) =>
+        seedTestTreatment(page, { title })
+      )
+    );
+    const [morning, evening] = await Promise.all(
+      [
+        ['Morning stack', vitaminD.id],
+        ['Evening stack', omega3.id],
+      ].map(([title, id]) => seedTestBundle(page, { title, memberIds: [id] }))
+    );
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Magnesium');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-bundle').click();
+    await page.getByTestId('link-bundle-search-input').click();
+    await page
+      .getByTestId(`link-bundle-autocomplete-item-${morning.id}`)
+      .click();
+    await expect(
+      page.getByTestId(`link-selected-bundle-${morning.id}`)
+    ).toBeVisible();
+    await page.getByTestId('save-treatment-button').click();
+
+    await expect(page).toHaveURL(/\/treatment\/[^/]+$/);
+    await expect(
+      page.getByTestId(`treatment-bundle-${morning.id}`)
+    ).toBeVisible();
+    await expect(
+      page.getByTestId(`treatment-bundle-${evening.id}`)
+    ).toHaveCount(0);
+    const id = new URL(page.url()).pathname.split('/').pop()!;
+    const stored = await Promise.all(
+      [morning.id, evening.id].map((bundleId) =>
+        bridge(page, (b, bundleId) => b.getBundle(bundleId), bundleId)
+      )
+    );
+    expect(stored.map(getBundleMemberIds)).toEqual([
+      [vitaminD.id, id],
+      [omega3.id],
+    ]);
+  });
+
+  test('offers no bundle field when there are no bundles', async ({ page }) => {
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('add-option-button').click();
+    await expect(page.getByTestId('form-add-menu')).toBeVisible();
+    await expect(page.getByTestId('menu-link-bundle')).toHaveCount(0);
+  });
+
+  test('allows one bundle per dose of the regimen', async ({ page }) => {
+    // Tall enough for the whole form, so its lists never open behind the dock.
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    const [vitaminD, omega3] = await Promise.all(
+      ['Vitamin D', 'Omega-3'].map((title) =>
+        seedTestTreatment(page, { title })
+      )
+    );
+    const [morning, evening] = await Promise.all(
+      [
+        ['Morning stack', vitaminD.id],
+        ['Evening stack', omega3.id],
+      ].map(([title, id]) => seedTestBundle(page, { title, memberIds: [id] }))
+    );
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Magnesium');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-bundle').click();
+    const search = page.getByTestId('link-bundle-search-input');
+    const pick = async (id: string) => {
+      await search.click();
+      await page.getByTestId(`link-bundle-autocomplete-item-${id}`).click();
+    };
+    // Without a regimen, one bundle.
+    await pick(morning.id);
+    await expect(search).toHaveCount(0);
+
+    // A regimen with two doses can be in two bundles.
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-treatment-regimen').click();
+    const field = (id: string) => page.getByTestId(`treatment-regimen-${id}`);
+    await field('p1-add').click();
+    await field('option-dose').click();
+    await expect(search).toBeVisible();
+    await pick(evening.id);
+    await expect(search).toHaveCount(0);
+
+    // Back to one dose, two bundles are too many.
+    await field('p1-d2-remove').click();
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-form-error')).toHaveText(
+      'A treatment with one dose can be in only one bundle'
+    );
   });
 });
