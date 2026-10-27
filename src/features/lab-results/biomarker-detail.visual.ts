@@ -84,6 +84,7 @@ test('Biomarker detail - Regional range', async ({ page }, testInfo) => {
     biomarkers: [{ name: 'Potassium', value: 5.15, unit: 'mmol/L' }],
   });
   await page.goto('/biomarker/2823-3');
+  await page.getByTestId('learn-toggle-range-source').click();
   await page.getByTestId('biomarker-range-region-source').waitFor();
   await takeSnapshot(page, 'Biomarker detail - Regional range', testInfo);
 });

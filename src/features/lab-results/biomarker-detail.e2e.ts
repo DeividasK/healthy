@@ -108,6 +108,7 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
       'Typical Hemoglobin (Hgb) levels differ by sex. This range is for men. Laboratories set their own ranges, so yours may differ a little.'
     );
+    await page.getByTestId('learn-toggle-range-source').click();
     await expect(page.getByTestId('biomarker-range-region')).toHaveText(
       'This range is used for every region. Change region'
     );
@@ -180,7 +181,7 @@ test.describe('Biomarker detail', () => {
     await expect(page.getByTestId('biomarker-range-explanation')).toHaveText(
       'This range comes from your laboratory report.'
     );
-    await expect(page.getByTestId('biomarker-range-region')).toHaveCount(0);
+    await expect(page.getByTestId('learn-toggle-range-source')).toHaveCount(0);
 
     // Unsupported stored measurements are excluded from history and trends.
     await page.evaluate(async () => {

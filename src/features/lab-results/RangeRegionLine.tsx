@@ -1,5 +1,11 @@
 import React from 'react';
-import { Linking, StyleSheet, Text } from 'react-native';
+import {
+  Linking,
+  StyleSheet,
+  Text,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { getRangeRegionInfo } from '@/src/data/biomarkers/rangeRegions';
 import { COLORS } from '@/src/theme/colors';
@@ -13,14 +19,16 @@ import type { ResolvedReferenceRange } from './referenceRanges';
 export function RangeRegionLine({
   resolved,
   testID,
+  style,
 }: {
   resolved: ResolvedReferenceRange;
   testID: string;
+  style?: StyleProp<TextStyle>;
 }) {
   const router = useRouter();
   const { region, source } = resolved;
   return (
-    <Text style={styles.line} testID={testID}>
+    <Text style={style} testID={testID}>
       {region && source ? (
         <>
           {`${getRangeRegionInfo(region).name} range, from `}
@@ -41,7 +49,7 @@ export function RangeRegionLine({
       <Text
         style={styles.link}
         accessibilityRole="link"
-        onPress={() => router.push('/settings')}
+        onPress={() => router.push('/settings?section=ranges')}
         testID={`${testID}-change`}
       >
         Change region
@@ -51,12 +59,6 @@ export function RangeRegionLine({
 }
 
 const styles = StyleSheet.create({
-  line: {
-    marginTop: 12,
-    color: COLORS.light.textSecondary,
-    fontSize: 15,
-    lineHeight: 23,
-  },
   link: {
     color: COLORS.light.link,
     textDecorationLine: 'underline',

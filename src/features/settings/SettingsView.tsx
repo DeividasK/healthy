@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField } from '@/src/components/FormField';
@@ -21,11 +21,13 @@ import { CONTENT_COLUMN } from '@/src/theme/layout';
 import { getDeviceRangeRegion } from './deviceRangeRegion';
 import { RangeRegionField } from './RangeRegionField';
 
-type Section = 'timesOfDay' | 'ranges';
+const SECTIONS = ['timesOfDay', 'ranges'] as const;
+type Section = (typeof SECTIONS)[number];
 
 /**
- * The active profile's settings, in sections that start folded: the clock
- * time of each part of the day, and the region for biomarker ranges.
+ * The active profile's settings, in sections that start folded unless the
+ * `section` search param names one: the clock time of each part of the day,
+ * and the region for biomarker ranges.
  */
 export function SettingsView() {
   const { activePatientId, isLoading } = useActivePatient();
@@ -72,7 +74,11 @@ function SettingsForm({
   const [timesOfDay, setTimesOfDay] = useState(initial.timesOfDay);
   const [deviceRegion] = useState(getDeviceRangeRegion);
   const [rangeRegion, setRangeRegion] = useState(initial.rangeRegion);
-  const [openSections, setOpenSections] = useState<Section[]>([]);
+  // A link may open one section, e.g. ?section=ranges from a biomarker page.
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const [openSections, setOpenSections] = useState<Section[]>(
+    SECTIONS.filter((known) => known === section)
+  );
   const toggleSection = (section: Section) =>
     setOpenSections((current) =>
       current.includes(section)

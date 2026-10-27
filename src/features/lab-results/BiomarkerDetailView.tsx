@@ -431,14 +431,6 @@ export function BiomarkerDetailView({
               ? explainReferenceRange(marker, latestRange)
               : 'This range comes from your laboratory report.'}
           </Text>
-          {latestRange &&
-            (latestRange.low !== undefined ||
-              latestRange.high !== undefined) && (
-              <RangeRegionLine
-                resolved={latestRange}
-                testID="biomarker-range-region"
-              />
-            )}
           <RangeProfileNotice
             missing={latestRange?.missing ?? []}
             testID="biomarker-range-notice"
@@ -557,7 +549,6 @@ export function BiomarkerDetailView({
   const learn = (
     <>
       <View style={styles.learnSection} testID="biomarker-learn">
-        <Text style={styles.sectionTitle}>Learn</Text>
         <LearnItem title="About this biomarker">
           {marker?.education?.about ||
             marker?.description ||
@@ -573,6 +564,16 @@ export function BiomarkerDetailView({
         <LearnItem title="What may be related to a change">
           {marker?.education?.whatMayBeRelatedToAChange || ''}
         </LearnItem>
+        {latestRange &&
+          (latestRange.low !== undefined || latestRange.high !== undefined) && (
+            <LearnItem title="Range source">
+              <RangeRegionLine
+                resolved={latestRange}
+                testID="biomarker-range-region"
+                style={styles.learnText}
+              />
+            </LearnItem>
+          )}
       </View>
     </>
   );
@@ -683,9 +684,16 @@ export function BiomarkerDetailView({
  * A full-width row, divided like resource rows, that expands its educational
  * text below the title; the chevron on the right turns when open.
  */
-function LearnItem({ title, children }: { title: string; children: string }) {
+function LearnItem({
+  title,
+  children,
+}: {
+  title: string;
+  /** Text, or a ready-styled element. Empty text leaves the item out. */
+  children: string | React.ReactElement;
+}) {
   const [expanded, setExpanded] = useState(false);
-  if (!children.trim()) return null;
+  if (typeof children === 'string' && !children.trim()) return null;
 
   return (
     <View style={styles.learnItem}>
@@ -707,7 +715,12 @@ function LearnItem({ title, children }: { title: string; children: string }) {
           <ChevronDown size={18} color={COLORS.light.muted} />
         </View>
       </Pressable>
-      {expanded && <Text style={styles.learnText}>{children}</Text>}
+      {expanded &&
+        (typeof children === 'string' ? (
+          <Text style={styles.learnText}>{children}</Text>
+        ) : (
+          children
+        ))}
     </View>
   );
 }

@@ -73,13 +73,19 @@ test.describe('Settings', () => {
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
       'Out of range'
     );
+    await page.getByTestId('learn-toggle-range-source').click();
     await expect(page.getByTestId('biomarker-range-region')).toHaveText(
       'This range is used for every region. Change region'
     );
 
     await page.getByTestId('biomarker-range-region-change').click();
-    await expect(page).toHaveURL(/\/settings$/);
-    await page.getByTestId('settings-ranges-toggle').click();
+    await expect(page).toHaveURL(/\/settings\?section=ranges$/);
+    // Opens with Biomarker Ranges expanded and Times of Day folded.
+    await expect(page.getByTestId('settings-ranges-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await expect(page.getByTestId('settings-time-MORN')).toHaveCount(0);
     // The device's region until one is picked (the browser is en-US).
     await expect(page.getByTestId('settings-range-region')).toHaveValue('us');
     await expect(
@@ -106,6 +112,7 @@ test.describe('Settings', () => {
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
       'In range'
     );
+    await page.getByTestId('learn-toggle-range-source').click();
     await expect(page.getByTestId('biomarker-range-region')).toHaveText(
       'Australia and New Zealand range, from AACB/RCPA harmonised reference intervals (2016). Change region'
     );
