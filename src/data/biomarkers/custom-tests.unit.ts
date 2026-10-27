@@ -28,6 +28,12 @@ const observation = (name: string, value: number, unit: string) =>
 test('codes a test by its name, apart from LOINC codes', () => {
   expect(customTestCode(' NAD+ (whole blood) ')).toBe('x-nad-plus-whole-blood');
   expect(customTestCode('Telomere length')).toBe('x-telomere-length');
+  // Names in any script keep their letters, so they don't collapse together.
+  expect(customTestCode('Branduolėti eritrocitai')).toBe(
+    'x-branduolėti-eritrocitai'
+  );
+  expect(customTestCode('Теломеры')).toBe('x-теломеры');
+  expect(customTestCode(' % ')).toBe('');
 });
 
 test('reads an own test result with its name and reported unit', () => {

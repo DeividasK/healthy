@@ -70,7 +70,12 @@ export function buildFHIRObservation(
   // Calculate optional interpretation if reference range is available
   let interpretation: Observation['interpretation'] = undefined;
 
-  if (item.referenceLow !== undefined || item.referenceHigh !== undefined) {
+  // A result given only as a bound leaves its status to be read from the
+  // bound against the range (see getObservationStatus).
+  if (
+    !item.comparator &&
+    (item.referenceLow !== undefined || item.referenceHigh !== undefined)
+  ) {
     let code = 'N';
     let display = 'Normal';
     if (item.referenceLow !== undefined && item.value < item.referenceLow) {

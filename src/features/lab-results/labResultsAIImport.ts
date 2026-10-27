@@ -5,7 +5,10 @@ import {
   type RecordableBiomarker,
   type UnitOption,
 } from '@/src/data/biomarkers';
-import { customTestBiomarker } from '@/src/data/biomarkers/customTests';
+import {
+  customTestBiomarker,
+  customTestCode,
+} from '@/src/data/biomarkers/customTests';
 import {
   parseResultValue,
   type ResultComparator,
@@ -165,7 +168,10 @@ export function parseLabResultsAIReply(
       const isOwnTest =
         typeof item.test === 'string' &&
         item.test.trim().toLowerCase() === OWN_TEST_ID;
-      if (isOwnTest && (!ownName || !reportedUnit)) {
+      if (
+        isOwnTest &&
+        (!ownName || !customTestCode(ownName) || !reportedUnit)
+      ) {
         errors.push(
           `${ownName ?? `Result ${index + 1}`} needs a name and a unit.`
         );

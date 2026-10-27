@@ -10,17 +10,19 @@ import { EMPTY_BIOMARKER_EDUCATION } from './types';
 export const CUSTOM_TEST_SYSTEM =
   'https://usehealthy.app/fhir/CodeSystem/custom-test';
 
-/** A stable code for a test name, e.g. "NAD+ (whole blood)" → "nad-plus-whole-blood". */
+/**
+ * A stable code for a test name, keeping letters of any script, e.g.
+ * "NAD+ (whole blood)" → "x-nad-plus-whole-blood". Empty when the name has
+ * no letters or digits.
+ */
 export function customTestCode(name: string): string {
-  return (
-    'x-' +
-    name
-      .trim()
-      .toLowerCase()
-      .replace(/\+/g, '-plus')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-  );
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/\+/g, '-plus')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-|-$/g, '');
+  return slug ? `x-${slug}` : '';
 }
 
 export function isCustomTestCode(code: string | undefined): boolean {

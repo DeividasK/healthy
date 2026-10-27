@@ -274,8 +274,41 @@ export function getObservationStatus(
   const range = getObservationReferenceRange(observation, marker, demographics);
   if (value === undefined || !Number.isFinite(value) || !range)
     return undefined;
+  const comparator = observation.valueQuantity?.comparator;
+  if (comparator && comparator !== 'ad')
+    return getBoundStatus(value, comparator, range);
   if (range.low !== undefined && value < range.low) return 'Low';
   if (range.high !== undefined && value > range.high) return 'High';
+  return 'Normal';
+}
+
+/**
+ * The status a result given only as a bound proves, e.g. "< 3" against a
+ * range up to 35 is in range; undefined when the result could lie on either
+ * side of a limit ("< 20" against a range up to 10).
+ */
+function getBoundStatus(
+  bound: number,
+  comparator: '<' | '<=' | '>=' | '>',
+  { low, high }: MeasurementReferenceRange
+): MeasurementStatus | undefined {
+  if (comparator === '<' || comparator === '<=') {
+    if (
+      low !== undefined &&
+      (bound < low || (bound === low && comparator === '<'))
+    )
+      return 'Low';
+    if (low !== undefined || (high !== undefined && bound > high))
+      return undefined;
+    return 'Normal';
+  }
+  if (
+    high !== undefined &&
+    (bound > high || (bound === high && comparator === '>'))
+  )
+    return 'High';
+  if (high !== undefined || (low !== undefined && bound < low))
+    return undefined;
   return 'Normal';
 }
 

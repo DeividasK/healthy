@@ -213,11 +213,14 @@ export function LabResultForm({
       testTime,
       testNotes,
       serviceProviderName,
-      activeItems: activeItems.map(({ id, valueStr, selectedUnit }) => ({
-        id,
-        valueStr,
-        selectedUnit,
-      })),
+      activeItems: activeItems.map(
+        ({ id, valueStr, comparator, selectedUnit }) => ({
+          id,
+          valueStr,
+          comparator,
+          selectedUnit,
+        })
+      ),
       links: links.values,
     },
     isReportLoaded
@@ -401,9 +404,11 @@ export function LabResultForm({
     if (!name) return false;
     const code = customTestCode(name);
     return (
+      Boolean(code) &&
       !autocompleteResults.some(
         (marker) => marker.name.toLowerCase() === name
-      ) && !activeItems.some((item) => item.definition.loinc === code)
+      ) &&
+      !activeItems.some((item) => item.definition.loinc === code)
     );
   }, [searchQuery, autocompleteResults, activeItems]);
 
