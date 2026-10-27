@@ -37,16 +37,7 @@ export function NativeDatePicker({
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: value || new Date(),
-        onChange: (event, selectedDate) => {
-          if (event.type === 'dismissed') {
-            return;
-          }
-          if (selectedDate) {
-            onChange(selectedDate);
-          } else {
-            onChange(null);
-          }
-        },
+        onValueChange: (_event, selectedDate) => onChange(selectedDate),
         mode: 'date',
         maximumDate: allowFuture ? undefined : new Date(),
         is24Hour: true,
