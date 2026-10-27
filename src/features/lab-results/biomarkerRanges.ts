@@ -132,6 +132,23 @@ export function rangeOn(history: BiomarkerRangeEntry[], date: string) {
   );
 }
 
+/**
+ * The limits of a range written by `formatLimits`, or undefined when the
+ * text isn't one.
+ */
+export function parseLimits(
+  text: string
+): Pick<BiomarkerRangeEntry, 'low' | 'high'> | undefined {
+  const limit = '(-?\\d+(?:\\.\\d+)?)';
+  const both = text.match(new RegExp(`^${limit}–${limit}$`));
+  if (both) return { low: both[1], high: both[2] };
+  const high = text.match(new RegExp(`^below ${limit}$`));
+  if (high) return { high: high[1] };
+  const low = text.match(new RegExp(`^above ${limit}$`));
+  if (low) return { low: low[1] };
+  return undefined;
+}
+
 /** The range printed with a result, as a range entry. */
 export function reportedRangeEntry(
   observation: Observation,
@@ -143,9 +160,17 @@ export function reportedRangeEntry(
   );
   if (!range) return undefined;
   const bound = range.low?.value !== undefined ? range.low : range.high;
+  // The text keeps the limits as written (5.0, not 5), when it matches them.
+  const written = range.text ? parseLimits(range.text) : undefined;
+  const asWritten = (value: number | undefined, text: string | undefined) =>
+    text !== undefined && Number(text) === value ? text : String(value);
   return {
-    ...(range.low?.value !== undefined && { low: String(range.low.value) }),
-    ...(range.high?.value !== undefined && { high: String(range.high.value) }),
+    ...(range.low?.value !== undefined && {
+      low: asWritten(range.low.value, written?.low),
+    }),
+    ...(range.high?.value !== undefined && {
+      high: asWritten(range.high.value, written?.high),
+    }),
     unit: bound?.code || bound?.unit || getObservationUnitCode(observation),
     since: since.slice(0, 10),
     source: 'report',

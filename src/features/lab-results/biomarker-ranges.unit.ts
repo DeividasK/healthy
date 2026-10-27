@@ -10,6 +10,7 @@ import {
   rangeHistory,
   rangeInUnit,
   rangeOn,
+  reportedRangeEntry,
   type BiomarkerRangeEntry,
 } from './biomarkerRanges';
 
@@ -181,6 +182,28 @@ test("lets the user's range replace reports from its day on", () => {
     'report 2026-01-10',
     'user 2026-03-01',
   ]);
+});
+
+test('keeps the decimals of a printed range from its text', () => {
+  const withText = (text: string, low?: number, high?: number) => {
+    const { referenceRange } = printed(low, high);
+    return hemoglobin('2026-01-01', 140, {
+      referenceRange: [{ ...referenceRange[0], text }],
+    });
+  };
+  const limits = (observation: Observation) => {
+    const entry = reportedRangeEntry(observation, '2026-01-01');
+    return [entry?.low, entry?.high];
+  };
+  expect(limits(withText('130.0–170.0', 130, 170))).toEqual(['130.0', '170.0']);
+  expect(limits(withText('below 170.0', undefined, 170))).toEqual([
+    undefined,
+    '170.0',
+  ]);
+  expect(limits(withText('above 130.0', 130))).toEqual(['130.0', undefined]);
+  // A limit the text doesn't match, or text that isn't a range, is left aside.
+  expect(limits(withText('120.0–170.0', 130, 170))).toEqual(['130', '170.0']);
+  expect(limits(withText('Adult men', 130, 170))).toEqual(['130', '170']);
 });
 
 test('shows limits as written, converting only into another unit', () => {
