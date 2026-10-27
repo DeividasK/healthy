@@ -15,7 +15,7 @@ runs:
       uses: actions/cache@v6
       with:
         path: dist
-        key: ${{ runner.os }}-web-${{ inputs.base-url || '/' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}
+        key: ${{ runner.os }}-web-${{ inputs.base-url || '/' }}-${{ hashFiles('.env', 'pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}
 
     - name: Cache Metro Bundler
       uses: actions/cache@v6

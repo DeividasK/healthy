@@ -59,6 +59,7 @@ function policy(scriptHashes) {
   ].join('; ');
 }
 
+/** CSP sources for the inline scripts in a page, by their SHA-256 hashes. */
 function inlineScriptHashes(html) {
   return [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map(([, body]) => createHash('sha256').update(body).digest('base64'))
