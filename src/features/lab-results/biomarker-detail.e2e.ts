@@ -97,10 +97,7 @@ test.describe('Biomarker detail', () => {
 
     await openRoute(page, '/biomarker/718-7');
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('150');
-    const unitPicker = page
-      .getByTestId('biomarker-unit-picker')
-      .locator('select');
-    await expect(unitPicker).toHaveValue('g/L');
+    await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('g/L');
     await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
       'In range'
     );
@@ -256,19 +253,26 @@ test.describe('Biomarker detail', () => {
       biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
     });
     await openRoute(page, '/biomarker/19123-9');
-    const unitPicker = page
-      .getByTestId('biomarker-unit-picker')
-      .locator('select');
+    const unit = page.getByTestId('biomarker-latest-unit');
+    const unitSwitch = page.getByTestId('biomarker-unit-switch');
     const value = page.getByTestId('biomarker-latest-value');
     const limits = page.getByTestId('biomarker-latest-range-limit');
     const history = page.getByTestId('biomarker-history-list');
     // The latest result's unit, with the catalog's mg/dL range converted.
-    await expect(unitPicker).toHaveValue('mmol/L');
+    await expect(unit).toHaveText('mmol/L');
+    await expect(unitSwitch).toHaveAccessibleName(
+      'Unit: mmol/L. Switch to mEq/L'
+    );
     await expect(value).toHaveText('0.91');
     await expect(limits).toHaveText(['0.7', '0.91']);
     await expect(history.getByText('0.86', { exact: true })).toBeVisible();
 
-    await unitPicker.selectOption('mg/dL');
+    // Each press moves to the next unit, wrapping to the first.
+    await unitSwitch.click();
+    await expect(unit).toHaveText('mEq/L');
+    await expect(value).toHaveText('1.8');
+    await unitSwitch.click();
+    await expect(unit).toHaveText('mg/dL');
     await expect(value).toHaveText('2.2');
     await expect(limits).toHaveText(['1.7', '2.2']);
     await expect(history.getByText('2.1', { exact: true })).toBeVisible();
@@ -280,7 +284,7 @@ test.describe('Biomarker detail', () => {
 
     // Coming back shows the unit last chosen.
     await reopenRoute(page);
-    await expect(unitPicker).toHaveValue('mg/dL');
+    await expect(unit).toHaveText('mg/dL');
     await expect(value).toHaveText('2.2');
   });
 
@@ -334,9 +338,9 @@ test.describe('Biomarker detail', () => {
     ).toBeVisible();
     await expect(page.getByTestId('biomarker-latest')).toBeVisible();
     await expect(page.getByTestId('biomarker-latest-value')).toHaveText('6.1');
-    await expect(
-      page.getByTestId('biomarker-unit-picker').locator('select')
-    ).toHaveValue('10*6/uL');
+    await expect(page.getByTestId('biomarker-latest-unit')).toHaveText(
+      '10*6/uL'
+    );
     await expect(page.getByTestId('biomarker-latest-date')).toHaveText(
       'Oct 1, 2026'
     );
