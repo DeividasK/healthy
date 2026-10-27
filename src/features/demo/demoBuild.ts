@@ -20,3 +20,13 @@ function demoBuildInSession(): boolean {
 
 export const IS_DEMO_BUILD =
   process.env.EXPO_PUBLIC_DEMO_BUILD === '1' || demoBuildInSession();
+
+/**
+ * The Pages deploy opens the demo build with `?snapshot=export` to make the
+ * ready-made demo: it then creates the demo afresh and hands over its
+ * database instead of loading the snapshot.
+ */
+export const IS_DEMO_SNAPSHOT_EXPORT =
+  IS_DEMO_BUILD &&
+  typeof location !== 'undefined' &&
+  new URLSearchParams(location.search).get('snapshot') === 'export';

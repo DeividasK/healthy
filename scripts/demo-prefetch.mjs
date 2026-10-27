@@ -1,13 +1,16 @@
-// Lists the demo's heavy files (app script, database worker and SQLite
-// WebAssembly) in d/prefetch.json, so the landing page can download them
-// while a visitor reads it and the demo opens without waiting for them.
+// Lists the demo's heavy files (app script, database worker, SQLite
+// WebAssembly and the ready-made demo database) in d/prefetch.json, so the
+// landing page can download them while a visitor reads it and the demo opens
+// without waiting for them.
 import { readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const site = process.argv[2];
 const demo = path.join(site, 'd');
 const files = (await readdir(demo, { recursive: true }))
-  .filter((file) => /^_expo\/static\/js\/web\/.*\.js$|\.wasm$/.test(file))
+  .filter((file) =>
+    /^_expo\/static\/js\/web\/.*\.js$|\.wasm$|^demo\.db\.gz$/.test(file)
+  )
   .map((file) => `/d/${file}`)
   // The app script first: it is the biggest and needed first.
   .sort(

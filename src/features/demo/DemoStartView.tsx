@@ -6,13 +6,26 @@ import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { useActionDock } from '@/src/components/AppChrome';
 import type { DockAction } from '@/src/components/ActionDock';
 import { COLORS } from '@/src/theme/colors';
+import { getDb } from '@/src/database/db';
 import { useLoadDemoProfile } from './useLoadDemoProfile';
+import { IS_DEMO_SNAPSHOT_EXPORT } from './demoBuild';
+import { exportDemoSnapshot } from './demoSnapshot';
 
 const NO_ACTIONS: DockAction[] = [];
 
+/** Hands the demo database to the Pages deploy, base64-encoded. */
+async function publishSnapshot() {
+  const bytes = await exportDemoSnapshot(await getDb());
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  (window as { __HEALTHY_DEMO_SNAPSHOT__?: string }).__HEALTHY_DEMO_SNAPSHOT__ =
+    btoa(binary);
+}
+
 /**
- * The demo build's first screen in place of Welcome: it adds the demo profile
- * and opens its Home, offering a retry if that fails.
+ * The demo build's first screen in place of Welcome, when no ready-made demo
+ * loaded: it adds the demo profile and opens its Home, offering a retry if
+ * that fails.
  */
 export function DemoStartView() {
   const { loadDemo, error } = useLoadDemoProfile();
@@ -34,7 +47,9 @@ export function DemoStartView() {
   useActionDock(actions);
 
   useEffect(() => {
-    void loadDemo();
+    void loadDemo().then((created) => {
+      if (created && IS_DEMO_SNAPSHOT_EXPORT) void publishSnapshot();
+    });
     // Loads once when the demo opens; retries come from the button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

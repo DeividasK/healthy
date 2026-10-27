@@ -579,9 +579,18 @@
         <a href="https://github.com/DeividasK/healthy/releases">What's new</a>
       </nav>
     </footer>
+    <script type="speculationrules">
+      {
+        "prerender": [
+          { "where": { "href_matches": "/d/" }, "eagerness": "moderate" }
+        ]
+      }
+    </script>
     <script>
       // Downloads the demo's files once the page has loaded, so Explore a
-      // demo opens without waiting for them. Skipped when saving data.
+      // demo opens without waiting for them. Skipped when saving data. Chrome
+      // also starts the demo itself when the button is hovered or touched
+      // (the speculation rules above).
       addEventListener('load', () => {
         if (navigator.connection?.saveData) return;
         const idle = window.requestIdleCallback ?? setTimeout;

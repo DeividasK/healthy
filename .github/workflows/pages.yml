@@ -89,6 +89,20 @@ jobs:
           EXPO_PUBLIC_STORAGE_NAMESPACE: d
         run: pnpm build:web --output-dir dist-demo
 
+      # Opens the demo build once and saves its demo profile as demo.db.gz, so
+      # visitors load it instead of waiting for every record to be written.
+      # A release from before this step has no snapshot export and skips it;
+      # its demo creates the records as before.
+      - name: Make Ready-made Demo
+        working-directory: .pages
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          if ! grep -rq '__HEALTHY_DEMO_SNAPSHOT__' ../dist-demo/_expo/static/js/web/; then
+            echo "::warning::This release cannot export a ready-made demo"
+            exit 0
+          fi
+          node scripts/demo-snapshot.mjs ../dist-demo
+
       - name: Assemble Site
         run: |
           mkdir _site

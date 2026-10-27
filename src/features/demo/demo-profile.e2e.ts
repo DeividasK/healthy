@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import type { Browser, Page } from '@playwright/test';
 import {
   test,
@@ -7,17 +8,67 @@ import {
 } from '@/src/features/testing/testStorage';
 import { DEMO_BUILD_SESSION_KEY } from './demoBuild';
 
-/** A tab of the demo build, in its own browser context. */
-async function openDemoBuild(browser: Browser, baseURL?: string) {
+/**
+ * A tab of the demo build, in its own browser context, optionally at a fixed
+ * time and with a ready-made demo to load.
+ */
+async function openDemoBuild(
+  browser: Browser,
+  baseURL?: string,
+  {
+    path = '/',
+    time,
+    snapshot,
+  }: { path?: string; time?: Date; snapshot?: Buffer } = {}
+) {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
   await page.addInitScript(
     (key) => sessionStorage.setItem(key, '1'),
     DEMO_BUILD_SESSION_KEY
   );
-  await page.goto('/');
+  if (time) await page.clock.setFixedTime(time);
+  if (snapshot)
+    await page.route('**/demo.db.gz', (route) =>
+      route.fulfill({
+        body: gzipSync(snapshot),
+        contentType: 'application/gzip',
+      })
+    );
+  await page.goto(path);
   return { context, page };
 }
+
+/**
+ * Every row of every table, comparable between two databases: random ids,
+ * real clock timestamps and the birthday are masked, so what remains is the
+ * records and their dates.
+ */
+const dumpDatabase = (page: Page) =>
+  bridge(page, async (b) => {
+    const tables = await b.querySql(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+    const dump: Record<string, string[]> = {};
+    for (const { name } of tables) {
+      const rows = await b.querySql(`SELECT * FROM "${name}"`);
+      dump[name] = rows
+        .map((row: unknown) =>
+          JSON.stringify(row)
+            .replace(
+              /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+              '<id>'
+            )
+            .replace(/\b\d{13}\b/g, '<ms>')
+            .replace(/"device_id":"\w+"/, '"device_id":"<device>"')
+            // The demo person's birthday is a fixed day, not one counted
+            // from today, so it moves a little with the ready-made demo.
+            .replace(/(birth_?[dD]ate\\?":\\?")[\d-]+/g, '$1<birthday>')
+        )
+        .sort();
+    }
+    return dump;
+  });
 
 /** How many rows of `table` belong to the active profile. */
 const countForActive = (page: Page, table: string) =>
@@ -47,6 +98,68 @@ test.describe('Demo profile', () => {
     } finally {
       await context.close();
     }
+  });
+
+  test('The ready-made demo matches a freshly created one, moved to today', async ({
+    browser,
+    baseURL,
+  }) => {
+    // Ten days apart, on days every month has, so moving by days and
+    // counting months back from today agree.
+    const made = new Date('2026-03-10T10:00:00');
+    const today = new Date('2026-03-20T10:00:00');
+
+    const snapshot = await test.step('Make the ready-made demo', async () => {
+      const exporter = await openDemoBuild(browser, baseURL, {
+        path: '/?snapshot=export',
+        time: made,
+      });
+      try {
+        const handle = await exporter.page.waitForFunction(
+          () => (window as any).__HEALTHY_DEMO_SNAPSHOT__,
+          undefined,
+          { timeout: 30000 }
+        );
+        return Buffer.from((await handle.jsonValue()) as string, 'base64');
+      } finally {
+        await exporter.context.close();
+      }
+    });
+
+    const loaded =
+      await test.step('Ten days later it opens straight on Home', async () => {
+        const demo = await openDemoBuild(browser, baseURL, {
+          time: today,
+          snapshot,
+        });
+        try {
+          await expect(
+            demo.page.getByTestId('home-conditions-section')
+          ).toBeVisible({ timeout: 20000 });
+          await expect(demo.page.getByTestId('demo-start')).toHaveCount(0);
+          await openRoute(demo.page, '/journal');
+          await expect(
+            demo.page.getByRole('checkbox', { name: 'Mark Meditation done' })
+          ).toBeVisible();
+          return await dumpDatabase(demo.page);
+        } finally {
+          await demo.context.close();
+        }
+      });
+
+    const created = await test.step('A demo created that day', async () => {
+      const demo = await openDemoBuild(browser, baseURL, { time: today });
+      try {
+        await expect(
+          demo.page.getByTestId('home-conditions-section')
+        ).toBeVisible({ timeout: 20000 });
+        return await dumpDatabase(demo.page);
+      } finally {
+        await demo.context.close();
+      }
+    });
+
+    expect(loaded).toEqual(created);
   });
 
   test('The demo build keeps nothing and leaves the app free in another tab', async ({
