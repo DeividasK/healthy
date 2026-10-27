@@ -865,8 +865,8 @@ function BiomarkerChart({
     { value: floor, text: floor.toFixed(decimals), status: endStatus },
   ].filter(
     // A zero floor right under the lower limit would print over its label.
-    ({ value }) =>
-      value !== floor ||
+    (_, index, labels) =>
+      index < labels.length - 1 ||
       floor === min ||
       low === undefined ||
       floorY - yFor(low) >= 14

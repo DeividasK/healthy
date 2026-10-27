@@ -3,11 +3,12 @@ import {
   Activity,
   BadgeCheck,
   Calendar,
+  CalendarCheck,
   CircleDot,
   MapPin,
   Tag,
 } from 'lucide-react-native';
-import type { Condition } from 'fhir/r5';
+import type { CodeableConcept, Condition } from 'fhir/r5';
 import {
   ResourceRow,
   type ResourceMeta,
@@ -20,6 +21,27 @@ import {
   VERIFICATION_OPTIONS,
 } from './ConditionForm';
 import { getConditionCategoryLabel } from './conditionCategories';
+import {
+  CONDITION_SEVERITY_SYSTEM,
+  VERIFICATION_STATUS_SYSTEM,
+} from './conditionService';
+
+/**
+ * A coded concept's label: the app's own wording for a code from `system`,
+ * otherwise the concept's text, the coding's display or its code.
+ */
+function getConceptLabel(
+  concept: CodeableConcept | undefined,
+  system: string,
+  options: { id: string; label: string }[]
+): string | undefined {
+  const coding = concept?.coding?.[0];
+  const own =
+    coding?.system === system
+      ? options.find((option) => option.id === coding.code)?.label
+      : undefined;
+  return own || concept?.text || coding?.display || coding?.code;
+}
 
 /** Meta line shared by condition rows and the condition view heading. */
 export function getConditionMeta(condition: Condition): ResourceMeta[] {
@@ -28,23 +50,20 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
     CONDITION_STATUS_OPTIONS.find((option) => option.id === statusCode)
       ?.label || statusCode;
   const resolved = condition.abatementDateTime;
-  const severityCode = condition.severity?.coding?.[0]?.code;
-  const severity =
-    SEVERITY_OPTIONS.find((option) => option.value === severityCode)?.label ||
-    severityCode;
+  const severity = getConceptLabel(
+    condition.severity,
+    CONDITION_SEVERITY_SYSTEM,
+    SEVERITY_OPTIONS.map(({ value, label }) => ({ id: value, label }))
+  );
   const bodySite = condition.bodySite?.[0]?.text;
   const categories = (condition.category ?? [])
     .map(getConditionCategoryLabel)
     .filter(Boolean);
-  const verification = condition.verificationStatus;
-  const verificationLabel =
-    verification &&
-    (VERIFICATION_OPTIONS.find(
-      (option) => option.id === verification.coding?.[0]?.code
-    )?.label ||
-      verification.text ||
-      verification.coding?.[0]?.display ||
-      verification.coding?.[0]?.code);
+  const verificationLabel = getConceptLabel(
+    condition.verificationStatus,
+    VERIFICATION_STATUS_SYSTEM,
+    VERIFICATION_OPTIONS
+  );
   return [
     ...(condition.onsetDateTime
       ? [
@@ -54,13 +73,12 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
           },
         ]
       : []),
-    ...(status
+    ...(status ? [{ icon: CircleDot, text: status }] : []),
+    ...(resolved
       ? [
           {
-            icon: CircleDot,
-            text: resolved
-              ? `${status} ${formatDisplayDate(resolved)}`
-              : status,
+            icon: CalendarCheck,
+            text: `Resolved ${formatDisplayDate(resolved)}`,
           },
         ]
       : []),
