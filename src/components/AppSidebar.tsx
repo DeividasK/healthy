@@ -143,6 +143,22 @@ export function AppSidebar() {
   );
 }
 
+/**
+ * Holds the sidebar's place while the app opens, before it knows whether a
+ * profile exists: the logo only, so returning users see no layout jump and
+ * nothing offers sections that may not be usable yet.
+ */
+export function AppSidebarPlaceholder() {
+  return (
+    <View style={styles.sidebar} testID="app-sidebar-placeholder">
+      <View style={styles.brand}>
+        <AppLogo size={26} color={COLORS.light.primary} />
+        <Text style={styles.wordmark}>Healthy</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   sidebar: {
     width: 240,

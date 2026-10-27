@@ -3,6 +3,7 @@ import {
   expect,
   seedTestPatient,
 } from '@/src/features/testing/testStorage';
+import { useSingleColumnLayout } from '@/src/features/testing/testLayout';
 
 // Loading the app is what these tests are about.
 test.use({ freshApp: true });
@@ -11,6 +12,7 @@ test.describe('App startup', () => {
   test('shows the app header while the script loads, then the app takes over in place', async ({
     page,
   }) => {
+    await useSingleColumnLayout(page);
     // Holds the app's script until the loading frame has been checked.
     let releaseScript!: () => void;
     const scriptReleased = new Promise<void>((resolve) => {
@@ -38,9 +40,62 @@ test.describe('App startup', () => {
     expect(appBox.width).toBeCloseTo(shellBox.width, 0);
   });
 
+  test('keeps the sidebar in place on desktop while the app loads', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    // Holds the app's script, then the database, so each loading frame can be
+    // checked.
+    let releaseScript!: () => void;
+    const scriptReleased = new Promise<void>((resolve) => {
+      releaseScript = resolve;
+    });
+    await page.route(/entry\.bundle|\/_expo\/static\/js\//, async (route) => {
+      await scriptReleased;
+      await route.continue();
+    });
+    let releaseDatabase!: () => void;
+    const databaseReleased = new Promise<void>((resolve) => {
+      releaseDatabase = resolve;
+    });
+    await page.route(
+      /expo-sqlite\/web\/worker|wa-sqlite\.wasm/,
+      async (route) => {
+        await databaseReleased;
+        await route.continue();
+      }
+    );
+
+    await page.goto('/', { waitUntil: 'commit' });
+    // The page loads in the desktop frame, not the phone header.
+    await expect(page.locator('#app-shell-header')).toBeHidden();
+    const shellLogo = page.locator('#app-shell-sidebar svg');
+    await expect(shellLogo).toBeVisible();
+    const shellBox = (await shellLogo.boundingBox())!;
+
+    releaseScript();
+    const placeholder = page.getByTestId('app-sidebar-placeholder');
+    await expect(placeholder).toBeVisible();
+    await expect(page.locator('#app-shell')).toHaveCount(0);
+    await expect(page.getByTestId('app-header')).toHaveCount(0);
+    await expect(page.getByTestId('app-loading-skeleton')).toBeVisible();
+    // The app's placeholder replaces the loading frame without the logo moving.
+    const appBox = (await placeholder.locator('svg').boundingBox())!;
+    expect(Math.abs(appBox.x - shellBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(appBox.y - shellBox.y)).toBeLessThanOrEqual(1);
+    expect(appBox.width).toBeCloseTo(shellBox.width, 0);
+
+    releaseDatabase();
+    // A fresh install has no profile, so Welcome shows with the header.
+    await expect(page).toHaveURL(/\/welcome$/);
+    await expect(placeholder).toHaveCount(0);
+    await expect(page.getByTestId('app-header')).toBeVisible();
+  });
+
   test('shows the header and placeholder rows while the database opens', async ({
     page,
   }) => {
+    await useSingleColumnLayout(page);
     // Holds the SQLite worker so the database stays closed for now.
     let releaseDatabase!: () => void;
     const databaseReleased = new Promise<void>((resolve) => {
