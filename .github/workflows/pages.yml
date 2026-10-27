@@ -114,9 +114,12 @@ jobs:
           for app in i d; do
             sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' "_site/$app/index.html"
           done
+          # Pages can't send headers, so every page carries its own policy.
+          node .pages/scripts/content-security-policy.mjs _site
           # Unknown paths fall back to the app they are under, so deep links
           # load. GitHub Pages has one 404 page, so it writes the right shell.
           node .pages/scripts/pages-404.mjs _site
+          node .pages/scripts/content-security-policy.mjs _site
           # The landing page downloads the demo's files ahead of a click.
           node .pages/scripts/demo-prefetch.mjs _site
           touch _site/.nojekyll
