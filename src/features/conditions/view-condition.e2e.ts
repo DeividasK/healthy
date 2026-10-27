@@ -254,6 +254,41 @@ test.describe('View Condition', () => {
     ).toHaveText('No steps match these filters.');
     await expect(count).toHaveText('0');
     await expect(button).toBeVisible();
+
+    await test.step('remembers the filters after a restart', async () => {
+      await page.reload();
+      await expect(count).toHaveText('0');
+      await expect(button).toHaveAccessibleName('Filter timeline, filters on');
+      await button.click();
+      await expect(
+        page.getByTestId('condition-timeline-filter-tone-paused')
+      ).toHaveAttribute('aria-checked', 'true');
+      await expect(
+        page.getByTestId('condition-timeline-filter-period')
+      ).toHaveValue('upcoming');
+      await page.getByTestId('condition-timeline-filters-done').click();
+    });
+
+    await test.step('keeps filters apart for each condition', async () => {
+      const other = await seedTestCondition(page, { title: 'Back pain' });
+      await seedTestConsultation(page, {
+        title: 'Physio review',
+        conditionIds: [other.id],
+        date: '2026-10-04',
+        status: 'completed',
+      });
+      await seedTestConsultation(page, {
+        title: 'Spine review',
+        conditionIds: [other.id],
+        date: '2026-11-10',
+        status: 'planned',
+      });
+      await openRoute(page, `/condition/${other.id}`);
+      await expect(rows).toHaveText([/Spine review/]);
+      await expect(button).toHaveAccessibleName('Filter timeline, filters on');
+      await openRoute(page, `/condition/${condition.id}`);
+      await expect(count).toHaveText('0');
+    });
   });
 });
 
