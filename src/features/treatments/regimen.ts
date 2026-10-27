@@ -402,6 +402,19 @@ export function hasRegimen(draft?: RegimenDraft | null): boolean {
   return Boolean(draft?.phases.some((phase) => phase.doses.length));
 }
 
+/**
+ * How many bundles a treatment can be in: one per dose of its regimen's
+ * largest phase, or one without a regimen.
+ */
+export function getMaxBundles(draft?: RegimenDraft | null): number {
+  return Math.max(1, ...(draft?.phases ?? []).map((p) => p.doses.length));
+}
+
+export const getMaxBundlesError = (max: number) =>
+  max === 1
+    ? 'A treatment with one dose can be in only one bundle'
+    : `A treatment with ${max} doses can be in at most ${max} bundles`;
+
 const isPositive = (text: string) => /^\d*\.?\d+$/.test(text) && +text > 0;
 const isPositiveInteger = (text: string) => /^\d+$/.test(text) && +text > 0;
 

@@ -718,4 +718,44 @@ test.describe('Add Treatment bundles', () => {
     await expect(page.getByTestId('form-add-menu')).toBeVisible();
     await expect(page.getByTestId('menu-link-bundle')).toHaveCount(0);
   });
+
+  test('allows one bundle per dose of the regimen', async ({ page }) => {
+    // Tall enough for the whole form, so its lists never open behind the dock.
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    const existing = await seedTestTreatment(page, { title: 'Vitamin D' });
+    const [morning, evening] = await Promise.all(
+      ['Morning stack', 'Evening stack'].map((title) =>
+        seedTestBundle(page, { title, memberIds: [existing.id] })
+      )
+    );
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Magnesium');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-bundle').click();
+    const search = page.getByTestId('link-bundle-search-input');
+    const pick = async (id: string) => {
+      await search.click();
+      await page.getByTestId(`link-bundle-autocomplete-item-${id}`).click();
+    };
+    // Without a regimen, one bundle.
+    await pick(morning.id);
+    await expect(search).toHaveCount(0);
+
+    // A regimen with two doses can be in two bundles.
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-add-treatment-regimen').click();
+    const field = (id: string) => page.getByTestId(`treatment-regimen-${id}`);
+    await field('p1-add').click();
+    await field('option-dose').click();
+    await expect(search).toBeVisible();
+    await pick(evening.id);
+    await expect(search).toHaveCount(0);
+
+    // Back to one dose, two bundles are too many.
+    await field('p1-d2-remove').click();
+    await page.getByTestId('save-treatment-button').click();
+    await expect(page.getByTestId('treatment-form-error')).toHaveText(
+      'A treatment with one dose can be in only one bundle'
+    );
+  });
 });

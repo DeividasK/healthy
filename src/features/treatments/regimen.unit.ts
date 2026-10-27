@@ -18,6 +18,7 @@ import {
   validateRegimen,
   type DoseDraft,
   type RegimenDraft,
+  getMaxBundles,
 } from './regimen';
 
 const request = (dosageInstruction: Dosage[]): MedicationRequest => ({
@@ -329,4 +330,14 @@ test('a dose at a specific time is stored as timeOfDay, never with when', () => 
     periodUnit: 'd',
     when: ['EVE'],
   });
+});
+
+test('a treatment can be in one bundle per dose of its largest phase', () => {
+  const doses = (count: number) => ({
+    doses: Array.from({ length: count }, () => createDoseDraft()),
+  });
+  expect(getMaxBundles(null)).toBe(1);
+  expect(getMaxBundles({ phases: [] })).toBe(1);
+  expect(getMaxBundles({ phases: [doses(2), doses(1)] })).toBe(2);
+  expect(getMaxBundles({ phases: [doses(1), doses(3)] })).toBe(3);
 });
