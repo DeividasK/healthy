@@ -212,7 +212,7 @@ export function ViewConditionView() {
       </ResourceSection>
     </>
   );
-  const timeline = <ConditionTimeline items={timelineItems} />;
+  const timeline = <ConditionTimeline conditionId={id} items={timelineItems} />;
 
   return (
     <ResourceViewLayout

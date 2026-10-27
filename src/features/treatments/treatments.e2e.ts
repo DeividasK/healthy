@@ -107,6 +107,14 @@ test('lists every treatment and filters them by current usage', async ({
     );
   });
 
+  await test.step('remembers the filters after a restart', async () => {
+    await page.reload();
+    await expect(rows).toHaveCount(2);
+    await expect(view.getByTestId('treatments-list')).toContainText(
+      'Taking, Not started'
+    );
+  });
+
   await test.step('opens a treatment and keeps the filters on return', async () => {
     await view
       .getByTestId(`treatments-row-${TREATMENTS['not-started']}`)

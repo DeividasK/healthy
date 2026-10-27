@@ -12,6 +12,7 @@ import {
   filterTimelineItems,
   getStatusTone,
   hasTimelineFilters,
+  parseTimelineFilters,
 } from './conditionTimeline';
 
 const subject = { reference: 'Patient/p1' };
@@ -197,4 +198,20 @@ test('knows when any filter is on', () => {
   expect(hasTimelineFilters({ ...NO_TIMELINE_FILTERS, period: 'past3' })).toBe(
     true
   );
+});
+
+test('reads saved filters, dropping options it no longer has', () => {
+  expect(
+    parseTimelineFilters({
+      tones: ['done', 'gone'],
+      types: ['treatment', 'note'],
+      period: 'past6',
+    })
+  ).toEqual({ tones: ['done'], types: ['treatment'], period: 'past6' });
+  expect(
+    parseTimelineFilters({ tones: [], types: [], period: 'past24' })
+  ).toEqual(NO_TIMELINE_FILTERS);
+  expect(parseTimelineFilters(null)).toBeNull();
+  expect(parseTimelineFilters(['active'])).toBeNull();
+  expect(parseTimelineFilters({ tones: 'active', types: [] })).toBeNull();
 });
