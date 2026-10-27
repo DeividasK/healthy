@@ -195,6 +195,20 @@ test.describe('Treatment bundles', () => {
     await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
       '1 of 2 taken'
     );
+    // The member count stays beside the progress.
+    await expect(page.getByTestId(`bundle-log-count-${key}`)).toHaveText(
+      '2 treatments'
+    );
+    // With one treatment unanswered, only the answer given is tinted.
+    await page.getByTestId('treatment-log-not-taken-j-omega').click();
+    await expect(takenAll).toHaveAttribute('aria-checked', 'mixed');
+    await expect(
+      page.getByTestId(`bundle-log-not-taken-${key}`)
+    ).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
+      '1 of 2 taken'
+    );
+    await page.getByTestId('treatment-log-not-taken-j-omega').click();
 
     // Moving between days, the bundle starts closed, even answered in part.
     await page.getByTestId('actions-previous-day').click();
@@ -415,6 +429,44 @@ test.describe('Treatment bundles', () => {
     await expect(
       page.getByTestId('treatment-log-row-t-magnesium-0')
     ).toHaveCount(0);
+  });
+
+  test('offers only treatments with a bundle place left', async ({ page }) => {
+    await seedTestResources(page, {
+      treatments: [
+        { id: 'f-vit-d', title: 'Vitamin D' },
+        { id: 'f-omega', title: 'Omega-3' },
+      ],
+    });
+    // Without a regimen, a treatment fits one bundle.
+    const bundle = await seedTestBundle(page, {
+      title: 'Morning',
+      memberIds: ['f-vit-d'],
+    });
+
+    await openRoute(page, '/bundle/add');
+    await page.getByTestId('bundle-treatment-search-input').click();
+    await expect(
+      page.getByTestId('bundle-treatment-autocomplete-item-f-omega')
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('bundle-treatment-autocomplete-item-f-vit-d')
+    ).toHaveCount(0);
+
+    // Its own bundle keeps it.
+    await openRoute(page, `/bundle/${bundle.id}/edit`);
+    await expect(
+      page.getByTestId('bundle-selected-treatment-f-vit-d')
+    ).toBeVisible();
+
+    // Saving refuses a treatment that has no place left.
+    await expect(
+      bridge(page, (b) =>
+        b.seedBundle({ title: 'Evening', times: [], memberIds: ['f-vit-d'] })
+      )
+    ).rejects.toThrow(
+      'Vitamin D is already in as many bundles as it has doses'
+    );
   });
 
   test('links bundles from the treatment form and cleans up on delete', async ({

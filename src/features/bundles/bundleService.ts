@@ -15,6 +15,12 @@ import {
   withoutMember,
   type BundleValues,
 } from './bundleModel';
+import { fetchMedicationRequestsByPatientId } from '@/src/features/treatments/treatmentsRepository';
+import {
+  getMaxBundles,
+  getRegimenDraft,
+} from '@/src/features/treatments/regimen';
+import { getTreatmentTitle } from '@/src/utils/fhirUtils';
 
 export const getBundleById = (id: string, patientId: string) =>
   fetchRequestOrchestrationById(id, patientId);
@@ -49,6 +55,37 @@ export async function getBundleLinkOptions(patientId: string) {
   );
 }
 
+interface TreatmentAtLimit {
+  id: string;
+  title: string;
+}
+
+/**
+ * The patient's treatments that cannot join another bundle: each is already
+ * in as many bundles as its regimen has doses (one without a regimen). The
+ * bundle `exceptId`, e.g. the one being edited, is not counted.
+ */
+export async function getTreatmentsAtBundleLimit(
+  patientId: string,
+  exceptId?: string
+): Promise<TreatmentAtLimit[]> {
+  const [treatments, bundles] = await Promise.all([
+    fetchMedicationRequestsByPatientId(patientId),
+    getAllBundles(patientId),
+  ]);
+  const counts = new Map<string, number>();
+  for (const bundle of bundles)
+    if (bundle.id !== exceptId)
+      for (const id of getBundleMemberIds(bundle))
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+  return treatments.flatMap((treatment) =>
+    treatment.id &&
+    (counts.get(treatment.id) ?? 0) >= getMaxBundles(getRegimenDraft(treatment))
+      ? [{ id: treatment.id, title: getTreatmentTitle(treatment) }]
+      : []
+  );
+}
+
 /** Creates or updates a bundle; returns its id. */
 export async function saveBundle(
   values: BundleValues & { id?: string; patientId: string }
@@ -58,6 +95,18 @@ export async function saveBundle(
   const existing = values.id
     ? await fetchRequestOrchestrationById(values.id, values.patientId)
     : null;
+  const added = values.memberIds.filter(
+    (memberId) => !(existing && getBundleMemberIds(existing).includes(memberId))
+  );
+  if (added.length) {
+    const full = (await getTreatmentsAtBundleLimit(values.patientId, id)).find(
+      (treatment) => added.includes(treatment.id)
+    );
+    if (full)
+      throw new Error(
+        `${full.title} is already in as many bundles as it has doses`
+      );
+  }
   const bundle = buildBundle(values, {
     id,
     patientId: values.patientId,

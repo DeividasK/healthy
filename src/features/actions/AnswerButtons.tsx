@@ -12,15 +12,15 @@ import type { TreatmentLogAnswer } from './actionDays';
 
 /**
  * "Not taken" (×) and "taken" (✓) buttons for a journal row. Pressing the
- * selected button again clears the answer. `mixed` tints both while a group
- * is fully answered with both answers.
+ * selected button again clears the answer. `partial` tints the buttons for
+ * the answers some, but not all, of a group's items have.
  */
 export function AnswerButtons({
   answer,
   name,
   testIDPrefix,
   disabled = false,
-  mixed = false,
+  partial = [],
   labels = { taken: 'taken', notTaken: 'not taken' },
   onAnswer,
 }: {
@@ -30,8 +30,8 @@ export function AnswerButtons({
   /** e.g. `treatment-log` gives `treatment-log-taken-<rowId>`; omitted while leaving. */
   testIDPrefix?: { prefix: string; rowId: string };
   disabled?: boolean;
-  /** Every item of a group is answered, some taken and some not. */
-  mixed?: boolean;
+  /** Answers some items of a group have, while the group has no single answer. */
+  partial?: TreatmentLogAnswer[];
   /** The answers in words, e.g. "done" and "not done" for a procedure. */
   labels?: { taken: string; notTaken: string };
   onAnswer: (answer: TreatmentLogAnswer | null) => void;
@@ -45,7 +45,7 @@ export function AnswerButtons({
     tintColor: string
   ) => {
     const selected = answer === value;
-    const tinted = mixed && !answer;
+    const tinted = !answer && partial.includes(value);
     return (
       <TouchableOpacity
         testID={
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   notTaken: {
     backgroundColor: COLORS.light.textSecondary,
   },
-  // Lighter than the selected answers, for a group answered both ways.
+  // Lighter than the selected answers, for a group answered in part.
   takenTint: {
     backgroundColor: COLORS.light.emptyIconContainer,
   },

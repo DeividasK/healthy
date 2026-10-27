@@ -202,10 +202,11 @@ function EditTreatmentForPatient({
       linkFields[1].initialIds,
       values.links?.bundle.ids || []
     );
-    for (const bundleId of bundleChanges.added)
-      await setTreatmentInBundle(id, bundleId, activePatientId, true);
+    // Leave bundles first, so swapping one at the limit frees its place.
     for (const bundleId of bundleChanges.removed)
       await setTreatmentInBundle(id, bundleId, activePatientId, false);
+    for (const bundleId of bundleChanges.added)
+      await setTreatmentInBundle(id, bundleId, activePatientId, true);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();
