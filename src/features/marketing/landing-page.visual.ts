@@ -19,10 +19,15 @@ test.describe('Landing page - Visual Regression', () => {
       const file = new URL(route.request().url()).pathname.slice(
         SITE_PATH.length
       );
-      await route.fulfill({
-        body: await readFile(path.join(SITE_DIR, file || 'index.html')),
-        contentType: CONTENT_TYPES[path.extname(file || '.html')],
-      });
+      // The demo under d/ is built at deploy, so its files are missing here.
+      const body = await readFile(
+        path.join(SITE_DIR, file || 'index.html')
+      ).catch(() => null);
+      await route.fulfill(
+        body
+          ? { body, contentType: CONTENT_TYPES[path.extname(file || '.html')] }
+          : { status: 404 }
+      );
     });
   });
 

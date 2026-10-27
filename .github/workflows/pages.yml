@@ -1,10 +1,10 @@
 name: Pages
 
 # usehealthy.app is one GitHub Pages site: the landing page in site/ at the
-# root, the released web app under /a, and the latest main build under /i,
-# which nothing links to. Every push to main redeploys the landing page and
-# /i; /a is always built from the latest release, so a change on main never
-# ships unreleased code to /a.
+# root, the released web app under /a, its demo under /d, and the latest main
+# build under /i, which nothing links to. Every push to main redeploys the
+# landing page and /i; /a and /d are always built from the latest release, so
+# a change on main never ships unreleased code to them.
 on:
   push:
     branches: [main]
@@ -80,17 +80,45 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build:web
 
+      # The released app again, opening a demo profile in an in-memory
+      # database, so the landing page's demo never touches the app's records.
+      - name: Build Demo App
+        env:
+          EXPO_BASE_URL: ${{ steps.pages.outputs.base_path }}/d
+          EXPO_PUBLIC_DEMO_BUILD: '1'
+          EXPO_PUBLIC_STORAGE_NAMESPACE: d
+        run: pnpm build:web --output-dir dist-demo
+
+      # Opens the demo build once and saves its demo profile as demo.db.gz, so
+      # visitors load it instead of waiting for every record to be written.
+      # A release from before this step has no snapshot export and skips it;
+      # its demo creates the records as before.
+      - name: Make Ready-made Demo
+        working-directory: .pages
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          if ! grep -rq '__HEALTHY_DEMO_SNAPSHOT__' ../dist-demo/_expo/static/js/web/; then
+            echo "::warning::This release cannot export a ready-made demo"
+            exit 0
+          fi
+          node scripts/demo-snapshot.mjs ../dist-demo
+
       - name: Assemble Site
         run: |
           mkdir _site
           cp -R .pages/site/. _site/
           cp -R dist _site/a
           cp -R .pages/dist _site/i
-          # Keep /i out of search results.
-          sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' _site/i/index.html
+          cp -R dist-demo _site/d
+          # Keep /i and /d out of search results.
+          for app in i d; do
+            sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' "_site/$app/index.html"
+          done
           # Unknown paths fall back to the app they are under, so deep links
           # load. GitHub Pages has one 404 page, so it writes the right shell.
           node .pages/scripts/pages-404.mjs _site
+          # The landing page downloads the demo's files ahead of a click.
+          node .pages/scripts/demo-prefetch.mjs _site
           touch _site/.nojekyll
 
       - name: Upload Pages Artifact

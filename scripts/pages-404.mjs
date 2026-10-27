@@ -1,7 +1,7 @@
 // Writes the GitHub Pages 404 page for usehealthy.app. Pages serves one 404
-// page for every unknown path, so it carries both app shells and writes the
-// one for the path it was asked for: /i/... gets the latest build, anything
-// else the released app under /a.
+// page for every unknown path, so it carries every app shell and writes the
+// one for the path it was asked for: /i/... gets the latest build, /d/... the
+// demo, anything else the released app under /a.
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -17,7 +17,11 @@ await writeFile(
   `<!doctype html>
 <script>
   document.write(
-    location.pathname.startsWith('/i/') ? ${await shell('i')} : ${await shell('a')}
+    location.pathname.startsWith('/i/')
+      ? ${await shell('i')}
+      : location.pathname.startsWith('/d/')
+        ? ${await shell('d')}
+        : ${await shell('a')}
   );
 </script>
 `

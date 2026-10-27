@@ -189,6 +189,23 @@
         transform: translate(-1px, -1px);
         box-shadow: 4px 4px 0 var(--foreground);
       }
+      .button.secondary {
+        background: var(--paper);
+        color: var(--primary);
+        box-shadow:
+          inset 0 0 0 1.5px var(--primary),
+          3px 3px 0 var(--primary);
+      }
+      .button.secondary:hover {
+        box-shadow:
+          inset 0 0 0 1.5px var(--primary),
+          4px 4px 0 var(--primary);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
       .button:focus-visible,
       a:focus-visible {
         outline: 3px solid var(--primary);
@@ -417,7 +434,10 @@
             Your blood tests, supplements, medications, and medical history in
             one convenient place so you can see the big picture.
           </p>
-          <a class="button" href="a/">Open Healthy</a>
+          <div class="actions">
+            <a class="button" href="a/">Open Healthy</a>
+            <a class="button secondary" href="d/">Explore a demo</a>
+          </div>
           <span class="hand note"
             >Free, forever. Private, on your device. Works in your
             browser.</span
@@ -559,5 +579,30 @@
         <a href="https://github.com/DeividasK/healthy/releases">What's new</a>
       </nav>
     </footer>
+    <script type="speculationrules">
+      {
+        "prerender": [
+          { "where": { "href_matches": "/d/" }, "eagerness": "moderate" }
+        ]
+      }
+    </script>
+    <script>
+      // Downloads the demo's files once the page has loaded, so Explore a
+      // demo opens without waiting for them. Skipped when saving data. Chrome
+      // also starts the demo itself when the button is hovered or touched
+      // (the speculation rules above).
+      addEventListener('load', () => {
+        if (navigator.connection?.saveData) return;
+        const idle = window.requestIdleCallback ?? setTimeout;
+        idle(async () => {
+          try {
+            const files = await (await fetch('d/prefetch.json')).json();
+            for (const file of files) fetch(file, { priority: 'low' });
+          } catch {
+            // Only a head start: the demo still loads on its own.
+          }
+        });
+      });
+    </script>
   </body>
 </html>
