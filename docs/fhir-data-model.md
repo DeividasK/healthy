@@ -429,8 +429,9 @@ separately write the same content. Older app versions ignore the elements.
 
 ## Treatment bundles
 
-Treatments taken together (e.g. a morning set of supplements) can be grouped
-into a bundle, mainly so the journal answers them with one tap. A bundle is a
+Treatments and activities done together (e.g. a morning set of supplements,
+or magnesium and stretching before bed) can be grouped into a bundle, mainly
+so the journal answers them with one tap. A bundle is a
 FHIR R5 `RequestOrchestration` stored in `request_orchestrations`
 (`status: active`, `intent: plan`, `subject` and `author` the patient):
 
@@ -442,19 +443,23 @@ FHIR R5 `RequestOrchestration` stored in `request_orchestrations`
   (an exact clock time); never both (tim-10). A bundle without a time has a
   single sub-action without timing.
 - Each time's sub-actions reference the treatments
-  (`resource: MedicationRequest/<id>`); every time lists the same treatments
-  (rqg-1: an action has a resource or sub-actions, not both).
+  (`resource: MedicationRequest/<id>`), then the activities: service requests
+  that repeat on a schedule (`resource: ServiceRequest/<id>`). Every time
+  lists the same members (rqg-1: an action has a resource or sub-actions, not
+  both).
 
-Editing changes only the name, times and treatments; other elements, and
-the actions of treatments that stay, are kept. Treatments must belong to the
-same patient; one not stored yet is tolerated so sync and restores can apply
-in any order. Deleting a treatment removes it from its bundles in the same
-transaction, and a bundle left without treatments is deleted. Deleting a
-bundle keeps its treatments and their logs.
+Editing changes only the name, times, treatments and activities; other
+elements, and the actions of members that stay, are kept. Members must
+belong to the same patient; one not stored yet is tolerated so sync and
+restores can apply in any order. Deleting a treatment or service request
+removes it from its bundles in the same transaction, and a bundle left
+without members is deleted. Deleting a bundle keeps its members and their
+logs.
 
 Logs are unchanged: one `MedicationAdministration` per treatment dose and
-day. A bundle's answer in the journal is derived from its doses' logs, so
-nothing is stored for the bundle itself:
+day, and one `Procedure` per activity and day. A bundle's answer in the
+journal is derived from its members' logs, so nothing is stored for the
+bundle itself:
 
 - Each due dose has a clock time: its `timeOfDay`, or its part of the day's
   time from the profile's settings (see Profile settings); free-text dosing
@@ -463,11 +468,12 @@ nothing is stored for the bundle itself:
   A bundle without a time takes all its treatments' doses. Otherwise a dose
   at the same clock time as one of the bundle's times joins it, doses
   without a time fill its remaining times in order, and a treatment with a
-  single dose that day always joins, at the nearest time.
+  single dose that day always joins, at the nearest time. An activity due
+  that day joins the same way, by its schedule's `when` or `timeOfDay`.
 - Answers flagged as not matching the day's regimen are never grouped.
-- The bundle's ✓ and ✗ answer every dose it groups that day, replacing
-  earlier answers; pressing the selected one again clears them. Its
-  treatments can still be answered one by one.
+- The bundle's ✓ and ✗ answer every dose and activity it groups that day,
+  replacing earlier answers; pressing the selected one again clears them.
+  Its members can still be answered one by one.
 - Membership applies to every day, past days included; logs never change.
 
 Doses can also be taken at an exact time: the regimen's Time of Day offers

@@ -147,7 +147,7 @@ test.describe('My actions - Visual Regression', () => {
 
   test('A bundle answered in part, opened', async ({ page }, testInfo) => {
     const bundle = await seedTestBundle(page, {
-      title: 'Morning supplements',
+      title: 'Daily supplements',
       times: ['MORN'],
       memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
     });

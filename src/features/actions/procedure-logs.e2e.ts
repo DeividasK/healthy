@@ -34,7 +34,7 @@ test.describe('Journal: scheduled procedures and activities', () => {
     await expect(section).toContainText('Procedures & activities');
     await expect(
       page.getByTestId('procedure-log-planned-duration-reading')
-    ).toHaveText('30 min');
+    ).toHaveText('30 min, once a day');
     await checkA11y(page);
 
     // Done records the planned minutes, which can then be changed.

@@ -316,6 +316,8 @@ test('a dose at a specific time is stored as timeOfDay, never with when', () => 
     timeOfDay: ['07:30:00'],
   });
   expect(formatDose(dosage)).toBe('1 tablet at 07:30');
+  // Under a time heading, the time is left out.
+  expect(formatDose(dosage, { withoutTime: true })).toBe('1 tablet');
 
   const [draft] = getRegimenDraft(request([dosage])).phases[0].doses;
   expect(getTimeOfDayChoice(draft.timing)).toBe(SPECIFIC_TIME);

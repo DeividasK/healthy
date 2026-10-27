@@ -6,6 +6,8 @@ import { getAllServiceRequests } from '@/src/features/service-requests/serviceRe
 import { fetchMedicationStatements } from './medicationStatementsRepository';
 import { fetchProceduresUpTo } from './proceduresRepository';
 import { buildProcedureItems } from './procedureDays';
+import { setProcedureLog } from './procedureLogService';
+import type { BundleChanges } from './bundleGrouping';
 import {
   deleteMedicationAdministrationRecord,
   fetchMedicationAdministrationsInRange,
@@ -120,6 +122,26 @@ export async function setTreatmentLogs(
       await setTreatmentLog(item, date, answer, patientId, true);
   });
   notifyDatabaseChanged(['medication_administrations']);
+}
+
+/**
+ * Saves a bundle's answers, for its doses and its activities, in one
+ * transaction.
+ */
+export async function setBundleAnswers(
+  changes: BundleChanges,
+  date: string,
+  patientId: string
+): Promise<void> {
+  if (!changes.items.length && !changes.procedures.length) return;
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    for (const { item, answer } of changes.items)
+      await setTreatmentLog(item, date, answer, patientId, true);
+    for (const { item, answer } of changes.procedures)
+      await setProcedureLog(item, date, answer, patientId, true);
+  });
+  notifyDatabaseChanged(['medication_administrations', 'procedures']);
 }
 
 /** `MedicationAdministration.dosage` for a scheduled dose. */
