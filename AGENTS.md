@@ -31,6 +31,7 @@ pnpm expo install --fix      # fix incompatible package versions
 ### Verification Guidelines
 
 - **Always run**: `pnpm tsc --noEmit`, `pnpm expo lint`, and `pnpm test:e2e` before declaring any task done.
+- **Check the demo profile**: open the screens you changed with the demo profile (see **Demo Profile** below) and keep them presentable.
 - **Always update the changelog**: before declaring any task done, check that every user-facing change has its changie fragment (see **Changelog Fragments** below). A task is not done without it. Never declare completion when `pnpm web` or dev server is broken.
 - **Visual Tests (`pnpm test:visual`)**:
   - You **MUST** write visual tests for new views.
@@ -83,6 +84,7 @@ Docs: https://docs.expo.dev/eas/index.md
 - **New Component Confirmation**: Always explicitly list and confirm in the plan if any new components need to be created, justifying why an existing component cannot be reused.
 - **Database Migrations & Breaking Changes**: All database changes must have migrations, and migrations must be highlighted in the plan. You MUST explicitly highlight any breaking changes (or explicitly confirm that changes are non-breaking/additive).
 - **Strict UI Scope**: Never add UI elements (badges, buttons, indicators, icons, labels, tags, etc.) that are not explicitly mentioned in the user request or approved implementation plan. Adhere strictly to the requested UI specifications and do not invent unsolicited visual elements.
+- **Demo Profile**: The demo profile (`src/features/demo/demoProfile.ts`) is how new people first see Healthy, so it must always be presentable. When you add or change a feature, data field or screen, decide how the demo shows it: add realistic demo records that use the feature and update the ones it affects. Keep demo data consistent (logs follow schedules and start dates, statuses match dates, linked records point both ways) and dated relative to today, so it never looks stale. Before declaring a UI change done, open the screens it touches with the demo profile on a phone and on desktop and check they look complete: no empty sections, raw codes, placeholder text, long runs of missing logs or marks that read as failures. Keep `src/features/demo/demo-profile.e2e.ts` passing and extend it when the demo gains a feature.
 - **Git Staging & File Management**: Never stage (`git add`), unstage (`git restore --staged`, `git reset`), commit (`git commit`), or push (`git push`) any git files or changes in the branch unless explicitly asked by the user. Leave all modified files unstaged for the user to review. Cloud sessions are the exception: follow **Cloud sessions** below.
 
 ## Changelog and releases

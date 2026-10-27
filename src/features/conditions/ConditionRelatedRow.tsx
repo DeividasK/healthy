@@ -1,5 +1,12 @@
 import React from 'react';
-import { Calendar, CircleDot } from 'lucide-react-native';
+import {
+  Activity,
+  BadgeCheck,
+  Calendar,
+  CircleDot,
+  MapPin,
+  Tag,
+} from 'lucide-react-native';
 import type { Condition } from 'fhir/r5';
 import {
   ResourceRow,
@@ -7,7 +14,12 @@ import {
 } from '@/src/components/ResourceSection';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
-import { CONDITION_STATUS_OPTIONS } from './ConditionForm';
+import {
+  CONDITION_STATUS_OPTIONS,
+  SEVERITY_OPTIONS,
+  VERIFICATION_OPTIONS,
+} from './ConditionForm';
+import { getConditionCategoryLabel } from './conditionCategories';
 
 /** Meta line shared by condition rows and the condition view heading. */
 export function getConditionMeta(condition: Condition): ResourceMeta[] {
@@ -15,6 +27,24 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
   const status =
     CONDITION_STATUS_OPTIONS.find((option) => option.id === statusCode)
       ?.label || statusCode;
+  const resolved = condition.abatementDateTime;
+  const severityCode = condition.severity?.coding?.[0]?.code;
+  const severity =
+    SEVERITY_OPTIONS.find((option) => option.value === severityCode)?.label ||
+    severityCode;
+  const bodySite = condition.bodySite?.[0]?.text;
+  const categories = (condition.category ?? [])
+    .map(getConditionCategoryLabel)
+    .filter(Boolean);
+  const verification = condition.verificationStatus;
+  const verificationLabel =
+    verification &&
+    (VERIFICATION_OPTIONS.find(
+      (option) => option.id === verification.coding?.[0]?.code
+    )?.label ||
+      verification.text ||
+      verification.coding?.[0]?.display ||
+      verification.coding?.[0]?.code);
   return [
     ...(condition.onsetDateTime
       ? [
@@ -24,7 +54,42 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
           },
         ]
       : []),
-    ...(status ? [{ icon: CircleDot, text: status }] : []),
+    ...(status
+      ? [
+          {
+            icon: CircleDot,
+            text: resolved
+              ? `${status} ${formatDisplayDate(resolved)}`
+              : status,
+          },
+        ]
+      : []),
+    ...(severity
+      ? [
+          {
+            icon: Activity,
+            text: severity,
+            accessibilityLabel: `Severity: ${severity}`,
+          },
+        ]
+      : []),
+    ...(bodySite ? [{ icon: MapPin, text: bodySite }] : []),
+    ...categories.map((category, index) => ({
+      icon: Tag,
+      text: category,
+      accessibilityLabel: `Category: ${category}`,
+      testID: `condition-category-${index}`,
+    })),
+    ...(verificationLabel
+      ? [
+          {
+            icon: BadgeCheck,
+            text: verificationLabel,
+            accessibilityLabel: `Verification status: ${verificationLabel}`,
+            testID: 'condition-verification-status',
+          },
+        ]
+      : []),
   ];
 }
 

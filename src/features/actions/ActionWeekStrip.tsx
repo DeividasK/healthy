@@ -47,6 +47,7 @@ export function ActionWeekStrip({
               <DayStatusMark
                 status={status}
                 highlighted={isToday}
+                isToday={isToday}
                 testID={`home-action-day-${day.date}-${status}`}
               />
             </TouchableOpacity>

@@ -811,8 +811,12 @@ function BiomarkerChart({
   /** Maps a value to the chart's vertical coordinate. */
   const yFor = (value: number) =>
     plotBottom - ((value - min) / (max - min)) * (plotBottom - paddingTop);
+  // Values that cannot be negative never show an axis below zero: the plot
+  // stops at zero when the grid's last square would reach past it.
+  const floor = min < 0 && Math.min(...values, low ?? 0) >= 0 ? 0 : min;
+  const floorY = yFor(floor);
   const bandTop = yFor(high ?? max);
-  const bandBottom = yFor(low ?? min);
+  const bandBottom = yFor(low ?? floor);
   /** Status of a value against the displayed range. */
   const statusFor = (value: number): RangeStatus | undefined =>
     !hasRange
@@ -858,8 +862,15 @@ function BiomarkerChart({
           },
         ]
       : []),
-    { value: min, text: min.toFixed(decimals), status: endStatus },
-  ];
+    { value: floor, text: floor.toFixed(decimals), status: endStatus },
+  ].filter(
+    // A zero floor right under the lower limit would print over its label.
+    ({ value }) =>
+      value !== floor ||
+      floor === min ||
+      low === undefined ||
+      floorY - yFor(low) >= 14
+  );
   return (
     <View
       style={[styles.chart, fill ? styles.chartFill : { width: maxChartWidth }]}
@@ -895,7 +906,7 @@ function BiomarkerChart({
                 x={axisX}
                 y={bandBottom}
                 width={plotWidth}
-                height={plotBottom - bandBottom}
+                height={floorY - bandBottom}
                 fill={COLORS.light.outOfRangeWash}
               />
             </>
@@ -910,7 +921,7 @@ function BiomarkerChart({
               x1={x}
               x2={x}
               y1={paddingTop}
-              y2={plotBottom}
+              y2={floorY}
               stroke={COLORS.light.chartGrid}
               strokeWidth="1"
             />
@@ -918,23 +929,25 @@ function BiomarkerChart({
           {Array.from(
             { length: Math.floor((plotBottom - paddingTop) / CHART_GRID) },
             (_, index) => plotBottom - (index + 1) * CHART_GRID
-          ).map((y) => (
-            <Line
-              key={`grid-y-${y}`}
-              x1={axisX}
-              x2={plotRight}
-              y1={y}
-              y2={y}
-              stroke={COLORS.light.chartGrid}
-              strokeWidth="1"
-            />
-          ))}
+          )
+            .filter((y) => y < floorY)
+            .map((y) => (
+              <Line
+                key={`grid-y-${y}`}
+                x1={axisX}
+                x2={plotRight}
+                y1={y}
+                y2={y}
+                stroke={COLORS.light.chartGrid}
+                strokeWidth="1"
+              />
+            ))}
           {/* The axis takes the colour of the range it passes through. */}
           <Rect
             x={axisX - 3}
             y={paddingTop}
             width={3}
-            height={plotBottom - paddingTop}
+            height={floorY - paddingTop}
             fill={hasRange ? COLORS.light.outOfRange : COLORS.light.border}
           />
           {hasRange && (
