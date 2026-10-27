@@ -216,11 +216,13 @@ function TreatmentForPatient({
   const title = getTreatmentTitle(treatment);
   const notes = getTreatmentNotes(treatment);
   const reasonText = getTreatmentReason(treatment);
-  // What was prescribed, and the regimen of the current period of taking it.
+  // What was prescribed, and the regimen of the current period of taking it
+  // when that differs from the prescription.
   const dosage = formatDosingLines(treatment.dosageInstruction).join('\n');
-  const currentRegimen = formatDosingLines(
+  const takenRegimen = formatDosingLines(
     usage.isTaking ? usage.periods[usage.periods.length - 1]?.dosage : []
   ).join('\n');
+  const currentRegimen = takenRegimen === dosage ? '' : takenRegimen;
   const dispenseQuantity = formatQuantityText(
     treatment.dispenseRequest?.quantity
   );

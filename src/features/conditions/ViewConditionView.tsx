@@ -1,13 +1,10 @@
-import { getConditionCategoryLabel } from './conditionCategories';
-import { VERIFICATION_OPTIONS } from './ConditionForm';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ClipboardList,
   FlaskConical,
-  MapPin,
   Pill,
   Stethoscope,
 } from 'lucide-react-native';
@@ -33,13 +30,13 @@ import {
   getAllReports,
   getLabResultsByConditionId,
 } from '@/src/features/lab-results/diagnosticReportService';
-import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionNotes, getConditionTitle } from '@/src/utils/fhirUtils';
 import { COLORS } from '@/src/theme/colors';
 import { deleteCondition, getConditionById } from './conditionService';
 import { goBackOr } from '@/src/utils/navigation';
 import { useIsWideLayout } from '@/src/theme/layout';
 import type {
+  Coding,
   Condition,
   DiagnosticReport,
   Encounter,
@@ -160,9 +157,6 @@ export function ViewConditionView() {
 
   const title = getConditionTitle(condition);
   const notes = getConditionNotes(condition);
-  const abatementDate = condition.abatementDateTime;
-  const severity = condition.severity?.coding?.[0]?.code;
-  const bodySite = condition.bodySite?.[0]?.text;
 
   const timelineItems = buildTimelineItems({
     consultations,
@@ -174,80 +168,25 @@ export function ViewConditionView() {
   const isWide = isWideWindow && timelineItems.length > 0;
   const info = (
     <>
-      <View style={styles.details}>
-        {condition.verificationStatus && (
-          <Text style={styles.notes} testID="condition-verification-status">
-            Verification status:{' '}
-            {VERIFICATION_OPTIONS.find(
-              (item) =>
-                item.id === condition.verificationStatus?.coding?.[0]?.code
-            )?.label ||
-              condition.verificationStatus.text ||
-              condition.verificationStatus.coding?.[0]?.display ||
-              condition.verificationStatus.coding?.[0]?.code}
-          </Text>
-        )}
-        {condition.category?.map((category, index) => (
-          <Text
-            key={index}
-            style={styles.notes}
-            testID={`condition-category-${index}`}
-          >
-            Category: {getConditionCategoryLabel(category)}
-          </Text>
-        ))}
-      </View>
-      {condition.code?.coding?.map((coding, index) => (
-        <View
-          key={index}
-          style={styles.details}
-          testID={`condition-terminology-${index}`}
-        >
-          {coding.system && (
-            <Text style={styles.notes}>
-              Terminology System: {coding.system}
-            </Text>
-          )}
-          {coding.code && (
-            <Text style={styles.notes}>Diagnosis Code: {coding.code}</Text>
-          )}
-          {coding.display && (
-            <Text style={styles.notes}>
-              Terminology Display: {coding.display}
-            </Text>
-          )}
-        </View>
-      ))}
-      {(severity || bodySite || abatementDate || notes) && (
+      {notes && (
         <View style={styles.details}>
-          {(severity || bodySite || abatementDate) && (
-            <View style={styles.detailMetaRow}>
-              {severity && (
-                <Text style={styles.metaText}>
-                  Severity:{' '}
-                  {severity.charAt(0).toUpperCase() + severity.slice(1)}
-                </Text>
-              )}
-              {bodySite && (
-                <View style={styles.inlineMeta}>
-                  <MapPin color={COLORS.light.muted} size={13} />
-                  <Text style={styles.metaText}>{bodySite}</Text>
-                </View>
-              )}
-              {abatementDate && (
-                <Text style={styles.metaText}>
-                  Resolved {formatDisplayDate(abatementDate)}
-                </Text>
-              )}
-            </View>
-          )}
-          {notes && (
-            <ResourceTextSection
-              title="Notes"
-              text={notes}
-              testID="condition-notes"
-            />
-          )}
+          <ResourceTextSection
+            title="Notes"
+            text={notes}
+            testID="condition-notes"
+          />
+        </View>
+      )}
+      {condition.code?.coding?.some((coding) => coding.code) && (
+        <View style={styles.details}>
+          <ResourceTextSection
+            title="Diagnosis code"
+            text={condition.code.coding
+              .filter((coding) => coding.code)
+              .map(formatTerminologyCoding)
+              .join('\n')}
+            testID="condition-terminology"
+          />
         </View>
       )}
 
@@ -383,31 +322,26 @@ export function ViewConditionView() {
   );
 }
 
+const TERMINOLOGY_NAMES: Record<string, string> = {
+  'http://snomed.info/sct': 'SNOMED CT',
+  'http://hl7.org/fhir/sid/icd-10': 'ICD-10',
+  'http://hl7.org/fhir/sid/icd-10-cm': 'ICD-10-CM',
+};
+
+/** One diagnosis code, e.g. "Hypercholesterolemia (SNOMED CT 13644009)". */
+function formatTerminologyCoding(coding: Coding): string {
+  const system = coding.system
+    ? (TERMINOLOGY_NAMES[coding.system] ?? coding.system)
+    : '';
+  const code = [system, coding.code].filter(Boolean).join(' ');
+  return coding.display ? `${coding.display} (${code})` : code;
+}
+
 const styles = StyleSheet.create({
-  inlineMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.light.mutedForeground,
-  },
   details: {
     marginBottom: 26,
     gap: 10,
   },
-  detailMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 12,
-  },
   columns: { flexDirection: 'row', gap: 48, alignItems: 'flex-start' },
   column: { flex: 1, minWidth: 0 },
-  notes: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: COLORS.light.textSecondary,
-  },
 });

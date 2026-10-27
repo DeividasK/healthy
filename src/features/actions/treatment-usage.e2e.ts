@@ -317,9 +317,8 @@ test('a new regimen starts a period, keeps earlier days on the old dose and flag
   await expect(page.getByTestId('treatment-dosage')).toHaveText(
     '2 tablets in the morning'
   );
-  await expect(page.getByTestId('treatment-current-regimen')).toHaveText(
-    '2 tablets in the morning'
-  );
+  // Taken as prescribed, the regimen is not repeated.
+  await expect(page.getByTestId('treatment-current-regimen')).toHaveCount(0);
   await page.getByTestId('treatment-usage-change').click();
   await expect(page.getByTestId('treatment-usage-form-title')).toHaveText(
     'Change usage: Prednisolone'

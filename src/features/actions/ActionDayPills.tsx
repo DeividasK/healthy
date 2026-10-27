@@ -344,6 +344,7 @@ function DayStrip({
               date={addDays(oldest, index - 1)}
               day={daysByDate[addDays(oldest, index - 1)]}
               isSelected={index === selectedItem}
+              isToday={addDays(oldest, index - 1) === today}
               width={pillWidth}
               onSelect={onSelect}
             />
@@ -358,12 +359,14 @@ function DayPill({
   date,
   day,
   isSelected,
+  isToday,
   width,
   onSelect,
 }: {
   date: string;
   day?: ActionDay;
   isSelected: boolean;
+  isToday: boolean;
   width: number;
   onSelect: (date: string) => void;
 }) {
@@ -384,6 +387,7 @@ function DayPill({
       {day ? (
         <DayStatusMark
           status={status}
+          isToday={isToday}
           size={20}
           testID={`actions-day-${date}-${status}`}
         />
