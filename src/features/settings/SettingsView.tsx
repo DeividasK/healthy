@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FormActionDock } from '@/src/components/FormActionDock';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField } from '@/src/components/FormField';
@@ -18,6 +18,8 @@ import {
 } from './profileSettingsRepository';
 import { LoadingView } from '@/src/components/LoadingView';
 import { CONTENT_COLUMN } from '@/src/theme/layout';
+import { getDeviceRangeRegion } from './deviceRangeRegion';
+import { RangeRegionField } from './RangeRegionField';
 
 /** The active profile's settings: the clock time of each part of the day. */
 export function SettingsView() {
@@ -62,16 +64,19 @@ function SettingsForm({
   initial: ProfileSettings;
 }) {
   const router = useRouter();
+  const { variant } = useLocalSearchParams<{ variant?: 'a' | 'b' | 'c' }>();
   const [timesOfDay, setTimesOfDay] = useState(initial.timesOfDay);
+  const [deviceRegion] = useState(getDeviceRangeRegion);
+  const [rangeRegion, setRangeRegion] = useState(initial.rangeRegion);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasChanges = useHasChanges({ timesOfDay });
+  const hasChanges = useHasChanges({ timesOfDay, rangeRegion });
 
   const handleSave = async () => {
     setError(null);
     setIsSaving(true);
     try {
-      await saveProfileSettings(patientId, { timesOfDay });
+      await saveProfileSettings(patientId, { timesOfDay, rangeRegion });
       if (router.canGoBack()) router.back();
       else router.replace('/');
     } catch (err) {
@@ -108,6 +113,12 @@ function SettingsForm({
             </FormField>
           );
         })}
+        <RangeRegionField
+          value={rangeRegion ?? deviceRegion}
+          pickedFromDevice={!rangeRegion}
+          onChange={setRangeRegion}
+          variant={variant}
+        />
       </ScrollView>
       <FormActionDock
         onSave={handleSave}
