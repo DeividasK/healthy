@@ -100,6 +100,9 @@ test.describe('Desktop - Visual Regression', () => {
       'Desktop - Biomarkers beside the detail',
       testInfo
     );
+    await page.getByTestId('labs-summary-filter-button').click();
+    await page.getByTestId('labs-summary-filters').waitFor();
+    await takeSnapshot(page, 'Desktop - Biomarker filters', testInfo);
   });
 
   test('Desktop - Biomarker page in two columns', async ({
