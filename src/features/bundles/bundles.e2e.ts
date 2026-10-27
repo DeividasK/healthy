@@ -195,6 +195,20 @@ test.describe('Treatment bundles', () => {
     await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
       '1 of 2 taken'
     );
+    // The member count stays beside the progress.
+    await expect(page.getByTestId(`bundle-log-count-${key}`)).toHaveText(
+      '2 treatments'
+    );
+    // With one treatment unanswered, only the answer given is tinted.
+    await page.getByTestId('treatment-log-not-taken-j-omega').click();
+    await expect(takenAll).toHaveAttribute('aria-checked', 'mixed');
+    await expect(
+      page.getByTestId(`bundle-log-not-taken-${key}`)
+    ).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByTestId(`bundle-log-progress-${key}`)).toHaveText(
+      '1 of 2 taken'
+    );
+    await page.getByTestId('treatment-log-not-taken-j-omega').click();
 
     // Moving between days, the bundle starts closed, even answered in part.
     await page.getByTestId('actions-previous-day').click();

@@ -145,17 +145,39 @@ test.describe('My actions - Visual Regression', () => {
     );
   });
 
-  test('A bundle answered in part, opened', async ({ page }, testInfo) => {
-    const bundle = await seedTestBundle(page, {
-      title: 'Daily supplements',
-      times: ['MORN'],
-      memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
+  for (const [layout, size] of [
+    ['', null],
+    [' - desktop', { width: 1280, height: 800 }],
+  ] as const)
+    test(`A bundle answered in part, opened${layout}`, async ({
+      page,
+    }, testInfo) => {
+      if (size) await page.setViewportSize(size);
+      const bundle = await seedTestBundle(page, {
+        title: 'Daily supplements',
+        times: ['MORN'],
+        memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
+      });
+      await page.goto('/journal');
+      await page.getByTestId(`bundle-log-toggle-${bundle.id}:0`).click();
+      await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
+      await takeSnapshot(
+        page,
+        `My actions - Bundle answered in part${layout}`,
+        testInfo
+      );
+      // With one treatment unanswered, only the answer given is tinted.
+      await page.getByTestId('treatment-log-not-taken-visual-log-iron').click();
+      await page
+        .getByTestId(`bundle-log-not-taken-${bundle.id}:0`)
+        .and(page.locator('[aria-checked="false"]'))
+        .waitFor();
+      await takeSnapshot(
+        page,
+        `My actions - Bundle with one unanswered${layout}`,
+        testInfo
+      );
     });
-    await page.goto('/journal');
-    await page.getByTestId(`bundle-log-toggle-${bundle.id}:0`).click();
-    await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
-    await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
-  });
 
   test('Treatments grouped by time of day, then reordered', async ({
     page,

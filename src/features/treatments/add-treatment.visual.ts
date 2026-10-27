@@ -3,6 +3,8 @@ import {
   takeSnapshot,
   waitForMenuToggle,
   seedTestPatient,
+  seedTestResources,
+  seedTestBundle,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Add Treatment - Visual Regression', () => {
@@ -63,4 +65,45 @@ test.describe('Add Treatment - Visual Regression', () => {
     await page.getByTestId('treatment-title-input').focus();
     await takeSnapshot(page, 'Treatment - Add Form Regimen', testInfo);
   });
+
+  for (const [name, size] of [
+    ['mobile', null],
+    ['desktop', { width: 1280, height: 800 }],
+  ] as const) {
+    test(`Bundles field - ${name}`, async ({ page }, testInfo) => {
+      if (size) await page.setViewportSize(size);
+      await seedTestPatient(page);
+      await seedTestResources(page, {
+        treatments: [{ id: 'visual-vitamin-d', title: 'Vitamin D3 4000 IU' }],
+      });
+      for (const [id, title] of [
+        ['visual-morning', 'Morning stack'],
+        ['visual-evening', 'Evening stack'],
+      ])
+        await seedTestBundle(page, {
+          id,
+          title,
+          times: [id === 'visual-morning' ? 'MORN' : 'EVE'],
+          memberIds: ['visual-vitamin-d'],
+        });
+      await page.goto('/treatment/add');
+      await page
+        .getByTestId('treatment-title-input')
+        .fill('Magnesium glycinate');
+      await page.getByTestId('add-option-button').click();
+      await page.getByTestId('menu-link-bundle').click();
+      await page.getByTestId('form-add-menu').waitFor({ state: 'hidden' });
+      await page.getByTestId('link-bundle-search-input').click();
+      await page
+        .getByTestId('link-bundle-autocomplete-item-visual-morning')
+        .click();
+      await page.getByTestId('link-selected-bundle-visual-morning').waitFor();
+      await page.getByTestId('treatment-title-input').focus();
+      await takeSnapshot(
+        page,
+        `Treatment - Add Form Bundles ${name}`,
+        testInfo
+      );
+    });
+  }
 });

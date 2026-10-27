@@ -17,6 +17,12 @@ import {
 import { getAllConditions } from '@/src/features/conditions/conditionService';
 import type { Condition } from 'fhir/r5';
 import { LoadingView } from '@/src/components/LoadingView';
+import { Group } from 'lucide-react-native';
+import {
+  getBundleLinkOptions,
+  setTreatmentInBundle,
+} from '@/src/features/bundles/bundleService';
+import type { LinkFieldConfig } from '@/src/components/useLinkFields';
 
 export function AddTreatmentView() {
   const { consultationId, conditionId } = useLocalSearchParams<{
@@ -50,6 +56,7 @@ function AddTreatmentForPatient({
   );
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [specialists, setSpecialists] = useState<string[]>([]);
+  const [linkFields, setLinkFields] = useState<LinkFieldConfig[]>([]);
   // Added through a consultation, the treatment defaults to that visit's
   // date, specialist and conditions (its diagnoses and reasons for visit).
   const [consultationSpecialist, setConsultationSpecialist] = useState('');
@@ -67,11 +74,22 @@ function AddTreatmentForPatient({
       consultationId
         ? getConsultationById(consultationId, activePatientId)
         : null,
+      getBundleLinkOptions(activePatientId),
     ])
-      .then(([patientConditions, knownSpecialists, consultation]) => {
+      .then(([patientConditions, knownSpecialists, consultation, bundles]) => {
         if (cancelled) return;
         setConditions(patientConditions);
         setSpecialists(knownSpecialists);
+        // The treatment can join existing bundles as it is created.
+        setLinkFields([
+          {
+            type: 'bundle',
+            label: 'Bundles',
+            icon: Group,
+            options: bundles,
+            initialIds: [],
+          },
+        ]);
         setConsultationSpecialist(
           (consultation && getConsultationDoctor(consultation)) || ''
         );
@@ -128,6 +146,8 @@ function AddTreatmentForPatient({
         ? formatLocalDate(values.usageStart)
         : undefined,
     });
+    for (const bundleId of values.links?.bundle.ids || [])
+      await setTreatmentInBundle(created.id!, bundleId, activePatientId, true);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       (document.activeElement as HTMLElement)?.blur?.();
@@ -153,6 +173,7 @@ function AddTreatmentForPatient({
         ],
       }}
       specialistSuggestions={specialists}
+      linkFields={linkFields}
     />
   );
 }

@@ -11,7 +11,11 @@ import {
   getBrowserLocalDate,
   checkA11y,
   openRoute,
+  seedTestTreatment,
+  seedTestBundle,
+  evaluateBridge as bridge,
 } from '@/src/features/testing/testStorage';
+import { getBundleMemberIds } from '@/src/features/bundles/bundleModel';
 
 test.describe('Add Treatment Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -661,5 +665,57 @@ test.describe('Treatment form keyboard support', () => {
     expect(statements).toHaveLength(1);
     expect(statements[0].effectivePeriod).toEqual({ start: nextWeek });
     expect(statements[0].adherence.code.coding[0].code).toBe('taking');
+  });
+});
+
+test.describe('Add Treatment bundles', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedTestPatient(page);
+  });
+
+  test('adds a new treatment to existing bundles', async ({ page }) => {
+    const existing = await seedTestTreatment(page, { title: 'Vitamin D' });
+    const [morning, evening] = await Promise.all(
+      ['Morning stack', 'Evening stack'].map((title) =>
+        seedTestBundle(page, { title, memberIds: [existing.id] })
+      )
+    );
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('treatment-title-input').fill('Magnesium');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-bundle').click();
+    await page.getByTestId('link-bundle-search-input').click();
+    await page
+      .getByTestId(`link-bundle-autocomplete-item-${morning.id}`)
+      .click();
+    await expect(
+      page.getByTestId(`link-selected-bundle-${morning.id}`)
+    ).toBeVisible();
+    await page.getByTestId('save-treatment-button').click();
+
+    await expect(page).toHaveURL(/\/treatment\/[^/]+$/);
+    await expect(
+      page.getByTestId(`treatment-bundle-${morning.id}`)
+    ).toBeVisible();
+    await expect(
+      page.getByTestId(`treatment-bundle-${evening.id}`)
+    ).toHaveCount(0);
+    const id = new URL(page.url()).pathname.split('/').pop()!;
+    const stored = await Promise.all(
+      [morning.id, evening.id].map((bundleId) =>
+        bridge(page, (b, bundleId) => b.getBundle(bundleId), bundleId)
+      )
+    );
+    expect(stored.map(getBundleMemberIds)).toEqual([
+      [existing.id, id],
+      [existing.id],
+    ]);
+  });
+
+  test('offers no bundle field when there are no bundles', async ({ page }) => {
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('add-option-button').click();
+    await expect(page.getByTestId('form-add-menu')).toBeVisible();
+    await expect(page.getByTestId('menu-link-bundle')).toHaveCount(0);
   });
 });
