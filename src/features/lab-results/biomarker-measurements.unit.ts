@@ -7,6 +7,7 @@ import {
   getObservationReferenceRange,
   getObservationStatus,
   isSupportedObservation,
+  roundConvertedBound,
   toRangeStatus,
 } from './biomarkerMeasurements';
 
@@ -44,6 +45,25 @@ test('normalizes mixed units and rejects unsupported or non-finite conversions',
       )
     ).toBeUndefined();
   }
+});
+
+test('rounds converted range bounds to the precision they were written with', () => {
+  expect(roundConvertedBound(0.69938, 1.7)).toBe(0.7);
+  expect(roundConvertedBound(0.90508, 2.2)).toBe(0.91);
+  expect(roundConvertedBound(2.586, 100)).toBe(2.6);
+  expect(roundConvertedBound(3.3618, 130)).toBe(3.4);
+  expect(roundConvertedBound(4.8762, 188.5)).toBe(4.876);
+  expect(roundConvertedBound(135, 13.5)).toBe(135);
+  expect(roundConvertedBound(150, 150)).toBe(150);
+  // A catalog range in mg/dL shown against a result in mmol/L.
+  expect(
+    getObservationReferenceRange({
+      resourceType: 'Observation',
+      status: 'final',
+      code: { coding: [{ system: 'http://loinc.org', code: '19123-9' }] },
+      valueQuantity: { value: 0.91, code: 'mmol/L', unit: 'mmol/L' },
+    })
+  ).toEqual({ low: 0.7, high: 0.91 });
 });
 
 test('validates catalog identity, missing units, and mismatched labels/codes', () => {

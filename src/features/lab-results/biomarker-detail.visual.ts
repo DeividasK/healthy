@@ -71,3 +71,28 @@ test('Biomarker detail - Calculated atherogenic index', async ({
     testInfo
   );
 });
+
+for (const [layout, viewport] of [
+  ['mobile', undefined],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test(`Biomarker detail - Range converted to the result's unit (${layout})`, async ({
+    page,
+  }, testInfo) => {
+    if (viewport) await page.setViewportSize(viewport);
+    await seedTestPatient(page);
+    // The catalog range is in mg/dL; the laboratory reported mmol/L.
+    await seedTestReport(page, {
+      id: `magnesium-visual-${layout}`,
+      date: '2026-06-01',
+      biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
+    });
+    await page.goto('/biomarker/19123-9');
+    await page.getByTestId('biomarker-title').waitFor();
+    await takeSnapshot(
+      page,
+      `Biomarker detail - Range converted to the result's unit (${layout})`,
+      testInfo
+    );
+  });
+}

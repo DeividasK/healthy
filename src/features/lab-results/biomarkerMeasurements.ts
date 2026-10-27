@@ -127,6 +127,28 @@ export function convertBiomarkerValue(
   );
 }
 
+/** Significant digits of a number as written, ignoring trailing zeros of integers. */
+function significantDigits(value: number) {
+  const digits = String(Math.abs(value))
+    .replace(/e.*$/, '')
+    .replace('.', '')
+    .replace(/^0+/, '');
+  return String(value).includes('.')
+    ? digits.length
+    : digits.replace(/0+$/, '').length;
+}
+
+/**
+ * Rounds a range bound converted from another unit to the precision of the
+ * bound as written (at least two significant digits), the way laboratories
+ * print converted ranges: 1.7–2.2 mg/dL becomes 0.70–0.91 mmol/L, not
+ * 0.69938–0.90508.
+ */
+export function roundConvertedBound(converted: number, source: number) {
+  if (converted === source || converted === 0) return converted;
+  return Number(converted.toPrecision(Math.max(2, significantDigits(source))));
+}
+
 /**
  * Returns the reference bounds in the observation's reported unit: the range
  * the laboratory reported, else the catalog's range for the patient's sex
@@ -141,17 +163,24 @@ export function getObservationReferenceRange(
   const reportedRange = observation.referenceRange?.find(
     (range) => range.low?.value !== undefined || range.high?.value !== undefined
   );
+  const roundBound = (converted: number | undefined, source: number) =>
+    converted === undefined
+      ? undefined
+      : roundConvertedBound(converted, source);
   /** Converts an individual FHIR bound into the observation's unit. */
   const convertBound = (
     bound: { value?: number; code?: string; unit?: string } | undefined
   ) =>
     bound?.value === undefined
       ? undefined
-      : convertBiomarkerValue(
-          bound.value,
-          bound.code || bound.unit || unitCode,
-          unitCode,
-          marker
+      : roundBound(
+          convertBiomarkerValue(
+            bound.value,
+            bound.code || bound.unit || unitCode,
+            unitCode,
+            marker
+          ),
+          bound.value
         );
   const catalog =
     reportedRange || !marker
@@ -165,7 +194,10 @@ export function getObservationReferenceRange(
   const convertCatalog = (bound: number | undefined) =>
     bound === undefined || !marker
       ? undefined
-      : convertBiomarkerValue(bound, marker.ucumCode, unitCode, marker);
+      : roundBound(
+          convertBiomarkerValue(bound, marker.ucumCode, unitCode, marker),
+          bound
+        );
   const low = reportedRange
     ? convertBound(reportedRange.low)
     : convertCatalog(catalog?.low);
