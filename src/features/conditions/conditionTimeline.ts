@@ -127,6 +127,34 @@ export const DEFAULT_TIMELINE_FILTERS: TimelineFilters = {
   period: 'all',
 };
 
+const SAVED_TONES: StatusTone[] = [
+  'planned',
+  'active',
+  'paused',
+  'done',
+  'faded',
+];
+const TYPES = Object.keys(TONES) as TimelineItem['type'][];
+const PERIODS: TimelinePeriod[] = [
+  'all',
+  'upcoming',
+  'past3',
+  'past6',
+  'past12',
+];
+
+/** Saved timeline filters, without options the timeline no longer has. */
+export function parseTimelineFilters(saved: unknown): TimelineFilters | null {
+  if (!saved || typeof saved !== 'object') return null;
+  const { tones, types, period } = saved as Partial<Record<string, unknown>>;
+  if (!Array.isArray(tones) || !Array.isArray(types)) return null;
+  return {
+    tones: SAVED_TONES.filter((tone) => tones.includes(tone)),
+    types: TYPES.filter((type) => types.includes(type)),
+    period: PERIODS.find((id) => id === period) ?? 'all',
+  };
+}
+
 export function hasTimelineFilters(filters: TimelineFilters) {
   return (
     filters.tones.length > 0 ||
