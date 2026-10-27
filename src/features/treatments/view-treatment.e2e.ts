@@ -44,10 +44,8 @@ test.describe('View Treatment Flow', () => {
     await expect(page.getByTestId('treatment-dosage-section')).toContainText(
       'Prescribed Dosage'
     );
-    // Being taken, it shows the regimen followed too.
-    await expect(page.getByTestId('treatment-current-regimen')).toHaveText(
-      longInstructions
-    );
+    // Taken as prescribed, the regimen is not repeated.
+    await expect(page.getByTestId('treatment-current-regimen')).toHaveCount(0);
     await checkA11y(page, { include: '[data-testid="treatment-view"]' });
     const stored = await getTestTreatment(page, treatment.id);
     expect(stored.dosageInstruction?.[0]?.text).toBe(longInstructions);

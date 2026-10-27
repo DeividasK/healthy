@@ -27,7 +27,7 @@ import { addDays, formatLocalDate } from '@/src/utils/dateUtils';
  * A sample person whose records use every feature: lab results over three
  * years, a permanent and a temporary condition, consultations, treatments in
  * bundles (one with an activity), a planned retest and repeating activities
- * with recent logs. Dates count back from today, so the journal and
+ * with three months of logs. Dates count back from today, so the journal and
  * timelines always look current.
  */
 
@@ -36,6 +36,9 @@ const CARDIOLOGIST = 'Dr. James Patel';
 const CLINIC = 'City Health Clinic';
 const HEART_CENTRE = 'Heart & Vascular Centre';
 const LAB = 'Central Laboratory';
+
+/** How many days before today the journal is filled in. */
+const LOGGED_DAYS = 90;
 
 /** The local day `months` months (and `days` days) from today. */
 function fromToday(months: number, days = 0): string {
@@ -74,6 +77,7 @@ const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
   },
   {
     monthsAgo: 24,
+    notes: 'Iron tablets are working. Energy is back.',
     values: {
       cholesterol_total: 205,
       ldl_calculated: 128,
@@ -88,6 +92,7 @@ const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
       vitamin_d: 28,
       vitamin_b12: 410,
       hs_crp: 1.6,
+      omega_3_index: 4.9,
       tsh: 2.3,
       alt: 34,
       creatinine: 1.0,
@@ -111,6 +116,7 @@ const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
       vitamin_d: 34,
       vitamin_b12: 455,
       hs_crp: 1.9,
+      omega_3_index: 5.3,
       tsh: 2.0,
       alt: 31,
       creatinine: 0.99,
@@ -507,14 +513,17 @@ async function addDemoRecords(patientId: string): Promise<void> {
       items: reportItems(report.values),
     });
 
-  // Two weeks of journal answers in one write; today is left to answer.
-  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i - 14));
+  // Up to three months of journal answers in one write, from the day each
+  // treatment or activity started; today is left to answer.
+  const days = Array.from({ length: LOGGED_DAYS }, (_, i) =>
+    addDays(today, i - LOGGED_DAYS)
+  );
   const actionDays = await getActionDays(patientId, days);
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     for (const [index, day] of actionDays.entries()) {
       // A missed evening every so often, like real life.
-      const missedEvening = index % 6 === 4;
+      const missedEvening = index % 11 === 7;
       for (const item of day.items)
         await setTreatmentLog(
           item,
@@ -526,15 +535,24 @@ async function addDemoRecords(patientId: string): Promise<void> {
           patientId,
           true
         );
-      // Each activity is skipped on a different day.
-      for (const [order, item] of (day.procedures ?? []).entries())
+      for (const [order, item] of (day.procedures ?? []).entries()) {
+        // Every activity is listed each day until its first session is
+        // logged, so one repeating every few days is logged on its own days.
+        const period = item.request.occurrenceTiming?.repeat?.period ?? 1;
+        if (period > 1) {
+          if (index % period === 0)
+            await setProcedureLog(item, day.date, 'taken', patientId, true);
+          continue;
+        }
+        // Each daily activity is skipped now and then, on different days.
         await setProcedureLog(
           item,
           day.date,
-          index === 8 - order * 3 ? 'not-taken' : 'taken',
+          (index + order * 4) % 13 === 5 ? 'not-taken' : 'taken',
           patientId,
           true
         );
+      }
     }
   });
   notifyDatabaseChanged(['medication_administrations', 'procedures']);

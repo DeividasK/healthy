@@ -14,7 +14,10 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceTextSection } from '@/src/components/ResourceTextSection';
 import { ResourceRow, ResourceSection } from '@/src/components/ResourceSection';
-import { ConditionRelatedRow } from '@/src/features/conditions/ConditionRelatedRow';
+import {
+  ConditionRelatedRow,
+  getConditionMeta,
+} from '@/src/features/conditions/ConditionRelatedRow';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import {
   deleteConsultation,
@@ -310,12 +313,15 @@ export function ViewConsultationView() {
                 <ResourceRow
                   key={`${index}-${valueIndex}`}
                   title={label}
-                  meta={(value.concept?.coding || []).map((coding) => ({
-                    icon: Hash,
-                    text: [coding.system, coding.code, coding.display]
-                      .filter(Boolean)
-                      .join(' · '),
-                  }))}
+                  meta={[
+                    ...(condition ? getConditionMeta(condition) : []),
+                    ...(value.concept?.coding || []).map((coding) => ({
+                      icon: Hash,
+                      text: [coding.system, coding.code, coding.display]
+                        .filter(Boolean)
+                        .join(' · '),
+                    })),
+                  ]}
                   {...(condition
                     ? {
                         testID:

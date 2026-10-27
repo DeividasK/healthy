@@ -201,6 +201,7 @@ export function ActionCalendar({
                   ) : (
                     <DayStatusMark
                       status={status}
+                      isToday={date === today}
                       size={16}
                       testID={`actions-calendar-day-${date}-${status}`}
                     />

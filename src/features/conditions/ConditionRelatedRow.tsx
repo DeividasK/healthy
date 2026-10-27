@@ -1,13 +1,47 @@
 import React from 'react';
-import { Calendar, CircleDot } from 'lucide-react-native';
-import type { Condition } from 'fhir/r5';
+import {
+  Activity,
+  BadgeCheck,
+  Calendar,
+  CalendarCheck,
+  CircleDot,
+  MapPin,
+  Tag,
+} from 'lucide-react-native';
+import type { CodeableConcept, Condition } from 'fhir/r5';
 import {
   ResourceRow,
   type ResourceMeta,
 } from '@/src/components/ResourceSection';
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 import { getConditionTitle } from '@/src/utils/fhirUtils';
-import { CONDITION_STATUS_OPTIONS } from './ConditionForm';
+import {
+  CONDITION_STATUS_OPTIONS,
+  SEVERITY_OPTIONS,
+  VERIFICATION_OPTIONS,
+} from './ConditionForm';
+import { getConditionCategoryLabel } from './conditionCategories';
+import {
+  CONDITION_SEVERITY_SYSTEM,
+  VERIFICATION_STATUS_SYSTEM,
+} from './conditionService';
+
+/**
+ * A coded concept's label: the app's own wording for a code from `system`,
+ * otherwise the concept's text, the coding's display or its code.
+ */
+function getConceptLabel(
+  concept: CodeableConcept | undefined,
+  system: string,
+  options: { id: string; label: string }[]
+): string | undefined {
+  const coding = concept?.coding?.[0];
+  const own =
+    coding?.system === system
+      ? options.find((option) => option.id === coding.code)?.label
+      : undefined;
+  return own || concept?.text || coding?.display || coding?.code;
+}
 
 /** Meta line shared by condition rows and the condition view heading. */
 export function getConditionMeta(condition: Condition): ResourceMeta[] {
@@ -15,6 +49,21 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
   const status =
     CONDITION_STATUS_OPTIONS.find((option) => option.id === statusCode)
       ?.label || statusCode;
+  const resolved = condition.abatementDateTime;
+  const severity = getConceptLabel(
+    condition.severity,
+    CONDITION_SEVERITY_SYSTEM,
+    SEVERITY_OPTIONS.map(({ value, label }) => ({ id: value, label }))
+  );
+  const bodySite = condition.bodySite?.[0]?.text;
+  const categories = (condition.category ?? [])
+    .map(getConditionCategoryLabel)
+    .filter(Boolean);
+  const verificationLabel = getConceptLabel(
+    condition.verificationStatus,
+    VERIFICATION_STATUS_SYSTEM,
+    VERIFICATION_OPTIONS
+  );
   return [
     ...(condition.onsetDateTime
       ? [
@@ -25,6 +74,40 @@ export function getConditionMeta(condition: Condition): ResourceMeta[] {
         ]
       : []),
     ...(status ? [{ icon: CircleDot, text: status }] : []),
+    ...(resolved
+      ? [
+          {
+            icon: CalendarCheck,
+            text: `Resolved ${formatDisplayDate(resolved)}`,
+          },
+        ]
+      : []),
+    ...(severity
+      ? [
+          {
+            icon: Activity,
+            text: severity,
+            accessibilityLabel: `Severity: ${severity}`,
+          },
+        ]
+      : []),
+    ...(bodySite ? [{ icon: MapPin, text: bodySite }] : []),
+    ...categories.map((category, index) => ({
+      icon: Tag,
+      text: category,
+      accessibilityLabel: `Category: ${category}`,
+      testID: `condition-category-${index}`,
+    })),
+    ...(verificationLabel
+      ? [
+          {
+            icon: BadgeCheck,
+            text: verificationLabel,
+            accessibilityLabel: `Verification status: ${verificationLabel}`,
+            testID: 'condition-verification-status',
+          },
+        ]
+      : []),
   ];
 }
 
