@@ -1,5 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { CountBadge } from './CountBadge';
 import { SelectedRowMarker } from './SelectedRowMarker';
@@ -182,11 +188,18 @@ export function ResourceRow({
 }: ResourceRowProps) {
   if (onPress && accessory) {
     const titleText = <Text style={styles.rowTitle}>{title}</Text>;
+    // On the web the kind is an image inside the button, so the button keeps
+    // its visible text as its name. Native screen readers would focus that
+    // image on its own, so there the kind leads the button's label instead.
+    const webTypeLabel = Platform.OS === 'web' ? typeLabel : undefined;
     return (
       <View style={styles.row} testID={testID}>
         <TouchableOpacity
           testID={`${testID}-open`}
           accessibilityRole="button"
+          accessibilityLabel={
+            typeLabel && !webTypeLabel ? `${typeLabel}: ${title}` : undefined
+          }
           style={[styles.main, styles.mainPressable]}
           activeOpacity={0.6}
           onPress={onPress}
@@ -194,9 +207,9 @@ export function ResourceRow({
           {TypeIcon ? (
             <View style={styles.titleLine}>
               <View
-                accessible={Boolean(typeLabel)}
-                accessibilityRole={typeLabel ? 'image' : undefined}
-                accessibilityLabel={typeLabel}
+                accessible={Boolean(webTypeLabel)}
+                accessibilityRole={webTypeLabel ? 'image' : undefined}
+                accessibilityLabel={webTypeLabel}
               >
                 <TypeIcon size={16} color={COLORS.light.primary} />
               </View>

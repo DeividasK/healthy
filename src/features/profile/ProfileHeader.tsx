@@ -109,7 +109,7 @@ export function ProfileHeader({
               accessibilityLabel={
                 copied
                   ? `Patient ID ${shortenPatientId(patient.id)} copied`
-                  : `Copy patient ID ${patient.id}`
+                  : `Copy patient ID ${shortenPatientId(patient.id)}`
               }
               style={styles.idPill}
               onPress={copyId}
