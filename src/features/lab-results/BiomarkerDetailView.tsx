@@ -653,13 +653,18 @@ export function BiomarkerDetailView({
     <>
       <View style={styles.learnSection} testID="biomarker-learn">
         <LearnItem title="About this biomarker">
-          {marker?.education?.about ||
-            marker?.description ||
-            'This biomarker is one part of your laboratory result and is interpreted together with other findings.'}
+          {marker
+            ? marker.education?.about ||
+              marker.description ||
+              'This biomarker is one part of your laboratory result and is interpreted together with other findings.'
+            : // A LOINC test outside the catalog: say what the page is based on.
+              `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.${latestMeasurement?.reportedRange ? ' Its range is the one your laboratory reported.' : ''}`}
         </LearnItem>
         <LearnItem title="Why it matters">
-          {marker?.education?.whyItMatters ||
-            'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'}
+          {marker
+            ? marker.education?.whyItMatters ||
+              'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'
+            : ''}
         </LearnItem>
         <LearnItem title="What it may affect">
           {marker?.education?.whatItMayAffect || ''}

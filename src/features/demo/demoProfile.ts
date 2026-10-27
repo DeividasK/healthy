@@ -51,7 +51,29 @@ function fromToday(months: number, days = 0): string {
 /** Lab values by catalog id, in each biomarker's primary unit. */
 type LabValues = Record<string, number>;
 
-const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
+/** A result for a LOINC test outside the catalog, with the lab's own range. */
+interface LoincResult {
+  loinc: string;
+  name: string;
+  value: number;
+  unit: string;
+  referenceHigh?: number;
+}
+
+/** Lp-PLA2, a vascular inflammation test the cardiologist added. */
+const LP_PLA2 = {
+  loinc: '39804-0',
+  name: 'Lipoprotein associated phospholipase A2 [Mass/volume] in Serum or Plasma',
+  unit: 'ng/mL',
+  referenceHigh: 200,
+};
+
+const REPORTS: {
+  monthsAgo: number;
+  notes?: string;
+  values: LabValues;
+  loincResults?: LoincResult[];
+}[] = [
   {
     monthsAgo: 36,
     notes: 'Routine check-up bloods. Feeling more tired than usual.',
@@ -121,6 +143,7 @@ const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
       alt: 31,
       creatinine: 0.99,
     },
+    loincResults: [{ ...LP_PLA2, value: 236 }],
   },
   {
     monthsAgo: 1,
@@ -146,11 +169,12 @@ const REPORTS: { monthsAgo: number; notes?: string; values: LabValues }[] = [
       alt: 27,
       creatinine: 0.97,
     },
+    loincResults: [{ ...LP_PLA2, value: 164 }],
   },
 ];
 
-function reportItems(values: LabValues) {
-  return Object.entries(values).map(([id, value]) => {
+function reportItems(values: LabValues, loincResults: LoincResult[] = []) {
+  const catalogItems = Object.entries(values).map(([id, value]) => {
     const marker = RECORDABLE_BIOMARKERS.find((m) => m.id === id);
     if (!marker) throw new Error(`Demo biomarker ${id} is not in the catalog`);
     return {
@@ -162,6 +186,18 @@ function reportItems(values: LabValues) {
       ucumCode: marker.ucumCode,
     };
   });
+  return [
+    ...catalogItems,
+    ...loincResults.map(({ loinc, name, value, unit, referenceHigh }) => ({
+      id: loinc,
+      name,
+      loinc,
+      value,
+      unit,
+      ucumCode: unit,
+      referenceHigh,
+    })),
+  ];
 }
 
 /** A one-dose daily regimen, e.g. 1 tablet in the evening; '' leaves the time open. */
@@ -510,7 +546,7 @@ async function addDemoRecords(patientId: string): Promise<void> {
       time: '08:15',
       notes: report.notes,
       serviceProviderName: LAB,
-      items: reportItems(report.values),
+      items: reportItems(report.values, report.loincResults),
     });
 
   // Up to three months of journal answers in one write, from the day each
