@@ -19,6 +19,7 @@ import { ResourceSection } from '@/src/components/ResourceSection';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { COLORS } from '@/src/theme/colors';
 import { useIsWideLayout } from '@/src/theme/layout';
+import { useSavedFilters } from '@/src/utils/savedFilters';
 import { getTreatmentReasonConditionIds } from '@/src/utils/fhirUtils';
 import { TIMELINE_TONES } from '@/src/features/conditions/timelineAppearance';
 import { getAllTreatments } from './treatmentService';
@@ -35,6 +36,13 @@ interface TreatmentItem {
   usage: CurrentUsage;
 }
 
+const NO_STATUSES: CurrentUsage[] = [];
+
+const parseStatuses = (saved: unknown) =>
+  Array.isArray(saved)
+    ? USAGE_FILTERS.filter((usage) => saved.includes(usage))
+    : null;
+
 /** Every treatment of the active patient, filtered by how it is used now. */
 export function TreatmentsView() {
   const router = useRouter();
@@ -43,7 +51,12 @@ export function TreatmentsView() {
   }>();
   const isWideWindow = useIsWideLayout();
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
-  const [statuses, setStatuses] = useState<CurrentUsage[]>([]);
+  // Each profile remembers its own filters on this device.
+  const [statuses, setStatuses, filtersLoaded] = useSavedFilters(
+    activePatientId ? `treatments:${activePatientId}` : null,
+    NO_STATUSES,
+    parseStatuses
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const generation = useRef(0);
   const [data, setData] = useState({
@@ -88,7 +101,8 @@ export function TreatmentsView() {
   const isCurrentPatient = data.patientId === activePatientId;
   const isLoading =
     isPatientLoading ||
-    (!!activePatientId && (!isCurrentPatient || data.isLoading));
+    (!!activePatientId &&
+      (!isCurrentPatient || data.isLoading || !filtersLoaded));
 
   const items = isCurrentPatient ? data.items : [];
   const filtered = statuses.length > 0;

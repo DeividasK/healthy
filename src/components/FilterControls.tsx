@@ -9,7 +9,8 @@ export const toggleFilter = <T,>(list: T[], value: T) =>
 
 /**
  * A section heading's round filter button; filled while filters are on.
- * `label` names what it filters, e.g. "Filter timeline".
+ * `label` names what it filters, e.g. "Filter timeline". Keep the filters it
+ * opens in `useSavedFilters`, so each one is remembered on the device.
  */
 export function FilterButton({
   label,

@@ -12,11 +12,13 @@ import { ServiceRequestRelatedRow } from '@/src/features/service-requests/Servic
 import { TreatmentRelatedRow } from '@/src/features/treatments/TreatmentRelatedRow';
 import { LabResultRelatedRow } from '@/src/features/lab-results/LabResultRelatedRow';
 import { COLORS } from '@/src/theme/colors';
+import { useSavedFilters } from '@/src/utils/savedFilters';
 import {
   DEFAULT_TIMELINE_FILTERS,
   filterTimelineItems,
   groupTimelineItems,
   hasTimelineFilters,
+  parseTimelineFilters,
   type TimelineItem,
 } from './conditionTimeline';
 import { TIMELINE_TONES, TIMELINE_TYPES } from './timelineAppearance';
@@ -26,11 +28,22 @@ import { TimelineFilterModal } from './TimelineFilterModal';
  * Every step related to a condition on one rail, grouped by month. The node
  * icon shows the step's type; the row wash and node colour show its status,
  * and called-off steps are faded. The heading's filter button narrows the
- * steps by status, time period and type.
+ * steps by status, time period and type; each condition remembers its own
+ * filters on this device.
  */
-export function ConditionTimeline({ items }: { items: TimelineItem[] }) {
+export function ConditionTimeline({
+  conditionId,
+  items,
+}: {
+  conditionId: string;
+  items: TimelineItem[];
+}) {
   const router = useRouter();
-  const [filters, setFilters] = useState(DEFAULT_TIMELINE_FILTERS);
+  const [filters, setFilters, filtersLoaded] = useSavedFilters(
+    `condition-timeline:${conditionId}`,
+    DEFAULT_TIMELINE_FILTERS,
+    parseTimelineFilters
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtered = hasTimelineFilters(filters);
   const groups = useMemo(
@@ -118,7 +131,7 @@ export function ConditionTimeline({ items }: { items: TimelineItem[] }) {
 
   // No steps, no timeline. When filters hide every step, the section stays so
   // its filter button can still be reached.
-  if (!items.length) return null;
+  if (!items.length || !filtersLoaded) return null;
 
   return (
     <ResourceSection
