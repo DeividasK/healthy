@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  ArrowLeftRight,
   Calculator,
   Calendar,
   ChevronDown,
@@ -34,7 +35,6 @@ import { useIsWideLayout } from '@/src/theme/layout';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { CollapsibleList } from '@/src/components/CollapsibleList';
 import { ResourceSection } from '@/src/components/ResourceSection';
-import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
 import {
   BiomarkerResultRow,
   BiomarkerValueRow,
@@ -355,6 +355,21 @@ export function BiomarkerDetailView({
   );
   const latestMeasurement =
     displayedMeasurements[displayedMeasurements.length - 1];
+  /** The unit the switch moves to: the next one, wrapping to the first. */
+  const nextUnit = displayUnit
+    ? unitOptions[(unitOptions.indexOf(displayUnit) + 1) % unitOptions.length]
+    : undefined;
+  /** Shows the page in a unit and remembers it for this biomarker. */
+  const chooseUnit = (ucum: string) => {
+    const units = { ...history.units, [marker!.id]: ucum };
+    setHistory((previous) => ({ ...previous, units }));
+    if (activePatientId)
+      void saveProfileSettings(activePatientId, {
+        biomarkerUnits: units,
+      }).catch((error) =>
+        console.error('Failed to save the biomarker unit:', error)
+      );
+  };
   /** The recorded results the latest calculated value was worked out from. */
   const latestSources = useMemo(() => {
     const references = new Set(
@@ -438,31 +453,26 @@ export function BiomarkerDetailView({
     <>
       <View style={styles.section} testID="biomarker-latest">
         <Text style={styles.sectionTitle}>Latest</Text>
-        <View
-          style={[
-            styles.latestValueGroup,
-            displayUnit && styles.latestValueWithPicker,
-          ]}
-        >
+        <View style={styles.latestValueGroup}>
           <Text style={styles.latestValue} testID="biomarker-latest-value">
             {latestMeasurement.value}
           </Text>
           {displayUnit ? (
-            <NativeUnitPicker
-              testID="biomarker-unit-picker"
-              selectedUnit={displayUnit.label}
-              units={unitOptions}
-              onSelect={(_label, ucum) => {
-                const units = { ...history.units, [marker!.id]: ucum };
-                setHistory((previous) => ({ ...previous, units }));
-                if (activePatientId)
-                  void saveProfileSettings(activePatientId, {
-                    biomarkerUnits: units,
-                  }).catch((error) =>
-                    console.error('Failed to save the biomarker unit:', error)
-                  );
-              }}
-            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Unit: ${displayUnit.label}. Switch to ${nextUnit!.label}`}
+              testID="biomarker-unit-switch"
+              onPress={() => chooseUnit(nextUnit!.ucum)}
+              style={({ hovered }: { hovered?: boolean }) => [
+                styles.unitSwitch,
+                hovered && styles.unitSwitchHovered,
+              ]}
+            >
+              <Text style={styles.latestUnit} testID="biomarker-latest-unit">
+                {displayUnit.label}
+              </Text>
+              <ArrowLeftRight size={16} color={COLORS.light.primary} />
+            </Pressable>
           ) : (
             <Text style={styles.latestUnit} testID="biomarker-latest-unit">
               {latestMeasurement.unit}
@@ -1151,7 +1161,15 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
   },
-  latestValueWithPicker: { alignItems: 'center', gap: 8 },
+  unitSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  unitSwitchHovered: { backgroundColor: COLORS.light.pillBorder },
   latestUnit: { color: COLORS.light.muted, fontSize: 14 },
   legend: {
     flexDirection: 'row',

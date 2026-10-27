@@ -114,10 +114,10 @@ test('Biomarker detail - Switched to another unit', async ({
     biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
   });
   await page.goto('/biomarker/19123-9');
-  await page
-    .getByTestId('biomarker-unit-picker')
-    .locator('select')
-    .selectOption('mg/dL');
+  // mmol/L, then mEq/L, then mg/dL.
+  await page.getByTestId('biomarker-unit-switch').click();
+  await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('mEq/L');
+  await page.getByTestId('biomarker-unit-switch').click();
   await expect(page.getByTestId('biomarker-latest-value')).toHaveText('2.2');
   await takeSnapshot(
     page,
