@@ -35,6 +35,8 @@ export interface FormFieldProps {
   /** Accessible name of the remove button; defaults to "Remove <label>". */
   removeLabel?: string;
   testID?: string;
+  /** Puts the label and a narrow control (e.g. a time) side by side. */
+  inline?: boolean;
 }
 
 interface FieldInputRegistry {
@@ -146,6 +148,7 @@ export function FormField({
   removeTestID,
   removeLabel,
   testID,
+  inline = false,
 }: FormFieldProps) {
   const containerRef = useRef<View>(null);
   const inputRef = useRef<TextInput | null>(null);
@@ -167,10 +170,10 @@ export function FormField({
     <FieldInputContext.Provider value={inputRegistry}>
       <View
         ref={containerRef}
-        style={[styles.container, style]}
+        style={[styles.container, inline && styles.inlineContainer, style]}
         testID={testID}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, inline && styles.inlineHeader]}>
           <Text
             ref={labelRef}
             {...WEB_LABEL_ROLE}
@@ -196,7 +199,11 @@ export function FormField({
           )}
         </View>
         {inputProps && <FormTextInput {...inputProps} />}
-        {children}
+        {inline ? (
+          <View style={styles.inlineControl}>{children}</View>
+        ) : (
+          children
+        )}
         {Boolean(error) && <Text style={styles.errorText}>{error}</Text>}
       </View>
     </FieldInputContext.Provider>
@@ -208,11 +215,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '100%',
   },
+  inlineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  inlineHeader: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  inlineControl: {
+    width: 140,
   },
   label: {
     flexShrink: 1,
