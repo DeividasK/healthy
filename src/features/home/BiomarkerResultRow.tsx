@@ -9,6 +9,7 @@ import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { SelectedRowMarker } from '@/src/components/SelectedRowMarker';
 import {
   getObservationMarker,
+  getValueComparator,
   getObservationReferenceRange,
 } from '@/src/features/lab-results/biomarkerMeasurements';
 import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
@@ -49,6 +50,7 @@ export function getBiomarkerName(observation: Observation) {
 export function BiomarkerValueRow({
   title,
   value,
+  comparator = '',
   unit,
   low,
   high,
@@ -61,6 +63,8 @@ export function BiomarkerValueRow({
 }: {
   title: string;
   value?: number;
+  /** The sign of a result reported only as a bound, e.g. "<". */
+  comparator?: string;
   unit: string;
   low?: number;
   high?: number;
@@ -87,7 +91,9 @@ export function BiomarkerValueRow({
       <View style={styles.main}>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.valueGroup}>
-          <Text style={styles.value}>{value ?? '-'}</Text>
+          <Text style={styles.value}>
+            {value === undefined ? '-' : `${comparator}${value}`}
+          </Text>
           <Text style={styles.unit}>{unit}</Text>
           {calculated && (
             <Calculator
@@ -133,6 +139,7 @@ export function BiomarkerResultRow({
       title={name}
       calculated={isCalculatedObservation(observation)}
       value={observation.valueQuantity?.value}
+      comparator={getValueComparator(observation)}
       unit={
         observation.valueQuantity?.unit || observation.valueQuantity?.code || ''
       }

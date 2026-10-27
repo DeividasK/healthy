@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { DiagnosticReport, Observation } from 'fhir/r5';
+import type { DiagnosticReport, Observation, Quantity } from 'fhir/r5';
 import { GENERAL_LAB_REPORT_LOINC } from '@/src/data/biomarkers';
 import {
   insertDiagnosticReportRecord,
@@ -33,6 +33,8 @@ export interface BiomarkerInputItem {
   /** Code system of `loinc` when it isn't LOINC. */
   codeSystem?: string;
   value: number;
+  /** Set when the report gives only a bound, e.g. "<" for "< 20". */
+  comparator?: Quantity['comparator'];
   unit: string;
   ucumCode: string;
   referenceLow?: number;
@@ -128,6 +130,7 @@ export function buildFHIRObservation(
     effectiveDateTime,
     valueQuantity: {
       value: item.value,
+      ...(item.comparator && { comparator: item.comparator }),
       unit: item.unit,
       system: 'http://unitsofmeasure.org',
       code: item.ucumCode,

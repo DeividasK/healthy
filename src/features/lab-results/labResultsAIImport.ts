@@ -6,6 +6,10 @@ import {
   type UnitOption,
 } from '@/src/data/biomarkers';
 import { customTestBiomarker } from '@/src/data/biomarkers/customTests';
+import {
+  parseResultValue,
+  type ResultComparator,
+} from './biomarkerMeasurements';
 import { unitKind, type LoincLabTests } from '@/src/data/loinc';
 import {
   parseAIValue,
@@ -26,6 +30,8 @@ export interface ImportedLabResultItem {
   marker: RecordableBiomarker;
   /** The value as the form's input shows it. */
   value: string;
+  /** Set when the report gives only a bound, e.g. "<" for "< 20". */
+  comparator?: ResultComparator;
   unit: UnitOption;
 }
 
@@ -81,6 +87,7 @@ Rules:
 - "serviceProvider" is the laboratory or clinic that did the tests. Leave it out if the report doesn't show it.
 - Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported. LOINC has separate codes for each kind of unit, so use the code for the unit the report gives: mass, like mg/dL, or amount of substance, like mmol/L.
 - "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
+- If the report gives a result only as a bound, like < 20.00 or > 90, write "value" as text with the sign, e.g. "<20.00" or ">90".
 - For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
 - For a test that has no LOINC code, like NAD+ or telomere length, use "${OWN_TEST_ID}" as the test id, add "name" with the test's name as reported, and copy its unit as reported.
 - Leave out tests in the list whose unit doesn't match one listed for them, and other tests whose LOINC code you aren't sure of. List the tests you leave out in a short note before the code block.
@@ -184,7 +191,12 @@ export function parseLabResultsAIReply(
       }
       seen.add(marker.id);
 
-      const value = parseAIValue(item.value);
+      // A result given only as a bound, e.g. "< 20.00", keeps its sign.
+      const bounded =
+        typeof item.value === 'string'
+          ? parseResultValue(item.value)
+          : undefined;
+      const value = bounded?.value ?? parseAIValue(item.value);
       if (value === undefined || !Number.isFinite(value) || value < 0) {
         errors.push(`${marker.name} has no valid value.`);
         return;
@@ -213,6 +225,7 @@ export function parseLabResultsAIReply(
           ? marker
           : { ...marker, units: [...marker.units, unit] },
         value: String(value),
+        ...(bounded?.comparator && { comparator: bounded.comparator }),
         unit,
       });
     });

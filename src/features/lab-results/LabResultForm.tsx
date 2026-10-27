@@ -36,6 +36,7 @@ import {
 import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { NativeUnitPicker } from '@/src/components/NativeUnitPicker';
+import { NativeSelect } from '@/src/components/NativeSelect';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
@@ -60,6 +61,11 @@ import {
   type RecordableBiomarker,
 } from '@/src/data/biomarkers';
 import { fetchAllDiagnosticReportRecords } from './labResultsRepository';
+import {
+  getValueComparator,
+  parseResultValue,
+  type ResultComparator,
+} from './biomarkerMeasurements';
 import { loadLoincLabTests, type LoincLabTests } from '@/src/data/loinc';
 import { formatLocalDate } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
@@ -82,9 +88,20 @@ export interface ActiveMarkerItem {
   id: string;
   definition: RecordableBiomarker;
   valueStr: string;
+  /** Set when the report gives only a bound, e.g. "<" for "< 20". */
+  comparator?: ResultComparator;
   selectedUnit: string;
   selectedUcum: string;
 }
+
+/** The sign before a value: equal to it, or only a bound, e.g. "< 20". */
+const COMPARATOR_OPTIONS = [
+  { id: '=', label: '=' },
+  { id: '<', label: '<' },
+  { id: '<=', label: '≤' },
+  { id: '>=', label: '≥' },
+  { id: '>', label: '>' },
+];
 
 /** Marks one of the user's own tests, which the app has no code for. */
 function OwnTestLabel({ style }: { style?: StyleProp<ViewStyle> }) {
@@ -306,6 +323,9 @@ export function LabResultForm({
               id: obs.id || `obs_${Date.now()}_${Math.random()}`,
               definition: def,
               valueStr: val,
+              ...(getValueComparator(obs) && {
+                comparator: obs.valueQuantity!.comparator,
+              }),
               selectedUnit: unit,
               selectedUcum: ucum,
             };
@@ -398,10 +418,11 @@ export function LabResultForm({
       ...(data.serviceProvider && { serviceProvider: data.serviceProvider }),
     });
     setActiveItems(
-      data.results.map(({ marker, value, unit }) => ({
+      data.results.map(({ marker, value, comparator, unit }) => ({
         id: marker.id,
         definition: marker,
         valueStr: value,
+        ...(comparator && { comparator }),
         selectedUnit: unit.label,
         selectedUcum: unit.ucum,
       }))
@@ -476,7 +497,7 @@ export function LabResultForm({
     }
 
     for (const item of activeItems) {
-      if (!item.valueStr.trim() || isNaN(Number(item.valueStr))) {
+      if (!parseResultValue(item.valueStr)) {
         showAlert(
           'Invalid Value',
           `Please provide a valid numeric value for ${item.definition.name}.`
@@ -509,7 +530,8 @@ export function LabResultForm({
         name: item.definition.name,
         loinc: getUnitLoinc(item.definition, item.selectedUcum),
         codeSystem: item.definition.codeSystem,
-        value: parseFloat(item.valueStr),
+        ...parseResultValue(item.valueStr)!,
+        ...(item.comparator && { comparator: item.comparator }),
         unit: item.selectedUnit.trim(),
         ucumCode: item.selectedUcum.trim(),
       }));
@@ -709,9 +731,34 @@ export function LabResultForm({
                     <OwnTestLabel style={styles.cardOwnTestLabel} />
                   )}
 
-                  {/* Input Row: = [value] [unit v] */}
+                  {/* Input Row: [= v] [value] [unit v] */}
                   <View style={styles.valueRow}>
-                    <Text style={styles.equalsSign}>=</Text>
+                    <View style={styles.comparatorSelect}>
+                      <NativeSelect
+                        compact
+                        testID={`marker-comparator-${index}`}
+                        name={`marker-comparator-${item.id}`}
+                        label={`${item.definition.name} is`}
+                        value={item.comparator ?? '='}
+                        options={COMPARATOR_OPTIONS}
+                        onChange={(sign) =>
+                          setActiveItems((prev) =>
+                            prev.map((current, i) =>
+                              i === index
+                                ? {
+                                    ...current,
+                                    comparator:
+                                      sign === '='
+                                        ? undefined
+                                        : (sign as ResultComparator),
+                                  }
+                                : current
+                            )
+                          )
+                        }
+                      />
+                    </View>
+
                     <TextInput
                       testID={`marker-value-input-${index}`}
                       id={`marker-value-input-${index}`}
@@ -973,11 +1020,8 @@ const styles = StyleSheet.create({
     gap: 8,
     width: '100%',
   },
-  equalsSign: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.light.textSecondary,
-    marginRight: 2,
+  comparatorSelect: {
+    width: 56,
     flexShrink: 0,
   },
   valueInput: {

@@ -487,6 +487,45 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     });
   });
 
+  test('records a result given only as a bound, like "< 3"', async ({
+    page,
+  }) => {
+    await useSingleColumnLayout(page);
+    await openRoute(page, '/lab-result/add');
+    await page.getByTestId('test-search-input').fill('TPO');
+    await page.getByTestId('autocomplete-item-tpo_antibodies').click();
+    const sign = page.locator('#marker-comparator-0');
+    await expect(sign).toHaveValue('=');
+    await expect(sign).toHaveAccessibleName(
+      'Thyroid Peroxidase Antibodies (TPO Ab) is'
+    );
+    await sign.selectOption('<');
+    await page.getByTestId('marker-value-input-0').fill('3');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/lab-result\/add/);
+    const [{ quantity }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        "SELECT json_extract(fhir_json, '$.valueQuantity') AS quantity FROM observations"
+      )
+    );
+    expect(JSON.parse(quantity)).toMatchObject({ value: 3, comparator: '<' });
+
+    await openRoute(page, '/biomarker/8099-4');
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('<3');
+    await expect(page.getByTestId('biomarker-history-list')).toContainText(
+      '<3IU/mL'
+    );
+
+    const [{ id }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM diagnostic_reports'
+      )
+    );
+    await openRoute(page, `/lab-result/${id}/edit`);
+    await expect(page.locator('#marker-comparator-0')).toHaveValue('<');
+    await expect(page.getByTestId('marker-value-input-0')).toHaveValue('3');
+  });
+
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {

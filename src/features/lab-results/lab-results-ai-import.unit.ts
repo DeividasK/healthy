@@ -221,3 +221,29 @@ test('instructions list the user’s own tests so the AI reuses their names', ()
     'My own tests, already in the app. For the same test, use "own" with exactly this name:\n- NAD+. Unit: µM\n- Telomere length. Unit: kb'
   );
 });
+
+test('keeps the sign of a result given only as a bound', () => {
+  const result = parseLabResultsAIReply(
+    `{"healthyLabResults": 1, "date": "2026-09-20", "results": [
+      { "test": "rheumatoid_factor", "value": "< 20.00", "unit": "IU/mL" },
+      { "test": "tpo_antibodies", "value": "<3", "unit": "IU/mL" },
+      { "test": "ferritin", "value": 85, "unit": "ng/mL" }
+    ]}`,
+    today
+  );
+  if (!result.ok) throw new Error(result.errors.join('\n'));
+  expect(
+    result.data.results.map(({ marker, value, comparator }) => [
+      marker.id,
+      value,
+      comparator,
+    ])
+  ).toEqual([
+    ['rheumatoid_factor', '20', '<'],
+    ['tpo_antibodies', '3', '<'],
+    ['ferritin', '85', undefined],
+  ]);
+  expect(buildLabResultsAIInstructions()).toContain(
+    'write "value" as text with the sign, e.g. "<20.00" or ">90"'
+  );
+});

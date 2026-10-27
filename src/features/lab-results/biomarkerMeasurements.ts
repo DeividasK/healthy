@@ -1,4 +1,4 @@
-import type { Observation } from 'fhir/r5';
+import type { Observation, Quantity } from 'fhir/r5';
 import {
   BIOMARKERS,
   hasLoincCode,
@@ -300,4 +300,41 @@ export function getMissingDemographics(
       missing.add(field);
   }
   return (['sex', 'age'] as const).filter((field) => missing.has(field));
+}
+
+export type ResultComparator = NonNullable<Quantity['comparator']>;
+
+const COMPARATOR_SIGNS: Partial<Record<ResultComparator, string>> = {
+  '<': '<',
+  '<=': '≤',
+  '>=': '≥',
+  '>': '>',
+};
+
+/**
+ * The sign before a result reported only as a bound, e.g. "<" for a
+ * result of "< 20" (below what the laboratory can measure); '' otherwise.
+ */
+export function getValueComparator(observation?: Observation): string {
+  const comparator = observation?.valueQuantity?.comparator;
+  return (comparator && COMPARATOR_SIGNS[comparator]) || '';
+}
+
+/**
+ * Reads a value as written in a report: a number, optionally after a
+ * bound sign, e.g. "14.2", "< 20.00", "≤3" or ">=5". Accepts a comma as the
+ * decimal separator.
+ */
+export function parseResultValue(
+  text: string
+): { value: number; comparator?: ResultComparator } | undefined {
+  const match = text
+    .trim()
+    .replace(',', '.')
+    .match(/^(<=|>=|<|>|≤|≥)?\s*(\d+(?:\.\d+)?)$/);
+  if (!match) return undefined;
+  const sign = match[1];
+  const comparator = (sign === '≤' ? '<=' : sign === '≥' ? '>=' : sign) as
+    ResultComparator | undefined;
+  return { value: Number(match[2]), ...(comparator && { comparator }) };
 }

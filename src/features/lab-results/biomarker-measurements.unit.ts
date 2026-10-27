@@ -7,7 +7,9 @@ import {
   getObservationMarker,
   getObservationReferenceRange,
   getObservationStatus,
+  getValueComparator,
   isSupportedObservation,
+  parseResultValue,
   roundConvertedValue,
   toRangeStatus,
 } from './biomarkerMeasurements';
@@ -246,4 +248,20 @@ test('collapses low and high results into out of range', () => {
   expect(toRangeStatus('High')).toBe('outOfRange');
   expect(toRangeStatus('Normal')).toBe('inRange');
   expect(toRangeStatus(undefined)).toBeUndefined();
+});
+
+test('reads values given as a bound and shows their sign', () => {
+  expect(parseResultValue('14.2')).toEqual({ value: 14.2 });
+  expect(parseResultValue('< 20.00')).toEqual({ value: 20, comparator: '<' });
+  expect(parseResultValue('≤3,5')).toEqual({ value: 3.5, comparator: '<=' });
+  expect(parseResultValue('>=90')).toEqual({ value: 90, comparator: '>=' });
+  expect(parseResultValue('<')).toBeUndefined();
+  expect(parseResultValue('abc')).toBeUndefined();
+  expect(
+    getValueComparator({
+      ...observation(),
+      valueQuantity: { value: 3, comparator: '<=' },
+    })
+  ).toBe('≤');
+  expect(getValueComparator(observation())).toBe('');
 });

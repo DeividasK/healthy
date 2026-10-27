@@ -68,6 +68,7 @@ import { formatDisplayDate } from '@/src/utils/dateUtils';
 import {
   convertBiomarkerValue,
   getObservationMarker,
+  getValueComparator,
   getObservationReferenceRange,
   getObservationStatus,
   getObservationUnitCode,
@@ -468,6 +469,7 @@ export function BiomarkerDetailView({
         <Text style={styles.sectionTitle}>Latest</Text>
         <View style={styles.latestValueGroup}>
           <Text style={styles.latestValue} testID="biomarker-latest-value">
+            {getValueComparator(latestMeasurement.observation)}
             {latestMeasurement.value}
           </Text>
           {displayUnit ? (
@@ -596,6 +598,7 @@ export function BiomarkerDetailView({
               <BiomarkerValueRow
                 title={formatDisplayDate(measurement.date)}
                 value={measurement.value}
+                comparator={getValueComparator(measurement.observation)}
                 unit={measurement.unit}
                 low={measurement.range?.low}
                 high={measurement.range?.high}
@@ -1124,6 +1127,7 @@ function BiomarkerChart({
                     fontWeight="700"
                     textAnchor="middle"
                   >
+                    {getValueComparator(measurements[index].observation)}
                     {formatChartValue(measurements[index].value)}
                   </SvgText>
                 )}
@@ -1159,7 +1163,7 @@ function BiomarkerChart({
             key={measurements[index].id}
             testID={`biomarker-point-${index}`}
             accessible
-            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${formatChartValue(measurements[index].value)} ${measurements[index].unit}`}
+            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${getValueComparator(measurements[index].observation)}${formatChartValue(measurements[index].value)} ${measurements[index].unit}`}
             style={[
               styles.pointTarget,
               { left: point.x - 12, top: point.y - 12 },
