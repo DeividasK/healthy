@@ -185,13 +185,19 @@ export function BiomarkerDetailView({
     if (isPatientLoading || !activePatientId) return;
     const generation = ++loadGeneration.current;
     const patientId = activePatientId;
-    setHistory({
-      patientId,
-      reports: [],
-      conditionLinks: [],
-      isLoading: true,
-      hasError: false,
-    });
+    // A reload for the same patient keeps showing the loaded results until
+    // the new ones arrive, so the page doesn't flash its skeleton.
+    setHistory((previous) =>
+      previous.patientId === patientId && !previous.isLoading
+        ? previous
+        : {
+            patientId,
+            reports: [],
+            conditionLinks: [],
+            isLoading: true,
+            hasError: false,
+          }
+    );
     try {
       const [loadedReports, conditionLinks] = await Promise.all([
         getAllReports(patientId),
@@ -564,6 +570,7 @@ export function BiomarkerDetailView({
   return (
     <ResourceViewLayout
       testID="biomarker-view"
+      contentKey={id}
       wide={isWide}
       title={title}
       titleTestID="biomarker-title"

@@ -143,6 +143,8 @@ test('lists every treatment and filters them by current usage', async ({
 });
 
 test('desktop shows the chosen treatment beside the list', async ({ page }) => {
+  // A desktop window in every project, phones included.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await openRoute(page, '/treatments');
   const view = page.getByTestId('treatments-view');
   const row = (id: string) => view.getByTestId(`treatments-row-${id}`);

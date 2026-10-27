@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
+import { expandBiomarkerGroups } from '@/src/features/testing/testSections';
 
 test('Labs Summary page - full and filtered latest results', async ({
   page,
@@ -26,6 +27,9 @@ test('Labs Summary page - full and filtered latest results', async ({
   });
   await page.goto('/labs-summary');
   const view = page.getByTestId('labs-summary-view');
+  await view.getByTestId('labs-summary-groups-inRange-toggle').waitFor();
+  await takeSnapshot(page, 'Labs Summary - collapsed groups', testInfo);
+  await expandBiomarkerGroups(view.getByTestId('labs-summary'));
   await view.getByTestId('labs-summary-result-718-7').waitFor();
   await takeSnapshot(page, 'Labs Summary - all biomarkers', testInfo);
   await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
