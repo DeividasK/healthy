@@ -29,11 +29,16 @@ export function createNarrativeDiv(text: string): string {
 export function parseNarrativeDiv(div?: string | null): string | null {
   if (!div) return null;
 
-  const textWithNewlines = div
+  let textWithNewlines = div
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>\s*<p>/gi, '\n\n')
-    .replace(/<[^>]*>/g, '')
-    .trim();
+    .replace(/<\/p>\s*<p>/gi, '\n\n');
+  // Removing a tag can join the text around it into a new one, so repeat.
+  let previous;
+  do {
+    previous = textWithNewlines;
+    textWithNewlines = textWithNewlines.replace(/<[^>]*>/g, '');
+  } while (textWithNewlines !== previous);
+  textWithNewlines = textWithNewlines.trim();
 
   if (!textWithNewlines) return null;
 
