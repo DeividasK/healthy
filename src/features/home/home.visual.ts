@@ -173,8 +173,12 @@ test.describe('Home View - Visual Regression', () => {
     );
     await page
       .getByRole('combobox', { name: 'Period' })
-      .selectOption({ label: '1 month' });
-    await takeSnapshot(page, 'Home View - Labs Summary last month', testInfo);
+      .selectOption({ label: '6 months' });
+    await takeSnapshot(
+      page,
+      'Home View - Labs Summary last 6 months',
+      testInfo
+    );
     await page.screenshot({ path: testInfo.outputPath('labs-summary.png') });
   });
   test('Home View - Collapsed and expanded sections', async ({

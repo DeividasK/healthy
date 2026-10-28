@@ -6,8 +6,6 @@ import {
 
 export const SUMMARY_SORT_OPTIONS = [
   { id: 'deviation', label: 'Largest deviations' },
-  { id: 'lowest', label: 'Lowest' },
-  { id: 'highest', label: 'Highest' },
   { id: 'newest', label: 'Newest' },
   { id: 'oldest', label: 'Oldest' },
 ] as const;
@@ -43,19 +41,14 @@ export function sortSummaryBiomarkers<T extends SortableBiomarker>(
   ranges?: BiomarkerRanges
 ): T[] {
   const ranked = biomarkers.map((biomarker) => {
+    if (sort !== 'deviation') return { biomarker, rank: biomarker.time };
     const deviation = signedDeviation(biomarker.observation, ranges);
     return {
       biomarker,
-      rank:
-        sort === 'newest' || sort === 'oldest'
-          ? biomarker.time
-          : sort === 'deviation' && deviation !== undefined
-            ? Math.abs(deviation)
-            : deviation,
+      rank: deviation === undefined ? undefined : Math.abs(deviation),
     };
   });
-  const descending =
-    sort === 'deviation' || sort === 'highest' || sort === 'newest';
+  const descending = sort !== 'oldest';
   return ranked
     .sort((a, b) => {
       const aValid = a.rank !== undefined && Number.isFinite(a.rank);
