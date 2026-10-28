@@ -69,6 +69,11 @@ export const THEME_COLORS = {
     inRangeTint: '#DCE8E1',
     inRangeWash: '#E6EFE9',
     noRange: '#d9dbd7',
+    // Sufficient: in range but outside the optimal part. A warm mid grey,
+    // darker than No range, between apricot and sage in lightness.
+    sufficient: '#7d93a6',
+    sufficientTint: '#dee2e4',
+    sufficientWash: '#eff0ef',
     // Graph grid inside charts: sage at 10%, visible on both range washes.
     chartGrid: 'rgba(61, 100, 80, 0.1)',
     // Condition severity markers: one ink, the fill level shows the severity.

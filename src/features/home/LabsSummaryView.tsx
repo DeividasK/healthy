@@ -14,7 +14,7 @@ import {
   PERIODS,
   periodCutoff,
 } from './LabsSummary';
-import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
 import {
   BiomarkerSelectionContext,
   getBiomarkerRouteId,
@@ -74,20 +74,16 @@ export function LabsSummaryView() {
     [isCurrentPatient, activePatientId, data.reports]
   );
   // The list's own filters, so the default is a row the list shows.
-  const demographics = useRangeDemographics();
+  const ranges = useBiomarkerRanges();
   const months = PERIODS.find(({ id }) => id === period)?.months ?? 0;
   // Desktop: the list stays on the left and the chosen biomarker shows on
   // the right, starting with the first one out of range.
   const firstId = useMemo(() => {
-    const biomarkers = latestBiomarkers(
-      reports,
-      periodCutoff(months),
-      demographics
-    );
+    const biomarkers = latestBiomarkers(reports, periodCutoff(months), ranges);
     const first =
       biomarkers.find(({ status }) => status === 'outOfRange') ?? biomarkers[0];
     return first && getBiomarkerRouteId(first.observation);
-  }, [reports, months, demographics]);
+  }, [reports, months, ranges]);
   const selectedId = biomarker ?? firstId;
   const selection = useMemo(
     () => ({

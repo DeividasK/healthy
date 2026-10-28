@@ -78,8 +78,18 @@ test.describe('Home View - Visual Regression', () => {
       id: 'report-home-single',
       date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: 14.5 },
-        { name: 'White Blood Cells', value: 6.8 },
+        {
+          name: 'Hemoglobin',
+          value: 14.5,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'White Blood Cells',
+          value: 6.8,
+          referenceLow: 4.5,
+          referenceHigh: 11,
+        },
       ],
       notes: 'Routine morning blood test',
     });
@@ -100,9 +110,24 @@ test.describe('Home View - Visual Regression', () => {
       id: 'report-home-multi-1',
       date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: 15.2 },
-        { name: 'White Blood Cells', value: 3.1 },
-        { name: 'Platelets', value: 480 },
+        {
+          name: 'Hemoglobin',
+          value: 15.2,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'White Blood Cells',
+          value: 3.1,
+          referenceLow: 4.5,
+          referenceHigh: 11,
+        },
+        {
+          name: 'Platelets',
+          value: 480,
+          referenceLow: 150,
+          referenceHigh: 450,
+        },
       ],
       notes: 'Follow-up consultation notes',
     });
@@ -111,15 +136,32 @@ test.describe('Home View - Visual Regression', () => {
       id: 'report-home-multi-2',
       date: '2020-10-02',
       biomarkers: [
-        { name: 'Red Blood Cells', value: 4.7 },
-        { name: 'Hematocrit', value: 41.5 },
+        {
+          name: 'Red Blood Cells',
+          value: 4.7,
+          referenceLow: 3.92,
+          referenceHigh: 5.65,
+        },
+        {
+          name: 'Hematocrit',
+          value: 41.5,
+          referenceLow: 35.5,
+          referenceHigh: 48.6,
+        },
       ],
     });
 
     await seedTestReport(page, {
       id: 'report-home-multi-older',
       date: '2026-09-20',
-      biomarkers: [{ name: 'Hemoglobin', value: 8 }],
+      biomarkers: [
+        {
+          name: 'Hemoglobin',
+          value: 8,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+      ],
     });
     await page.goto('/');
     await page.getByTestId('labs-summary-grid-cell-777-3').waitFor();

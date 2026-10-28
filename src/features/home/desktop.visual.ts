@@ -17,18 +17,48 @@ test.describe('Desktop - Visual Regression', () => {
       id: 'desktop-visual-report',
       date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: 15.2 },
-        { name: 'White Blood Cells', value: 3.1 },
-        { name: 'Platelets', value: 480 },
-        { name: 'Red Blood Cells', value: 4.7 },
+        {
+          name: 'Hemoglobin',
+          value: 15.2,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'White Blood Cells',
+          value: 3.1,
+          referenceLow: 4.5,
+          referenceHigh: 11,
+        },
+        {
+          name: 'Platelets',
+          value: 480,
+          referenceLow: 150,
+          referenceHigh: 450,
+        },
+        {
+          name: 'Red Blood Cells',
+          value: 4.7,
+          referenceLow: 3.92,
+          referenceHigh: 5.65,
+        },
       ],
     });
     await seedTestReport(page, {
       id: 'desktop-visual-older',
       date: '2026-06-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: 14.1 },
-        { name: 'White Blood Cells', value: 4.2 },
+        {
+          name: 'Hemoglobin',
+          value: 14.1,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'White Blood Cells',
+          value: 4.2,
+          referenceLow: 4.5,
+          referenceHigh: 11,
+        },
       ],
     });
   });
