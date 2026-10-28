@@ -18,9 +18,8 @@ jobs:
           persist-credentials: false
           # The changelog check diffs the branch against origin/main.
           fetch-depth: 0
-      - uses: pnpm/setup@v3
+      - uses: ./.github/actions/setup-pnpm
         with:
-          cache: true
           save-cache: false
       - name: TypeScript Check
         run: pnpm tsc --noEmit
@@ -60,9 +59,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/setup@v3
+      - uses: ./.github/actions/setup-pnpm
         with:
-          cache: true
           save-cache: false
       - uses: ./.github/actions/android-debug-build
 
@@ -77,9 +75,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/setup@v3
-        with:
-          cache: true
+      - uses: ./.github/actions/setup-pnpm
       - uses: ./.github/actions/build-web
 
   e2e-shards:
@@ -96,9 +92,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/setup@v3
+      - uses: ./.github/actions/setup-pnpm
         with:
-          cache: true
           save-cache: false
       - name: Run E2E Tests
         env:
@@ -128,9 +123,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/setup@v3
+      - uses: ./.github/actions/setup-pnpm
         with:
-          cache: true
           save-cache: false
       - uses: actions/download-artifact@v5
         with:
@@ -167,9 +161,8 @@ jobs:
           fetch-depth: 0
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: pnpm/setup@v3
+      - uses: ./.github/actions/setup-pnpm
         with:
-          cache: true
           save-cache: false
       - name: Run Visual Tests
         run: pnpm test:visual
