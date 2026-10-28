@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,10 @@ import {
   Platform,
 } from 'react-native';
 import { COLORS } from '@/src/theme/colors';
+import { useFieldRevealContext } from './FieldReveal';
+
+/** The card's top margin and borders, on top of its list height. */
+const CARD_CHROME = 8;
 
 export interface AutocompleteItem {
   id: string;
@@ -24,7 +28,14 @@ export interface AutocompleteDropdownProps {
   maxHeight?: number;
 }
 
-export function AutocompleteDropdown({
+export function AutocompleteDropdown(props: AutocompleteDropdownProps) {
+  if (props.items.length === 0) {
+    return null;
+  }
+  return <DropdownCard {...props} />;
+}
+
+function DropdownCard({
   items,
   onSelect,
   focusedId,
@@ -33,12 +44,19 @@ export function AutocompleteDropdown({
   itemTestIDPrefix = 'autocomplete-item-',
   maxHeight = 180,
 }: AutocompleteDropdownProps) {
-  if (items.length === 0) {
-    return null;
-  }
+  const cardRef = useRef<View>(null);
+  const reveal = useFieldRevealContext();
+
+  // Opening near the bottom of a form scrolls the whole list above the
+  // action dock, which would otherwise cover its lower options.
+  useEffect(() => {
+    if (!reveal || !cardRef.current) return;
+    reveal.revealDropdown(cardRef.current, maxHeight + CARD_CHROME);
+    return () => reveal.closeDropdown();
+  }, [reveal, maxHeight]);
 
   return (
-    <View style={[styles.card, { maxHeight }]} testID={testID}>
+    <View ref={cardRef} style={[styles.card, { maxHeight }]} testID={testID}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
