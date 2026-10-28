@@ -1,9 +1,13 @@
-import type { Observation } from 'fhir/r5';
+import type { Observation, Quantity } from 'fhir/r5';
 import {
   BIOMARKERS,
   hasLoincCode,
   type BiomarkerDefinition,
 } from '@/src/data/biomarkers';
+import {
+  CUSTOM_TEST_SYSTEM,
+  customTestBiomarker,
+} from '@/src/data/biomarkers/customTests';
 import { LOINC_CODE_PATTERN, loincTestBiomarker } from '@/src/data/loinc';
 
 export type MeasurementStatus = 'Low' | 'Normal' | 'High';
@@ -53,7 +57,19 @@ export function getObservationMarker(
     BIOMARKERS.find((marker) => byCode(marker) && byName(marker)) ??
     BIOMARKERS.find(byName) ??
     BIOMARKERS.find(byCode) ??
-    getLoincTestMarker(observation)
+    getLoincTestMarker(observation) ??
+    getCustomTestMarker(observation)
+  );
+}
+
+function getCustomTestMarker(observation: Observation) {
+  const coding = observation.code.coding?.[0];
+  const unit =
+    observation.valueQuantity?.unit || observation.valueQuantity?.code;
+  if (coding?.system !== CUSTOM_TEST_SYSTEM || !unit) return undefined;
+  return customTestBiomarker(
+    coding.display || observation.code.text || '',
+    unit
   );
 }
 
@@ -169,4 +185,41 @@ function significantDigits(value: number) {
 export function roundConvertedValue(converted: number, source: number) {
   if (converted === source || converted === 0) return converted;
   return Number(converted.toPrecision(Math.max(2, significantDigits(source))));
+}
+
+export type ResultComparator = NonNullable<Quantity['comparator']>;
+
+const COMPARATOR_SIGNS: Partial<Record<ResultComparator, string>> = {
+  '<': '<',
+  '<=': '≤',
+  '>=': '≥',
+  '>': '>',
+};
+
+/**
+ * The sign before a result reported only as a bound, e.g. "<" for a
+ * result of "< 20" (below what the laboratory can measure); '' otherwise.
+ */
+export function getValueComparator(observation?: Observation): string {
+  const comparator = observation?.valueQuantity?.comparator;
+  return (comparator && COMPARATOR_SIGNS[comparator]) || '';
+}
+
+/**
+ * Reads a value as written in a report: a number, optionally after a
+ * bound sign, e.g. "14.2", "< 20.00", "≤3" or ">=5". Accepts a comma as the
+ * decimal separator.
+ */
+export function parseResultValue(
+  text: string
+): { value: number; comparator?: ResultComparator } | undefined {
+  const match = text
+    .trim()
+    .replace(',', '.')
+    .match(/^(<=|>=|<|>|≤|≥)?\s*(\d+(?:\.\d+)?)$/);
+  if (!match) return undefined;
+  const sign = match[1];
+  const comparator = (sign === '≤' ? '<=' : sign === '≥' ? '>=' : sign) as
+    ResultComparator | undefined;
+  return { value: Number(match[2]), ...(comparator && { comparator }) };
 }

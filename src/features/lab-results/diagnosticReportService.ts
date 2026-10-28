@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import type { DiagnosticReport, Observation } from 'fhir/r5';
+import type { DiagnosticReport, Observation, Quantity } from 'fhir/r5';
 import { GENERAL_LAB_REPORT_LOINC } from '@/src/data/biomarkers';
 import {
   insertDiagnosticReportRecord,
@@ -30,7 +30,11 @@ export interface BiomarkerInputItem {
   id: string; // marker canonical id or loinc
   name: string;
   loinc: string;
+  /** Code system of `loinc` when it isn't LOINC. */
+  codeSystem?: string;
   value: number;
+  /** Set when the report gives only a bound, e.g. "<" for "< 20". */
+  comparator?: Quantity['comparator'];
   unit: string;
   ucumCode: string;
   referenceLow?: number;
@@ -68,7 +72,12 @@ export function buildFHIRObservation(
   // Calculate optional interpretation if reference range is available
   let interpretation: Observation['interpretation'] = undefined;
 
-  if (item.referenceLow !== undefined || item.referenceHigh !== undefined) {
+  // A result given only as a bound leaves its status to be read from the
+  // bound against the range (see getObservationStatus).
+  if (
+    !item.comparator &&
+    (item.referenceLow !== undefined || item.referenceHigh !== undefined)
+  ) {
     let code = 'N';
     let display = 'Normal';
     if (item.referenceLow !== undefined && item.value < item.referenceLow) {
@@ -114,7 +123,7 @@ export function buildFHIRObservation(
     code: {
       coding: [
         {
-          system: 'http://loinc.org',
+          system: item.codeSystem ?? 'http://loinc.org',
           code: item.loinc,
           display: item.name,
         },
@@ -128,6 +137,7 @@ export function buildFHIRObservation(
     effectiveDateTime,
     valueQuantity: {
       value: item.value,
+      ...(item.comparator && { comparator: item.comparator }),
       unit: item.unit,
       system: 'http://unitsofmeasure.org',
       code: item.ucumCode,

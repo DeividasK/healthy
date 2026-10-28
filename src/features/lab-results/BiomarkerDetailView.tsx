@@ -71,11 +71,13 @@ import { formatDisplayDate } from '@/src/utils/dateUtils';
 import {
   convertBiomarkerValue,
   getObservationMarker,
+  getValueComparator,
   getObservationUnitCode,
   isSupportedObservation,
   RANGE_STATUS_LABELS,
   roundConvertedValue,
   RANGE_STATUSES,
+  toRangeStatus,
   type RangeStatus,
 } from './biomarkerMeasurements';
 import { BiomarkerRangeSection } from './BiomarkerRangeSection';
@@ -83,12 +85,14 @@ import {
   buildBiomarkerRanges,
   hasOptimal,
   limitValue,
+  getBoundStatus,
   rangeInUnit,
   rangeOn as rangeOnDay,
   type BiomarkerRangeEntry,
   type ResolvedRange,
 } from './biomarkerRanges';
 import { getChartScale } from './chartScale';
+import { CUSTOM_TEST_SYSTEM } from '@/src/data/biomarkers/customTests';
 
 type Measurement = {
   date: string;
@@ -383,12 +387,17 @@ export function BiomarkerDetailView({
           low: limitValue(entry.low),
           high: limitValue(entry.high),
         };
+        const comparator = measurement.observation.valueQuantity?.comparator;
         const status: RangeStatus | undefined = !range
           ? undefined
-          : (range.low !== undefined && measurement.value < range.low) ||
-              (range.high !== undefined && measurement.value > range.high)
-            ? 'outOfRange'
-            : 'inRange';
+          : comparator && comparator !== 'ad'
+            ? toRangeStatus(
+                getBoundStatus(measurement.value, comparator, range)
+              )
+            : (range.low !== undefined && measurement.value < range.low) ||
+                (range.high !== undefined && measurement.value > range.high)
+              ? 'outOfRange'
+              : 'inRange';
         const optimalLow = limitValue(entry?.optimalLow);
         const optimalHigh = limitValue(entry?.optimalHigh);
         /** In range but outside the optimal part, when there is one. */
@@ -419,6 +428,9 @@ export function BiomarkerDetailView({
         console.error('Failed to save the biomarker unit:', error)
       );
   };
+  /** One of the user's own tests, which neither the catalog nor LOINC codes. */
+  const isOwnTest =
+    recordedLatest?.observation.code.coding?.[0]?.system === CUSTOM_TEST_SYSTEM;
   /** The code of the results as shown: a test's units can have codes of their own. */
   const latestCode =
     marker && displayUnit
@@ -508,6 +520,7 @@ export function BiomarkerDetailView({
         <Text style={styles.sectionTitle}>Latest</Text>
         <View style={styles.latestValueGroup}>
           <Text style={styles.latestValue} testID="biomarker-latest-value">
+            {getValueComparator(latestMeasurement.observation)}
             {latestMeasurement.value}
           </Text>
           {displayUnit ? (
@@ -595,20 +608,23 @@ export function BiomarkerDetailView({
     <>
       {chartMeasurements.length > 1 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Value history</Text>
-          <View style={styles.legend} testID="biomarker-chart-legend">
-            {legendStatuses.map((status) => (
-              <View key={status} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: STATUS_COLORS[status] },
-                  ]}
-                />
-                <Text style={styles.legendLabel}>{ZONE_LABELS[status]}</Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>History</Text>
+          {/* Without a range no result has a status for the legend to explain. */}
+          {chartMeasurements.some((measurement) => measurement.status) && (
+            <View style={styles.legend} testID="biomarker-chart-legend">
+              {legendStatuses.map((status) => (
+                <View key={status} style={styles.legendItem}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      { backgroundColor: STATUS_COLORS[status] },
+                    ]}
+                  />
+                  <Text style={styles.legendLabel}>{ZONE_LABELS[status]}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           <BiomarkerChart
             measurements={chartMeasurements}
             low={latestMeasurement.range?.low}
@@ -637,6 +653,7 @@ export function BiomarkerDetailView({
               <BiomarkerValueRow
                 title={formatDisplayDate(measurement.date)}
                 value={measurement.value}
+                comparator={getValueComparator(measurement.observation)}
                 unit={measurement.unit}
                 low={measurement.range?.low}
                 high={measurement.range?.high}
@@ -705,8 +722,10 @@ export function BiomarkerDetailView({
             ? marker.education?.about ||
               marker.description ||
               'This biomarker is one part of your laboratory result and is interpreted together with other findings.'
-            : // A LOINC test outside the catalog: say what the page is based on.
-              `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.`}
+            : isOwnTest
+              ? 'This is your own test, so Healthy has no guide for it.'
+              : // A LOINC test outside the catalog: say what the page is based on.
+                `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.`}
         </LearnItem>
         <LearnItem title="What it may affect">
           {marker?.education?.whatItMayAffect || ''}
@@ -1196,6 +1215,7 @@ function BiomarkerChart({
                     fontWeight="700"
                     textAnchor="middle"
                   >
+                    {getValueComparator(measurements[index].observation)}
                     {formatChartValue(measurements[index].value)}
                   </SvgText>
                 )}
@@ -1231,7 +1251,7 @@ function BiomarkerChart({
             key={measurements[index].id}
             testID={`biomarker-point-${index}`}
             accessible
-            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${formatChartValue(measurements[index].value)} ${measurements[index].unit}`}
+            accessibilityLabel={`${formatDisplayDate(measurements[index].date)}: ${getValueComparator(measurements[index].observation)}${formatChartValue(measurements[index].value)} ${measurements[index].unit}`}
             style={[
               styles.pointTarget,
               { left: point.x - 12, top: point.y - 12 },

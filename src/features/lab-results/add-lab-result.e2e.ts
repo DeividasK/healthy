@@ -440,6 +440,121 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     });
   });
 
+  test('records a test that isn’t in the list as the user’s own test', async ({
+    page,
+  }) => {
+    await useSingleColumnLayout(page);
+
+    await test.step('Add NAD+ from the search and type its unit', async () => {
+      await openRoute(page, '/lab-result/add');
+      await page
+        .getByTestId('date-picker-button')
+        .locator('input[type="date"]')
+        .fill('2026-04-10');
+      await page.getByTestId('test-search-input').fill('NAD+');
+      const addRow = page.getByTestId('autocomplete-add-custom');
+      await expect(addRow).toHaveText(
+        'Add “NAD+” as your own testFor tests not in the list, like telomere length'
+      );
+      await addRow.click();
+      await expect(page.getByTestId('marker-card-0')).toContainText(
+        'NAD+Your own test'
+      );
+      await page.getByTestId('marker-value-input-0').fill('31.5');
+      await page.getByTestId('marker-unit-input-0').fill('µM');
+      await page.getByTestId('save-button').click();
+      await expect(page).not.toHaveURL(/lab-result\/add/);
+      const stored = await page.evaluate(() =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+          "SELECT json_extract(fhir_json, '$.code.coding[0].system') AS system, loinc_code FROM observations"
+        )
+      );
+      expect(stored).toEqual([
+        {
+          system: 'https://usehealthy.app/fhir/CodeSystem/custom-test',
+          loinc_code: 'x-nad-plus',
+        },
+      ]);
+    });
+
+    await test.step('The search offers it again with its last unit', async () => {
+      await openRoute(page, '/lab-result/add');
+      await page.getByTestId('test-search-input').fill('nad+');
+      const option = page.getByTestId('autocomplete-item-x-nad-plus');
+      await expect(option).toHaveText('NAD+Your own test');
+      await expect(page.getByTestId('autocomplete-add-custom')).toHaveCount(0);
+      await option.click();
+      await expect(page.getByTestId('marker-unit-input-0')).toHaveValue('µM');
+      await page.getByTestId('marker-value-input-0').fill('38.2');
+      await page.getByTestId('save-button').click();
+      await expect(page).not.toHaveURL(/lab-result\/add/);
+    });
+
+    await test.step('Its page charts its history without a range legend', async () => {
+      await openRoute(page, '/biomarker/x-nad-plus');
+      await expect(page.getByTestId('biomarker-title')).toHaveText('NAD+');
+      await expect(page.getByTestId('biomarker-chart')).toBeVisible();
+      await expect(page.getByText('History', { exact: true })).toBeVisible();
+      await expect(page.getByTestId('biomarker-chart-legend')).toHaveCount(0);
+      await page.getByTestId('learn-toggle-about-this-biomarker').click();
+      await expect(
+        page.getByText('This is your own test, so Healthy has no guide for it.')
+      ).toBeVisible();
+    });
+
+    await test.step('Editing its report keeps it as the user’s own test', async () => {
+      const [{ id }] = await page.evaluate(() =>
+        (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+          "SELECT id FROM diagnostic_reports WHERE effective_date LIKE '2026-04-10%'"
+        )
+      );
+      await openRoute(page, `/lab-result/${id}/edit`);
+      await expect(page.getByTestId('marker-card-0')).toContainText(
+        'NAD+Your own test'
+      );
+      await expect(page.getByTestId('marker-unit-input-0')).toHaveValue('µM');
+    });
+  });
+
+  test('records a result given only as a bound, like "< 3"', async ({
+    page,
+  }) => {
+    await useSingleColumnLayout(page);
+    await openRoute(page, '/lab-result/add');
+    await page.getByTestId('test-search-input').fill('TPO');
+    await page.getByTestId('autocomplete-item-tpo_antibodies').click();
+    const sign = page.locator('#marker-comparator-0');
+    await expect(sign).toHaveValue('=');
+    await expect(sign).toHaveAccessibleName(
+      'Thyroid Peroxidase Antibodies (TPO Ab) is'
+    );
+    await sign.selectOption('<');
+    await page.getByTestId('marker-value-input-0').fill('3');
+    await page.getByTestId('save-button').click();
+    await expect(page).not.toHaveURL(/lab-result\/add/);
+    const [{ quantity }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        "SELECT json_extract(fhir_json, '$.valueQuantity') AS quantity FROM observations"
+      )
+    );
+    expect(JSON.parse(quantity)).toMatchObject({ value: 3, comparator: '<' });
+
+    await openRoute(page, '/biomarker/8099-4');
+    await expect(page.getByTestId('biomarker-latest-value')).toHaveText('<3');
+    await expect(page.getByTestId('biomarker-history-list')).toContainText(
+      '<3IU/mL'
+    );
+
+    const [{ id }] = await page.evaluate(() =>
+      (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
+        'SELECT id FROM diagnostic_reports'
+      )
+    );
+    await openRoute(page, `/lab-result/${id}/edit`);
+    await expect(page.locator('#marker-comparator-0')).toHaveValue('<');
+    await expect(page.getByTestId('marker-value-input-0')).toHaveValue('3');
+  });
+
   test('should show "Select Test" label and open dropdown with only test names upon clicking the input field', async ({
     page,
   }) => {
