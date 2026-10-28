@@ -22,9 +22,26 @@ test.describe('View Lab Result - Visual Regression', () => {
       notes: 'Fasting sample taken at 8am.\nRepeat in three months.',
       serviceProviderName: 'City Lab',
       biomarkers: [
-        { name: 'Hemoglobin', value: 14.5, unit: 'g/dL' },
-        { name: 'White Blood Cells', value: 12.4, unit: '10*3/uL' },
-        { name: 'Red Blood Cells', value: 3.9 },
+        {
+          name: 'Hemoglobin',
+          value: 14.5,
+          unit: 'g/dL',
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'White Blood Cells',
+          value: 12.4,
+          unit: '10*3/uL',
+          referenceLow: 4.5,
+          referenceHigh: 11,
+        },
+        {
+          name: 'Red Blood Cells',
+          value: 3.9,
+          referenceLow: 3.92,
+          referenceHigh: 5.65,
+        },
         // Together they add the calculated atherogenic index.
         { name: 'Triglycerides', value: 0.9, unit: 'mmol/L' },
         { name: 'HDL', value: 1.93, unit: 'mmol/L' },

@@ -1,39 +1,19 @@
 /**
  * Biomarker catalog: the tests lab results can record, with their LOINC
- * codes, UCUM units and typical reference ranges.
+ * codes and UCUM units.
  */
 import { CBC_MARKERS } from './cbc';
 import { COMMON_BIOMARKERS } from './common';
-import type { RangeRegion } from './rangeRegions';
-import { ANZ_RANGES } from './regions/anz';
-import type { BiomarkerDefinition, RegionalRange } from './types';
+import type { BiomarkerDefinition } from './types';
 
 export * from './types';
 
 export const GENERAL_LAB_REPORT_LOINC = '11502-2'; // Laboratory report
 
-/** Each region's own ranges, by catalog id; other markers use International. */
-export const REGIONAL_RANGES: Partial<
-  Record<RangeRegion, Record<string, RegionalRange>>
-> = {
-  anz: ANZ_RANGES,
-};
-
-function withRegionalRanges(marker: BiomarkerDefinition): BiomarkerDefinition {
-  const regionalRanges: BiomarkerDefinition['regionalRanges'] = {};
-  for (const [region, ranges] of Object.entries(REGIONAL_RANGES)) {
-    const range = ranges?.[marker.id];
-    if (range) regionalRanges[region as RangeRegion] = range;
-  }
-  return Object.keys(regionalRanges).length > 0
-    ? { ...marker, regionalRanges }
-    : marker;
-}
-
 export const BIOMARKERS: BiomarkerDefinition[] = [
   ...CBC_MARKERS,
   ...COMMON_BIOMARKERS,
-].map(withRegionalRanges);
+];
 
 /**
  * A biomarker results can record: one with a LOINC code. Calculated ones

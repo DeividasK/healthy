@@ -13,16 +13,31 @@ test('Labs Summary page - full and filtered latest results', async ({
   await seedTestReport(page, {
     date: '2026-10-02',
     biomarkers: [
-      { name: 'Hemoglobin', value: 15.2 },
-      { name: 'White Blood Cells', value: 3.1 },
-      { name: 'Platelets', value: 480 },
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+      {
+        name: 'White Blood Cells',
+        value: 3.1,
+        referenceLow: 4.5,
+        referenceHigh: 11,
+      },
+      { name: 'Platelets', value: 480, referenceLow: 150, referenceHigh: 450 },
     ],
   });
   await seedTestReport(page, {
     date: '2020-10-02',
     biomarkers: [
-      { name: 'Hemoglobin', value: 8 },
-      { name: 'Red Blood Cells', value: 4.7 },
+      { name: 'Hemoglobin', value: 8, referenceLow: 11.6, referenceHigh: 16.6 },
+      {
+        name: 'Red Blood Cells',
+        value: 4.7,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
     ],
   });
   await page.goto('/labs-summary');

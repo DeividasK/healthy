@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import type { Observation } from 'fhir/r5';
-import { getObservationStatus } from './biomarkerMeasurements';
 import {
   getCalculatedObservations,
   isCalculatedObservation,
@@ -55,7 +54,6 @@ test('works out the atherogenic index from triglycerides and HDL', () => {
   });
   expect(aip.code.coding).toBeUndefined();
   expect(isCalculatedObservation(aip)).toBe(true);
-  expect(getObservationStatus(aip)).toBe('Normal');
 });
 
 test('converts results in mg/dL to mmol/L first', () => {
@@ -65,7 +63,6 @@ test('converts results in mg/dL to mmol/L first', () => {
     result('hdl', '2085-9', 40, 'mg/dL')
   )!;
   expect(aip.valueQuantity?.value).toBe(0.21);
-  expect(getObservationStatus(aip)).toBe('High');
 });
 
 test('works out standard values with their codes, in the inputs’ unit', () => {

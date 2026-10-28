@@ -3,7 +3,6 @@ import {
   type BiomarkerCalculation,
   type BiomarkerCategory,
   type BiomarkerDefinition,
-  type DemographicRange,
   type UnitOption,
 } from './types';
 
@@ -21,24 +20,10 @@ export interface BiomarkerEntry {
   aliases?: string[];
   loinc?: string;
   unitLoinc?: Record<string, string>;
-  /** The first unit is the primary one, in which `range` is given. */
+  /** The first unit is the primary one. */
   units: UnitOption[];
-  /** The general adult range, used when no `ranges` entry applies. */
-  range?: { low?: number; high?: number };
-  /** Ranges by sex and age, most specific first. */
-  ranges?: DemographicRange[];
-  rangeNote?: string;
   description: string;
   calculation?: BiomarkerCalculation;
-}
-
-function rangeText(
-  { low, high }: { low?: number; high?: number },
-  unit: string
-): string {
-  if (low !== undefined && high !== undefined)
-    return `${low} - ${high} ${unit}`;
-  return high !== undefined ? `< ${high} ${unit}` : `> ${low} ${unit}`;
 }
 
 /** Builds catalog definitions for one category from compact entries. */
@@ -54,9 +39,6 @@ export function defineBiomarkers(
       loinc,
       unitLoinc,
       units,
-      range,
-      ranges,
-      rangeNote,
       description,
       calculation,
     }) => ({
@@ -69,11 +51,6 @@ export function defineBiomarkers(
       primaryUnit: units[0].label,
       ucumCode: units[0].ucum,
       units,
-      ...(range && {
-        referenceRange: { ...range, text: rangeText(range, units[0].label) },
-      }),
-      ...(ranges && { demographicRanges: ranges }),
-      ...(rangeNote && { rangeNote }),
       description,
       education: { ...EMPTY_BIOMARKER_EDUCATION },
       ...(calculation && { calculation }),

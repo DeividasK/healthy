@@ -7,11 +7,9 @@ import { getBiomarkerKey } from '@/src/data/biomarkers';
 import { COLORS } from '@/src/theme/colors';
 import { BiomarkerRangeLine } from '@/src/components/BiomarkerRangeLine';
 import { SelectedRowMarker } from '@/src/components/SelectedRowMarker';
-import {
-  getObservationMarker,
-  getObservationReferenceRange,
-} from '@/src/features/lab-results/biomarkerMeasurements';
-import { useRangeDemographics } from '@/src/features/lab-results/useRangeDemographics';
+import { getObservationMarker } from '@/src/features/lab-results/biomarkerMeasurements';
+import { getObservationRange } from '@/src/features/lab-results/biomarkerRanges';
+import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
 import { isCalculatedObservation } from '@/src/features/lab-results/calculatedBiomarkers';
 
 // PROTOTYPE: the desktop list-and-detail option. Inside a provider, rows
@@ -125,7 +123,7 @@ export function BiomarkerResultRow({
   const router = useRouter();
   const selection = useContext(BiomarkerSelectionContext);
   const routeId = getBiomarkerRouteId(observation);
-  const demographics = useRangeDemographics();
+  const ranges = useBiomarkerRanges({ refresh: false });
   const name = getBiomarkerName(observation);
   const code = observation.code?.coding?.[0]?.code;
   return (
@@ -136,7 +134,7 @@ export function BiomarkerResultRow({
       unit={
         observation.valueQuantity?.unit || observation.valueQuantity?.code || ''
       }
-      {...getObservationReferenceRange(observation, undefined, demographics)}
+      {...getObservationRange(observation, ranges)}
       testID={testID || `biomarker-row-${code || observation.id}`}
       rangeTestID={
         testID
