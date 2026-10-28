@@ -18,16 +18,13 @@ import {
 } from './profileSettingsRepository';
 import { LoadingView } from '@/src/components/LoadingView';
 import { CONTENT_COLUMN } from '@/src/theme/layout';
-import { getDeviceRangeRegion } from './deviceRangeRegion';
-import { RangeRegionField } from './RangeRegionField';
 
-const SECTIONS = ['timesOfDay', 'ranges'] as const;
+const SECTIONS = ['timesOfDay'] as const;
 type Section = (typeof SECTIONS)[number];
 
 /**
  * The active profile's settings, in sections that start folded unless the
- * `section` search param names one: the clock time of each part of the day,
- * and the region for biomarker ranges.
+ * `section` search param names one: the clock time of each part of the day.
  */
 export function SettingsView() {
   const { activePatientId, isLoading } = useActivePatient();
@@ -72,9 +69,7 @@ function SettingsForm({
 }) {
   const router = useRouter();
   const [timesOfDay, setTimesOfDay] = useState(initial.timesOfDay);
-  const [deviceRegion] = useState(getDeviceRangeRegion);
-  const [rangeRegion, setRangeRegion] = useState(initial.rangeRegion);
-  // A link may open one section, e.g. ?section=ranges from a biomarker page.
+  // A link may open one section, e.g. ?section=timesOfDay.
   const { section } = useLocalSearchParams<{ section?: string }>();
   const [openSections, setOpenSections] = useState<Section[]>(
     SECTIONS.filter((known) => known === section)
@@ -87,13 +82,13 @@ function SettingsForm({
     );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasChanges = useHasChanges({ timesOfDay, rangeRegion });
+  const hasChanges = useHasChanges({ timesOfDay });
 
   const handleSave = async () => {
     setError(null);
     setIsSaving(true);
     try {
-      await saveProfileSettings(patientId, { timesOfDay, rangeRegion });
+      await saveProfileSettings(patientId, { timesOfDay });
       if (router.canGoBack()) router.back();
       else router.replace('/');
     } catch (err) {
@@ -135,18 +130,6 @@ function SettingsForm({
               </FormField>
             );
           })}
-        </FoldingSection>
-        <FoldingSection
-          title="Biomarker Ranges"
-          isOpen={openSections.includes('ranges')}
-          onToggle={() => toggleSection('ranges')}
-          testID="settings-ranges"
-        >
-          <RangeRegionField
-            value={rangeRegion ?? deviceRegion}
-            pickedFromDevice={!rangeRegion}
-            onChange={setRangeRegion}
-          />
         </FoldingSection>
       </ScrollView>
       <FormActionDock

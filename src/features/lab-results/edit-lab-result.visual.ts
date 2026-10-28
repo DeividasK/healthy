@@ -18,8 +18,18 @@ test.describe('Edit Lab Result View - Visual Regression', () => {
       id: 'report-edit-test',
       date: '2026-10-02',
       biomarkers: [
-        { name: 'Hemoglobin', value: 13.8 },
-        { name: 'Platelets', value: 210 },
+        {
+          name: 'Hemoglobin',
+          value: 13.8,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+        {
+          name: 'Platelets',
+          value: 210,
+          referenceLow: 150,
+          referenceHigh: 450,
+        },
       ],
       notes: 'Initial checkup notes for editing',
     });

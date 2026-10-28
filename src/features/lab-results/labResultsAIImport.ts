@@ -7,6 +7,7 @@ import {
 } from '@/src/data/biomarkers';
 import { unitKind, type LoincLabTests } from '@/src/data/loinc';
 import {
+  isAbsent,
   parseAIValue,
   readAIDate,
   readAIReply,
@@ -14,6 +15,7 @@ import {
   readText,
   type AIImportResult,
 } from '@/src/utils/aiImport';
+import { isWrittenLimit } from './biomarkerRanges';
 
 /** Version marker the AI puts in its reply, so other JSON is not mistaken for it. */
 export const LAB_RESULTS_AI_FORMAT_KEY = 'healthyLabResults';
@@ -24,6 +26,9 @@ export interface ImportedLabResultItem {
   /** The value as the form's input shows it. */
   value: string;
   unit: UnitOption;
+  /** The range printed with the result, in its unit, as written. */
+  low?: string;
+  high?: string;
 }
 
 export interface ImportedLabResults {
@@ -58,7 +63,7 @@ Reply with exactly one JSON code block in this format:
   "time": "HH:MM",
   "serviceProvider": "Name of the laboratory",
   "results": [
-    { "test": "test id from the list below", "value": 0, "unit": "unit from the list below" }
+    { "test": "test id from the list below", "value": 0, "unit": "unit from the list below", "low": "0.0", "high": "0.0" }
   ]
 }
 \`\`\`
@@ -71,7 +76,8 @@ Rules:
 - "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
 - For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
 - Leave out tests in the list whose unit doesn't match one listed for them, and other tests whose LOINC code you aren't sure of. List the tests you leave out in a short note before the code block.
-- Don't add reference ranges, flags, comments or any other fields.
+- "low" and "high" are the limits of the reference range printed with the result, in the same unit. Write them as text, exactly as printed, keeping zeros like "5.0". For a range like "< 5" give only "high", for "> 60" only "low". Leave them out if the report prints no range for the test.
+- Don't add flags, comments or any other fields.
 
 Tests and units:
 ${tests}`;
@@ -105,6 +111,40 @@ function findUnit(marker: RecordableBiomarker, unitText: string) {
       normalizeUnit(option.label) === normalizeUnit(unitText) ||
       normalizeUnit(option.ucum) === normalizeUnit(unitText)
   );
+}
+
+/** A range limit as written, or undefined when absent; null when invalid. */
+function readLimit(value: unknown): string | undefined | null {
+  if (isAbsent(value)) return undefined;
+  const text =
+    typeof value === 'number'
+      ? String(value)
+      : typeof value === 'string'
+        ? value.trim().replace(',', '.')
+        : '';
+  return isWrittenLimit(text) ? text : null;
+}
+
+/** The printed range of a result, or undefined (with an error) when invalid. */
+function readRange(
+  item: Record<string, unknown>,
+  name: string,
+  errors: string[]
+): Pick<ImportedLabResultItem, 'low' | 'high'> | undefined {
+  const low = readLimit(item.low);
+  const high = readLimit(item.high);
+  if (
+    low === null ||
+    high === null ||
+    (low !== undefined && high !== undefined && Number(high) <= Number(low))
+  ) {
+    errors.push(`${name} has an invalid range.`);
+    return undefined;
+  }
+  return {
+    ...(low !== undefined && { low }),
+    ...(high !== undefined && { high }),
+  };
 }
 
 /**
@@ -182,12 +222,16 @@ export function parseLabResultsAIReply(
         return;
       }
 
+      const range = readRange(item, marker.name, errors);
+      if (!range) return;
+
       results.push({
         marker: marker.units.includes(unit)
           ? marker
           : { ...marker, units: [...marker.units, unit] },
         value: String(value),
         unit,
+        ...range,
       });
     });
   }

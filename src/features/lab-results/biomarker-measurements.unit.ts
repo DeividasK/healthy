@@ -5,8 +5,6 @@ import {
   assertCatalogObservation,
   convertBiomarkerValue,
   getObservationMarker,
-  getObservationReferenceRange,
-  getObservationStatus,
   isSupportedObservation,
   roundConvertedValue,
   toRangeStatus,
@@ -40,11 +38,6 @@ test('normalizes mixed units and rejects unsupported or non-finite conversions',
     expect(
       convertBiomarkerValue(value, 'g/L', 'g/L', hemoglobin)
     ).toBeUndefined();
-    expect(
-      getObservationStatus(
-        observation({ valueQuantity: { value, code: 'g/L' } })
-      )
-    ).toBeUndefined();
   }
 });
 
@@ -56,15 +49,6 @@ test('rounds converted range bounds to the precision they were written with', ()
   expect(roundConvertedValue(4.8762, 188.5)).toBe(4.876);
   expect(roundConvertedValue(135, 13.5)).toBe(135);
   expect(roundConvertedValue(150, 150)).toBe(150);
-  // A catalog range in mg/dL shown against a result in mmol/L.
-  expect(
-    getObservationReferenceRange({
-      resourceType: 'Observation',
-      status: 'final',
-      code: { coding: [{ system: 'http://loinc.org', code: '19123-9' }] },
-      valueQuantity: { value: 0.91, code: 'mmol/L', unit: 'mmol/L' },
-    })
-  ).toEqual({ low: 0.7, high: 0.91 });
 });
 
 test('validates catalog identity, missing units, and mismatched labels/codes', () => {
@@ -129,116 +113,6 @@ test('reads LOINC tests outside the catalog from the result itself', () => {
     }),
   ])
     expect(isSupportedObservation(value)).toBe(false);
-});
-
-test('uses unit-aligned catalog ranges and gives laboratory bounds precedence', () => {
-  // The general adult range, then the range for the patient's sex.
-  expect(getObservationReferenceRange(observation())).toEqual({
-    low: 116,
-    high: 166,
-  });
-  expect(
-    getObservationReferenceRange(observation(), undefined, { sex: 'male' })
-  ).toEqual({ low: 132, high: 166 });
-  expect(
-    getObservationReferenceRange(observation(), undefined, { sex: 'female' })
-  ).toEqual({ low: 116, high: 150 });
-  const laboratory = observation({
-    referenceRange: [
-      {
-        low: { value: 14, code: 'g/dL' },
-        high: { value: 14.9, code: 'g/dL' },
-      },
-    ],
-  });
-  expect(getObservationReferenceRange(laboratory)).toEqual({
-    low: 140,
-    high: 149,
-  });
-  expect(getObservationStatus(laboratory)).toBe('High');
-  for (const high of [140, 139]) {
-    expect(
-      getObservationReferenceRange(
-        observation({
-          referenceRange: [
-            {
-              low: { value: 140, code: 'g/L' },
-              high: { value: high, code: 'g/L' },
-            },
-          ],
-        })
-      )
-    ).toBeUndefined();
-  }
-  expect(
-    getObservationReferenceRange(
-      observation({
-        referenceRange: [
-          {
-            low: { value: 1, code: 'unknown' },
-            high: { value: 2, code: 'unknown' },
-          },
-        ],
-      })
-    )
-  ).toBeUndefined();
-});
-
-test('classifies boundary values and honors explicit FHIR interpretations', () => {
-  for (const [value, status] of [
-    [131, 'Low'],
-    [132, 'Normal'],
-    [166, 'Normal'],
-    [167, 'High'],
-  ] as const) {
-    expect(
-      getObservationStatus(
-        observation({ valueQuantity: { value, code: 'g/L' } }),
-        undefined,
-        { sex: 'male' }
-      )
-    ).toBe(status);
-  }
-  for (const [code, status] of [
-    ['L', 'Low'],
-    ['LL', 'Low'],
-    ['N', 'Normal'],
-    ['H', 'High'],
-    ['HH', 'High'],
-  ] as const) {
-    expect(
-      getObservationStatus(
-        observation({ interpretation: [{ coding: [{ code }] }] })
-      )
-    ).toBe(status);
-  }
-  expect(
-    getObservationStatus(
-      observation({ interpretation: [{ coding: [{ code: 'unknown' }] }] })
-    )
-  ).toBe('Normal');
-  expect(
-    getObservationStatus(observation({ valueQuantity: { code: 'g/L' } }))
-  ).toBeUndefined();
-});
-
-test('supports one-sided laboratory ranges without inventing a missing bound', () => {
-  const lowOnly = observation({
-    referenceRange: [{ low: { value: 160, code: 'g/L' } }],
-  });
-  expect(getObservationReferenceRange(lowOnly)).toEqual({
-    low: 160,
-    high: undefined,
-  });
-  expect(getObservationStatus(lowOnly)).toBe('Low');
-  const highOnly = observation({
-    referenceRange: [{ high: { value: 140, code: 'g/L' } }],
-  });
-  expect(getObservationReferenceRange(highOnly)).toEqual({
-    low: undefined,
-    high: 140,
-  });
-  expect(getObservationStatus(highOnly)).toBe('High');
 });
 
 test('collapses low and high results into out of range', () => {

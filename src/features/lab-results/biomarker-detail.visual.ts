@@ -5,6 +5,7 @@ import {
   seedTestReport,
   evaluateBridge,
 } from '@/src/features/testing/visualTest';
+import { seedRangeHistory } from './rangeTestSeed';
 import { expect } from '@playwright/test';
 
 test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
@@ -37,7 +38,14 @@ test('Biomarker detail - Red Blood Cells history', async ({
   await seedTestReport(page, {
     id: 'rbc-visual-first',
     date: '2026-08-01',
-    biomarkers: [{ name: 'Red Blood Cells', value: 4.5 }],
+    biomarkers: [
+      {
+        name: 'Red Blood Cells',
+        value: 4.5,
+        referenceLow: 4.35,
+        referenceHigh: 5.65,
+      },
+    ],
   });
   await seedTestReport(page, {
     id: 'rbc-visual-second',
@@ -113,7 +121,22 @@ for (const [layout, viewport] of [
   }, testInfo) => {
     if (viewport) await page.setViewportSize(viewport);
     await seedTestPatient(page);
-    // The catalog range is in mg/dL; the laboratory reported mmol/L.
+    // The range the user set is in mg/dL; the laboratory reported mmol/L.
+    await evaluateBridge(page, (bridge) =>
+      bridge.saveProfileSettings({
+        biomarkerRanges: {
+          '19123-9': [
+            {
+              low: '1.7',
+              high: '2.2',
+              unit: 'mg/dL',
+              since: '2026-01-01',
+              source: 'user',
+            },
+          ],
+        },
+      })
+    );
     await seedTestReport(page, {
       id: `magnesium-visual-${layout}`,
       date: '2026-06-01',
@@ -156,18 +179,41 @@ test('Biomarker detail - Switched to another unit', async ({
   );
 });
 
-test('Biomarker detail - Regional range', async ({ page }, testInfo) => {
-  await seedTestPatient(page);
-  await evaluateBridge(page, (bridge) =>
-    bridge.saveProfileSettings({ rangeRegion: 'anz' })
-  );
-  await seedTestReport(page, {
-    id: 'potassium-visual',
-    date: '2026-10-01',
-    biomarkers: [{ name: 'Potassium', value: 5.15, unit: 'mmol/L' }],
+for (const [layout, viewport] of [
+  ['mobile', undefined],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test(`Biomarker detail - Range set with an optimal part (${layout})`, async ({
+    page,
+  }, testInfo) => {
+    if (viewport) await page.setViewportSize(viewport);
+    await seedRangeHistory(page);
+    await page.goto('/biomarker/2823-3');
+    await page.getByTestId('biomarker-range-list-toggle').click();
+    await page.getByTestId('biomarker-range-2026-02-10').waitFor();
+    await takeSnapshot(
+      page,
+      `Biomarker detail - Range set with an optimal part (${layout})`,
+      testInfo
+    );
   });
-  await page.goto('/biomarker/2823-3');
-  await page.getByTestId('learn-toggle-range-source').click();
-  await page.getByTestId('biomarker-range-region-source').waitFor();
-  await takeSnapshot(page, 'Biomarker detail - Regional range', testInfo);
-});
+
+  test(`Biomarker detail - No range (${layout})`, async ({
+    page,
+  }, testInfo) => {
+    if (viewport) await page.setViewportSize(viewport);
+    await seedTestPatient(page);
+    await seedTestReport(page, {
+      id: `potassium-visual-none-${layout}`,
+      date: '2026-05-12',
+      biomarkers: [{ name: 'Potassium', value: 4.4, unit: 'mmol/L' }],
+    });
+    await page.goto('/biomarker/2823-3');
+    await page.getByTestId('biomarker-title').waitFor();
+    await takeSnapshot(
+      page,
+      `Biomarker detail - No range (${layout})`,
+      testInfo
+    );
+  });
+}

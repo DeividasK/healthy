@@ -1,7 +1,7 @@
 import {
-  isRangeRegion,
-  type RangeRegion,
-} from '@/src/data/biomarkers/rangeRegions';
+  isWrittenLimit,
+  type BiomarkerRangeEntry,
+} from '@/src/features/lab-results/biomarkerRanges';
 import { getWhenLabel } from '@/src/features/treatments/regimen';
 
 /** A part of the day offered in forms (FHIR `Timing.repeat.when`). */
@@ -31,10 +31,11 @@ export interface ProfileSettings {
    */
   biomarkerUnits?: Record<string, string>;
   /**
-   * The region whose biomarker ranges apply when a lab report has none of
-   * its own. Unset until the user picks one: the device's region applies.
+   * Ranges the user set on biomarker pages, by biomarker key (as in its
+   * page's route), each with the day it took effect. Ranges printed on lab
+   * reports live on the results.
    */
-  rangeRegion?: RangeRegion;
+  biomarkerRanges?: Record<string, BiomarkerRangeEntry[]>;
 }
 
 export const DEFAULT_TIMES_OF_DAY: Record<PartOfDay, string> = {
@@ -50,6 +51,26 @@ export const PARTS_OF_DAY = (
 ).map((code) => ({ code, label: getWhenLabel(code) }));
 
 const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A range the user set, with numbers as limits and at least one bound. */
+function isUserRange(entry: unknown): entry is BiomarkerRangeEntry {
+  if (!entry || typeof entry !== 'object') return false;
+  const range = entry as Partial<BiomarkerRangeEntry>;
+  const limits = [range.low, range.high, range.optimalLow, range.optimalHigh];
+  return (
+    range.source === 'user' &&
+    typeof range.unit === 'string' &&
+    typeof range.since === 'string' &&
+    ISO_DATE.test(range.since) &&
+    (range.low !== undefined || range.high !== undefined) &&
+    limits.every(
+      (limit) =>
+        limit === undefined ||
+        (typeof limit === 'string' && isWrittenLimit(limit))
+    )
+  );
+}
 
 /** Stored settings, with defaults for anything missing or invalid. */
 export function withDefaults(stored?: Partial<ProfileSettings> | null) {
@@ -78,15 +99,18 @@ export function withDefaults(stored?: Partial<ProfileSettings> | null) {
   if (storedUnits && typeof storedUnits === 'object')
     for (const [marker, unit] of Object.entries(storedUnits))
       if (typeof unit === 'string') biomarkerUnits[marker] = unit;
-  const rangeRegion = isRangeRegion(stored?.rangeRegion)
-    ? stored.rangeRegion
-    : undefined;
+  const biomarkerRanges: Record<string, BiomarkerRangeEntry[]> = {};
+  const storedRanges = stored?.biomarkerRanges;
+  if (storedRanges && typeof storedRanges === 'object')
+    for (const [marker, entries] of Object.entries(storedRanges))
+      if (Array.isArray(entries))
+        biomarkerRanges[marker] = entries.filter(isUserRange);
   return {
     ...stored,
     timesOfDay,
     journalOrder,
     biomarkerUnits,
-    rangeRegion,
+    biomarkerRanges,
   } as ProfileSettings;
 }
 
