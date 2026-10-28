@@ -16,6 +16,7 @@ import {
 } from '@/src/features/lab-results/biomarkerRanges';
 import { withCalculatedObservations } from '@/src/features/lab-results/calculatedBiomarkers';
 import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
+import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { CountBadge } from '@/src/components/CountBadge';
@@ -106,6 +107,7 @@ export function LabsSummary({
   autoFocusSearch?: boolean;
 }) {
   const router = useRouter();
+  const { activePatientId } = useActivePatient();
   const ranges = useBiomarkerRanges();
   const [search, setSearch] = useState('');
   // The user asked for search with a key, so focus is where they expect it.
@@ -160,10 +162,14 @@ export function LabsSummary({
         pressLabel="Open biomarkers"
         pressTestID="labs-summary-open"
         onPress={() =>
-          // Only a chosen period replaces the summary's saved one.
+          // Only a chosen period replaces the summary's saved one, and only
+          // for the profile it was chosen for.
           router.push({
             pathname: '/labs-summary',
-            params: period === 'all' ? {} : { period },
+            params:
+              period === 'all' || !activePatientId
+                ? {}
+                : { period, patient: activePatientId },
           })
         }
       >

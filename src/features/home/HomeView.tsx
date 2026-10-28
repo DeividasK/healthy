@@ -326,11 +326,12 @@ export function HomeView() {
   // Desktop: how you're doing beside what's going on, once there is both.
   // The overview's biomarkers keep their own filters, apart from the
   // Biomarkers page's.
-  const [overviewFilters, setOverviewFilters] = useSavedFilters(
-    activePatientId ? `home-biomarkers:${activePatientId}` : null,
-    DEFAULT_LABS_SUMMARY_FILTERS,
-    parseLabsSummaryFilters
-  );
+  const [overviewFilters, setOverviewFilters, overviewFiltersLoaded] =
+    useSavedFilters(
+      activePatientId ? `home-biomarkers:${activePatientId}` : null,
+      DEFAULT_LABS_SUMMARY_FILTERS,
+      parseLabsSummaryFilters
+    );
   const isOverview =
     isWideWindow &&
     (hasJournal || records.length > 0) &&
@@ -419,7 +420,8 @@ export function HomeView() {
       records={records}
       showAll={isOverview}
       filters={overviewFilters}
-      onFiltersChange={setOverviewFilters}
+      // A change before the saved filters load would overwrite them.
+      onFiltersChange={overviewFiltersLoaded ? setOverviewFilters : undefined}
     />
   );
   // Treatments Section

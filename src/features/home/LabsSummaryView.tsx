@@ -28,8 +28,9 @@ import { useIsWideLayout } from '@/src/theme/layout';
 
 /** The active patient's latest biomarker results for the chosen period, then every lab result. */
 export function LabsSummaryView() {
-  const { period, biomarker, focus } = useLocalSearchParams<{
+  const { period, patient, biomarker, focus } = useLocalSearchParams<{
     period?: string;
+    patient?: string;
     biomarker?: string;
     focus?: string;
   }>();
@@ -74,27 +75,22 @@ export function LabsSummaryView() {
     parseLabsSummaryFilters
   );
   // Home opens the summary with its own period, which becomes the saved one
-  // of the profile it was chosen for; a profile switch before it is saved
-  // drops it.
-  const [periodPatient, setPeriodPatient] = useState<string | null>(null);
-  const boundPatient =
-    period === undefined ? null : (periodPatient ?? activePatientId ?? null);
-  if (boundPatient !== periodPatient) setPeriodPatient(boundPatient);
+  // of the profile it was chosen for, and is dropped for any other.
   const homePeriod =
-    isPeriod(period) && boundPatient === activePatientId ? period! : undefined;
+    isPeriod(period) && patient === activePatientId ? period! : undefined;
   const filters = homePeriod
     ? { ...savedFilters, period: homePeriod }
     : savedFilters;
   useEffect(() => {
-    if (period === undefined || !activePatientId) return;
+    if (period === undefined && patient === undefined) return;
     if (homePeriod && !filtersLoaded) return;
     if (homePeriod && homePeriod !== savedFilters.period)
       setFilters({ ...savedFilters, period: homePeriod });
-    router.setParams({ period: undefined });
+    router.setParams({ period: undefined, patient: undefined });
   }, [
-    activePatientId,
     filtersLoaded,
     period,
+    patient,
     homePeriod,
     savedFilters,
     setFilters,

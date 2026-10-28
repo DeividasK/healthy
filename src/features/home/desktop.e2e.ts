@@ -100,7 +100,7 @@ test('Home puts results beside conditions, and stacks them when one side is empt
   await filters.getByTestId('labs-summary-filters-done').click();
   const filterOn = { name: 'Filter latest results, filters on' };
   await expect(summary.getByRole('button', filterOn)).toBeVisible();
-  await openRoute(page, '/');
+  await page.reload();
   await expect(summary.getByRole('button', filterOn)).toBeVisible();
   await openRoute(page, '/labs-summary');
   await expect(
