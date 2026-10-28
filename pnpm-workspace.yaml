@@ -24,3 +24,15 @@ minimumReleaseAgeExclude:
   - expo-network@57.0.3
   - expo-router@57.0.29
   - expo-sharing@57.0.24
+
+# Security fixes for transitive dev-only deps whose parents pin a vulnerable
+# version. Drop each entry once the parent ships the fix.
+overrides:
+  # Optional peer of react-native's CLI plugin. Without this pin pnpm resolves
+  # it to the newest release instead of the one matching react-native.
+  '@react-native/metro-config': 0.86.3
+  # serve@14.2.6 pins compression@1.8.1 (GHSA memory-leak DoS).
+  compression: 1.8.2
+  # @chromatic-com/playwright@1.0.0 pins storybook@10.2.13 (preview origin
+  # validation and dev server code injection advisories).
+  storybook: ^10.6.2

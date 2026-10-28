@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-26.04
     # This job warms the same pnpm cache/runtime as the browser jobs.
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,7 +89,7 @@ jobs:
       matrix:
         shard: [1, 2]
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,7 +155,7 @@ jobs:
       contents: read
     runs-on: ubuntu-26.04
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -164,13 +164,30 @@ jobs:
           fetch-depth: 0
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Chromatic bills per snapshot. When every commit on the branch can't
+      # change how the app looks (CI, tooling, docs), each one says so with a
+      # 'Chromatic: skip' trailer. The visual tests don't run, and Chromatic
+      # marks the commit as passing (its required UI Tests check) without
+      # taking any snapshots.
+      - name: Check for Chromatic Skip
+        id: skip
+        run: |
+          base=$(git merge-base origin/main HEAD)
+          commits=$(git rev-list --no-merges "$base..HEAD")
+          [ -n "$commits" ] || exit 0
+          for commit in $commits; do
+            git log -1 --format=%B "$commit" | grep -qiE '^Chromatic: *skip *$' || exit 0
+          done
+          echo "Skipping visual tests: every commit on this branch has a 'Chromatic: skip' trailer."
+          echo "chromatic=true" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-pnpm
         with:
           save-cache: false
       - name: Run Visual Tests
+        if: ${{ !steps.skip.outputs.chromatic }}
         run: pnpm test:visual
       - name: Upload Capture Timings
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !steps.skip.outputs.chromatic }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-test-results
@@ -184,6 +201,12 @@ jobs:
           path: test-results/
           retention-days: 7
       - name: Publish to Chromatic
+        if: ${{ !steps.skip.outputs.chromatic }}
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: pnpm chromatic:publish --exit-zero-on-changes
+      - name: Mark Chromatic as Passing
+        if: ${{ steps.skip.outputs.chromatic }}
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: pnpm chromatic:publish --skip

@@ -13,6 +13,7 @@ import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField } from '@/src/components/FormField';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { GroupHeader } from '@/src/components/GroupHeader';
@@ -258,6 +259,7 @@ export function BundleForm({
               })}
             </FormField>
           )}
+          <FieldRevealSpace />
         </ScrollView>
         <FloatingAddMenu
           visible={showPlusMenu}

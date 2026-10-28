@@ -8,13 +8,40 @@ permissions:
   contents: read
 
 jobs:
+  # A merged pull request whose every commit has a 'Chromatic: skip' trailer
+  # can't change how the app looks, so it publishes no new baseline.
+  chromatic-skip:
+    name: Check for Chromatic Skip
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-26.04
+    outputs:
+      skip: ${{ steps.skip.outputs.skip }}
+    steps:
+      - id: skip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].number // empty')
+          [ -n "$pr" ] || exit 0
+          verdicts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/commits" \
+            --jq '.[] | select(.parents | length == 1)
+              | if (.commit.message | split("\n") | any(test("^Chromatic: *skip *$"; "i"))) then "skip" else "run" end')
+          if [ -n "$verdicts" ] && ! grep -qx run <<< "$verdicts"; then
+            echo "Skipping the baseline: every commit in #$pr has a 'Chromatic: skip' trailer."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
   visual:
     name: Visual Snapshots (Auto-Accept)
+    needs: chromatic-skip
+    if: ${{ needs.chromatic-skip.outputs.skip != 'true' }}
     permissions:
       contents: read
     runs-on: ubuntu-26.04
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     steps:
       - name: Checkout code

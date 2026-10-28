@@ -44,6 +44,7 @@ export function TreatmentLogRow({
       testID={isLeaving ? undefined : `treatment-log-row-${item.rowId}`}
       title={title}
       typeIcon={Pill}
+      typeLabel="Treatment"
       meta={[
         // What it was taken under, once that no longer matches.
         ...(item.takenAs || item.dose
@@ -62,7 +63,6 @@ export function TreatmentLogRow({
             ]
           : []),
       ]}
-      accessibilityLabel={`View treatment: ${title}`}
       onPress={onOpen}
       accessory={
         reorder ? (

@@ -235,7 +235,9 @@ test.describe('Treatment bundles', () => {
       .toBeNull();
 
     // The row opens the bundle.
-    await row.getByRole('button', { name: /View bundle/ }).click();
+    await row
+      .getByRole('button', { name: /^Bundle Daily supplements/ })
+      .click();
     await expect(page.getByTestId('bundle-title')).toHaveText(
       'Daily supplements'
     );

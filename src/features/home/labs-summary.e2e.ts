@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import {
   test,
   expect,
@@ -8,6 +9,21 @@ import {
   useSingleColumnLayout,
   expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
+
+/** Opens the summary's filters; Done closes them. */
+async function openFilters(page: Page) {
+  await page.getByTestId('labs-summary-filter-button').click();
+  const filters = page.getByTestId('labs-summary-filters');
+  return {
+    period: filters.getByRole('combobox', { name: 'Time period' }),
+    sort: filters.getByRole('combobox', { name: 'Sort' }),
+    reset: filters.getByTestId('labs-summary-filters-reset'),
+    done: async () => {
+      await filters.getByTestId('labs-summary-filters-done').click();
+      await expect(filters).toBeHidden();
+    },
+  };
+}
 
 test.beforeEach(async ({ page }) => {
   // The single-column summary; desktop's list beside the detail is tested
@@ -101,19 +117,14 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   const period = home.getByRole('combobox', { name: 'Period' });
   await expect(period.locator('option')).toHaveText([
     'All time',
-    '10 years',
-    '5 years',
-    '2 years',
-    '1 year',
     '6 months',
-    '1 month',
+    '1 year',
+    '2 years',
   ]);
   for (const [label, count] of [
-    ['10 years', 4],
-    ['5 years', 3],
     ['2 years', 3],
+    ['1 year', 3],
     ['6 months', 3],
-    ['1 month', 3],
   ] as const) {
     await period.selectOption({ label });
     await expect(home.getByTestId('labs-summary-count')).toHaveText(
@@ -124,16 +135,20 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   await expect(home.getByTestId('labs-summary-grid-cell-718-7')).toHaveCount(1);
   await expect(home.getByTestId('labs-summary-grid-cell-789-8')).toHaveCount(0);
 
+  // The summary takes Home's period as its own, then drops it from the URL.
   await home.getByRole('button', { name: 'Open biomarkers' }).click();
-  await expect(page).toHaveURL(/labs-summary\?period=1$/);
+  await expect(page).toHaveURL(/labs-summary$/);
   const view = page.getByTestId('labs-summary-view');
   const summary = view.getByTestId('labs-summary');
   await expect(
     view.getByRole('heading', { name: 'Biomarkers', exact: true })
   ).toBeVisible();
-  await expect(summary.getByRole('combobox', { name: 'Period' })).toHaveValue(
-    '1'
-  );
+  await expect(summary.getByRole('combobox')).toHaveCount(0);
+  await expect(
+    summary.getByRole('button', {
+      name: 'Filter latest results, filters on',
+    })
+  ).toBeVisible();
   await expect(summary.getByTestId('labs-summary-total')).toHaveText('3');
   await expect(
     summary.getByTestId('labs-summary-groups-outOfRange-count')
@@ -142,7 +157,7 @@ test('Home shows latest results as a status grid; the summary groups them by sta
     summary.getByTestId('labs-summary-groups-inRange-count')
   ).toHaveText('1');
   await summary.getByTestId('labs-summary-grid-cell-718-7').click();
-  await expect(page).toHaveURL(/labs-summary\?period=1$/);
+  await expect(page).toHaveURL(/labs-summary$/);
   await expect(
     summary.getByTestId('labs-summary-grid-squares').getByRole('button')
   ).toHaveCount(0);
@@ -171,8 +186,14 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   const hemoglobin = summary.getByTestId('labs-summary-result-718-7');
   await expect(hemoglobin).toHaveText('Hemoglobin (Hgb)15.2g/dL');
   await expect(summary.getByTestId('labs-summary-range-718-7')).toBeVisible();
-  await summary.getByRole('combobox', { name: 'Period' }).selectOption('all');
+  const filters = await openFilters(page);
+  await expect(filters.period).toHaveValue('6');
+  await filters.period.selectOption('all');
+  await filters.done();
   await expect(summary.getByTestId('labs-summary-total')).toHaveText('4');
+  await expect(
+    summary.getByRole('button', { name: 'Filter latest results' })
+  ).toBeVisible();
   await expect(
     summary.locator('[data-testid^="labs-summary-result-"]')
   ).toHaveCount(4);
@@ -182,7 +203,7 @@ test('Home shows latest results as a status grid; the summary groups them by sta
     'In range'
   );
   await page.getByTestId('back-button').click();
-  await expect(view.getByTestId('labs-summary-total')).toHaveText('3');
+  await expect(view.getByTestId('labs-summary-total')).toHaveText('4');
   await page.getByTestId('back-button').click();
   await expect(page).toHaveURL(/\/$/);
   await home.getByTestId('labs-summary-grid-cell-6690-2').click();
@@ -251,7 +272,9 @@ test('the key and groups list only statuses with results; empty periods and inva
   await expect(
     view.getByTestId('labs-summary-groups-noRange-count')
   ).toHaveText('1');
-  await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
+  const filters = await openFilters(page);
+  await filters.period.selectOption('6');
+  await filters.done();
   await expect(view.getByTestId('labs-summary-total')).toHaveText('0');
   await expect(
     view.getByTestId('labs-summary-grid-squares').getByRole('img')
@@ -262,10 +285,11 @@ test('the key and groups list only statuses with results; empty periods and inva
   await expect(
     view.locator('[data-testid^="labs-summary-result-"]')
   ).toHaveCount(0);
+  // An unknown period in the URL keeps the saved one.
   await openRoute(page, '/labs-summary?period=invalid');
-  await expect(view.getByRole('combobox', { name: 'Period' })).toHaveValue(
-    'all'
-  );
+  await expect(page).toHaveURL(/labs-summary$/);
+  await expect(view.getByTestId('labs-summary-total')).toHaveText('0');
+  await (await openFilters(page)).reset.click();
   await expect(view.getByTestId('labs-summary-total')).toHaveText('2');
 });
 
@@ -321,7 +345,9 @@ test('summary Search filters the grouped latest results and respects the period'
   await expect(summary.getByTestId('labs-summary-total')).toHaveText('4');
   await search.fill('BLOOD');
   await expect(rows).toHaveCount(2);
-  await summary.getByRole('combobox', { name: 'Period' }).selectOption('1');
+  const filters = await openFilters(page);
+  await filters.period.selectOption('6');
+  await filters.done();
   await expect(rows).toHaveCount(1);
   await expect(
     summary
@@ -346,7 +372,7 @@ test('summary Search filters the grouped latest results and respects the period'
   );
 });
 
-test('Sort ranks latest biomarkers within each status by deviation, value and clinical date', async ({
+test('the heading filter sorts latest biomarkers within each status by deviation or clinical date, and is remembered', async ({
   page,
 }) => {
   await seedTestReport(page, {
@@ -393,37 +419,40 @@ test('Sort ranks latest biomarkers within each status by deviation, value and cl
   });
   await openRoute(page, '/labs-summary');
   const view = page.getByTestId('labs-summary-view');
-  const sort = view.getByRole('combobox', { name: 'Sort', exact: true });
   const rows = view.getByRole('button', { name: /^View biomarker:/ });
   await expandBiomarkerGroups(view);
-  await expect(sort.locator('option')).toHaveText([
+  // The filter button sits at the end of the Latest results heading.
+  const heading = view.getByRole('heading', { name: 'Latest results' });
+  const button = view.getByRole('button', { name: 'Filter latest results' });
+  const headingBox = (await heading.boundingBox())!;
+  const buttonBox = (await button.boundingBox())!;
+  const gridBox = (await view.getByTestId('labs-summary-grid').boundingBox())!;
+  expect(buttonBox.y + buttonBox.height).toBeLessThan(gridBox.y);
+  expect(buttonBox.x + buttonBox.width).toBeCloseTo(
+    gridBox.x + gridBox.width,
+    0
+  );
+  expect(
+    Math.abs(
+      buttonBox.y +
+        buttonBox.height / 2 -
+        (headingBox.y + headingBox.height / 2)
+    )
+  ).toBeLessThan(2);
+
+  const filters = await openFilters(page);
+  await expect(filters.period.locator('option')).toHaveText([
+    'All time',
+    '6 months',
+    '1 year',
+    '2 years',
+  ]);
+  await expect(filters.sort.locator('option')).toHaveText([
     'Largest deviations',
-    'Lowest',
-    'Highest',
     'Newest',
     'Oldest',
   ]);
-  await expect(sort).toHaveValue('deviation');
-  const sortBox = (await sort.boundingBox())!;
-  const rowBox = (await rows.first().boundingBox())!;
-  expect(sortBox.width).toBe(150);
-  const periodBox = (await view
-    .getByRole('combobox', { name: 'Period' })
-    .boundingBox())!;
-  expect(periodBox.width).toBe(100);
-  expect(periodBox.y).toBeCloseTo(sortBox.y, 0);
-  expect(sortBox.x).toBeCloseTo(periodBox.x + periodBox.width + 12, 0);
-  const periodLabel = (await view
-    .getByText('Period', { exact: true })
-    .boundingBox())!;
-  const sortLabel = (await view
-    .getByText('Sort', { exact: true })
-    .boundingBox())!;
-  expect(periodLabel.y + periodLabel.height).toBeCloseTo(periodBox.y, 0);
-  expect(sortLabel.y + sortLabel.height).toBeCloseTo(sortBox.y, 0);
-  expect(periodBox.x).toBeCloseTo(rowBox.x + 20, 0);
-  const gridBox = (await view.getByTestId('labs-summary-grid').boundingBox())!;
-  expect(periodBox.y).toBeGreaterThan(gridBox.y + gridBox.height);
+  await expect(filters.sort).toHaveValue('deviation');
   const names = {
     wbc: 'White Blood Cells (WBC)',
     plt: 'Platelets (PLT)',
@@ -433,23 +462,37 @@ test('Sort ranks latest biomarkers within each status by deviation, value and cl
   // Out of range (white cells, platelets) always precede in range.
   for (const [choice, order] of [
     ['deviation', ['wbc', 'plt', 'rbc', 'hgb']],
-    ['lowest', ['wbc', 'plt', 'hgb', 'rbc']],
-    ['highest', ['plt', 'wbc', 'rbc', 'hgb']],
     ['newest', ['plt', 'wbc', 'hgb', 'rbc']],
     ['oldest', ['wbc', 'plt', 'rbc', 'hgb']],
   ] as const) {
-    await sort.selectOption(choice);
+    await filters.sort.selectOption(choice);
     await expect(rows).toHaveCount(4);
     for (const [index, key] of order.entries())
       await expect(rows.nth(index)).toContainText(names[key]);
     await expect(view.getByTestId('labs-summary-total')).toHaveText('4');
   }
-  await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
-  await expect(sort).toHaveValue('oldest');
+  await filters.period.selectOption('6');
+  await expect(filters.sort).toHaveValue('oldest');
+  await filters.done();
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toContainText(names.wbc);
   await expect(view.getByTestId('labs-summary-result-789-8')).toHaveCount(0);
-  await sort.selectOption('highest');
-  await expect(rows.nth(0)).toContainText(names.plt);
-  await expect(rows.nth(1)).toContainText(names.wbc);
+
+  await test.step('remembers the filters after a restart', async () => {
+    await page.reload();
+    await expandBiomarkerGroups(view);
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0)).toContainText(names.wbc);
+    const saved = await openFilters(page);
+    await expect(saved.period).toHaveValue('6');
+    await expect(saved.sort).toHaveValue('oldest');
+    await saved.reset.click();
+    await expect(saved.period).toHaveValue('all');
+    await expect(saved.sort).toHaveValue('deviation');
+    await saved.done();
+    await expect(rows).toHaveCount(4);
+    await expect(
+      view.getByRole('button', { name: 'Filter latest results' })
+    ).toBeVisible();
+  });
 });

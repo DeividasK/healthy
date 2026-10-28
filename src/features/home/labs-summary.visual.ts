@@ -47,12 +47,20 @@ test('Labs Summary page - full and filtered latest results', async ({
   await expandBiomarkerGroups(view.getByTestId('labs-summary'));
   await view.getByTestId('labs-summary-result-718-7').waitFor();
   await takeSnapshot(page, 'Labs Summary - all biomarkers', testInfo);
-  await view.getByRole('combobox', { name: 'Period' }).selectOption('1');
-  await takeSnapshot(page, 'Labs Summary - last month', testInfo);
-  await view
-    .getByRole('combobox', { name: 'Sort', exact: true })
-    .selectOption('lowest');
-  await takeSnapshot(page, 'Labs Summary - lowest first', testInfo);
+  await view.getByTestId('labs-summary-filter-button').click();
+  const filters = page.getByTestId('labs-summary-filters');
+  await filters
+    .getByRole('combobox', { name: 'Time period' })
+    .selectOption('6');
+  await filters.getByRole('combobox', { name: 'Sort' }).selectOption('oldest');
+  await takeSnapshot(page, 'Labs Summary - filters', testInfo);
+  await filters.getByTestId('labs-summary-filters-done').click();
+  await filters.waitFor({ state: 'hidden' });
+  await takeSnapshot(
+    page,
+    'Labs Summary - last 6 months, oldest first',
+    testInfo
+  );
   const search = view.getByRole('textbox', { name: 'Search', exact: true });
   await search.fill('Hemoglobin');
   await view.getByTestId('labs-summary-result-718-7').waitFor();

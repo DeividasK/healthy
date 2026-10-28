@@ -21,6 +21,7 @@ import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { useHasChanges } from '@/src/components/useHasChanges';
@@ -439,6 +440,7 @@ function UsageFormLayout({
             />
           )}
           {children}
+          <FieldRevealSpace />
         </ScrollView>
         <FloatingAddMenu
           visible={showPlusMenu}
