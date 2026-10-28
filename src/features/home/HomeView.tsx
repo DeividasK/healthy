@@ -59,6 +59,11 @@ import {
   useDatabaseSubscription,
 } from '@/src/database/dbEvents';
 import { LabsSummary } from './LabsSummary';
+import {
+  DEFAULT_LABS_SUMMARY_FILTERS,
+  parseLabsSummaryFilters,
+} from './labsSummaryFilters';
+import { useSavedFilters } from '@/src/utils/savedFilters';
 import { StartYourRecord } from './StartYourRecord';
 import {
   CONTENT_COLUMN,
@@ -319,6 +324,14 @@ export function HomeView() {
     (day) => day.items.length + (day.procedures?.length ?? 0) > 0
   );
   // Desktop: how you're doing beside what's going on, once there is both.
+  // The overview's biomarkers keep their own filters, apart from the
+  // Biomarkers page's.
+  const [overviewFilters, setOverviewFilters, overviewFiltersLoaded] =
+    useSavedFilters(
+      activePatientId ? `home-biomarkers:${activePatientId}` : null,
+      DEFAULT_LABS_SUMMARY_FILTERS,
+      parseLabsSummaryFilters
+    );
   const isOverview =
     isWideWindow &&
     (hasJournal || records.length > 0) &&
@@ -403,7 +416,13 @@ export function HomeView() {
   // Biomarkers: the latest result of each, as a status grid
   // On wide screens the overview has room for every biomarker by status.
   const biomarkers = records.length > 0 && (
-    <LabsSummary records={records} showAll={isOverview} />
+    <LabsSummary
+      records={records}
+      showAll={isOverview}
+      filters={overviewFilters}
+      // A change before the saved filters load would overwrite them.
+      onFiltersChange={overviewFiltersLoaded ? setOverviewFilters : undefined}
+    />
   );
   // Treatments Section
   const treatmentsSection = treatments.length > 0 && (
