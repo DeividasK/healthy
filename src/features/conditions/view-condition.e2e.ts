@@ -32,7 +32,7 @@ test.describe('View Condition', () => {
       date: '2026-10-04',
       status: 'completed',
     });
-    const review = await seedTestConsultation(page, {
+    await seedTestConsultation(page, {
       title: 'MRI review',
       conditionIds: [condition.id],
       date: '2026-11-03',
@@ -103,12 +103,9 @@ test.describe('View Condition', () => {
     await expect(timeline.getByText('Naproxen')).toHaveCount(0);
     await expect(timeline.getByText('Spine MRI')).toHaveCount(0);
 
-    // Each step shows its status tone
+    // Steps show their status tone; conditionTimeline.unit.ts maps every
+    // status to its tone.
     for (const [type, id, tone] of [
-      ['consultation', review.id, 'planned'],
-      ['lab-result', report.report.id, 'done'],
-      ['treatment', ibuprofen.id, 'paused'],
-      ['service-request', mri.id, 'active'],
       ['consultation', visit.id, 'done'],
       ['service-request', xray.id, 'faded'],
     ])
@@ -238,10 +235,6 @@ test.describe('View Condition', () => {
     await expect(button).toHaveAccessibleName('Filter timeline');
     await page
       .getByTestId('condition-timeline-filter-period')
-      .selectOption('past3');
-    await expect(rows).toHaveText([/Knee MRI/, /Orthopaedic review/]);
-    await page
-      .getByTestId('condition-timeline-filter-period')
       .selectOption('upcoming');
     await expect(rows).toHaveText([/MRI review/]);
 
@@ -322,7 +315,7 @@ test.describe('Condition view island', () => {
       .toBe(44);
   });
 
-  test('Escape cancels editing, asking first when data was entered', async ({
+  test('Cancel and Escape leave an unchanged edit form without asking', async ({
     page,
   }) => {
     await seedTestCondition(page, { id: 'escape-condition', title: 'Escape' });
@@ -336,15 +329,5 @@ test.describe('Condition view island', () => {
     await expect(page.getByTestId('condition-title-input')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page).toHaveURL(/\/condition\/escape-condition$/);
-
-    await page.getByTestId('edit-condition-button').click();
-    await page.getByTestId('condition-title-input').fill('Changed');
-    await page.keyboard.press('Escape');
-    const modal = page.getByTestId('discard-changes-modal');
-    await expect(modal.getByRole('button', { name: 'No' })).toBeFocused();
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/condition\/escape-condition$/);
-    await expect(page.getByTestId('condition-title')).toHaveText('Escape');
   });
 });

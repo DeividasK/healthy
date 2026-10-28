@@ -349,6 +349,31 @@ for (const terminology of [
     ]);
     expect(stored.encounter.reasonReference).toBeUndefined();
     await openRoute(page, `/consultation/${stored.encounter.id}`);
+    if (!terminology.system) {
+      // An edit keeps a code-only coding as it is, without empty system or
+      // display. The view, link and removal steps below run once, for the
+      // full coding.
+      await page.getByTestId('edit-consultation-button').click();
+      await expect(page.getByTestId('diagnosis-0-code-input')).toHaveValue(
+        'L21'
+      );
+      await page
+        .getByTestId('diagnosis-0-title-input')
+        .fill('Updated diagnosis wording');
+      await page.getByTestId('save-button').click();
+      await expect(page.getByTestId('consultation-diagnoses')).toContainText(
+        'Updated diagnosis wording'
+      );
+      const edited = await evaluateBridge(
+        page,
+        (b, id) => b.getConsultation(id),
+        stored.encounter.id
+      );
+      expect(edited.diagnosis[0].condition[0].concept.coding).toEqual([
+        terminology,
+      ]);
+      return;
+    }
     await expect(page.getByTestId('consultation-reasons')).toContainText(
       'Reasons for visit'
     );

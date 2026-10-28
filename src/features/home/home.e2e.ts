@@ -372,6 +372,21 @@ test.describe('Shared header and island motion', () => {
     const background = page.getByTestId('action-dock-background');
     const primaryButton = page.getByTestId('floating-add-button');
     await expect(background).toHaveCSS('opacity', '0');
+    // The + grows in while the island's background fades out, and the two
+    // animations can end a frame apart. Measure it once it is full size (its
+    // box, scale included, matches its layout size), as it is the size the
+    // island must keep through the route changes below.
+    await expect
+      .poll(() =>
+        primaryButton.evaluate((element: HTMLElement) => {
+          const box = element.getBoundingClientRect();
+          return (
+            box.width === element.offsetWidth &&
+            box.height === element.offsetHeight
+          );
+        })
+      )
+      .toBe(true);
     const collapsedSize = (await background.boundingBox())!;
     const primarySize = (await primaryButton.boundingBox())!;
     expect(collapsedSize.width).toBeLessThan(primarySize.width);
@@ -447,9 +462,10 @@ test.describe('Shared header and island motion', () => {
       true
     );
     expect(motion.heights.length).toBeGreaterThan(0);
-    expect(
-      motion.heights.every((height) => height === primarySize.height)
-    ).toBe(true);
+    // Every frame, so a failure shows which frames differed.
+    expect(motion.heights).toEqual(
+      motion.heights.map(() => primarySize.height)
+    );
     await expect(background).toHaveCSS('opacity', '1');
     const expandedSize = (await background.boundingBox())!;
     expect(expandedSize.width).toBeGreaterThan(primarySize.width);
@@ -499,12 +515,12 @@ test.describe('Shared header and island motion', () => {
         heights: state.heights as number[],
       };
     });
-    expect(
-      dockMotion.widths.every((width) => width === primarySize.width)
-    ).toBe(true);
-    expect(
-      dockMotion.heights.every((height) => height === primarySize.height)
-    ).toBe(true);
+    expect(dockMotion.widths).toEqual(
+      dockMotion.widths.map(() => primarySize.width)
+    );
+    expect(dockMotion.heights).toEqual(
+      dockMotion.heights.map(() => primarySize.height)
+    );
     const consultationSize = (await background.boundingBox())!;
     expect(consultationSize.height).toBe(expandedSize.height);
     await page.getByTestId('back-button').click();

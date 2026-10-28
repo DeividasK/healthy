@@ -2,160 +2,163 @@ import {
   test,
   takeSnapshot,
   seedTestPatient,
-  seedTestCondition,
-  seedTestTreatment,
-  seedTestConsultation,
+  seedTestBundle,
   seedTestResources,
 } from '@/src/features/testing/visualTest';
+import type { RegimenDraft } from '@/src/features/treatments/regimen';
 
+// The visual fixture fixes today at 2026-10-08.
+
+const dose = (
+  amount: string,
+  when: string,
+  { amountMax = '', frequencyMax = '', boundsValue = '', boundsUnit = 'd' } = {}
+): RegimenDraft['phases'][number]['doses'][number] => ({
+  amount,
+  amountMax,
+  unit: '{tablet}',
+  route: '26643006',
+  site: '',
+  patientInstruction: when === 'MORN' ? 'Take with breakfast' : '',
+  timing: {
+    frequency: '1',
+    frequencyMax,
+    period: '1',
+    periodUnit: 'd',
+    when,
+    boundsValue,
+    boundsUnit,
+  },
+});
+
+/** Taken from 2026-10-08 in place of the free-text prescription. */
+const taperingRegimen: RegimenDraft = {
+  phases: [
+    {
+      doses: [
+        dose('2', 'MORN', { boundsValue: '7' }),
+        dose('1', 'EVE', { boundsValue: '7' }),
+      ],
+    },
+    {
+      doses: [
+        dose('1', '', {
+          amountMax: '2',
+          frequencyMax: '2',
+          boundsValue: '3',
+          boundsUnit: 'mo',
+        }),
+      ],
+    },
+  ],
+};
+
+const longInstructions = [
+  '1. Take 2 tablets in the morning and 1 tablet in the evening with food for the first week.',
+  '2. Stay hydrated by drinking at least 2 liters of water daily.',
+  '3. In case of rash, discontinue immediately and contact the clinic.',
+  '4. Do not stop suddenly; taper as described below.',
+].join('\n\n');
+
+// Chromatic keys baselines by test title, so this keeps its original title.
 test.describe('View Treatment - Visual Regression', () => {
   test('Long instructions, reason condition and consultation link', async ({
     page,
   }, testInfo) => {
     await seedTestPatient(page);
-    const consultation = await seedTestConsultation(page, {
-      title: 'Infectious Disease Clinic',
-      doctorName: 'Dr. Beverly Crusher',
-      serviceType: 'Infectious Disease',
+    await seedTestResources(page, {
+      conditions: [
+        { id: 'visual-sinusitis', title: 'Acute bacterial sinusitis' },
+      ],
+      consultations: [
+        {
+          id: 'visual-clinic',
+          title: 'ENT Clinic',
+          doctorName: 'Dr. Beverly Crusher',
+          serviceType: 'Otolaryngology',
+          date: '2025-07-25',
+        },
+      ],
+      treatments: [
+        {
+          id: 'visual-prednisolone',
+          title: 'Prednisolone 5mg',
+          intent: 'order',
+          status: 'active',
+          authoredOn: '2025-07-25',
+          consultationId: 'visual-clinic',
+          // A treatment has free-text instructions or a regimen, never both:
+          // the regimen shows as the current one, from the change below.
+          dosageInstructions: longInstructions,
+          dispenseQuantity: { value: '56', unit: '{tablet}' },
+          reason: 'Sinus inflammation',
+          reasonConditionIds: ['visual-sinusitis'],
+          notes: 'Monitored for sleep problems.',
+        },
+      ],
+      treatmentUsage: [
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'start',
+          date: '2025-07-25',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'stop',
+          date: '2026-09-01',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'start',
+          date: '2026-10-01',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'pause',
+          date: '2026-10-04',
+          notes: 'Waiting for a refill',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'resume',
+          date: '2026-10-07',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          action: 'change',
+          date: '2026-10-08',
+          regimen: taperingRegimen,
+        },
+      ],
+      treatmentLogs: [
+        {
+          treatmentId: 'visual-prednisolone',
+          date: '2026-10-03',
+          answer: 'taken',
+        },
+        {
+          treatmentId: 'visual-prednisolone',
+          date: '2026-10-07',
+          answer: 'not-taken',
+        },
+      ],
     });
-    const condition = await seedTestCondition(page, {
-      title: 'Tick bite',
+    await seedTestBundle(page, {
+      id: 'visual-morning',
+      title: 'Morning stack',
+      times: ['MORN'],
+      memberIds: ['visual-prednisolone'],
     });
-    const longInstructions = [
-      '1. Take 2 tablets in the morning and 2 tablets in the evening with food.',
-      '2. Stay hydrated by drinking at least 2 liters of water daily.',
-      '3. In case of rash, discontinue immediately and contact the clinic.',
-      '4. Complete the entire 14-day regimen without interruption.',
-    ].join('\n\n');
 
-    const treatment = await seedTestTreatment(page, {
-      title: 'Doxycycline Hyclate 100mg',
-      intent: 'order',
-      status: 'active',
-      consultationId: consultation.id,
-      dosageInstructions: longInstructions,
-      reason: 'Lyme disease prophylaxis',
-      reasonConditionIds: [condition.id],
-      notes: 'Monitored for sun sensitivity.',
-    });
-
-    await page.goto(`/treatment/${treatment.id}`);
-    await page.getByTestId('treatment-title').waitFor();
+    await page.goto('/treatment/visual-prednisolone');
+    await page.getByTestId('treatment-current-regimen').waitFor();
+    await page.getByTestId('treatment-bundle-visual-morning').waitFor();
+    await page.getByTestId('origin-consultation-link').waitFor();
+    await page.getByTestId('treatment-log-history').waitFor();
+    await page.getByTestId('treatment-usage-list-toggle').click();
+    await page
+      .getByRole('button', { name: 'Show less', exact: true })
+      .waitFor();
     await takeSnapshot(page, 'Treatment View - Details', testInfo);
-
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await takeSnapshot(page, 'Treatment View - Wide layout', testInfo);
   });
-
-  test('Phased regimen and quantity to dispense', async ({
-    page,
-  }, testInfo) => {
-    await seedTestPatient(page);
-    const treatment = await seedTestTreatment(page, {
-      title: 'Prednisolone 5mg',
-      intent: 'order',
-      status: 'active',
-      regimen: {
-        phases: [
-          {
-            doses: [
-              {
-                amount: '2',
-                amountMax: '',
-                unit: '{tablet}',
-                route: '26643006',
-                site: '',
-                patientInstruction: 'Take with breakfast',
-                timing: {
-                  frequency: '1',
-                  frequencyMax: '',
-                  period: '1',
-                  periodUnit: 'd',
-                  when: 'MORN',
-                  boundsValue: '7',
-                  boundsUnit: 'd',
-                },
-              },
-              {
-                amount: '1',
-                amountMax: '',
-                unit: '{tablet}',
-                route: '26643006',
-                site: '',
-                patientInstruction: '',
-                timing: {
-                  frequency: '1',
-                  frequencyMax: '',
-                  period: '1',
-                  periodUnit: 'd',
-                  when: 'EVE',
-                  boundsValue: '7',
-                  boundsUnit: 'd',
-                },
-              },
-            ],
-          },
-          {
-            doses: [
-              {
-                amount: '1',
-                amountMax: '2',
-                unit: '{tablet}',
-                route: '26643006',
-                site: '',
-                patientInstruction: '',
-                timing: {
-                  frequency: '1',
-                  frequencyMax: '2',
-                  period: '1',
-                  periodUnit: 'd',
-                  when: '',
-                  boundsValue: '3',
-                  boundsUnit: 'mo',
-                },
-              },
-            ],
-          },
-        ],
-      },
-      dispenseQuantity: { value: '56', unit: '{tablet}' },
-    });
-
-    await page.goto(`/treatment/${treatment.id}`);
-    await page.getByTestId('treatment-dosage').waitFor();
-    await takeSnapshot(page, 'Treatment View - Regimen', testInfo);
-  });
-});
-
-test('Taking and paused usage periods', async ({ page }, testInfo) => {
-  await seedTestPatient(page);
-  await seedTestResources(page, {
-    treatments: [
-      {
-        id: 'usage-history',
-        title: 'Vitamin D',
-        status: 'active',
-        authoredOn: '2025-07-25',
-      },
-    ],
-    treatmentUsage: [
-      { treatmentId: 'usage-history', action: 'start', date: '2025-07-25' },
-      { treatmentId: 'usage-history', action: 'stop', date: '2026-09-01' },
-      { treatmentId: 'usage-history', action: 'start', date: '2026-10-01' },
-      {
-        treatmentId: 'usage-history',
-        action: 'pause',
-        date: '2026-10-04',
-        notes: 'Waiting for a refill',
-      },
-      { treatmentId: 'usage-history', action: 'resume', date: '2026-10-07' },
-    ],
-  });
-  await page.goto('/treatment/usage-history');
-  await page.getByTestId('treatment-usage-change').waitFor();
-  await page.getByTestId('treatment-usage-section').waitFor();
-  await takeSnapshot(page, 'Treatment View - Usage periods', testInfo);
-  await page.getByTestId('treatment-usage-list-toggle').click();
-  await page.getByRole('button', { name: 'Show less', exact: true }).waitFor();
-  await takeSnapshot(page, 'Treatment View - All usage periods', testInfo);
 });

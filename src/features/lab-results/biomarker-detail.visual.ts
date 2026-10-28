@@ -6,8 +6,8 @@ import {
   evaluateBridge,
 } from '@/src/features/testing/visualTest';
 import { seedRangeHistory } from './rangeTestSeed';
-import { expect } from '@playwright/test';
 
+// With no printed or user range, this page also owns the No range state.
 test('Biomarker detail - Mixed hemoglobin units and empty education', async ({
   page,
 }, testInfo) => {
@@ -112,50 +112,28 @@ test('Biomarker detail - Calculated atherogenic index', async ({
   );
 });
 
-for (const [layout, viewport] of [
-  ['mobile', undefined],
-  ['desktop', { width: 1280, height: 800 }],
-] as const) {
-  test(`Biomarker detail - Range converted to the result's unit (${layout})`, async ({
-    page,
-  }, testInfo) => {
-    if (viewport) await page.setViewportSize(viewport);
-    await seedTestPatient(page);
-    // The range the user set is in mg/dL; the laboratory reported mmol/L.
-    await evaluateBridge(page, (bridge) =>
-      bridge.saveProfileSettings({
-        biomarkerRanges: {
-          '19123-9': [
-            {
-              low: '1.7',
-              high: '2.2',
-              unit: 'mg/dL',
-              since: '2026-01-01',
-              source: 'user',
-            },
-          ],
-        },
-      })
-    );
-    await seedTestReport(page, {
-      id: `magnesium-visual-${layout}`,
-      date: '2026-06-01',
-      biomarkers: [{ name: 'Magnesium', value: 0.91, unit: 'mmol/L' }],
-    });
-    await page.goto('/biomarker/19123-9');
-    await page.getByTestId('biomarker-title').waitFor();
-    await takeSnapshot(
-      page,
-      `Biomarker detail - Range converted to the result's unit (${layout})`,
-      testInfo
-    );
-  });
-}
-
 test('Biomarker detail - Switched to another unit', async ({
   page,
 }, testInfo) => {
   await seedTestPatient(page);
+  // The range is in mmol/L; the page shows mg/dL, so its limits are
+  // converted and rounded: 0.7-0.91 mmol/L becomes 1.7-2.2 mg/dL, and the
+  // latest 2.2 sits on the rounded upper limit, in range.
+  await evaluateBridge(page, (bridge) =>
+    bridge.saveProfileSettings({
+      biomarkerRanges: {
+        '19123-9': [
+          {
+            low: '0.7',
+            high: '0.91',
+            unit: 'mmol/L',
+            since: '2026-01-01',
+            source: 'user',
+          },
+        ],
+      },
+    })
+  );
   await seedTestReport(page, {
     id: 'magnesium-visual-older',
     date: '2026-05-01',
@@ -169,9 +147,15 @@ test('Biomarker detail - Switched to another unit', async ({
   await page.goto('/biomarker/19123-9');
   // mmol/L, then mEq/L, then mg/dL.
   await page.getByTestId('biomarker-unit-switch').click();
-  await expect(page.getByTestId('biomarker-latest-unit')).toHaveText('mEq/L');
+  await page
+    .getByTestId('biomarker-latest-unit')
+    .filter({ hasText: /^mEq\/L$/ })
+    .waitFor();
   await page.getByTestId('biomarker-unit-switch').click();
-  await expect(page.getByTestId('biomarker-latest-value')).toHaveText('2.2');
+  await page
+    .getByTestId('biomarker-latest-unit')
+    .filter({ hasText: /^mg\/dL$/ })
+    .waitFor();
   await takeSnapshot(
     page,
     'Biomarker detail - Switched to another unit',
@@ -194,25 +178,6 @@ for (const [layout, viewport] of [
     await takeSnapshot(
       page,
       `Biomarker detail - Range set with an optimal part (${layout})`,
-      testInfo
-    );
-  });
-
-  test(`Biomarker detail - No range (${layout})`, async ({
-    page,
-  }, testInfo) => {
-    if (viewport) await page.setViewportSize(viewport);
-    await seedTestPatient(page);
-    await seedTestReport(page, {
-      id: `potassium-visual-none-${layout}`,
-      date: '2026-05-12',
-      biomarkers: [{ name: 'Potassium', value: 4.4, unit: 'mmol/L' }],
-    });
-    await page.goto('/biomarker/2823-3');
-    await page.getByTestId('biomarker-title').waitFor();
-    await takeSnapshot(
-      page,
-      `Biomarker detail - No range (${layout})`,
       testInfo
     );
   });

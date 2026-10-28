@@ -14,6 +14,7 @@ import {
   snapshotClinicalTables,
   RECORD_SECRETS,
   evaluateBridge as bridge,
+  restartApp,
 } from '@/src/features/testing/testStorage';
 import type { Page } from '@playwright/test';
 
@@ -311,10 +312,13 @@ test.describe('Sync between devices', () => {
     });
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);
-    // Reload so sync starts with the connection made through the bridge.
-    await page.goto('/journal');
-    // Let the sync that runs on start finish before marking the entry.
-    await page.waitForLoadState('networkidle');
+    // Remount so sync starts with the connection made through the bridge.
+    await restartApp(page, '/journal');
+    // Let the sync that runs on start finish before marking the entry; the
+    // bridge's own syncs above leave no sync time behind.
+    await expect
+      .poll(() => bridge(page, (b) => b.lastSyncTimestamp()))
+      .not.toBeNull();
     const uploads = () =>
       store.requests.filter((request) => request.method !== 'GET').length;
     const before = uploads();
@@ -340,11 +344,14 @@ test.describe('Sync between devices', () => {
   test('rebuilds the change log for a database already marked v12 without it', async ({
     page,
   }) => {
+    await page.clock.install();
     await seedTestPatient(page);
+    // The fake clock fires the upload check the save above scheduled, and a
+    // database round trip queues behind its reads, so it never reads the
+    // tables while they are being dropped.
+    await page.clock.fastForward(2100);
+    await bridge(page, (b) => b.querySql('SELECT 1'));
     await bridge(page, async (b) => {
-      // Let the upload check scheduled by the save above run first, so it
-      // never reads the tables while they are being dropped.
-      await new Promise((resolve) => setTimeout(resolve, 2500));
       const names = await b.querySql(
         "SELECT name, type FROM sqlite_master WHERE name LIKE 'sync_%' AND type IN ('table', 'trigger')"
       );

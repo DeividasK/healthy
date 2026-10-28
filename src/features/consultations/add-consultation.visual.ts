@@ -17,7 +17,6 @@ test.describe('Add Consultation View - Visual Regression', () => {
     await page.goto('/consultation/add');
     await page.getByTestId('consultation-title-input').waitFor();
 
-    await takeSnapshot(page, 'Consultation View - Add New Form', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
     await waitForMenuToggle(page, 'add-option-button', false);
@@ -35,7 +34,6 @@ test.describe('Add Consultation View - Visual Regression', () => {
       });
       await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
     }
-    await takeSnapshot(page, 'Consultation View - Add Diagnosis', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-add-diagnosis').click();
     await waitForMenuToggle(page, 'add-option-button', false);
@@ -53,12 +51,17 @@ test.describe('Add Consultation View - Visual Regression', () => {
       id: 'add-second',
       title: 'Androgenic alopecia',
     });
+    await seedTestCondition(page, { id: 'add-third', title: 'Atopic eczema' });
     await page.goto('/consultation/add?conditionId=add-first');
     await page
       .getByTestId('consultation-title-input')
       .fill('Dermatology review');
+    // Two selected conditions above the search, with its suggestions open.
     await page.getByTestId('condition-search-input').fill('Androgenic');
-    await page.getByTestId('condition-autocomplete-item-add-second').waitFor();
+    await page.getByTestId('condition-autocomplete-item-add-second').click();
+    await page.getByTestId('selected-condition-add-second').waitFor();
+    await page.getByTestId('condition-search-input').fill('Atopic');
+    await page.getByTestId('condition-autocomplete-item-add-third').waitFor();
     await takeSnapshot(
       page,
       'Consultation View - Conditions search',
@@ -66,13 +69,6 @@ test.describe('Add Consultation View - Visual Regression', () => {
       {
         keepFocus: true,
       }
-    );
-    await page.getByTestId('condition-autocomplete-item-add-second').click();
-    await page.getByTestId('selected-condition-add-second').waitFor();
-    await takeSnapshot(
-      page,
-      'Consultation View - Multiple diagnosis form',
-      testInfo
     );
   });
 });

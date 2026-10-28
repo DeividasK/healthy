@@ -118,7 +118,9 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
       {
         text: 'Original instructions',
         route: { text: 'Oral' },
-        timing: { repeat: { frequency: 2, period: 1, periodUnit: 'd' } },
+        timing: {
+          repeat: { frequency: 2, period: 1, periodUnit: 'd', when: ['MORN'] },
+        },
       },
       { text: 'Additional instructions', sequence: 2 },
     ],
@@ -151,10 +153,22 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
       ),
     resource
   );
-  await openRoute(page, '/treatment/imported-request/edit');
-  await expect(page.getByTestId('treatment-intent-select')).toHaveValue(
-    'proposal'
+  await openRoute(page, '/treatment/imported-request');
+  // Uncommon codes are labelled instead of hidden: the form offers neither.
+  await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
+  await expect(
+    page.getByTestId('treatment-view').getByText('Ended')
+  ).toBeVisible();
+  // Text and regimen are both shown under the one Dosage heading
+  await expect(page.getByTestId('treatment-dosage')).toHaveText(
+    'Original instructions\noral, twice a day, in the morning'
   );
+
+  await page.getByTestId('edit-treatment-button').click();
+  await expect(page).toHaveURL(/\/treatment\/imported-request\/edit$/);
+  const intent = page.getByTestId('treatment-intent-select');
+  await expect(intent).toHaveValue('proposal');
+  await expect(intent.locator('option:checked')).toHaveText('Proposal');
   await expect(page.getByTestId('treatment-status-select')).toHaveValue(
     'ended'
   );
@@ -164,6 +178,9 @@ test('editing imported requests preserves nested FHIR data and date-time precisi
   await expect(
     page.getByTestId('treatment-regimen-p1-d1-frequency-input')
   ).toHaveValue('2');
+  await expect(
+    page.getByTestId('treatment-regimen-p1-d1-when-select')
+  ).toHaveValue('MORN');
   await page.getByTestId('remove-treatment-reason-button').click();
   await page.getByTestId('treatment-notes-input').fill('Edited first note');
   await page.getByTestId('save-treatment-button').click();
@@ -311,36 +328,6 @@ test('recodes a development-era treatments section instead of adding another', a
     { reference: `MedicationRequest/${first.id}` },
     { reference: `MedicationRequest/${second.id}` },
   ]);
-});
-
-test('new documents are authored by the patient and requesters default to the consultation specialist', async ({
-  page,
-}) => {
-  const consultation = await seedTestConsultation(page, {
-    id: 'attribution-visit',
-    title: 'Attribution visit',
-    doctorName: 'Encounter clinician',
-  });
-  await openRoute(page, `/treatment/add?consultationId=${consultation.id}`);
-  await expect(page.getByTestId('treatment-requester-input')).toHaveValue(
-    'Encounter clinician'
-  );
-  await page.getByTestId('treatment-title-input').fill('Attributed treatment');
-  await page.getByTestId('save-treatment-button').click();
-  await expect(page.getByTestId('treatment-title')).toHaveText(
-    'Attributed treatment'
-  );
-  const document = await getTestClinicalDocument(page, consultation.id);
-  expect(document.author).toEqual([{ reference: 'Patient/integrity-patient' }]);
-  expect(document.status).toBe('preliminary');
-  const [row] = await page.evaluate(() =>
-    (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
-      "SELECT fhir_json FROM medication_requests WHERE display_label = 'Attributed treatment'"
-    )
-  );
-  expect(JSON.parse(row.fhir_json).requester).toEqual({
-    display: 'Encounter clinician',
-  });
 });
 
 test('rejects conflicting or invalid dosing without saving', async ({

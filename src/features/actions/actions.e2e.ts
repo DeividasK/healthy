@@ -10,6 +10,7 @@ import {
   seedTestPatient,
   seedTestResources,
   openRoute,
+  reopenRoute,
 } from '@/src/features/testing/testStorage';
 
 test.describe('My actions: treatment logging', () => {
@@ -644,7 +645,7 @@ test.describe('My actions: journal organisation', () => {
             `MedicationRequest/${id.replace('treatment-log-row-', '').replace(/-0$/, '')}`
         )
       );
-    await page.reload();
+    await reopenRoute(page);
     await expect.poll(() => rowIds(morning)).toEqual(moved);
     await page.getByTestId('actions-previous-day').click();
     await expect.poll(() => rowIds(morning)).toEqual(moved);

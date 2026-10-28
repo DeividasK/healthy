@@ -37,12 +37,29 @@ test.describe('View Service Request - Visual Regression', () => {
       status: 'active',
       authoredOn: '2026-02-03',
       consultationId: origin.id,
-      plannedDate: '2026-03-10',
+      schedule: {
+        period: 4,
+        periodMax: 6,
+        periodUnit: 'wk',
+        count: 3,
+        duration: 45,
+      },
       requesterName: 'Dr. Beverly Crusher',
       instructions: longInstructions,
       reason: 'Intermittent palpitations',
       reasonConditionIds: [condition.id],
       notes: 'Results go to the cardiology clinic.',
+    });
+    await seedTestResources(page, {
+      procedureLogs: [
+        { serviceRequestId: request.id, date: '2026-03-10', answer: 'taken' },
+        {
+          serviceRequestId: request.id,
+          date: '2026-04-07',
+          answer: 'taken',
+          duration: 50,
+        },
+      ],
     });
     await page.evaluate(
       ({ requestId, consultationId, patientId }) =>
@@ -82,46 +99,7 @@ test.describe('View Service Request - Visual Regression', () => {
 
     await page.goto(`/service-request/${request.id}`);
     await page.getByTestId('service-request-title').waitFor();
-    await takeSnapshot(page, 'Service Request View - Details', testInfo);
-
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await takeSnapshot(page, 'Service Request View - Wide layout', testInfo);
-  });
-
-  test('A repeating procedure with its sessions', async ({
-    page,
-  }, testInfo) => {
-    await seedTestPatient(page);
-    await seedTestResources(page, {
-      serviceRequests: [
-        {
-          id: 'visual-prp',
-          title: 'PRP injection',
-          category: '71388002',
-          status: 'active',
-          authoredOn: '2026-08-20',
-          requesterName: 'Dr. Beverly Crusher',
-          schedule: {
-            period: 4,
-            periodMax: 6,
-            periodUnit: 'wk',
-            count: 3,
-            duration: 45,
-          },
-        },
-      ],
-      procedureLogs: [
-        { serviceRequestId: 'visual-prp', date: '2026-09-02', answer: 'taken' },
-        {
-          serviceRequestId: 'visual-prp',
-          date: '2026-10-07',
-          answer: 'taken',
-          duration: 50,
-        },
-      ],
-    });
-    await page.goto('/service-request/visual-prp');
     await page.getByTestId('service-request-session-2').waitFor();
-    await takeSnapshot(page, 'Service Request View - Sessions', testInfo);
+    await takeSnapshot(page, 'Service Request View - Details', testInfo);
   });
 });

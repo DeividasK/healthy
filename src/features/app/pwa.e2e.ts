@@ -2,7 +2,7 @@ import type { Route } from '@playwright/test';
 import {
   test,
   expect,
-  createPatientViaUI,
+  seedTestPatient,
 } from '@/src/features/testing/testStorage';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
@@ -11,7 +11,8 @@ test.use({ freshApp: true });
 
 test.describe('Installable web app', () => {
   test('links a manifest with home-screen icons', async ({ page, request }) => {
-    await createPatientViaUI(page);
+    // The app adds the link on any screen, with or without a profile.
+    await page.goto('/');
 
     const href = await page
       .locator('link[rel="manifest"]')
@@ -39,7 +40,7 @@ test.describe('Installable web app', () => {
     context,
     consoleMonitor,
   }) => {
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
     await expect(page.getByTestId('offline-header-indicator')).toHaveCount(0);
 
     await context.setOffline(true);
@@ -58,6 +59,8 @@ test.describe('Installable web app', () => {
       await page.route(google, failLookup);
       // The browser logs each request that cannot reach Google.
       consoleMonitor.ignore('net::ERR_NAME_NOT_RESOLVED');
+      // A fake clock, so the next reachability check need not be waited out.
+      await page.clock.install();
       // Reload so the app's sync on start runs with the bridge's connection.
       await page.goto('/profile');
       await expect(indicator).toBeVisible();
@@ -65,7 +68,8 @@ test.describe('Installable web app', () => {
 
       // The app checks again on its own and clears the status once through.
       await page.unroute(google, failLookup);
-      await expect(indicator).toHaveCount(0, { timeout: 15000 });
+      await page.clock.fastForward(10_000);
+      await expect(indicator).toHaveCount(0);
     });
   });
 });

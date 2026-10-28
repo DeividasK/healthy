@@ -151,6 +151,9 @@ jobs:
 
   visual:
     name: Visual Regression (Chromatic)
+    # Chromatic bills every snapshot, so don't publish a push that fails the
+    # basic checks; it will be pushed again anyway.
+    needs: [checks]
     permissions:
       contents: read
     runs-on: ubuntu-26.04
