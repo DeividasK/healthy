@@ -5,6 +5,10 @@ import {
   parseLabResultsAIReply,
 } from './labResultsAIImport';
 import { loadLoincLabTests } from '@/src/data/loinc';
+import {
+  CUSTOM_TEST_SYSTEM,
+  customTestBiomarker,
+} from '@/src/data/biomarkers/customTests';
 
 const today = new Date(2026, 9, 22);
 
@@ -220,4 +224,75 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
       today
     ).ok
   ).toBe(false);
+});
+
+test('keeps a test with no LOINC code as the user’s own test', () => {
+  const reply = `\`\`\`json
+{
+  "healthyLabResults": 1,
+  "date": "2026-09-20",
+  "results": [
+    { "test": "own", "name": "NAD+", "value": 38.2, "unit": "µM" },
+    { "test": "own", "name": "Telomere length", "value": 6.8 }
+  ]
+}
+\`\`\``;
+  expect(parseLabResultsAIReply(reply, today)).toEqual({
+    ok: false,
+    errors: ['Telomere length needs a name and a unit.'],
+  });
+  const result = parseLabResultsAIReply(
+    reply.replace('"value": 6.8 }', '"value": 6.8, "unit": "kb" }'),
+    today
+  );
+  if (!result.ok) throw new Error(result.errors.join('\n'));
+  expect(
+    result.data.results.map(({ marker, value, unit }) => [
+      marker.name,
+      marker.loinc,
+      marker.codeSystem,
+      value,
+      unit.label,
+    ])
+  ).toEqual([
+    ['NAD+', 'x-nad-plus', CUSTOM_TEST_SYSTEM, '38.2', 'µM'],
+    ['Telomere length', 'x-telomere-length', CUSTOM_TEST_SYSTEM, '6.8', 'kb'],
+  ]);
+});
+
+test('instructions list the user’s own tests so the AI reuses their names', () => {
+  expect(buildLabResultsAIInstructions()).not.toContain('My own tests');
+  const instructions = buildLabResultsAIInstructions([
+    customTestBiomarker('NAD+', 'µM'),
+    customTestBiomarker('Telomere length', 'kb'),
+  ]);
+  expect(instructions).toContain(
+    'My own tests, already in the app. For the same test, use "own" with exactly this name:\n- NAD+. Unit: µM\n- Telomere length. Unit: kb'
+  );
+});
+
+test('keeps the sign of a result given only as a bound', () => {
+  const result = parseLabResultsAIReply(
+    `{"healthyLabResults": 1, "date": "2026-09-20", "results": [
+      { "test": "rheumatoid_factor", "value": "< 20.00", "unit": "IU/mL" },
+      { "test": "tpo_antibodies", "value": "<3", "unit": "IU/mL" },
+      { "test": "ferritin", "value": 85, "unit": "ng/mL" }
+    ]}`,
+    today
+  );
+  if (!result.ok) throw new Error(result.errors.join('\n'));
+  expect(
+    result.data.results.map(({ marker, value, comparator }) => [
+      marker.id,
+      value,
+      comparator,
+    ])
+  ).toEqual([
+    ['rheumatoid_factor', '20', '<'],
+    ['tpo_antibodies', '3', '<'],
+    ['ferritin', '85', undefined],
+  ]);
+  expect(buildLabResultsAIInstructions()).toContain(
+    'write "value" as text with the sign, e.g. "<20.00" or ">90"'
+  );
 });
