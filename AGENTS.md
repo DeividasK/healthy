@@ -10,7 +10,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Node Version Management
 
-Node version is managed via `fnm` and automatically loaded across shells via `~/.zshenv` to match `package.json` (`devEngines.runtime.version`, e.g. `22.23.2`).
+Node version is managed via `fnm` and automatically loaded across shells via `~/.zshenv` to match `package.json` (`devEngines.runtime.version`, e.g. `24.22.1`).
 
 ## Commands
 
