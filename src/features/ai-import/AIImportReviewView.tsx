@@ -248,69 +248,81 @@ function ProposalCard({
       ]}
       testID={testID}
     >
-      <View style={styles.typeLine}>
-        <IconDisc icon={kind.icon} size={32} />
-        <Text style={styles.typeText}>{kind.label.toUpperCase()}</Text>
-      </View>
-      <Text style={styles.cardTitle} testID={`${testID}-title`}>
-        {proposal.input.title}
-      </Text>
-      <ResourceMetaLine meta={getProposalMeta(proposal)} />
-      {dosing.map((line) => (
-        <Text key={line} style={styles.dosing}>
-          {line}
+      <View
+        style={[
+          styles.content,
+          decision === 'skipped' && styles.contentSkipped,
+        ]}
+      >
+        <View style={styles.typeLine}>
+          <IconDisc icon={kind.icon} size={32} />
+          <Text style={styles.typeText}>{kind.label.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.cardTitle} testID={`${testID}-title`}>
+          {proposal.input.title}
         </Text>
-      ))}
-      {links.length > 0 && (
-        <View style={styles.links} testID={`${testID}-links`}>
-          {links.map((link) => {
-            const Icon = link.dropped ? Unlink : Link2;
-            return (
-              <View
-                key={`${link.role}-${link.target.ref}`}
-                style={styles.linkRow}
-              >
-                <Icon
-                  size={14}
-                  color={
-                    link.dropped ? COLORS.light.muted : COLORS.light.primary
-                  }
-                />
-                <Text
-                  style={[styles.linkText, link.dropped && styles.linkDropped]}
+        <ResourceMetaLine meta={getProposalMeta(proposal)} />
+        {dosing.map((line) => (
+          <Text key={line} style={styles.dosing}>
+            {line}
+          </Text>
+        ))}
+        {links.length > 0 && (
+          <View style={styles.links} testID={`${testID}-links`}>
+            {links.map((link) => {
+              const Icon = link.dropped ? Unlink : Link2;
+              return (
+                <View
+                  key={`${link.role}-${link.target.ref}`}
+                  style={styles.linkRow}
                 >
-                  {linkText(proposal, link)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-      {matches.length > 0 && (
-        <View style={styles.existing}>
-          <Text style={styles.existingLabel}>Save as</Text>
-          <NativeSelect
-            testID={`${testID}-existing`}
-            name={`existing-${proposal.ref}`}
-            label="Save as"
-            value={chosenExisting}
-            options={[
-              ...matches.map((match) => ({
-                id: match.id,
-                label: `Your condition: ${match.title}`,
-              })),
-              { id: '', label: 'New condition' },
-            ]}
-            onChange={(id) => chooseExistingCondition(proposal.ref, id || null)}
-          />
-        </View>
-      )}
-      {proposal.source && (
-        <View style={styles.sourceRow}>
-          <Quote size={13} color={COLORS.light.muted} />
-          <Text style={styles.sourceText}>From “{proposal.source}”</Text>
-        </View>
-      )}
+                  <Icon
+                    size={14}
+                    color={
+                      link.dropped ? COLORS.light.muted : COLORS.light.primary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.linkText,
+                      link.dropped && styles.linkDropped,
+                    ]}
+                  >
+                    {linkText(proposal, link)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+        {matches.length > 0 && (
+          <View style={styles.existing}>
+            <Text style={styles.existingLabel}>Save as</Text>
+            <NativeSelect
+              testID={`${testID}-existing`}
+              name={`existing-${proposal.ref}`}
+              label="Save as"
+              value={chosenExisting}
+              options={[
+                ...matches.map((match) => ({
+                  id: match.id,
+                  label: `Your condition: ${match.title}`,
+                })),
+                { id: '', label: 'New condition' },
+              ]}
+              onChange={(id) =>
+                chooseExistingCondition(proposal.ref, id || null)
+              }
+            />
+          </View>
+        )}
+        {proposal.source && (
+          <View style={styles.sourceRow}>
+            <Quote size={13} color={COLORS.light.muted} />
+            <Text style={styles.sourceText}>From “{proposal.source}”</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.actions}>
         {decision === 'proposed' ? (
           <>
@@ -339,7 +351,7 @@ function ProposalCard({
           </>
         ) : (
           <>
-            <DecisionBadge decision={decision} testID={`${testID}-decision`} />
+            <DecisionStatus decision={decision} testID={`${testID}-decision`} />
             <CardButton
               label="Undo"
               icon={Undo2}
@@ -391,7 +403,8 @@ function CardButton({
   );
 }
 
-function DecisionBadge({
+/** The card's decision as text: an icon and a word, never colour alone. */
+function DecisionStatus({
   decision,
   testID,
 }: {
@@ -400,20 +413,11 @@ function DecisionBadge({
 }) {
   const accepted = decision === 'accepted';
   const Icon = accepted ? Check : X;
+  const color = accepted ? COLORS.light.primary : COLORS.light.mutedForeground;
   return (
-    <View
-      style={[styles.badge, accepted && styles.badgeAccepted]}
-      testID={testID}
-    >
-      <Icon
-        size={14}
-        color={
-          accepted
-            ? COLORS.light.primaryForeground
-            : COLORS.light.mutedForeground
-        }
-      />
-      <Text style={[styles.badgeText, accepted && styles.badgeTextAccepted]}>
+    <View style={styles.status}>
+      <Icon size={16} color={color} />
+      <Text style={[styles.statusText, { color }]} testID={testID}>
         {accepted ? 'Accepted' : 'Skipped'}
       </Text>
     </View>
@@ -461,7 +465,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     padding: 15,
   },
-  cardSkipped: { opacity: 0.6, borderStyle: 'dashed' },
+  cardSkipped: { borderStyle: 'dashed' },
+  content: { gap: 8 },
+  // Only the record fades; its Undo stays fully visible.
+  contentSkipped: { opacity: 0.6 },
   typeLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   typeText: {
     fontSize: 12,
@@ -527,20 +534,7 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
   },
   buttonTextPrimary: { color: COLORS.light.primaryForeground },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    height: 28,
-    borderRadius: 9999,
-    backgroundColor: COLORS.light.pillBackground,
-  },
-  badgeAccepted: { backgroundColor: COLORS.light.primary },
-  badgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.light.mutedForeground,
-  },
-  badgeTextAccepted: { color: COLORS.light.primaryForeground },
+  // Grows to put Undo on the right, where Accept was.
+  status: { flexDirection: 'row', alignItems: 'center', gap: 6, flexGrow: 1 },
+  statusText: { fontSize: 14, fontWeight: '600' },
 });
