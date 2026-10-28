@@ -107,7 +107,9 @@ export function ProfileHeader({
               testID="profile-id-copy-button"
               accessibilityRole="button"
               accessibilityLabel={
-                copied ? 'Patient ID copied' : `Copy patient ID ${patient.id}`
+                copied
+                  ? `Patient ID ${shortenPatientId(patient.id)} copied`
+                  : `Copy patient ID ${shortenPatientId(patient.id)}`
               }
               style={styles.idPill}
               onPress={copyId}

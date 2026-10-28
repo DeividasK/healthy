@@ -6,6 +6,7 @@ import { NativeSelect } from '@/src/components/NativeSelect';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { useOptionalFields } from '@/src/components/useOptionalFields';
@@ -294,6 +295,7 @@ export function ProfileForm({
             )}
 
             {footer}
+            <FieldRevealSpace />
           </ScrollView>
 
           <FormActionDock

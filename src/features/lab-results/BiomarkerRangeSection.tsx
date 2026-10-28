@@ -93,7 +93,6 @@ export function BiomarkerRangeSection({
               selected={entry === inUse}
               title={title}
               meta={meta}
-              accessibilityLabel={`View lab result: ${since}`}
               onPress={
                 entry.reportId ? () => onOpenReport(entry.reportId!) : undefined
               }

@@ -129,7 +129,6 @@ export function ConditionRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View condition: ${title}`}
       meta={[...getConditionMeta(condition), ...extraMeta]}
       onPress={onPress}
     />

@@ -50,7 +50,6 @@ export function AddProfileView() {
             description="From Google Drive or a backup file"
             leading={<RowIconDisc icon={ArchiveRestore} />}
             onPress={() => router.push('/profile/restore')}
-            accessibilityLabel="Restore a profile instead"
             testID="add-profile-restore"
           />
         </View>

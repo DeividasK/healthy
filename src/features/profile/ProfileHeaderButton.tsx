@@ -29,12 +29,20 @@ export function ProfileHeaderButton({
   const initials = getPatientInitials(activePatient);
   // Nothing to show before a profile exists.
   if (!activePatient) return null;
-
+  const showInitials = Boolean(initials) && initials !== 'S';
   return (
     <TouchableOpacity
       testID="profile-header-button"
       accessibilityRole="button"
-      accessibilityLabel="View Profile"
+      // Beside the name, the button is named by what it shows. Voice control
+      // users say what they see (WCAG 2.5.3, label in name).
+      accessibilityLabel={
+        showName
+          ? undefined
+          : showInitials
+            ? `View Profile: ${initials}`
+            : 'View Profile'
+      }
       activeOpacity={0.7}
       style={style}
       onPress={() => {
@@ -46,7 +54,7 @@ export function ProfileHeaderButton({
         style={styles.avatar}
         testID="profile-header-avatar"
       >
-        {initials && initials !== 'S' ? (
+        {showInitials ? (
           <Text style={styles.initialsText}>{initials}</Text>
         ) : (
           <User size={16} color={COLORS.light.primary} />

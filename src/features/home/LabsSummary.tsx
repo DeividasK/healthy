@@ -22,38 +22,18 @@ import { CountBadge } from '@/src/components/CountBadge';
 import { ResourceSection } from '@/src/components/ResourceSection';
 import { BiomarkerStatusGrid } from '@/src/components/BiomarkerStatusGrid';
 import { BiomarkerStatusGroups } from './BiomarkerStatusGroups';
+import { FilterButton } from '@/src/components/FilterControls';
+import { sortSummaryBiomarkers } from './labsSummarySorting';
 import {
-  SUMMARY_SORT_OPTIONS,
-  sortSummaryBiomarkers,
-  type SummarySort,
-} from './labsSummarySorting';
-
-export const PERIODS = [
-  { id: 'all', label: 'All time', months: 0 },
-  { id: '120', label: '10 years', months: 120 },
-  { id: '60', label: '5 years', months: 60 },
-  { id: '24', label: '2 years', months: 24 },
-  { id: '12', label: '1 year', months: 12 },
-  { id: '6', label: '6 months', months: 6 },
-  { id: '1', label: '1 month', months: 1 },
-];
-
-/** Calendar-month cutoff, clamped for months with fewer days. */
-export function periodCutoff(months: number) {
-  if (!months) return -Infinity;
-  const cutoff = new Date();
-  const day = cutoff.getDate();
-  cutoff.setDate(1);
-  cutoff.setMonth(cutoff.getMonth() - months);
-  const lastDay = new Date(
-    cutoff.getFullYear(),
-    cutoff.getMonth() + 1,
-    0
-  ).getDate();
-  cutoff.setDate(Math.min(day, lastDay));
-  cutoff.setHours(0, 0, 0, 0);
-  return cutoff.getTime();
-}
+  DEFAULT_LABS_SUMMARY_FILTERS,
+  hasLabsSummaryFilters,
+  isPeriod,
+  PERIODS,
+  periodCutoff,
+  periodMonths,
+  type LabsSummaryFilters,
+} from './labsSummaryFilters';
+import { LabsSummaryFilterModal } from './LabsSummaryFilterModal';
 
 /**
  * Uses clinical measurement dates rather than report creation or import
@@ -106,18 +86,22 @@ export function latestBiomarkers(
 
 /**
  * The latest result of each supported biomarker as a status grid. On Home
- * it is a section opening the full summary; the full summary adds the
- * results grouped by status, with sort and search.
+ * it is a section with a period picker, opening the full summary; the full
+ * summary adds the results grouped by status, with search, and a filter
+ * button for the period and sort, whose choice its page keeps.
  */
 export function LabsSummary({
   records,
   showAll = false,
-  initialPeriod = 'all',
+  filters = DEFAULT_LABS_SUMMARY_FILTERS,
+  onFiltersChange,
   autoFocusSearch = false,
 }: {
   records: DiagnosticReportRecord[];
   showAll?: boolean;
-  initialPeriod?: string;
+  /** The full summary's period and sort. */
+  filters?: LabsSummaryFilters;
+  onFiltersChange?: (filters: LabsSummaryFilters) => void;
   /** Starts in the search field (the / keyboard shortcut). */
   autoFocusSearch?: boolean;
 }) {
@@ -129,19 +113,16 @@ export function LabsSummary({
   useEffect(() => {
     if (autoFocusSearch) searchRef.current?.focus();
   }, [autoFocusSearch]);
-  const [sort, setSort] = useState<SummarySort>('deviation');
-  const [period, setPeriod] = useState(() =>
-    PERIODS.some((option) => option.id === initialPeriod)
-      ? initialPeriod
+  const [homePeriod, setHomePeriod] = useState('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const period = showAll
+    ? isPeriod(filters.period)
+      ? filters.period
       : 'all'
-  );
+    : homePeriod;
+  const { sort } = filters;
   const biomarkers = useMemo(
-    () =>
-      latestBiomarkers(
-        records,
-        periodCutoff(PERIODS.find((option) => option.id === period)!.months),
-        ranges
-      ),
+    () => latestBiomarkers(records, periodCutoff(periodMonths(period)), ranges),
     [records, period, ranges]
   );
   const query = search.trim().toLowerCase();
@@ -165,17 +146,6 @@ export function LabsSummary({
     return sortSummaryBiomarkers(matches, sort, ranges);
   }, [biomarkers, query, showAll, sort, ranges]);
 
-  const periodPicker = (
-    <NativeSelect
-      compact
-      value={period}
-      options={PERIODS}
-      onChange={setPeriod}
-      label="Period"
-      testID="labs-summary-period"
-      name="labs-summary-period"
-    />
-  );
   const grid = (
     <BiomarkerStatusGrid items={biomarkers} testID="labs-summary-grid" />
   );
@@ -190,11 +160,25 @@ export function LabsSummary({
         pressLabel="Open biomarkers"
         pressTestID="labs-summary-open"
         onPress={() =>
-          router.push({ pathname: '/labs-summary', params: { period } })
+          // Only a chosen period replaces the summary's saved one.
+          router.push({
+            pathname: '/labs-summary',
+            params: period === 'all' ? {} : { period },
+          })
         }
       >
         <View style={styles.homeBody}>
-          <View style={styles.homePeriod}>{periodPicker}</View>
+          <View style={styles.homePeriod}>
+            <NativeSelect
+              compact
+              value={homePeriod}
+              options={PERIODS}
+              onChange={setHomePeriod}
+              label="Period"
+              testID="labs-summary-period"
+              name="labs-summary-period"
+            />
+          </View>
           {grid}
         </View>
       </ResourceSection>
@@ -212,26 +196,16 @@ export function LabsSummary({
           accessibilityLabel={`Latest results: ${biomarkers.length} biomarkers`}
           testID="labs-summary-total"
         />
-      </View>
-      {grid}
-      <View style={styles.controlsRow}>
-        <View style={styles.periodControl}>
-          <Text style={styles.controlLabel}>Period</Text>
-          {periodPicker}
-        </View>
-        <View style={styles.sortControl}>
-          <Text style={styles.controlLabel}>Sort</Text>
-          <NativeSelect
-            compact
-            value={sort}
-            options={[...SUMMARY_SORT_OPTIONS]}
-            onChange={(value) => setSort(value as SummarySort)}
-            label="Sort"
-            testID="labs-summary-sort"
-            name="labs-summary-sort"
+        <View style={styles.headingAction}>
+          <FilterButton
+            label="Filter latest results"
+            active={hasLabsSummaryFilters(filters)}
+            testID="labs-summary-filter-button"
+            onPress={() => setFiltersOpen(true)}
           />
         </View>
       </View>
+      {grid}
       <TextInput
         id="labs-summary-search"
         nativeID="labs-summary-search"
@@ -259,6 +233,12 @@ export function LabsSummary({
           rowTestID={({ id }) => `labs-summary-result-${id}`}
         />
       )}
+      <LabsSummaryFilterModal
+        visible={filtersOpen}
+        filters={filters}
+        onChange={(next) => onFiltersChange?.(next)}
+        onClose={() => setFiltersOpen(false)}
+      />
     </View>
   );
 }
@@ -277,21 +257,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.light.foreground,
   },
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  periodControl: { width: 100 },
-  sortControl: { width: 150 },
-  controlLabel: {
-    fontSize: 14,
-    lineHeight: 18,
-    color: COLORS.light.textSecondary,
-  },
+  headingAction: { marginLeft: 'auto' },
   searchInput: {
+    marginTop: 20,
     minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 10,

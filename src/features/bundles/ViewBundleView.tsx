@@ -179,7 +179,6 @@ function BundleForPatient({
               testID={`bundle-treatment-${treatment.id}`}
               title={title}
               description={formatTreatmentRegimen(treatment, hasTimes)}
-              accessibilityLabel={`View treatment: ${title}`}
               onPress={() => router.push(`/treatment/${treatment.id}`)}
             />
           );
@@ -199,7 +198,6 @@ function BundleForPatient({
               testID={`bundle-activity-${request.id}`}
               title={title}
               description={formatActivitySchedule(request, hasTimes)}
-              accessibilityLabel={`View service request: ${title}`}
               onPress={() => router.push(`/service-request/${request.id}`)}
             />
           );

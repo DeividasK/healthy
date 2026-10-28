@@ -40,6 +40,7 @@ import { NativeSelect } from '@/src/components/NativeSelect';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
@@ -1000,6 +1001,7 @@ export function LabResultForm({
                   </View>
                 )}
             </View>
+            <FieldRevealSpace />
           </ScrollView>
 
           {/* Bottom Save Action */}

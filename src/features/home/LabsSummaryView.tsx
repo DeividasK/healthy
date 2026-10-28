@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import type { DiagnosticReportRecord } from '@/src/database/types';
@@ -8,12 +8,15 @@ import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { LabResultsSection } from '@/src/features/lab-results/LabResultsSection';
+import { LabsSummary, latestBiomarkers } from './LabsSummary';
 import {
-  LabsSummary,
-  latestBiomarkers,
-  PERIODS,
+  DEFAULT_LABS_SUMMARY_FILTERS,
+  isPeriod,
+  parseLabsSummaryFilters,
   periodCutoff,
-} from './LabsSummary';
+  periodMonths,
+} from './labsSummaryFilters';
+import { useSavedFilters } from '@/src/utils/savedFilters';
 import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
 import {
   BiomarkerSelectionContext,
@@ -64,10 +67,28 @@ export function LabsSummaryView() {
     }, [load])
   );
   useDatabaseSubscription(['diagnostic_reports', 'observations'], load);
+  // Each profile remembers its own period and sort on this device.
+  const [savedFilters, setFilters, filtersLoaded] = useSavedFilters(
+    activePatientId ? `biomarkers:${activePatientId}` : null,
+    DEFAULT_LABS_SUMMARY_FILTERS,
+    parseLabsSummaryFilters
+  );
+  // Home opens the summary with its own period, which becomes the saved one.
+  const homePeriod = isPeriod(period) ? period! : undefined;
+  const filters = homePeriod
+    ? { ...savedFilters, period: homePeriod }
+    : savedFilters;
+  useEffect(() => {
+    if (!filtersLoaded || period === undefined) return;
+    if (homePeriod && homePeriod !== savedFilters.period)
+      setFilters({ ...savedFilters, period: homePeriod });
+    router.setParams({ period: undefined });
+  }, [filtersLoaded, period, homePeriod, savedFilters, setFilters, router]);
   const isCurrentPatient = data.patientId === activePatientId;
   const isLoading =
     isPatientLoading ||
-    (!!activePatientId && (!isCurrentPatient || data.isLoading));
+    (!!activePatientId &&
+      (!isCurrentPatient || data.isLoading || !filtersLoaded));
 
   const reports = useMemo(
     () => (isCurrentPatient && activePatientId ? data.reports : []),
@@ -75,7 +96,7 @@ export function LabsSummaryView() {
   );
   // The list's own filters, so the default is a row the list shows.
   const ranges = useBiomarkerRanges();
-  const months = PERIODS.find(({ id }) => id === period)?.months ?? 0;
+  const months = periodMonths(filters.period);
   // Desktop: the list stays on the left and the chosen biomarker shows on
   // the right, starting with the first one out of range.
   const firstId = useMemo(() => {
@@ -96,10 +117,11 @@ export function LabsSummaryView() {
 
   const summary = (
     <LabsSummary
-      key={`${activePatientId}:${period || 'all'}`}
+      key={activePatientId}
       records={reports}
       showAll
-      initialPeriod={period}
+      filters={filters}
+      onFiltersChange={setFilters}
       autoFocusSearch={focus === 'search'}
     />
   );
@@ -116,7 +138,7 @@ export function LabsSummaryView() {
         <ListDetailLayout
           title="Biomarkers"
           listId="biomarker-list"
-          rowLabel="View biomarker:"
+          rowSelector='[aria-label^="View biomarker:"]'
           testID="labs-summary-view"
           list={
             <>

@@ -29,16 +29,14 @@ export function NativeTimePicker({
 
       DateTimePickerAndroid.open({
         value: now,
-        onChange: (_event, selectedDate) => {
-          if (selectedDate) {
-            const h = selectedDate.getHours().toString().padStart(2, '0');
-            const m = selectedDate.getMinutes().toString().padStart(2, '0');
-            const newTime = `${h}:${m}`;
-            if (maxTime && newTime > maxTime) {
-              return;
-            }
-            onChange(newTime);
+        onValueChange: (_event, selectedDate) => {
+          const h = selectedDate.getHours().toString().padStart(2, '0');
+          const m = selectedDate.getMinutes().toString().padStart(2, '0');
+          const newTime = `${h}:${m}`;
+          if (maxTime && newTime > maxTime) {
+            return;
           }
+          onChange(newTime);
         },
         mode: 'time',
         is24Hour: true,

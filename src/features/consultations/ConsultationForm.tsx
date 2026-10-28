@@ -34,6 +34,7 @@ import { NativeTimePicker } from '@/src/components/NativeTimePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import {
@@ -889,6 +890,7 @@ export function ConsultationForm({
             )}
 
             {links.fields}
+            <FieldRevealSpace />
           </ScrollView>
 
           {/* Bottom Save Action */}

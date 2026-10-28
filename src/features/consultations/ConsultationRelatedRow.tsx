@@ -90,7 +90,6 @@ export function ConsultationRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View consultation: ${title}`}
       meta={[...getConsultationMeta(consultation), ...extraMeta]}
       note={showNotes ? getConsultationNotes(consultation) : null}
       onPress={onPress}

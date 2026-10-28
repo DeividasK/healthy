@@ -1,0 +1,3 @@
+kind: Fixed
+body: A search list opened near the bottom of a form now scrolls up so none of its options sit behind the action bar.
+time: 2026-10-28T05:30:00.000000000Z
