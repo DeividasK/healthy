@@ -11,7 +11,9 @@ allowBuilds:
 
 patchedDependencies:
   '@expo/metro-config': patches/@expo__metro-config.patch
+  deepmerge: patches/deepmerge.patch
   expo-sqlite: patches/expo-sqlite.patch
+  query-string: patches/query-string.patch
 
 minimumReleaseAgeExclude:
   - '@expo/cli@57.0.32'
@@ -25,8 +27,7 @@ minimumReleaseAgeExclude:
   - expo-router@57.0.29
   - expo-sharing@57.0.24
 
-# Security fixes for transitive dev-only deps whose parents pin a vulnerable
-# version. Drop each entry once the parent ships the fix.
+# Security fixes for transitive deps whose parents pin a vulnerable version. Drop each entry once the parent ships the fix.
 overrides:
   # Optional peer of react-native's CLI plugin. Without this pin pnpm resolves
   # it to the newest release instead of the one matching react-native.
@@ -36,3 +37,15 @@ overrides:
   # @chromatic-com/playwright@1.0.0 pins storybook@10.2.13 (preview origin
   # validation and dev server code injection advisories).
   storybook: ^10.6.2
+  # storybook@10.6.4 allows esbuild@0.27, whose dev server can read any file
+  # on Windows.
+  esbuild: ^0.28.1
+  # @expo/cli@57.0.32 pins node-forge@1.4.0 (RSA signature forgery).
+  node-forge: ^1.4.1
+  # @expo/cli@57.0.32 pins zod@3 (memory exhaustion on large arrays). The CLI
+  # only builds simple dev tools schemas, which zod 4 still supports.
+  '@expo/cli>zod': ^4.6.6
+  # query-string@7.1.3 (expo-router) pins decode-uri-component@0.2 (exponential
+  # decoding of malformed input). 0.5 is ESM only, so the query-string patch
+  # reads its default export.
+  decode-uri-component: ^0.5.1
