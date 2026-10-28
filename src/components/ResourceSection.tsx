@@ -1,5 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import { CountBadge } from './CountBadge';
 import { SelectedRowMarker } from './SelectedRowMarker';
@@ -119,15 +125,12 @@ interface ResourceRowProps extends ResourceRowAppearance {
    * chevron. With `onPress`, only the title and meta open the resource.
    */
   accessory?: React.ReactNode;
-  /** Accessible name of the open button, e.g. "View condition: Migraine". */
-  accessibilityLabel?: string;
   /** Test ID of the pressable row (or of the plain row when it cannot be opened). */
   testID?: string;
-  /**
-   * The row's kind, drawn before the title, e.g. a bundle in the journal.
-   * Decorative: `accessibilityLabel` names the kind.
-   */
+  /** The row's kind, drawn before the title, e.g. a bundle in the journal. */
   typeIcon?: LucideIcon;
+  /** Names `typeIcon` for screen readers, e.g. "Bundle". */
+  typeLabel?: string;
 }
 
 /**
@@ -164,7 +167,9 @@ export function ResourceMetaLine({ meta }: { meta: ResourceMeta[] }) {
 
 /**
  * One related resource: title, meta line and a chevron. The whole row opens
- * the resource; without `onPress` it is plain text with no chevron.
+ * the resource; without `onPress` it is plain text with no chevron. The open
+ * button takes its name from the text it shows, so voice control users can
+ * say what they see (WCAG 2.5.3, label in name).
  */
 export function ResourceRow({
   title,
@@ -173,29 +178,41 @@ export function ResourceRow({
   note,
   onPress,
   accessory,
-  accessibilityLabel,
   testID,
   leading,
   backgroundColor,
   dimmed = false,
   selected = false,
   typeIcon: TypeIcon,
+  typeLabel,
 }: ResourceRowProps) {
   if (onPress && accessory) {
     const titleText = <Text style={styles.rowTitle}>{title}</Text>;
+    // On the web the kind is an image inside the button, so the button keeps
+    // its visible text as its name. Native screen readers would focus that
+    // image on its own, so there the kind leads the button's label instead.
+    const webTypeLabel = Platform.OS === 'web' ? typeLabel : undefined;
     return (
       <View style={styles.row} testID={testID}>
         <TouchableOpacity
           testID={`${testID}-open`}
           accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
+          accessibilityLabel={
+            typeLabel && !webTypeLabel ? `${typeLabel}: ${title}` : undefined
+          }
           style={[styles.main, styles.mainPressable]}
           activeOpacity={0.6}
           onPress={onPress}
         >
           {TypeIcon ? (
             <View style={styles.titleLine}>
-              <TypeIcon size={16} color={COLORS.light.primary} />
+              <View
+                accessible={Boolean(webTypeLabel)}
+                accessibilityRole={webTypeLabel ? 'image' : undefined}
+                accessibilityLabel={webTypeLabel}
+              >
+                <TypeIcon size={16} color={COLORS.light.primary} />
+              </View>
               {titleText}
             </View>
           ) : (
@@ -257,7 +274,6 @@ export function ResourceRow({
     <TouchableOpacity
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
       aria-current={selected || undefined}
       style={style}
       activeOpacity={0.6}

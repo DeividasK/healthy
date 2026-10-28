@@ -268,9 +268,7 @@ test.describe('Add Consultation Flow', () => {
       });
 
       await test.step('Open the new standalone consultation view from Home', async () => {
-        await page
-          .getByRole('button', { name: /^View consultation: Annual Physical/ })
-          .click();
+        await page.getByRole('button', { name: /^Annual Physical/ }).click();
         await expect(page).toHaveURL(/.*consultation\/.*$/);
         const view = page.getByTestId('consultation-view');
         await expect(view.getByTestId('consultation-title')).toHaveText(

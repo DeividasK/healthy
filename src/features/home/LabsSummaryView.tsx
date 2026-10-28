@@ -116,7 +116,7 @@ export function LabsSummaryView() {
         <ListDetailLayout
           title="Biomarkers"
           listId="biomarker-list"
-          rowLabel="View biomarker:"
+          rowSelector='[aria-label^="View biomarker:"]'
           testID="labs-summary-view"
           list={
             <>

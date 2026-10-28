@@ -92,7 +92,6 @@ export function BundleRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View bundle: ${title}`}
       meta={getBundleMeta(bundle)}
       onPress={onPress}
     />

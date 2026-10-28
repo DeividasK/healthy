@@ -13,7 +13,7 @@ import { WIDE_MAX_WIDTH } from '@/src/theme/layout';
 export function ListDetailLayout({
   title,
   listId,
-  rowLabel,
+  rowSelector,
   testID,
   list,
   detail,
@@ -22,15 +22,15 @@ export function ListDetailLayout({
   title: string;
   /** The list's element id, which the arrow keys search for rows. */
   listId: string;
-  /** Start of each row's accessible name, e.g. "View biomarker:". */
-  rowLabel: string;
+  /** CSS selector of the list's rows, e.g. `[aria-label^="View biomarker:"]`. */
+  rowSelector: string;
   testID: string;
   list: React.ReactNode;
   detail: React.ReactNode;
   /** The screen's action dock, unless the detail brings its own. */
   dock?: React.ReactNode;
 }) {
-  useListArrowKeys(listId, rowLabel);
+  useListArrowKeys(listId, rowSelector);
   return (
     <View style={styles.split} testID={testID}>
       <ScrollView

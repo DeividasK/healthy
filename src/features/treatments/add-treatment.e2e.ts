@@ -689,7 +689,6 @@ test.describe('Add Treatment bundles', () => {
     await page.getByTestId('treatment-title-input').fill('Magnesium');
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('menu-link-bundle').click();
-    await page.getByTestId('link-bundle-search-input').click();
     await page
       .getByTestId(`link-bundle-autocomplete-item-${morning.id}`)
       .click();
@@ -715,6 +714,27 @@ test.describe('Add Treatment bundles', () => {
       [vitaminD.id, id],
       [omega3.id],
     ]);
+  });
+
+  test('scrolls an opened list above the action dock', async ({ page }) => {
+    for (const title of ['Morning', 'Evening', 'Sleep', 'Training', 'Travel']) {
+      const treatment = await seedTestTreatment(page, {
+        title: `${title} item`,
+      });
+      await seedTestBundle(page, { title, memberIds: [treatment.id] });
+    }
+    await openRoute(page, '/treatment/add');
+    await page.getByTestId('add-option-button').click();
+    await page.getByTestId('menu-link-bundle').click();
+    const list = page.getByTestId('link-bundle-autocomplete-list');
+    const dock = page.getByTestId('resource-action-dock');
+    await expect(async () => {
+      const [listBox, dockBox] = await Promise.all([
+        list.boundingBox(),
+        dock.boundingBox(),
+      ]);
+      expect(listBox!.y + listBox!.height).toBeLessThanOrEqual(dockBox!.y);
+    }).toPass();
   });
 
   test('offers no bundle field when there are no bundles', async ({ page }) => {

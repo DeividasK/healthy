@@ -131,7 +131,6 @@ export function ServiceRequestRelatedRow({
     <ResourceRow
       testID={testID}
       title={title}
-      accessibilityLabel={`View service request: ${title}`}
       meta={[...getServiceRequestMeta(request), ...extraMeta]}
       onPress={onPress}
       {...appearance}

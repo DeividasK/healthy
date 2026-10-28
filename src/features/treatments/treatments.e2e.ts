@@ -67,7 +67,9 @@ test('lists every treatment and filters them by current usage', async ({
   await page.getByTestId('home-treatments-open').click();
   await expect(page).toHaveURL(/\/treatments$/);
   const view = page.getByTestId('treatments-view');
-  const rows = view.getByRole('button', { name: /^View treatment: / });
+  const rows = view.locator(
+    '[data-testid^="treatments-row-list-"][role="button"]'
+  );
   await expect(rows).toHaveCount(4);
   await expect(view.getByTestId('treatments-list-count')).toHaveText('4');
   await expect(

@@ -336,7 +336,6 @@ function ServiceRequestForPatient({
                       ? [{ icon: Timer, text: formatMinutes(duration) }]
                       : []),
                   ]}
-                  accessibilityLabel={`Open the journal on ${date}`}
                   onPress={
                     date
                       ? () =>

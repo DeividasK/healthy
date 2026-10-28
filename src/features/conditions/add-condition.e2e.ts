@@ -121,7 +121,7 @@ test.describe('Add Condition Flow', () => {
 
       let conditionId = '';
       await test.step('View it with its timeline, then edit it', async () => {
-        await page.getByRole('button', { name: /^View condition:/ }).click();
+        await page.getByRole('button', { name: /^Left Knee Pain/ }).click();
         await expect(page.getByTestId('condition-title')).toHaveText(
           'Left Knee Pain'
         );
