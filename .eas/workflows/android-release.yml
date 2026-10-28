@@ -12,7 +12,7 @@ on:
 # submit job only gets it from here.
 defaults:
   tools:
-    node: 24.22.1
+    node: 24.21.0
 
 # Releases come only from `release`, also when the workflow is run by hand on
 # another branch; branches get a debug build check in GitHub CI instead.
