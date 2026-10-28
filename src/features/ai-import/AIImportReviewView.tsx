@@ -61,6 +61,7 @@ export const toExistingConditions = (
     id: condition.id!,
     title: getConditionTitle(condition),
     code: condition.code?.coding?.[0]?.code,
+    system: condition.code?.coding?.[0]?.system,
   }));
 
 /**

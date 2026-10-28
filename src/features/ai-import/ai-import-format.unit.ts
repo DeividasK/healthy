@@ -9,6 +9,7 @@ import {
   getProposalLinks,
   planSave,
   startReview,
+  type ExistingCondition,
   type Review,
 } from './proposals';
 
@@ -74,7 +75,7 @@ const read = (text: string): ImportedRecords => {
 
 const review = (
   decisions: Record<string, 'accepted' | 'skipped'>,
-  existing: { id: string; title: string; code?: string }[] = []
+  existing: ExistingCondition[] = []
 ): Review => {
   const started = startReview(read(VISIT_REPLY), existing);
   return {
@@ -295,4 +296,15 @@ test('an existing condition with the same code is linked instead of added', () =
       { id: 'cond-name', title: 'soft tissue overuse disorder' },
     ]).existingConditions
   ).toEqual({ knee: 'cond-name' });
+  // The same code in another terminology is a different condition.
+  expect(
+    startReview(read(VISIT_REPLY), [
+      {
+        id: 'cond-snomed',
+        title: 'Left knee pain',
+        code: 'M70.8',
+        system: 'http://snomed.info/sct',
+      },
+    ]).existingConditions
+  ).toEqual({ knee: null });
 });

@@ -172,9 +172,17 @@ export function EditProposalView() {
               authoredDate: values.authoredDate
                 ? formatLocalDate(values.authoredDate)
                 : undefined,
-              dosageInstructions: values.dosageInstructions,
-              regimen: values.regimen,
-              dispenseQuantity: values.dispenseQuantity,
+              // The form omits unchanged dosing (undefined); null removes it.
+              dosageInstructions:
+                values.dosageInstructions === undefined
+                  ? input.dosageInstructions
+                  : values.dosageInstructions,
+              regimen:
+                values.regimen === undefined ? input.regimen : values.regimen,
+              dispenseQuantity:
+                values.dispenseQuantity === undefined
+                  ? input.dispenseQuantity
+                  : values.dispenseQuantity,
               reason: values.reason,
               notes: values.notes,
               requesterName: values.requesterName,

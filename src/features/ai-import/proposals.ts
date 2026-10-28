@@ -139,6 +139,8 @@ export interface ExistingCondition {
   id: string;
   title: string;
   code?: string;
+  /** The code's terminology, e.g. ICD-10. */
+  system?: string;
 }
 
 /**
@@ -168,10 +170,14 @@ export function findExistingConditions(
   existing: ExistingCondition[]
 ): ExistingCondition[] {
   const code = input.terminology?.code?.trim().toUpperCase();
+  const system = input.terminology?.system;
   const title = input.title.trim().toLowerCase();
+  // A code matches only within the same terminology, or one not named.
   return existing.filter(
     (condition) =>
-      (code && condition.code?.trim().toUpperCase() === code) ||
+      (code &&
+        condition.code?.trim().toUpperCase() === code &&
+        (!condition.system || !system || condition.system === system)) ||
       condition.title.trim().toLowerCase() === title
   );
 }

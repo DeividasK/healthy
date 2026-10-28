@@ -303,6 +303,49 @@ test.describe('Import with AI', () => {
     expect(reasonIds(request)).toEqual([`Condition/${existing.id}`]);
   });
 
+  test('an edited treatment keeps the regimen the form left unchanged', async ({
+    page,
+  }) => {
+    await importReply(
+      page,
+      reply([
+        {
+          type: 'treatment',
+          ref: 'vitd',
+          name: 'Vitamin D3',
+          intent: 'plan',
+          regimen: [
+            {
+              doses: [
+                {
+                  amount: 1,
+                  unit: 'capsule',
+                  times: 1,
+                  every: 1,
+                  everyUnit: 'd',
+                },
+              ],
+            },
+          ],
+        },
+      ])
+    );
+    await page.getByTestId('ai-import-card-vitd-edit').click();
+    await page.getByTestId('treatment-title-input').fill('Vitamin D3 2000 IU');
+    await page.getByTestId('save-treatment-button').click();
+    await expect(card(page, 'vitd-title')).toHaveText('Vitamin D3 2000 IU');
+    await page.getByTestId('ai-import-card-vitd-accept').click();
+    await page.getByTestId('ai-import-add-button').click();
+    await expect(page).toHaveURL(/\/$/);
+
+    const [treatment] = await stored(page, 'medication_requests');
+    expect(treatment.medication.concept.text).toBe('Vitamin D3 2000 IU');
+    expect(treatment.dosageInstruction).toHaveLength(1);
+    expect(
+      treatment.dosageInstruction[0].doseAndRate[0].doseQuantity
+    ).toMatchObject({ value: 1 });
+  });
+
   test('lists every problem in a reply that cannot be read', async ({
     page,
   }) => {
