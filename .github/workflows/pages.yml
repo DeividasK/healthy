@@ -114,8 +114,16 @@ jobs:
           for app in i d; do
             sed -i 's#<head>#<head><meta name="robots" content="noindex" />#' "_site/$app/index.html"
           done
+          # Pages can't send headers, so every page carries its own policy,
+          # made from the configuration its app was built with: /a and /d from
+          # the release, /i and the landing page from main.
+          node .pages/scripts/content-security-policy.mjs _site/a .env
+          node .pages/scripts/content-security-policy.mjs _site/d .env
+          node .pages/scripts/content-security-policy.mjs _site/i .pages/.env
+          node .pages/scripts/content-security-policy.mjs _site .pages/.env
           # Unknown paths fall back to the app they are under, so deep links
-          # load. GitHub Pages has one 404 page, so it writes the right shell.
+          # load. GitHub Pages has one 404 page, so it writes the right shell,
+          # which brings that app's policy.
           node .pages/scripts/pages-404.mjs _site
           # The landing page downloads the demo's files ahead of a click.
           node .pages/scripts/demo-prefetch.mjs _site
