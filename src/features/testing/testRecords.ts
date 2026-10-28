@@ -6,6 +6,21 @@ import { evaluateBridge, seedTestPatient, seedTestResources } from './testSeed';
 export const TEST_PHOTO_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAABgAAAAQCAIAAACDRijCAAAAJ0lEQVR4nGO0TQlgwAamtNZiFc+pbsYqzoRVlAwwatCoQaMGjVSDANg6BBHAZq0iAAAAAElFTkSuQmCC';
 
+/** The stored FHIR resource of row `id` in `table`, as the app saved it. */
+export const getStoredFhir = async (
+  page: Page,
+  table: string,
+  id: string
+): Promise<any> => {
+  const rows = await evaluateBridge<{ fhir_json: string }[]>(
+    page,
+    (b, { table, id }) =>
+      b.querySql(`SELECT fhir_json FROM ${table} WHERE id = ?;`, [id]),
+    { table, id }
+  );
+  return JSON.parse(rows[0].fhir_json);
+};
+
 /** Every table that holds a synced, backed-up clinical record. */
 export const CLINICAL_TABLES = [
   'patients',

@@ -5,6 +5,8 @@ import {
   seedTestResources,
 } from '@/src/features/testing/visualTest';
 
+// Chromatic keys baselines by test title, so this keeps its original title;
+// stop, notes and resume are asserted in treatment-usage.e2e.ts.
 test('Usage form: start, stop with notes, resume', async ({
   page,
 }, testInfo) => {
@@ -24,49 +26,6 @@ test('Usage form: start, stop with notes, resume', async ({
   await page.getByTestId('treatment-usage-start').click();
   await page.getByTestId('save-usage-button').waitFor();
   await takeSnapshot(page, 'Treatment usage - Start taking', testInfo);
-  // A supplement without a prescription opens on a regimen of 1 tablet once a day.
-  await seedTestResources(page, {
-    treatments: [
-      { id: 'visual-supplement', title: 'Magnesium', status: 'active' },
-    ],
-  });
-  await page.goto('/treatment/visual-supplement');
-  await page.getByTestId('treatment-usage-start').click();
-  await page.getByTestId('treatment-regimen-field').waitFor();
-  await takeSnapshot(
-    page,
-    'Treatment usage - Start taking without a prescription',
-    testInfo
-  );
-  await seedTestResources(page, {
-    treatmentUsage: [
-      { treatmentId: 'visual-usage', action: 'start', date: '2026-10-01' },
-    ],
-  });
-  await page.goto('/treatment/visual-usage');
-  await page.getByTestId('treatment-usage-change').click();
-  await page.getByTestId('add-option-button').click();
-  await page.getByTestId('menu-add-usage-notes').click();
-  await page
-    .getByTestId('treatment-usage-notes-input')
-    .fill('Waiting for a refill');
-  await takeSnapshot(page, 'Treatment usage - On hold with notes', testInfo);
-  await page.getByTestId('treatment-usage-kind-stop').click();
-  await takeSnapshot(page, 'Treatment usage - Stopped selection', testInfo);
-  await seedTestResources(page, {
-    treatmentUsage: [
-      {
-        treatmentId: 'visual-usage',
-        action: 'pause',
-        date: '2026-10-06',
-        notes: 'Waiting for a refill',
-      },
-    ],
-  });
-  await page.goto('/treatment/visual-usage');
-  await page.getByTestId('treatment-usage-start').click();
-  await page.getByTestId('save-usage-button').waitFor();
-  await takeSnapshot(page, 'Treatment usage - Resume taking', testInfo);
 });
 
 test('Usage form: a new regimen and where it shows', async ({
@@ -120,14 +79,17 @@ test('Usage form: a new regimen and where it shows', async ({
   });
   await page.goto('/treatment/visual-regimen');
   await page.getByTestId('treatment-usage-change').click();
-  await page.getByTestId('save-usage-button').waitFor();
-  await takeSnapshot(page, 'Treatment usage - Change usage', testInfo);
   await page.getByTestId('treatment-usage-kind-change').click();
   await page
     .getByTestId('treatment-usage-date-picker')
     .locator('input')
     .fill('2026-10-05');
   await page.getByLabel('Min Amount').fill('1');
+  await page.getByTestId('add-option-button').click();
+  await page.getByTestId('menu-add-usage-notes').click();
+  await page
+    .getByTestId('treatment-usage-notes-input')
+    .fill('Waiting for a refill');
   await takeSnapshot(page, 'Treatment usage - New regimen', testInfo);
   await page.getByTestId('save-usage-button').click();
   await page.getByTestId('treatment-current-regimen').waitFor();
@@ -135,7 +97,6 @@ test('Usage form: a new regimen and where it shows', async ({
     .getByTestId(/^treatment-usage-period-/)
     .nth(1)
     .waitFor();
-  await takeSnapshot(page, 'Treatment View - New regimen', testInfo);
   await page.goto('/journal?date=2026-10-06');
   await page.getByTestId('treatment-log-mismatch-visual-regimen-0').waitFor();
   await takeSnapshot(
@@ -171,13 +132,11 @@ test('Usage form: edit and remove a period', async ({ page }, testInfo) => {
   await page.goto('/treatment/visual-edit');
   await page.getByRole('button', { name: /^Edit On hold/i }).click();
   await page.getByTestId('treatment-usage-notes-input').waitFor();
-  await takeSnapshot(page, 'Treatment usage - Edit period', testInfo);
   await page.getByTestId('treatment-usage-state-taking').click();
   await page.getByTestId('treatment-usage-instructions-input').waitFor();
   await takeSnapshot(page, 'Treatment usage - Edit period as taking', testInfo);
   await page.getByTestId('treatment-usage-remove-button').click();
   await page.getByTestId('treatment-usage-remove-dialog').waitFor();
-  await takeSnapshot(page, 'Treatment usage - Remove period', testInfo);
   // Do not capture Expo's development error toast for this injected failure.
   await page.evaluate(() => {
     const report = console.error;

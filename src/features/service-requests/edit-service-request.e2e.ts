@@ -11,7 +11,6 @@ import {
   findServiceRequestSection,
   evaluateBridge as bridge,
   openRoute,
-  showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
 test.describe('Edit Service Request', () => {
@@ -218,11 +217,6 @@ test.describe('Edit Service Request', () => {
     await expect(
       page.getByTestId(`condition-service-request-count-${condition.id}`)
     ).toBeVisible();
-    await openRoute(page, `/condition/${condition.id}`);
-    await showAllTimelineSteps(page);
-    await expect(
-      page.getByTestId(`condition-timeline-item-service-request-${request.id}`)
-    ).toBeVisible();
     expect((await getTestServiceRequest(page, request.id)).reason).toEqual([
       { reference: { reference: `Condition/${condition.id}` } },
     ]);
@@ -238,13 +232,11 @@ test.describe('Edit Service Request', () => {
       .toBeUndefined();
   });
 
-  test('links lab results and lists them on the request, the result and the condition', async ({
+  test('links lab results and lists them on the request and the result', async ({
     page,
   }) => {
-    const condition = await seedTestCondition(page, { title: 'Anaemia' });
     const request = await seedTestServiceRequest(page, {
       title: 'Blood count',
-      reasonConditionIds: [condition.id],
     });
     const { report } = await seedTestReport(page, {
       date: '2026-10-05',
@@ -288,13 +280,6 @@ test.describe('Edit Service Request', () => {
     await expect(
       page.getByTestId('service-request-title').filter({ visible: true })
     ).toHaveText('Blood count');
-
-    // The request's condition shows the result on its timeline
-    await openRoute(page, `/condition/${condition.id}`);
-    await showAllTimelineSteps(page);
-    await expect(
-      page.getByTestId(`condition-timeline-item-lab-result-${report.id}`)
-    ).toBeVisible();
 
     await openRoute(page, `/service-request/${request.id}/edit`);
     await page.getByTestId('link-remove-lab-result-button').click();

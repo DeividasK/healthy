@@ -1,4 +1,3 @@
-import { formatLocalDate } from '@/src/utils/dateUtils';
 import {
   test,
   expect,
@@ -643,6 +642,9 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   test('limits date and time to now and pulls a later time back when the date returns to today', async ({
     page,
   }) => {
+    // A fixed browser clock, so today and now cannot move under the checks
+    // (a minute rolling over, a late evening or midnight).
+    await page.clock.setFixedTime(new Date('2026-10-14T10:00:00'));
     await page.getByTestId('start-lab-result').click();
     const dateInput = page
       .getByTestId('date-picker-button')
@@ -650,7 +652,7 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
     const timeInput = page
       .getByTestId('time-picker-button')
       .locator('input[type="time"]');
-    await expect(dateInput).toHaveAttribute('max', formatLocalDate(new Date()));
+    await expect(dateInput).toHaveAttribute('max', '2026-10-14');
 
     // A past date allows any time
     await dateInput.fill('2026-09-20');
@@ -665,14 +667,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       dialogTriggered = true;
       await dialog.accept();
     });
-    const now = new Date();
-    await dateInput.fill(formatLocalDate(now));
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    await expect(page.getByTestId('time-picker-button')).toContainText(
-      currentTime
-    );
+    await dateInput.fill('2026-10-14');
+    await expect(page.getByTestId('time-picker-button')).toContainText('10:00');
     expect(dialogTriggered).toBe(false);
     // Today's time cannot go past now either
-    expect(await timeInput.getAttribute('max')).toBeTruthy();
+    await expect(timeInput).toHaveAttribute('max', '10:00');
   });
 });

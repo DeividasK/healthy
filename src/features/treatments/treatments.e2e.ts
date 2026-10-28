@@ -5,6 +5,7 @@ import {
   seedTestPatient,
   seedTestResources,
   openRoute,
+  reopenRoute,
   useSingleColumnLayout,
 } from '@/src/features/testing/testStorage';
 
@@ -109,8 +110,8 @@ test('lists every treatment and filters them by current usage', async ({
     );
   });
 
-  await test.step('remembers the filters after a restart', async () => {
-    await page.reload();
+  await test.step('remembers the filters when the list is opened again', async () => {
+    await reopenRoute(page);
     await expect(rows).toHaveCount(2);
     await expect(view.getByTestId('treatments-list')).toContainText(
       'Taking, Not started'
@@ -203,6 +204,9 @@ test('desktop shows the chosen treatment beside the list', async ({ page }) => {
     await row(TREATMENTS['not-started']).click();
     await expect(title).toHaveText('Ibuprofen');
     await page.getByTestId('delete-treatment-button').click();
+    // Fast-forward the delete countdown once the modal has started it.
+    await expect(page.getByTestId('delete-treatment-modal')).toBeVisible();
+    await page.clock.runFor(5000);
     await page.getByTestId('delete-modal-confirm-button').click();
     await expect(page).toHaveURL(/\/treatments$/);
     await expect(row(TREATMENTS['not-started'])).toHaveCount(0);

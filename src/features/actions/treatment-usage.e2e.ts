@@ -55,12 +55,13 @@ test.beforeEach(async ({ page }) => {
 test('start, pause, resume and stop persist FHIR periods and only ask on taking days', async ({
   page,
 }) => {
-  // Opens the journal on each of seven days, a full app load each time.
-  test.setTimeout(60_000);
+  // Its own treatment, with the regimen the start and resume forms show.
+  const lifecycleId = 'usage-lifecycle';
+  const lifecycleUrl = `/treatment/${lifecycleId}`;
   await seedTestResources(page, {
     treatments: [
       {
-        id: treatmentId,
+        id: lifecycleId,
         title: 'Vitamin D',
         status: 'active',
         authoredOn,
@@ -76,9 +77,9 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await openRoute(page, '/journal');
   await expect(page.getByTestId('actions-day-label')).toBeVisible();
   await expect(
-    page.getByTestId(`treatment-log-row-${treatmentId}`)
+    page.getByTestId(`treatment-log-row-${lifecycleId}`)
   ).toHaveCount(0);
-  await openRoute(page, viewUrl);
+  await openRoute(page, lifecycleUrl);
   await page.getByTestId('treatment-usage-start').click();
   await expect(page.getByTestId('treatment-usage-form-title')).toHaveText(
     'Start taking: Vitamin D'
@@ -86,7 +87,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(
     page.getByTestId('treatment-usage-instructions-input')
   ).toHaveValue('1 capsule daily');
-  await saveChange(page, dates[1]);
+  await saveChange(page, dates[1], lifecycleUrl);
   await page.getByTestId('treatment-usage-change').click();
   await expect(
     page.getByRole('radio', { name: 'On hold', exact: true })
@@ -98,7 +99,7 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
     .fill('Waiting for a refill');
   await expect(page.getByTestId('form-add-menu')).toHaveCount(0);
   await checkA11y(page);
-  await saveChange(page, dates[3]);
+  await saveChange(page, dates[3], lifecycleUrl);
   await expect(page.getByTestId('treatment-usage-section')).toContainText(
     'Waiting for a refill'
   );
@@ -110,12 +111,12 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(
     page.getByTestId('treatment-usage-instructions-input')
   ).toHaveValue('1 capsule daily');
-  await saveChange(page, dates[5]);
+  await saveChange(page, dates[5], lifecycleUrl);
   await page.getByTestId('treatment-usage-change').click();
   await page.getByTestId('treatment-usage-kind-stop').click();
-  await saveChange(page, dates[6]);
+  await saveChange(page, dates[6], lifecycleUrl);
 
-  const statements = await getTestTreatmentUsage(page, treatmentId);
+  const statements = await getTestTreatmentUsage(page, lifecycleId);
   expect(statements).toHaveLength(4);
   expect(statements.map((statement) => statement.effectivePeriod)).toEqual([
     { start: dates[1], end: dates[2] },
@@ -139,12 +140,73 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
       status: 'recorded',
       subject: { reference: 'Patient/usage-patient' },
       medication: { concept: { text: 'Vitamin D' } },
-      derivedFrom: [{ reference: `MedicationRequest/${treatmentId}` }],
+      derivedFrom: [{ reference: `MedicationRequest/${lifecycleId}` }],
     });
   }
   expect(statements[1].note).toEqual([{ text: 'Waiting for a refill' }]);
-  expect((await getTestTreatment(page, treatmentId)).status).toBe('active');
+  expect((await getTestTreatment(page, lifecycleId)).status).toBe('active');
+
+  // Only days it was being taken ask for an answer.
+  const takingDays = [1, 2, 5];
   await reopenRoute(page);
+  await expect(
+    page.getByTestId(`treatment-log-history-day-${dates[5]}-missing`)
+  ).toBeVisible();
+  for (const index of [0, 3, 4, 6]) {
+    await expect(
+      page.getByTestId(`treatment-log-history-day-${dates[index]}-missing`)
+    ).toHaveCount(0);
+  }
+  // Home's strip shows the same last seven days the journal opens on.
+  await openRoute(page, '/');
+  for (const [index, date] of dates.entries()) {
+    const status = takingDays.includes(index) ? 'empty' : 'none';
+    await expect(
+      page.getByTestId(`home-action-day-${date}-${status}`)
+    ).toBeVisible();
+  }
+  // The journal leaves it out on a day it was on hold.
+  await openRoute(page, `/journal?date=${dates[3]}`);
+  await expect(page.getByTestId('actions-day-label')).toBeVisible();
+  await expect(
+    page.getByTestId(`treatment-log-row-${lifecycleId}`)
+  ).toHaveCount(0);
+});
+
+test('lists usage periods newest first and collapses the oldest', async ({
+  page,
+}) => {
+  const dates = await Promise.all(
+    [-6, -5, -4, -3, -2, -1, 0].map((offset) =>
+      getBrowserLocalDate(page, offset)
+    )
+  );
+  await seedTestResources(page, {
+    treatmentUsage: [
+      {
+        treatmentId,
+        action: 'start',
+        date: dates[1],
+        dosageInstructions: '1 capsule daily',
+      },
+      {
+        treatmentId,
+        action: 'pause',
+        date: dates[3],
+        notes: 'Waiting for a refill',
+      },
+      {
+        treatmentId,
+        action: 'resume',
+        date: dates[5],
+        dosageInstructions: '1 capsule daily',
+      },
+      { treatmentId, action: 'stop', date: dates[6] },
+    ],
+  });
+  const statements = await getTestTreatmentUsage(page, treatmentId);
+  expect(statements).toHaveLength(4);
+  await openRoute(page, viewUrl);
   const usageRows = page.getByTestId(/^treatment-usage-period-/);
   const badge = page.getByTestId('treatment-usage-section-count');
   const toggle = page.getByTestId('treatment-usage-list-toggle');
@@ -168,24 +230,9 @@ test('start, pause, resume and stop persist FHIR periods and only ask on taking 
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(usageRows).toHaveCount(3);
   await expect(badge).toHaveText('4');
-  await expect(
-    page.getByTestId(`treatment-log-history-day-${dates[5]}-missing`)
-  ).toBeVisible();
-  for (const index of [0, 3, 4, 6]) {
-    await expect(
-      page.getByTestId(`treatment-log-history-day-${dates[index]}-missing`)
-    ).toHaveCount(0);
-  }
-  for (const [index, date] of dates.entries()) {
-    await openRoute(page, `/journal?date=${date}`);
-    await expect(page.getByTestId('actions-day-label')).toBeVisible();
-    await expect(
-      page.getByTestId(`treatment-log-row-${treatmentId}`)
-    ).toHaveCount([1, 2, 5].includes(index) ? 1 : 0);
-  }
+
   // Removing a previously collapsed entry updates the total and removes the
   // toggle when the entire list fits in the three-row preview.
-  await openRoute(page, viewUrl);
   await toggle.click();
   await removePeriod(page, statements[0].id);
   await expect(usageRows).toHaveCount(3);

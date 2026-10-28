@@ -88,22 +88,12 @@ const countForActive = (page: Page, table: string) =>
   );
 
 test.describe('Demo profile', () => {
-  test('The demo build opens a demo profile with three years of records', async ({
-    browser,
-    baseURL,
-  }) => {
-    const { context, page } = await openDemoBuild(browser, baseURL);
-    try {
-      await runDemoChecks(page);
-    } finally {
-      await context.close();
-    }
-  });
-
   test('The ready-made demo matches a freshly created one, moved to today', async ({
     browser,
     baseURL,
   }) => {
+    // Opens the demo three times, and the export alone may take 30 s.
+    test.slow();
     // Ten days apart, on days every month has, so moving by days and
     // counting months back from today agree.
     const made = new Date('2026-03-10T10:00:00');
@@ -162,16 +152,21 @@ test.describe('Demo profile', () => {
     expect(loaded).toEqual(created);
   });
 
-  test('The demo build keeps nothing and leaves the app free in another tab', async ({
+  test('The demo build opens three years of records, keeps nothing and leaves the app free in another tab', async ({
     page,
     browser,
     baseURL,
   }) => {
+    // Builds the demo twice and walks through it.
+    test.slow();
     const demo = await openDemoBuild(browser, baseURL);
     try {
+      await runDemoChecks(demo.page);
+      // The checks end on the profile; a reload below starts from Home.
+      await openRoute(demo.page, '/');
       await expect(
         demo.page.getByTestId('home-conditions-section')
-      ).toBeVisible({ timeout: 20000 });
+      ).toBeVisible();
 
       await test.step('The app opens beside the demo', async () => {
         const app = await demo.context.newPage();

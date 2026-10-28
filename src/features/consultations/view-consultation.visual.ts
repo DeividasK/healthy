@@ -54,6 +54,7 @@ test.describe('View Consultation - Visual Regression', () => {
       title: 'Knee MRI',
       category: '363679005',
       authoredOn: '2026-10-04',
+      plannedDate: '2026-10-25',
       consultationId: consultation.id,
     });
     await page.goto(`/consultation/${consultation.id}`);

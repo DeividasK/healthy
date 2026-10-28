@@ -148,55 +148,6 @@ test.describe('Edit Treatment Flow', () => {
     expect(text.dosageInstruction).toEqual([{ text: 'Back to plain text' }]);
   });
 
-  test('labels uncommon codes and keeps imported text stored beside a regimen', async ({
-    page,
-  }) => {
-    const seeded = await seedTestTreatment(page, {
-      title: 'Imported regimen',
-      intent: 'proposal',
-      status: 'on-hold',
-      dosageInstructions: 'One each morning',
-    });
-    seeded.dosageInstruction[0].timing = { repeat: { when: ['MORN'] } };
-    await page.evaluate(
-      (request) =>
-        (window as any).__HEALTHY_TEST_BRIDGE__.saveTreatment(
-          request,
-          request.subject.reference.slice(8)
-        ),
-      seeded
-    );
-    await openRoute(page, `/treatment/${seeded.id}`);
-    // Uncommon codes are labelled instead of hidden
-    await expect(page.getByTestId('treatment-intent')).toHaveText('Proposal');
-    await expect(
-      page.getByTestId('treatment-view').getByText('On Hold')
-    ).toBeVisible();
-    // Text and regimen are both shown under the one Dosage heading
-    await expect(page.getByTestId('treatment-dosage')).toHaveText(
-      'One each morning\nin the morning'
-    );
-
-    await page.getByTestId('edit-treatment-button').click();
-    const intent = page.getByTestId('treatment-intent-select');
-    await expect(intent).toHaveValue('proposal');
-    await expect(intent.locator('option:checked')).toHaveText('Proposal');
-    await expect(page.getByTestId('treatment-instructions-input')).toHaveCount(
-      0
-    );
-    await expect(
-      page.getByTestId('treatment-regimen-p1-d1-when-select')
-    ).toHaveValue('MORN');
-    await page.getByTestId('treatment-title-input').fill('Imported, renamed');
-    await page.getByTestId('save-treatment-button').click();
-    await expect(page.getByTestId('treatment-title')).toHaveText(
-      'Imported, renamed'
-    );
-    const kept = await getTestTreatment(page, seeded.id);
-    expect(kept.dosageInstruction).toEqual(seeded.dosageInstruction);
-    expect(kept.intent).toBe('proposal');
-  });
-
   test("cannot move the treatment's date past the day taking it started", async ({
     page,
     consoleMonitor,

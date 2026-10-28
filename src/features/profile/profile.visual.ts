@@ -20,8 +20,7 @@ test.describe('Profile Views - Visual Regression', () => {
     await page.goto('/profile');
     await page.getByTestId('profile-avatar-photo').waitFor();
 
-    await takeSnapshot(page, 'Profile View - Details', testInfo);
-
+    // The switcher opens inline above the details, so one snapshot shows both.
     await page.getByTestId('switch-profile-button').click();
     await page.getByTestId('profile-switcher').waitFor();
     await takeSnapshot(page, 'Profile View - Switcher Open', testInfo);
@@ -31,7 +30,6 @@ test.describe('Profile Views - Visual Regression', () => {
     await seedTestPatient(page, { id: 'patient-visual' });
     await page.goto('/profile/new');
     await page.getByTestId('add-profile-header-title').waitFor();
-    await takeSnapshot(page, 'Profile View - Add a profile', testInfo);
 
     for (const option of [
       'menu-add-family-name',

@@ -6,6 +6,7 @@ import {
   seedTestReport,
   seedTestCondition,
   openRoute,
+  getBrowserLocalDate,
   useSingleColumnLayout,
   expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
@@ -29,7 +30,6 @@ test.beforeEach(async ({ page }) => {
   // The single-column summary; desktop's list beside the detail is tested
   // under 'Desktop' below.
   await useSingleColumnLayout(page);
-  await page.clock.setFixedTime(new Date('2026-10-14T10:00:00Z'));
   await seedTestPatient(page, { id: 'summary-patient-a' });
 });
 
@@ -37,7 +37,7 @@ test('Home shows latest results as a status grid; the summary groups them by sta
   page,
 }) => {
   await seedTestReport(page, {
-    date: '2026-10-10',
+    date: await getBrowserLocalDate(page, -4),
     biomarkers: [
       {
         name: 'Hemoglobin',
@@ -303,7 +303,7 @@ test('summary Search filters the grouped latest results and respects the period'
   page,
 }) => {
   await seedTestReport(page, {
-    date: '2026-10-10',
+    date: await getBrowserLocalDate(page, -4),
     biomarkers: [
       {
         name: 'Hemoglobin',
@@ -382,7 +382,7 @@ test('the heading filter sorts latest biomarkers within each status by deviation
   page,
 }) => {
   await seedTestReport(page, {
-    date: '2026-10-12',
+    date: await getBrowserLocalDate(page, -2),
     biomarkers: [
       {
         name: 'Hemoglobin',
@@ -393,13 +393,13 @@ test('the heading filter sorts latest biomarkers within each status by deviation
     ],
   });
   await seedTestReport(page, {
-    date: '2026-10-10',
+    date: await getBrowserLocalDate(page, -4),
     biomarkers: [
       { name: 'Platelets', value: 480, referenceLow: 150, referenceHigh: 450 },
     ],
   });
   await seedTestReport(page, {
-    date: '2026-10-08',
+    date: await getBrowserLocalDate(page, -6),
     biomarkers: [
       {
         name: 'White Blood Cells',

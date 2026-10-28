@@ -68,11 +68,6 @@ test('Treatments page - all treatments and filtered by status', async ({
   await page.getByTestId('treatments-filter-status-taking').click();
   await page.getByTestId('treatments-filter-status-on-hold').click();
   await takeSnapshot(page, 'Treatments - filters', testInfo);
-  await page.getByTestId('treatments-filters-done').click();
-  await view.getByTestId('treatments-row-visual-ibuprofen').waitFor({
-    state: 'detached',
-  });
-  await takeSnapshot(page, 'Treatments - taking or on hold', testInfo);
 });
 
 test('Treatments page - desktop list beside the chosen treatment', async ({
@@ -80,8 +75,11 @@ test('Treatments page - desktop list beside the chosen treatment', async ({
 }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await seedTreatments(page);
-  await page.goto('/treatments?treatment=visual-vitamin-d');
+  // Open a treatment that is not started, so the view shows no Usage section
+  // and the dock offers Start (Play); 'Treatment View - Details' covers taking.
+  await page.goto('/treatments?treatment=visual-ibuprofen');
   await page.getByTestId('treatment-title').waitFor();
+  await page.getByTestId('treatment-usage-start').waitFor();
   await page.getByTestId('treatments-row-visual-ibuprofen').waitFor();
   await takeSnapshot(page, 'Treatments - desktop', testInfo);
 });

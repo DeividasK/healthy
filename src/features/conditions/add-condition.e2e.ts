@@ -2,6 +2,7 @@ import {
   test,
   expect,
   seedTestPatient,
+  seedTestCondition,
   seedTestConsultation,
   checkA11y,
   evaluateBridge,
@@ -40,7 +41,7 @@ test.describe('Add Condition Flow', () => {
   test(
     'adds a condition with optional fields, then views, edits and deletes it',
     { tag: ['@smoke', '@critical'] },
-    async ({ page, consoleMonitor }) => {
+    async ({ page }) => {
       await test.step('Navigate to Add Condition screen and audit a11y', async () => {
         // An empty Home starts a first record from its starter rows.
         await page.getByTestId('start-condition').click();
@@ -157,7 +158,7 @@ test.describe('Add Condition Flow', () => {
         await expect(page.getByTestId('condition-timeline')).toBeVisible();
       });
 
-      await test.step('Delete it after a countdown, explaining a failure and allowing retry', async () => {
+      await test.step('Delete it after a countdown', async () => {
         const deleteButton = page.getByTestId('delete-condition-button');
         const modal = page.getByTestId('delete-confirmation-modal');
         await deleteButton.click();
@@ -168,53 +169,81 @@ test.describe('Add Condition Flow', () => {
           'Updated Condition'
         );
 
-        await evaluateBridge(
-          page,
-          (b, id) =>
-            b.executeSql(
-              `CREATE TEMP TRIGGER fail_condition_delete BEFORE DELETE ON conditions
-               WHEN OLD.id = '${id}'
-               BEGIN SELECT RAISE(ABORT, 'Simulated deletion failure'); END;`
-            ),
-          conditionId
-        );
-        consoleMonitor.ignore('Failed to delete resource:');
+        // Fast-forward the delete countdown once the modal has started it.
+        const confirm = page.getByTestId('delete-modal-confirm-button');
         await page.clock.install();
         await deleteButton.click();
-        const confirm = page.getByTestId('delete-modal-confirm-button');
-        // Confirming unlocks only after a 5 second countdown.
         await expect(confirm).toHaveAttribute('aria-disabled', 'true');
-        await expect(confirm).toContainText('Delete (');
         await page.clock.runFor(5000);
-        await expect(confirm).toHaveText('Delete');
         await expect(confirm).toBeEnabled();
-        const dialogPromise = page.waitForEvent('dialog');
-        const clickPromise = confirm.click();
-        const dialog = await dialogPromise;
-        expect(dialog.type()).toBe('alert');
-        expect(dialog.message()).toBe(
-          'Error\nFailed to delete. Please try again.'
-        );
-        await dialog.accept();
-        await clickPromise;
-        await expect(modal).toBeVisible();
-        await expect(page).toHaveURL(new RegExp(`condition/${conditionId}$`));
-
-        await evaluateBridge(page, (b) =>
-          b.executeSql('DROP TRIGGER fail_condition_delete;')
-        );
         await confirm.click();
         await expect(page).toHaveURL(/\/$/);
         // The condition is gone for good; its consultation stays.
         const conditionRows = page.getByTestId(/^condition-card-/);
         await expect(page.getByText('Knee Arthroscopy Review')).toBeVisible();
         await expect(conditionRows).toHaveCount(0);
-        await page.reload();
+        await reopenRoute(page);
         await expect(page.getByText('Knee Arthroscopy Review')).toBeVisible();
         await expect(conditionRows).toHaveCount(0);
+        expect(
+          await evaluateBridge(page, (b, id) => b.getCondition(id), conditionId)
+        ).toBeNull();
       });
     }
   );
+
+  test('unlocks deleting after a countdown, explains a failure and allows a retry', async ({
+    page,
+    consoleMonitor,
+  }) => {
+    const condition = await seedTestCondition(page, { title: 'Knee pain' });
+    await seedTestConsultation(page, {
+      conditionIds: [condition.id],
+      title: 'Knee Arthroscopy Review',
+    });
+    await openRoute(page, `/condition/${condition.id}`);
+    const getCondition = () =>
+      evaluateBridge(page, (b, id) => b.getCondition(id), condition.id);
+
+    await evaluateBridge(
+      page,
+      (b, id) =>
+        b.executeSql(
+          `CREATE TEMP TRIGGER fail_condition_delete BEFORE DELETE ON conditions
+           WHEN OLD.id = '${id}'
+           BEGIN SELECT RAISE(ABORT, 'Simulated deletion failure'); END;`
+        ),
+      condition.id
+    );
+    consoleMonitor.ignore('Failed to delete resource:');
+    await page.clock.install();
+    await page.getByTestId('delete-condition-button').click();
+    const modal = page.getByTestId('delete-confirmation-modal');
+    const confirm = page.getByTestId('delete-modal-confirm-button');
+    // Confirming unlocks only after a 5 second countdown.
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+    await expect(confirm).toContainText('Delete (');
+    await page.clock.runFor(5000);
+    await expect(confirm).toHaveText('Delete');
+    await expect(confirm).toBeEnabled();
+    const dialogPromise = page.waitForEvent('dialog');
+    const clickPromise = confirm.click();
+    const dialog = await dialogPromise;
+    expect(dialog.type()).toBe('alert');
+    expect(dialog.message()).toBe('Error\nFailed to delete. Please try again.');
+    await dialog.accept();
+    await clickPromise;
+    await expect(modal).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`condition/${condition.id}$`));
+    expect(await getCondition()).not.toBeNull();
+
+    await evaluateBridge(page, (b) =>
+      b.executeSql('DROP TRIGGER fail_condition_delete;')
+    );
+    await confirm.click();
+    await expect(page).toHaveURL(/\/$/);
+    expect(await getCondition()).toBeNull();
+  });
 });
 
 test.describe('New condition form keyboard support', () => {

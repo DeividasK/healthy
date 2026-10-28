@@ -11,7 +11,11 @@ import {
   syncAllTestProfiles,
   bootstrapApp,
   openRoute,
+  restartApp,
+  evaluateBridge as bridge,
+  MOCK_TOKEN_SERVICE_URL,
   REVOKED_REFRESH_TOKEN,
+  type MockDriveStore,
 } from '@/src/features/testing/testStorage';
 import { readFile } from 'node:fs/promises';
 import type { Page, Route } from '@playwright/test';
@@ -23,6 +27,31 @@ const OTHER_PHRASE = `${'abandon '.repeat(23)}art`;
 // encryption and the Drive round trips take several seconds when the full
 // suite loads the CPU.
 const syncExpect = expect.configure({ timeout: 15_000 });
+
+/** The saved Google session, or null when there is none. */
+const savedConfig = (page: Page) =>
+  page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key) ?? 'null'),
+    CONFIG_KEY
+  );
+
+/** Leaves the saved Google session with an expired access token. */
+const expireToken = (page: Page, refreshToken: string) =>
+  page.evaluate(
+    ({ key, refreshToken }) => {
+      const config = JSON.parse(localStorage.getItem(key)!);
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...config,
+          accessToken: 'stale-token',
+          refreshToken,
+          tokenExpiresAt: Date.now() - 100000,
+        })
+      );
+    },
+    { key: CONFIG_KEY, refreshToken }
+  );
 
 async function readPhrase(page: Page): Promise<string> {
   const field = page.getByTestId('recovery-phrase-value');
@@ -58,6 +87,9 @@ test.describe('Google Drive sync with a recovery phrase', () => {
 
     await expect(page).toHaveURL(/\/sync\/recovery-phrase/);
     const phrase = await readPhrase(page);
+    await expect(
+      page.getByTestId('recovery-phrase-download-button')
+    ).toBeEnabled();
     await page.getByTestId('recovery-phrase-confirm-button').click();
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page.getByTestId('connected-user-email')).toHaveText(
@@ -99,14 +131,9 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       [...store.files.values()].filter((f) => f.name.startsWith('chunk_'))
         .length;
     const syncedChunks = chunks();
-    await page.getByTestId('switch-profile-button').click();
-    await page.getByTestId('add-new-profile-button').click();
-    await page.getByTestId('patient-given-name-input').fill('Bob');
-    await page.getByTestId('save-profile-button').click();
-    // A new profile opens on its own empty Home.
-    await expect(page.getByTestId('start-your-record-heading')).toHaveText(
-      "Bob's record"
-    );
+    // The profile flow itself is covered with the profile screens.
+    await bridge(page, (b) => b.seedPatient({ id: 'bob', givenName: 'Bob' }));
+    await bridge(page, (b) => b.setActivePatient('bob'));
     await openRoute(page, '/profile');
     await expect(page.getByTestId('profile-display-name').first()).toHaveText(
       'Bob'
@@ -135,9 +162,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     }
     // Leaving the account follows once the last profile stops syncing.
     await expect(page.getByTestId('backup-status-text')).toHaveText(/^Off/);
-    expect(
-      await page.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
-    ).toBeNull();
+    expect(await savedConfig(page)).toBeNull();
     await expect(
       page.getByTestId('profile-display-name').first()
     ).toBeVisible();
@@ -238,7 +263,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     page,
     browser,
   }, testInfo) => {
-    // Boots two more devices.
+    // Opens two more devices.
     test.slow();
     await seedTestPatient(page, { id: 'alice', givenName: 'Alice' });
     const { store, phrase } = await connectTestSync(page);
@@ -265,6 +290,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(device.getByTestId('backup-status-text')).toHaveText(
       'up to date'
     );
+    // Frees the worker's spare device for the next one.
+    await close();
     // The unreadable records are gone; this device's profile is uploaded again.
     expect(driveContents(store)).not.toContain(phrase);
     const restored = await openSecondDevice(browser, testInfo);
@@ -281,7 +308,6 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     // The device holding the old phrase learns that the data was reset.
     await expect(syncTestDevice(page)).rejects.toThrow('removed or reset');
     await restored.close();
-    await close();
   });
 
   test('leaves a Google account whose phrase is not known', async ({
@@ -303,9 +329,7 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await expect(
       device.getByTestId('disconnect-locked-sync-button')
     ).toHaveCount(0);
-    expect(
-      await device.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
-    ).toBeNull();
+    expect(await savedConfig(device)).toBeNull();
     // Leaving never touches the other account's synced data.
     expect([...store.files.values()].some((f) => f.name === 'vault.json')).toBe(
       true
@@ -327,168 +351,133 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await page.getByTestId('close-no-profiles-modal-button').click();
     await expect(modal).not.toBeVisible();
     // Restoring never creates a vault or keeps the Google session.
-    expect(
-      await page.evaluate((key) => localStorage.getItem(key), CONFIG_KEY)
-    ).toBeNull();
+    expect(await savedConfig(page)).toBeNull();
   });
 
-  test('renews an expired Google token in the background', async ({ page }) => {
-    await seedTestPatient(page);
-    const { store } = await connectTestSync(page, {
-      userEmail: 'bob@gmail.com',
+  test.describe('background token handling', () => {
+    let store: MockDriveStore;
+    test.beforeEach(async ({ page }) => {
+      await seedTestPatient(page);
+      ({ store } = await connectTestSync(page, { userEmail: 'bob@gmail.com' }));
     });
-    await page.evaluate((key) => {
-      const config = JSON.parse(localStorage.getItem(key)!);
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          ...config,
-          accessToken: 'stale-token',
-          refreshToken: 'mock-refresh-token',
-          tokenExpiresAt: Date.now() - 100000,
-        })
+
+    test('renews an expired Google token in the background', async ({
+      page,
+    }) => {
+      await expireToken(page, 'mock-refresh-token');
+      store.acceptedToken = 'fresh-gis-token';
+      // Remount so sync starts with the connection made through the bridge.
+      await restartApp(page, '/profile');
+      // The token service swaps the refresh token without any popup.
+      await expect(page.getByTestId('backup-status-text')).toHaveText(
+        'up to date'
       );
-    }, CONFIG_KEY);
-    store.acceptedToken = 'fresh-gis-token';
-    // Reload so sync starts with the connection made through the bridge.
-    await page.goto('/profile');
-    // The token service swaps the refresh token without any popup.
-    await expect(page.getByTestId('backup-status-text')).toHaveText(
-      'up to date'
-    );
-    const saved = await page.evaluate(
-      (key) => JSON.parse(localStorage.getItem(key)!),
-      CONFIG_KEY
-    );
-    expect(saved.accessToken).toBe('fresh-gis-token');
-    expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
-    expect(await page.evaluate(() => (window as any).__googleAuthPopups)).toBe(
-      0
-    );
-  });
-
-  test('a revoked Google session pauses background sync until the user syncs', async ({
-    page,
-    consoleMonitor,
-  }) => {
-    // Chromium logs the token service refusing the revoked refresh token.
-    consoleMonitor.ignore(
-      'Failed to load resource: the server responded with a status of 400'
-    );
-    await seedTestPatient(page);
-    const { store } = await connectTestSync(page, {
-      userEmail: 'bob@gmail.com',
+      const saved = await savedConfig(page);
+      expect(saved.accessToken).toBe('fresh-gis-token');
+      expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
+      expect(
+        await page.evaluate(() => (window as any).__googleAuthPopups)
+      ).toBe(0);
     });
-    await page.evaluate(
-      ({ key, refreshToken }) => {
-        const config = JSON.parse(localStorage.getItem(key)!);
-        localStorage.setItem(
-          key,
-          JSON.stringify({
-            ...config,
-            accessToken: 'stale-token',
-            refreshToken,
-            tokenExpiresAt: Date.now() - 100000,
-          })
-        );
-      },
-      { key: CONFIG_KEY, refreshToken: REVOKED_REFRESH_TOKEN }
-    );
-    store.acceptedToken = 'fresh-gis-token';
-    const savedConfig = () =>
-      page.evaluate(
-        (key) => JSON.parse(localStorage.getItem(key)!),
-        CONFIG_KEY
+
+    test('a revoked Google session pauses background sync until the user syncs', async ({
+      page,
+      consoleMonitor,
+    }) => {
+      // Chromium logs the token service refusing the revoked refresh token.
+      consoleMonitor.ignore(
+        'Failed to load resource: the server responded with a status of 400'
       );
-    // Reload so sync starts with the connection made through the bridge.
-    await page.goto('/profile');
-    // Signing in again needs Google's popup, which browsers block without a
-    // click, so the background sync on start leaves the token alone.
-    await expect(page.getByTestId('sync-now-button')).toBeVisible();
-    await page.waitForLoadState('networkidle');
-    expect((await savedConfig()).accessToken).toBe('stale-token');
+      await expireToken(page, REVOKED_REFRESH_TOKEN);
+      store.acceptedToken = 'fresh-gis-token';
+      const refused = page.waitForResponse(`${MOCK_TOKEN_SERVICE_URL}/**`);
+      // Remount so sync starts with the connection made through the bridge.
+      await restartApp(page, '/profile');
+      // Signing in again needs Google's popup, which browsers block without a
+      // click, so the background sync on start leaves the token alone.
+      expect((await refused).status()).toBe(400);
+      await expect(page.getByTestId('backup-status-text')).toHaveText(
+        'not synced yet'
+      );
+      await expect(page.getByTestId('sync-now-button')).toBeVisible();
+      expect((await savedConfig(page)).accessToken).toBe('stale-token');
 
-    // Syncing by hand signs in again, gets a new refresh token and catches up.
-    await page.getByTestId('sync-now-button').click();
-    await expect(page.getByTestId('backup-status-text')).toHaveText(
-      'up to date'
-    );
-    const saved = await savedConfig();
-    expect(saved.accessToken).toBe('fresh-gis-token');
-    expect(saved.refreshToken).toBe('mock-refresh-token');
-    expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
-  });
-
-  test('stays connected when Google rejects the session', async ({
-    page,
-    consoleMonitor,
-  }) => {
-    // Chromium logs each rejected request; the app retries on the next round.
-    consoleMonitor.ignore(
-      'Failed to load resource: the server responded with a status of 401',
-      'Google Drive session expired'
-    );
-    await seedTestPatient(page);
-    const { store } = await connectTestSync(page, {
-      userEmail: 'bob@gmail.com',
+      // Syncing by hand signs in again, gets a new refresh token and catches up.
+      await page.getByTestId('sync-now-button').click();
+      await expect(page.getByTestId('backup-status-text')).toHaveText(
+        'up to date'
+      );
+      const saved = await savedConfig(page);
+      expect(saved.accessToken).toBe('fresh-gis-token');
+      expect(saved.refreshToken).toBe('mock-refresh-token');
+      expect(saved.tokenExpiresAt).toBeGreaterThan(Date.now());
     });
-    store.acceptedToken = 'revoked-everywhere';
-    const requestsBefore = store.requests.length;
-    // Reload so sync starts with the connection made through the bridge.
-    await page.goto('/profile');
-    await expect(page.getByTestId('sync-now-button')).toBeVisible();
-    await expect(page.getByTestId('connected-user-email')).toHaveText(
-      'bob@gmail.com'
-    );
-    // The sync that runs on start is refused first.
-    await expect
-      .poll(() => store.requests.length)
-      .toBeGreaterThan(requestsBefore);
 
-    // Once Google refuses a token, automatic syncs stop asking for one.
-    const driveRequests: string[] = [];
-    page.on('request', (request) => {
-      if (request.url().startsWith('https://www.googleapis.com/'))
-        driveRequests.push(request.url());
-    });
-    await page.evaluate(() => {
-      (window as any).__tokenRequests = 0;
-      const oauth2 = (window as any).google.accounts.oauth2;
-      const init = oauth2.initTokenClient;
-      oauth2.initTokenClient = (config: any) => {
-        const client = init(config);
-        return {
-          requestAccessToken: (options: any) => {
-            (window as any).__tokenRequests++;
-            client.requestAccessToken(options);
-          },
+    test('stays connected when Google rejects the session', async ({
+      page,
+      consoleMonitor,
+    }) => {
+      // Chromium logs each rejected request; the app retries on the next round.
+      consoleMonitor.ignore(
+        'Failed to load resource: the server responded with a status of 401',
+        'Google Drive session expired'
+      );
+      store.acceptedToken = 'revoked-everywhere';
+      const requestsBefore = store.requests.length;
+      // Remount so sync starts with the connection made through the bridge.
+      await restartApp(page, '/profile');
+      await expect(page.getByTestId('sync-now-button')).toBeVisible();
+      await expect(page.getByTestId('connected-user-email')).toHaveText(
+        'bob@gmail.com'
+      );
+      // The sync that runs on start is refused first.
+      await expect
+        .poll(() => store.requests.length)
+        .toBeGreaterThan(requestsBefore);
+
+      // Once Google refuses a token, automatic syncs stop asking for one.
+      const driveRequests: string[] = [];
+      page.on('request', (request) => {
+        if (request.url().startsWith('https://www.googleapis.com/'))
+          driveRequests.push(request.url());
+      });
+      await page.evaluate(() => {
+        (window as any).__tokenRequests = 0;
+        const oauth2 = (window as any).google.accounts.oauth2;
+        const init = oauth2.initTokenClient;
+        oauth2.initTokenClient = (config: any) => {
+          const client = init(config);
+          return {
+            requestAccessToken: (options: any) => {
+              (window as any).__tokenRequests++;
+              client.requestAccessToken(options);
+            },
+          };
         };
-      };
+      });
+      await focusPastSyncThrottle(page, 3);
+      expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(
+        0
+      );
+      expect(driveRequests).toEqual([]);
     });
-    await focusPastSyncThrottle(page, 3);
-    expect(await page.evaluate(() => (window as any).__tokenRequests)).toBe(0);
-    expect(driveRequests).toEqual([]);
-  });
 
-  test('does not contact Google in the background when no profile syncs', async ({
-    page,
-  }) => {
-    await seedTestPatient(page);
-    await connectTestSync(page, { userEmail: 'bob@gmail.com' });
-    await page.evaluate(() =>
-      (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
-        'UPDATE sync_profiles SET synced = 0;'
-      )
-    );
-    const googleRequests: string[] = [];
-    page.on('request', (request) => {
-      if (/googleapis\.com|accounts\.google\.com/.test(request.url()))
-        googleRequests.push(request.url());
+    test('does not contact Google in the background when no profile syncs', async ({
+      page,
+    }) => {
+      await bridge(page, (b) =>
+        b.executeSql('UPDATE sync_profiles SET synced = 0;')
+      );
+      const googleRequests: string[] = [];
+      page.on('request', (request) => {
+        if (/googleapis\.com|accounts\.google\.com/.test(request.url()))
+          googleRequests.push(request.url());
+      });
+      // Remount so sync starts again with no profile marked as synced.
+      await restartApp(page, '/');
+      await page.getByTestId('profile-header-button').waitFor();
+      await focusPastSyncThrottle(page, 2);
+      expect(googleRequests).toEqual([]);
     });
-    // Reload so sync starts again with no profile marked as synced.
-    await page.goto('/');
-    await page.getByTestId('profile-header-button').waitFor();
-    await focusPastSyncThrottle(page, 2);
-    expect(googleRequests).toEqual([]);
   });
 });

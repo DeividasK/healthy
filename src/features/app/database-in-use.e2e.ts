@@ -1,7 +1,7 @@
 import {
   test,
   expect,
-  createPatientViaUI,
+  seedTestPatient,
 } from '@/src/features/testing/testStorage';
 import { mockGoogleIdentityServices } from '@/src/features/testing/mockGoogleDrive';
 
@@ -12,7 +12,7 @@ test.describe('Database open in another tab', () => {
   test('a second tab waits for the first instead of crashing', async ({
     page,
   }) => {
-    await createPatientViaUI(page);
+    await seedTestPatient(page);
 
     const secondTab = await page.context().newPage();
     await mockGoogleIdentityServices(secondTab);
@@ -32,7 +32,7 @@ test.describe('Database open in another tab', () => {
     await expect(secondTab.getByTestId('start-your-record')).toBeVisible();
     await secondTab.goto('/profile');
     await expect(secondTab.getByTestId('profile-display-name')).toHaveText(
-      'John'
+      'John Doe'
     );
   });
 });
