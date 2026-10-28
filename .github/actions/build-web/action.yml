@@ -12,13 +12,13 @@ runs:
   steps:
     - name: Cache Web Build Output
       id: web-build-cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: dist
         key: ${{ runner.os }}-web-${{ inputs.base-url || '/' }}-${{ hashFiles('.env', 'pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}
 
     - name: Cache Metro Bundler
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .expo/cache
         key: ${{ runner.os }}-metro-${{ inputs.base-url || '/' }}-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'app.json', 'app.config.js', 'tsconfig.json', 'metro.config.js', 'babel.config.js', 'tailwind.config.js', 'global.css', 'app/**', 'src/**', 'components/**', 'constants/**', 'assets/**', 'public/**') }}

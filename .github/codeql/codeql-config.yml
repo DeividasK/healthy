@@ -1,0 +1,13 @@
+name: Healthy CodeQL config
+
+queries:
+  - uses: security-extended
+
+# Tests and maintainer scripts run only on our own machines and CI, never in
+# the app, so their alerts are noise.
+paths-ignore:
+  - '**/*.e2e.ts'
+  - '**/*.visual.ts'
+  - '**/*.unit.ts'
+  - src/features/testing
+  - scripts

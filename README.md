@@ -1,5 +1,7 @@
 # ❤️ Healthy
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/DeividasK/healthy/badge)](https://scorecard.dev/viewer/?uri=github.com/DeividasK/healthy)
+
 A privacy-first, 100% local-first cross-platform (Web, iOS, Android) application designed to help individuals record, track, and understand their health over time.
 
 ## Design Principles
