@@ -1,4 +1,4 @@
-import { RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
+import { getBiomarkerKey, RECORDABLE_BIOMARKERS } from '@/src/data/biomarkers';
 import { customTestBiomarker } from '@/src/data/biomarkers/customTests';
 import {
   createOrUpdatePatient,
@@ -16,6 +16,7 @@ import {
   setTreatmentLog,
 } from '@/src/features/actions/treatmentLogService';
 import { setProcedureLog } from '@/src/features/actions/procedureLogService';
+import { saveProfileSettings } from '@/src/features/settings/profileSettingsRepository';
 import { getDb } from '@/src/database/db';
 import { notifyDatabaseChanged } from '@/src/database/dbEvents';
 import {
@@ -51,6 +52,32 @@ function fromToday(months: number, days = 0): string {
 
 /** Lab values by catalog id, in each biomarker's primary unit. */
 type LabValues = Record<string, number>;
+
+/**
+ * The adult male ranges the demo laboratory prints with its results, by
+ * catalog id, in each biomarker's primary unit.
+ */
+const LAB_RANGES: Record<string, { low?: number; high?: number }> = {
+  cholesterol_total: { high: 200 },
+  ldl_calculated: { high: 100 },
+  hdl: { low: 40 },
+  triglycerides: { high: 150 },
+  apob: { high: 90 },
+  lpa_mass: { high: 30 },
+  glucose: { low: 70, high: 99 },
+  insulin: { low: 2.6, high: 24.9 },
+  hba1c: { low: 4, high: 5.6 },
+  cbc_hemoglobin: { low: 13.2, high: 16.6 },
+  ferritin: { low: 24, high: 336 },
+  iron: { low: 50, high: 150 },
+  vitamin_d: { low: 30, high: 100 },
+  vitamin_b12: { low: 200, high: 900 },
+  hs_crp: { high: 3 },
+  omega_3_index: { low: 8 },
+  tsh: { low: 0.4, high: 4 },
+  alt: { low: 7, high: 55 },
+  creatinine: { low: 0.74, high: 1.35 },
+};
 
 /** A result for a LOINC test outside the catalog, with the lab's own range. */
 interface LoincResult {
@@ -198,7 +225,11 @@ function reportItems(
   const catalogItems = Object.entries(values).map(([id, value]) => {
     const marker = RECORDABLE_BIOMARKERS.find((m) => m.id === id);
     if (!marker) throw new Error(`Demo biomarker ${id} is not in the catalog`);
+    const range = LAB_RANGES[id];
+    if (!range) throw new Error(`Demo biomarker ${id} has no lab range`);
     return {
+      referenceLow: range.low,
+      referenceHigh: range.high,
       id: marker.id,
       name: marker.name,
       loinc: marker.loinc,
@@ -581,6 +612,28 @@ async function addDemoRecords(patientId: string): Promise<void> {
       serviceProviderName: LAB,
       items: reportItems(report.values, report.loincResults, report.ownTests),
     });
+
+  // A vitamin D range Alex set with their doctor 18 months ago, narrower
+  // than the lab's and with an optimal part: the last two results read as
+  // sufficient, then optimal.
+  const vitaminDTest = RECORDABLE_BIOMARKERS.find(
+    ({ id }) => id === 'vitamin_d'
+  )!;
+  await saveProfileSettings(patientId, {
+    biomarkerRanges: {
+      [getBiomarkerKey(vitaminDTest)]: [
+        {
+          low: '30',
+          high: '80',
+          optimalLow: '40',
+          optimalHigh: '60',
+          unit: vitaminDTest.ucumCode,
+          since: fromToday(-18),
+          source: 'user',
+        },
+      ],
+    },
+  });
 
   // Up to three months of journal answers in one write, from the day each
   // treatment or activity started; today is left to answer.

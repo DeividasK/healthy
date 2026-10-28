@@ -33,6 +33,8 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     const plateletsOption = page.getByTestId('autocomplete-item-cbc_platelets');
     await plateletsOption.click();
     await page.getByTestId('marker-value-input-1').fill('260');
+    await page.getByTestId('marker-range-low-0').fill('13.5');
+    await page.getByTestId('marker-range-high-0').fill('17.0');
     await page.getByTestId('marker-card-1').waitFor();
 
     await takeSnapshot(
@@ -101,6 +103,27 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await page.getByTestId('ai-import-errors').waitFor();
 
     await takeSnapshot(page, 'Add Report View - Import with AI', testInfo);
+  });
+
+  test('Add Report View - Printed range - Desktop', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const searchInput = page.getByTestId('test-search-input');
+    await searchInput.fill('Hemoglobin');
+    await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
+    await page.getByTestId('marker-value-input-0').fill('14.2');
+    await page.getByTestId('marker-range-low-0').fill('13.5');
+    await page.getByTestId('marker-range-high-0').fill('17.0');
+    await searchInput.fill('Platelets');
+    await page.getByTestId('autocomplete-item-cbc_platelets').click();
+    await page.getByTestId('marker-value-input-1').fill('260');
+    await page.getByTestId('marker-card-1').waitFor();
+    await takeSnapshot(
+      page,
+      'Add Report View - Printed range - Desktop',
+      testInfo
+    );
   });
 });
 

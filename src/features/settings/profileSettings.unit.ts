@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { getRangeRegionForCountry } from '@/src/data/biomarkers/rangeRegions';
 import { withDefaults } from './profileSettings';
 
 test('every stored journal order is kept only as a list of keys', () => {
@@ -24,18 +23,28 @@ test('keeps only the units stored as text for each biomarker', () => {
   expect(withDefaults(null).biomarkerUnits).toEqual({});
 });
 
-test('keeps only a known range region', () => {
-  expect(withDefaults({ rangeRegion: 'anz' }).rangeRegion).toBe('anz');
-  expect(
-    withDefaults({ rangeRegion: 'mars' as never }).rangeRegion
-  ).toBeUndefined();
-});
-
-test('defaults the range region from the device region', () => {
-  expect(getRangeRegionForCountry('LT')).toBe('europe');
-  expect(getRangeRegionForCountry('gb')).toBe('europe');
-  expect(getRangeRegionForCountry('NZ')).toBe('anz');
-  expect(getRangeRegionForCountry('US')).toBe('us');
-  expect(getRangeRegionForCountry('JP')).toBe('international');
-  expect(getRangeRegionForCountry(null)).toBe('international');
+test('keeps only well-formed ranges the user set', () => {
+  const kept = {
+    low: '3.5',
+    high: '5.30',
+    optimalLow: '4.0',
+    unit: 'mmol/L',
+    since: '2026-09-02',
+    source: 'user',
+  };
+  const { biomarkerRanges } = withDefaults({
+    biomarkerRanges: {
+      '2823-3': [
+        kept,
+        { ...kept, high: '5,3' },
+        { ...kept, low: undefined, high: undefined },
+        { ...kept, since: 'yesterday' },
+        { ...kept, source: 'report' },
+        null,
+      ],
+      ldl: 'invalid',
+    } as never,
+  });
+  expect(biomarkerRanges).toEqual({ '2823-3': [kept] });
+  expect(withDefaults(null).biomarkerRanges).toEqual({});
 });

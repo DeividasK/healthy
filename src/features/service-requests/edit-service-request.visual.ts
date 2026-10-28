@@ -39,7 +39,14 @@ test.describe('Edit Service Request - Visual Regression', () => {
     await seedTestReport(page, {
       date: '2026-04-21',
       serviceRequestIds: [request.id],
-      biomarkers: [{ name: 'Hemoglobin', value: 13.1 }],
+      biomarkers: [
+        {
+          name: 'Hemoglobin',
+          value: 13.1,
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+      ],
     });
 
     await page.goto(`/service-request/${request.id}/edit`);

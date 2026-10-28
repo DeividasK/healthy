@@ -72,7 +72,15 @@ test.describe('View Condition View - Visual Regression', () => {
       time: '08:15',
       serviceProviderName: 'City Lab',
       serviceRequestIds: [mri.id],
-      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+      biomarkers: [
+        {
+          name: 'Hemoglobin',
+          value: 14.5,
+          unit: 'g/dL',
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+      ],
     });
     await seedTestConsultation(page, {
       id: 'cons-cond-view-visual-planned',

@@ -19,10 +19,21 @@ test.beforeEach(async ({ page }) => {
 const seedResults = (page: Parameters<typeof seedTestReport>[0]) =>
   seedTestReport(page, {
     date: '2026-10-10',
+    // With the laboratory's ranges, as printed on the report.
     biomarkers: [
-      { name: 'Hemoglobin', value: 15.2 },
-      { name: 'White Blood Cells', value: 3.1 },
-      { name: 'Platelets', value: 250 },
+      {
+        name: 'Hemoglobin',
+        value: 15.2,
+        referenceLow: 11.6,
+        referenceHigh: 16.6,
+      },
+      {
+        name: 'White Blood Cells',
+        value: 3.1,
+        referenceLow: 4.5,
+        referenceHigh: 11,
+      },
+      { name: 'Platelets', value: 250, referenceLow: 150, referenceHigh: 450 },
     ],
   });
 

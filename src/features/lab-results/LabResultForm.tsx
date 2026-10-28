@@ -83,6 +83,11 @@ import {
   type ImportedLabResults,
 } from './labResultsAIImport';
 import { CONTENT_COLUMN } from '@/src/theme/layout';
+import {
+  formatLimits,
+  isWrittenLimit,
+  reportedRangeEntry,
+} from './biomarkerRanges';
 
 export interface ActiveMarkerItem {
   id: string;
@@ -92,6 +97,9 @@ export interface ActiveMarkerItem {
   comparator?: ResultComparator;
   selectedUnit: string;
   selectedUcum: string;
+  /** The range printed with the result, in the selected unit, as typed. */
+  lowStr: string;
+  highStr: string;
 }
 
 /** The sign before a value: equal to it, or only a bound, e.g. "< 20". */
@@ -112,6 +120,9 @@ function OwnTestLabel({ style }: { style?: StyleProp<ViewStyle> }) {
     </View>
   );
 }
+
+/** A typed limit as the app stores it: a decimal comma becomes a point. */
+const cleanLimit = (text: string) => text.trim().replace(',', '.');
 
 /** Checks the selected local date and optional time against the current time. */
 export function isDateTimeInFuture(
@@ -214,11 +225,13 @@ export function LabResultForm({
       testNotes,
       serviceProviderName,
       activeItems: activeItems.map(
-        ({ id, valueStr, comparator, selectedUnit }) => ({
+        ({ id, valueStr, comparator, selectedUnit, lowStr, highStr }) => ({
           id,
           valueStr,
           comparator,
           selectedUnit,
+          lowStr,
+          highStr,
         })
       ),
       links: links.values,
@@ -316,12 +329,12 @@ export function LabResultForm({
               description: name,
               education: {
                 about: '',
-                whyItMatters: '',
                 whatItMayAffect: '',
                 whatMayBeRelatedToAChange: '',
               },
             };
 
+            const range = reportedRangeEntry(obs, '');
             return {
               id: obs.id || `obs_${Date.now()}_${Math.random()}`,
               definition: def,
@@ -331,6 +344,8 @@ export function LabResultForm({
               }),
               selectedUnit: unit,
               selectedUcum: ucum,
+              lowStr: range?.low ?? '',
+              highStr: range?.high ?? '',
             };
           }
         );
@@ -423,13 +438,15 @@ export function LabResultForm({
       ...(data.serviceProvider && { serviceProvider: data.serviceProvider }),
     });
     setActiveItems(
-      data.results.map(({ marker, value, comparator, unit }) => ({
+      data.results.map(({ marker, value, comparator, unit, low, high }) => ({
         id: marker.id,
         definition: marker,
         valueStr: value,
         ...(comparator && { comparator }),
         selectedUnit: unit.label,
         selectedUcum: unit.ucum,
+        lowStr: low ?? '',
+        highStr: high ?? '',
       }))
     );
     setSearchQuery('');
@@ -444,6 +461,8 @@ export function LabResultForm({
       valueStr: '',
       selectedUnit: defaultUnit ? defaultUnit.label : '',
       selectedUcum: defaultUnit ? defaultUnit.ucum : '',
+      lowStr: '',
+      highStr: '',
     };
     setActiveItems((prev) => [...prev, newItem]);
     setSearchQuery('');
@@ -460,6 +479,8 @@ export function LabResultForm({
         valueStr: '',
         selectedUnit: unit,
         selectedUcum: unit,
+        lowStr: '',
+        highStr: '',
       },
     ]);
     setSearchQuery('');
@@ -482,6 +503,17 @@ export function LabResultForm({
       )
     );
   };
+
+  const updateItem = (index: number, change: Partial<ActiveMarkerItem>) =>
+    setActiveItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...change } : item))
+    );
+
+  const handleLimitChange = (
+    index: number,
+    key: 'lowStr' | 'highStr',
+    val: string
+  ) => updateItem(index, { [key]: val.replace(/[^0-9.,]/g, '') });
 
   const handleSelectUnit = (index: number, unitLabel: string, ucum: string) => {
     setActiveItems((prev) =>
@@ -516,6 +548,19 @@ export function LabResultForm({
         );
         return;
       }
+      const low = cleanLimit(item.lowStr);
+      const high = cleanLimit(item.highStr);
+      if (
+        (low && !isWrittenLimit(low)) ||
+        (high && !isWrittenLimit(high)) ||
+        (low && high && Number(high) <= Number(low))
+      ) {
+        showAlert(
+          'Invalid Range',
+          `Please check the range of ${item.definition.name}: limits are numbers, like 3.5, and the upper limit is above the lower one.`
+        );
+        return;
+      }
     }
 
     if (isDateTimeInFuture(selectedDate, testTime)) {
@@ -530,16 +575,25 @@ export function LabResultForm({
       setIsSaving(true);
       const effectiveDateStr = formatLocalDate(selectedDate);
 
-      const biomarkers: BiomarkerInputItem[] = activeItems.map((item) => ({
-        id: item.definition.id,
-        name: item.definition.name,
-        loinc: getUnitLoinc(item.definition, item.selectedUcum),
-        codeSystem: item.definition.codeSystem,
-        ...parseResultValue(item.valueStr)!,
-        ...(item.comparator && { comparator: item.comparator }),
-        unit: item.selectedUnit.trim(),
-        ucumCode: item.selectedUcum.trim(),
-      }));
+      const biomarkers: BiomarkerInputItem[] = activeItems.map((item) => {
+        const low = cleanLimit(item.lowStr) || undefined;
+        const high = cleanLimit(item.highStr) || undefined;
+        return {
+          id: item.definition.id,
+          name: item.definition.name,
+          loinc: getUnitLoinc(item.definition, item.selectedUcum),
+          codeSystem: item.definition.codeSystem,
+          ...parseResultValue(item.valueStr)!,
+          ...(item.comparator && { comparator: item.comparator }),
+          unit: item.selectedUnit.trim(),
+          ucumCode: item.selectedUcum.trim(),
+          ...(low !== undefined && { referenceLow: Number(low) }),
+          ...(high !== undefined && { referenceHigh: Number(high) }),
+          ...((low !== undefined || high !== undefined) && {
+            referenceText: formatLimits(low, high),
+          }),
+        };
+      });
 
       await createAndSaveDiagnosticReport({
         reportId: isEdit ? initialReportId : undefined,
@@ -800,6 +854,46 @@ export function LabResultForm({
                       />
                     )}
                   </View>
+
+                  {/* Range Row: Range [lower] – [upper] unit */}
+                  <View
+                    style={styles.rangeRow}
+                    testID={`marker-range-${index}`}
+                  >
+                    <Text style={styles.rangeLabel}>Range</Text>
+                    <TextInput
+                      testID={`marker-range-low-${index}`}
+                      id={`marker-range-low-${index}`}
+                      name={`marker-range-low-${item.id}`}
+                      accessibilityLabel={`${item.definition.name} lower limit`}
+                      style={styles.rangeInput}
+                      placeholder="Lower"
+                      placeholderTextColor={COLORS.light.placeholderInput}
+                      keyboardType="decimal-pad"
+                      value={item.lowStr}
+                      onChangeText={(val) =>
+                        handleLimitChange(index, 'lowStr', val)
+                      }
+                    />
+                    <Text style={styles.rangeDash}>–</Text>
+                    <TextInput
+                      testID={`marker-range-high-${index}`}
+                      id={`marker-range-high-${index}`}
+                      name={`marker-range-high-${item.id}`}
+                      accessibilityLabel={`${item.definition.name} upper limit`}
+                      style={styles.rangeInput}
+                      placeholder="Upper"
+                      placeholderTextColor={COLORS.light.placeholderInput}
+                      keyboardType="decimal-pad"
+                      value={item.highStr}
+                      onChangeText={(val) =>
+                        handleLimitChange(index, 'highStr', val)
+                      }
+                    />
+                    <Text style={styles.rangeUnit} numberOfLines={1}>
+                      {item.selectedUnit}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -1042,6 +1136,41 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
     backgroundColor: COLORS.light.card,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    marginTop: 8,
+  },
+  rangeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.light.textSecondary,
+    width: 48,
+  },
+  rangeInput: {
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    color: COLORS.light.foreground,
+    backgroundColor: COLORS.light.card,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  rangeDash: {
+    fontSize: 14,
+    color: COLORS.light.textSecondary,
+  },
+  rangeUnit: {
+    fontSize: 13,
+    color: COLORS.light.textSecondary,
+    maxWidth: 80,
   },
   addTestSection: {
     marginBottom: 16,

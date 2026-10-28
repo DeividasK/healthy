@@ -59,6 +59,55 @@ test('reads results from a reply with a note and a fenced code block', () => {
   ]);
 });
 
+test('reads the printed ranges as written', () => {
+  const result = parseLabResultsAIReply(
+    JSON.stringify({
+      date: '2026-10-20',
+      results: [
+        {
+          test: 'cbc_hemoglobin',
+          value: 14.5,
+          unit: 'g/dL',
+          low: '13.5',
+          high: '17.0',
+        },
+        { test: 'ferritin', value: 85, unit: 'ng/mL', low: 30 },
+        { test: 'cbc_wbc', value: 6.8, unit: '10^9/L', high: '11,0' },
+        { test: 'cbc_platelets', value: 250, unit: '10^3/µL', low: null },
+      ],
+    }),
+    today
+  );
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.data.results.map(({ low, high }) => [low, high])).toEqual([
+    ['13.5', '17.0'],
+    ['30', undefined],
+    [undefined, '11.0'],
+    [undefined, undefined],
+  ]);
+});
+
+test('rejects ranges that are not numbers or end below where they start', () => {
+  const result = parseLabResultsAIReply(
+    JSON.stringify({
+      date: '2026-10-20',
+      results: [
+        { test: 'cbc_hemoglobin', value: 14.5, unit: 'g/dL', low: '< 13' },
+        { test: 'ferritin', value: 85, unit: 'ng/mL', low: 300, high: 30 },
+      ],
+    }),
+    today
+  );
+  expect(result).toEqual({
+    ok: false,
+    errors: [
+      'Hemoglobin (Hgb) has an invalid range.',
+      'Ferritin has an invalid range.',
+    ],
+  });
+});
+
 test('finds catalog tests by the LOINC code of any of their units', () => {
   const result = parseLabResultsAIReply(
     '{"date":"2026-10-20","results":[{"test":"14749-6","value":5.1,"unit":"mmol/L"}]}',

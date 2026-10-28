@@ -215,6 +215,7 @@ export function ResourceRow({
           leading ? styles.rowAfterLeading : { backgroundColor },
         ]}
         testID={onPress ? `${testID}-row` : testID}
+        aria-current={(!onPress && selected) || undefined}
       >
         {selected && <SelectedRowMarker />}
         <View style={[styles.main, dimmed && styles.dimmed]}>

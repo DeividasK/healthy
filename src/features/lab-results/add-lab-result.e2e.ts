@@ -82,6 +82,14 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await wbcInput.fill('6.8');
       });
 
+      await test.step('Enter the range printed with Hemoglobin', async () => {
+        await expect(page.getByTestId('marker-range-1')).toContainText(
+          '10*9/L'
+        );
+        await page.getByTestId('marker-range-low-0').fill('13,5');
+        await page.getByTestId('marker-range-high-0').fill('17.0');
+      });
+
       await test.step('Add notes via plus menu and save', async () => {
         const plusMenuBtn = page.getByTestId('plus-menu-button');
         await plusMenuBtn.click();
@@ -124,9 +132,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(
           home.getByTestId('labs-summary-grid-cell-718-7')
         ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
+        // Entered without its printed range, WBC has none yet.
         await expect(
           home.getByTestId('labs-summary-grid-cell-6690-2')
-        ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+        ).toHaveAccessibleName('White Blood Cells (WBC): No range');
         const stored = await page.evaluate(() =>
           (window as any).__HEALTHY_TEST_BRIDGE__.querySql(
             'SELECT fhir_json FROM observations'
@@ -172,7 +181,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         ).toHaveCount(2);
         await expect(
           results.getByTestId('lab-result-groups-inRange-count')
-        ).toHaveText('2');
+        ).toHaveText('1');
+        await expect(
+          results.getByTestId('lab-result-groups-noRange-count')
+        ).toHaveText('1');
         await expandBiomarkerGroups(results);
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
           '14.5'
@@ -188,6 +200,13 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await test.step('Edit it from its view and return to the update', async () => {
         await page.getByTestId('edit-lab-result-button').click();
         await expect(page).toHaveURL(new RegExp(`lab-result/${reportId}/edit`));
+        // The range shows as it was written.
+        await expect(page.getByTestId('marker-range-low-0')).toHaveValue(
+          '13.5'
+        );
+        await expect(page.getByTestId('marker-range-high-0')).toHaveValue(
+          '17.0'
+        );
         await page.getByTestId('marker-value-input-0').fill('11.2');
         await page.getByTestId('remove-notes-button').click();
         await page.getByTestId('save-button').click();
@@ -199,6 +218,9 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         await expect(results.getByTestId('biomarker-row-718-7')).toContainText(
           '11.2'
         );
+        await expect(
+          results.getByTestId('lab-result-groups-outOfRange-count')
+        ).toHaveText('1');
         await expect(page.getByTestId('lab-result-notes-section')).toHaveCount(
           0
         );
@@ -331,10 +353,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
   "time": "08:15",
   "serviceProvider": "City Laboratory",
   "results": [
-    { "test": "cbc_hemoglobin", "value": 14.5, "unit": "g/dL" },
+    { "test": "cbc_hemoglobin", "value": 14.5, "unit": "g/dL", "low": "13.5", "high": "17.0" },
     { "test": "cbc_wbc", "value": 6.8, "unit": "10^9/L" },
-    { "test": "ferritin", "value": 85, "unit": "ng/mL" },
-    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L" },
+    { "test": "ferritin", "value": 85, "unit": "ng/mL", "low": 30 },
+    { "test": "ldl_calculated", "value": 2.4, "unit": "mmol/L", "high": "3.0" },
     { "test": "2339-0", "value": 92, "unit": "mg/dL" }
   ]
 }
@@ -366,6 +388,11 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         page.getByTestId('unit-picker-button-1').locator('select')
       ).toHaveValue('10*9/L');
       await expect(page.getByTestId('marker-value-input-1')).toHaveValue('6.8');
+      // Printed ranges are copied as written.
+      await expect(page.getByTestId('marker-range-high-0')).toHaveValue('17.0');
+      await expect(page.getByTestId('marker-range-low-1')).toHaveValue('');
+      await expect(page.getByTestId('marker-range-low-2')).toHaveValue('30');
+      await expect(page.getByTestId('marker-range-high-3')).toHaveValue('3.0');
       await expect(page.getByTestId('marker-card-3')).toContainText(
         'LDL Cholesterol'
       );
@@ -383,7 +410,10 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
       await expect(home.getByTestId('labs-summary-count')).toHaveText('5');
       await expect(
         home.getByTestId('labs-summary-grid-cell-6690-2')
-      ).toHaveAccessibleName('White Blood Cells (WBC): In range');
+      ).toHaveAccessibleName('White Blood Cells (WBC): No range');
+      await expect(
+        home.getByTestId('labs-summary-grid-cell-718-7')
+      ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
       await expect(
         home.getByTestId('labs-summary-grid-cell-2276-4')
       ).toHaveAccessibleName('Ferritin: In range');
@@ -400,7 +430,6 @@ test.describe('Add Lab Results Flow (Complete Blood Count)', () => {
         codes.find((row: { name: string }) => row.name === 'LDL Cholesterol')
           .loinc_code
       ).toBe('39469-2');
-      // A LOINC test outside the catalog has no range of its own.
       await expect(
         home.getByTestId('labs-summary-grid-cell-2339-0')
       ).toHaveAccessibleName('Glucose [Mass/volume] in Blood: No range');

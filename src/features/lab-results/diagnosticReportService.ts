@@ -39,6 +39,8 @@ export interface BiomarkerInputItem {
   ucumCode: string;
   referenceLow?: number;
   referenceHigh?: number;
+  /** The printed range as written, e.g. "3.50–5.10", so its decimals survive. */
+  referenceText?: string;
 }
 
 export interface CreateReportOptions {
@@ -167,6 +169,7 @@ export function buildFHIRObservation(
                 code: item.ucumCode,
               }
             : undefined,
+        ...(item.referenceText && { text: item.referenceText }),
       },
     ];
   }

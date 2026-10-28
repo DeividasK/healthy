@@ -69,7 +69,15 @@ test.describe('View Service Request - Visual Regression', () => {
       date: '2026-03-11',
       serviceProviderName: 'City Lab',
       serviceRequestIds: [request.id],
-      biomarkers: [{ name: 'Hemoglobin', value: 14.5, unit: 'g/dL' }],
+      biomarkers: [
+        {
+          name: 'Hemoglobin',
+          value: 14.5,
+          unit: 'g/dL',
+          referenceLow: 11.6,
+          referenceHigh: 16.6,
+        },
+      ],
     });
 
     await page.goto(`/service-request/${request.id}`);

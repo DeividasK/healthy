@@ -23,15 +23,10 @@ import { getBasedOnServiceRequestIds } from '@/src/utils/fhirUtils';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { useDatabaseSubscription } from '@/src/database/dbEvents';
 import { deleteReport, getReportById } from './diagnosticReportService';
-import {
-  getObservationStatus,
-  isSupportedObservation,
-  toRangeStatus,
-  getMissingDemographics,
-} from './biomarkerMeasurements';
+import { isSupportedObservation, toRangeStatus } from './biomarkerMeasurements';
 import { withCalculatedObservations } from './calculatedBiomarkers';
-import { RangeProfileNotice } from './RangeProfileNotice';
-import { useRangeDemographics } from './useRangeDemographics';
+import { getObservationStatus } from './biomarkerRanges';
+import { useBiomarkerRanges } from './useBiomarkerRanges';
 import { getLabResultMeta, LAB_RESULT_TITLE } from './labResultMeta';
 import { BiomarkerDetailView } from './BiomarkerDetailView';
 import { goBackOr } from '@/src/utils/navigation';
@@ -60,7 +55,7 @@ function LabResultForPatient({
   const router = useRouter();
   const { biomarker } = useLocalSearchParams<{ biomarker?: string }>();
   const isWideWindow = useIsWideLayout();
-  const demographics = useRangeDemographics();
+  const ranges = useBiomarkerRanges();
   const [record, setRecord] = useState<DiagnosticReportRecord | null>(null);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(id));
@@ -122,11 +117,9 @@ function LabResultForPatient({
         id: observation.id || String(index),
         name: getBiomarkerName(observation),
         observation,
-        status: toRangeStatus(
-          getObservationStatus(observation, undefined, demographics)
-        ),
+        status: toRangeStatus(getObservationStatus(observation, ranges)),
       }));
-  }, [record, demographics]);
+  }, [record, ranges]);
   const first =
     results.find(({ status }) => status === 'outOfRange') ?? results[0];
   const selectedId =
@@ -161,10 +154,6 @@ function LabResultForPatient({
     ?.map((note) => note.text)
     .filter(Boolean)
     .join('\n');
-  const missing = getMissingDemographics(
-    results.map(({ observation }) => observation),
-    demographics
-  );
 
   const page = (
     <ResourceViewLayout
@@ -219,11 +208,6 @@ function LabResultForPatient({
         {results.length > 0 && (
           <>
             <BiomarkerStatusGrid items={results} testID="lab-result-grid" />
-            <RangeProfileNotice
-              missing={missing}
-              testID="lab-result-range-notice"
-              style={styles.notice}
-            />
             <BiomarkerStatusGroups
               biomarkers={results}
               testID="lab-result-groups"
@@ -263,8 +247,5 @@ const styles = StyleSheet.create({
   details: {
     gap: 16,
     marginBottom: 28,
-  },
-  notice: {
-    marginTop: 16,
   },
 });

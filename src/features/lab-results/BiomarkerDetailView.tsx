@@ -18,6 +18,8 @@ import {
   FlaskConical,
   FolderPlus,
   Hash,
+  Plus,
+  SlidersHorizontal,
   Waypoints,
 } from 'lucide-react-native';
 import Svg, {
@@ -56,6 +58,7 @@ import {
 } from './calculatedBiomarkers';
 import {
   BIOMARKERS,
+  getBiomarkerKey,
   getUnitLoinc,
   hasLoincCode,
   type BiomarkerCalculation,
@@ -69,26 +72,27 @@ import {
   convertBiomarkerValue,
   getObservationMarker,
   getValueComparator,
-  getObservationReferenceRange,
-  getObservationStatus,
   getObservationUnitCode,
   isSupportedObservation,
   RANGE_STATUS_LABELS,
   roundConvertedValue,
   RANGE_STATUSES,
   toRangeStatus,
-  type MeasurementReferenceRange,
   type RangeStatus,
 } from './biomarkerMeasurements';
+import { BiomarkerRangeSection } from './BiomarkerRangeSection';
 import {
-  explainReferenceRange,
-  resolveReferenceRange,
-} from './referenceRanges';
-import { RangeRegionLine } from './RangeRegionLine';
-import { RangeProfileNotice } from './RangeProfileNotice';
+  buildBiomarkerRanges,
+  hasOptimal,
+  limitValue,
+  getBoundStatus,
+  rangeInUnit,
+  rangeOn as rangeOnDay,
+  type BiomarkerRangeEntry,
+  type ResolvedRange,
+} from './biomarkerRanges';
 import { getChartScale } from './chartScale';
 import { CUSTOM_TEST_SYSTEM } from '@/src/data/biomarkers/customTests';
-import { useRangeDemographics } from './useRangeDemographics';
 
 type Measurement = {
   date: string;
@@ -99,9 +103,7 @@ type Measurement = {
   status?: RangeStatus;
   reportId: string;
   unitCode: string;
-  range?: MeasurementReferenceRange;
-  /** Whether the laboratory reported the range, rather than the catalog. */
-  reportedRange: boolean;
+  range?: ResolvedRange;
   observation: Observation;
 };
 
@@ -174,7 +176,6 @@ export function BiomarkerDetailView({
   const isWideWindow = useIsWideLayout();
   const isWide = !selectedId && isWideWindow;
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
-  const demographics = useRangeDemographics();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [history, setHistory] = useState({
     patientId: '',
@@ -184,6 +185,8 @@ export function BiomarkerDetailView({
     >,
     /** The unit each biomarker was last shown in (UCUM, by biomarker id). */
     units: {} as Record<string, string>,
+    /** Ranges the user set on biomarker pages, by biomarker id. */
+    ranges: {} as Record<string, BiomarkerRangeEntry[]>,
     isLoading: true,
     hasError: false,
   });
@@ -213,6 +216,7 @@ export function BiomarkerDetailView({
             reports: [],
             conditionLinks: [],
             units: {},
+            ranges: {},
             isLoading: true,
             hasError: false,
           }
@@ -229,6 +233,7 @@ export function BiomarkerDetailView({
         reports: loadedReports,
         conditionLinks,
         units: settings.biomarkerUnits ?? {},
+        ranges: settings.biomarkerRanges ?? {},
         isLoading: false,
         hasError: false,
       });
@@ -240,6 +245,7 @@ export function BiomarkerDetailView({
         reports: [],
         conditionLinks: [],
         units: {},
+        ranges: {},
         isLoading: false,
         hasError: true,
       });
@@ -269,6 +275,11 @@ export function BiomarkerDetailView({
       )
   );
 
+  /** Every biomarker's ranges: printed on the reports, or set by the user. */
+  const allRanges = useMemo(
+    () => buildBiomarkerRanges(reports, history.ranges),
+    [reports, history.ranges]
+  );
   const measurements = useMemo(() => {
     const matches: Measurement[] = [];
     for (const record of withCalculatedObservations(reports)) {
@@ -295,24 +306,15 @@ export function BiomarkerDetailView({
               '',
             id: observation.id || `${record.report.id}-${matches.length}`,
             name: displayName,
-            status: toRangeStatus(
-              getObservationStatus(observation, marker, demographics)
-            ),
             reportId: record.report.id || '',
             unitCode: getObservationUnitCode(observation),
-            range: getObservationReferenceRange(
-              observation,
-              marker,
-              demographics
-            ),
-            reportedRange: Boolean(observation.referenceRange?.length),
             observation,
           });
         }
       }
     }
     return matches.sort((a, b) => a.date.localeCompare(b.date));
-  }, [id, marker, reports, demographics]);
+  }, [id, marker, reports]);
 
   const recordedLatest = measurements[measurements.length - 1];
   /** Units the reader can switch the results to, when there is a choice. */
@@ -326,10 +328,40 @@ export function BiomarkerDetailView({
   const displayUnit =
     unitOptions.find((unit) => unit.ucum === history.units[marker!.id]) ||
     unitOptions.find((unit) => matchesUnit(unit, recordedLatest.unitCode));
-  /** The results in the chosen unit, with their ranges worked out in it. */
+  /** The unit ranges are shown in: the one the results are shown in. */
+  const rangeUnit = displayUnit?.ucum ?? recordedLatest?.unitCode ?? '';
+  const rangeKey = marker ? getBiomarkerKey(marker) : (id ?? '');
+  /**
+   * The range's history in the shown unit: ranges printed on the lab
+   * reports, and ranges the user set here, each from the day it took effect.
+   */
+  const ranges = useMemo(
+    () =>
+      (allRanges[rangeKey] ?? []).flatMap(
+        (entry) => rangeInUnit(entry, rangeUnit, marker) ?? []
+      ),
+    [allRanges, rangeKey, rangeUnit, marker]
+  );
+  /** The range in effect on a day. */
+  const rangeOn = useCallback(
+    (date: string) => rangeOnDay(ranges, date),
+    [ranges]
+  );
+  /** Opens the range form, in the unit the page shows; `since` edits one. */
+  const openRangeForm = (since?: string) =>
+    router.push({
+      pathname: '/biomarker/[id]/range',
+      params: {
+        id: id!,
+        unit: rangeUnit,
+        unitLabel: displayUnit?.label ?? recordedLatest?.unit ?? rangeUnit,
+        ...(since && { since }),
+      },
+    });
+  /** The results in the chosen unit, each with the range in effect then. */
   const displayedMeasurements = useMemo(
     () =>
-      displayUnit
+      (displayUnit
         ? measurements.map((measurement) => {
             if (matchesUnit(displayUnit, measurement.unitCode))
               return measurement;
@@ -346,16 +378,38 @@ export function BiomarkerDetailView({
                   value: roundConvertedValue(value, measurement.value),
                   unit: displayUnit.label,
                   unitCode: displayUnit.ucum,
-                  range: getObservationReferenceRange(
-                    measurement.observation,
-                    marker,
-                    demographics,
-                    displayUnit.ucum
-                  ),
                 };
           })
-        : measurements,
-    [measurements, displayUnit, marker, demographics]
+        : measurements
+      ).map((measurement) => {
+        const entry = rangeOn(measurement.date);
+        const range = entry && {
+          low: limitValue(entry.low),
+          high: limitValue(entry.high),
+        };
+        const comparator = measurement.observation.valueQuantity?.comparator;
+        const status: RangeStatus | undefined = !range
+          ? undefined
+          : comparator && comparator !== 'ad'
+            ? toRangeStatus(
+                getBoundStatus(measurement.value, comparator, range)
+              )
+            : (range.low !== undefined && measurement.value < range.low) ||
+                (range.high !== undefined && measurement.value > range.high)
+              ? 'outOfRange'
+              : 'inRange';
+        const optimalLow = limitValue(entry?.optimalLow);
+        const optimalHigh = limitValue(entry?.optimalHigh);
+        /** In range but outside the optimal part, when there is one. */
+        const zone: ZoneStatus | undefined =
+          status === 'inRange' &&
+          ((optimalLow !== undefined && measurement.value < optimalLow) ||
+            (optimalHigh !== undefined && measurement.value > optimalHigh))
+            ? 'sufficient'
+            : status;
+        return { ...measurement, range, status, zone };
+      }),
+    [measurements, displayUnit, marker, rangeOn]
   );
   const latestMeasurement =
     displayedMeasurements[displayedMeasurements.length - 1];
@@ -425,10 +479,10 @@ export function BiomarkerDetailView({
       marker
         ? getRelatedBiomarkers(
             marker,
-            latestBiomarkers(reports, -Infinity, demographics)
+            latestBiomarkers(reports, -Infinity, allRanges)
           )
         : [],
-    [marker, reports, demographics]
+    [marker, reports, allRanges]
   );
 
   if (isLoading)
@@ -449,10 +503,7 @@ export function BiomarkerDetailView({
     );
 
   const title = marker?.name || measurements[0].name;
-  const latestRange =
-    marker && !latestMeasurement.reportedRange
-      ? resolveReferenceRange(marker, demographics, latestMeasurement.date)
-      : undefined;
+  const latestRange = rangeOn(latestMeasurement.date);
   const about = (
     <>
       {marker?.description && (
@@ -498,6 +549,16 @@ export function BiomarkerDetailView({
           value={latestMeasurement.value}
           low={latestMeasurement.range?.low}
           high={latestMeasurement.range?.high}
+          optimalLow={limitValue(latestRange?.optimalLow)}
+          optimalHigh={limitValue(latestRange?.optimalHigh)}
+          limitText={(value) =>
+            [
+              latestRange?.low,
+              latestRange?.high,
+              latestRange?.optimalLow,
+              latestRange?.optimalHigh,
+            ].find((limit) => limitValue(limit) === value) ?? String(value)
+          }
           width="100%"
           large
           testID="biomarker-latest-range"
@@ -530,24 +591,18 @@ export function BiomarkerDetailView({
       )}
     </>
   );
+  /** Sufficient only shows once a range has an optimal part. */
+  const legendStatuses: ZoneStatus[] = ranges.some(hasOptimal)
+    ? ['outOfRange', 'sufficient', 'inRange']
+    : RANGE_STATUSES;
   const range = (
-    <>
-      {marker && (
-        <View style={styles.section} testID="biomarker-range">
-          <Text style={styles.sectionTitle}>Reference range</Text>
-          <Text style={styles.description} testID="biomarker-range-explanation">
-            {latestRange
-              ? explainReferenceRange(marker, latestRange)
-              : 'This range comes from your laboratory report.'}
-          </Text>
-          <RangeProfileNotice
-            missing={latestRange?.missing ?? []}
-            testID="biomarker-range-notice"
-            style={styles.notice}
-          />
-        </View>
-      )}
-    </>
+    <BiomarkerRangeSection
+      history={ranges}
+      inUse={latestRange}
+      unitLabel={displayUnit?.label ?? latestMeasurement.unit}
+      onEdit={(entry) => openRangeForm(entry.since)}
+      onOpenReport={(reportId) => router.push(`/lab-result/${reportId}`)}
+    />
   );
   const chart = (
     <>
@@ -557,7 +612,7 @@ export function BiomarkerDetailView({
           {/* Without a range no result has a status for the legend to explain. */}
           {chartMeasurements.some((measurement) => measurement.status) && (
             <View style={styles.legend} testID="biomarker-chart-legend">
-              {RANGE_STATUSES.map((status) => (
+              {legendStatuses.map((status) => (
                 <View key={status} style={styles.legendItem}>
                   <View
                     style={[
@@ -565,9 +620,7 @@ export function BiomarkerDetailView({
                       { backgroundColor: STATUS_COLORS[status] },
                     ]}
                   />
-                  <Text style={styles.legendLabel}>
-                    {RANGE_STATUS_LABELS[status]}
-                  </Text>
+                  <Text style={styles.legendLabel}>{ZONE_LABELS[status]}</Text>
                 </View>
               ))}
             </View>
@@ -576,6 +629,8 @@ export function BiomarkerDetailView({
             measurements={chartMeasurements}
             low={latestMeasurement.range?.low}
             high={latestMeasurement.range?.high}
+            optimalLow={limitValue(latestRange?.optimalLow)}
+            optimalHigh={limitValue(latestRange?.optimalHigh)}
             fill={isWide || Boolean(selectedId)}
           />
         </View>
@@ -670,13 +725,7 @@ export function BiomarkerDetailView({
             : isOwnTest
               ? 'This is your own test, so Healthy has no guide for it.'
               : // A LOINC test outside the catalog: say what the page is based on.
-                `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.${latestMeasurement?.reportedRange ? ' Its range is the one your laboratory reported.' : ''}`}
-        </LearnItem>
-        <LearnItem title="Why it matters">
-          {marker
-            ? marker.education?.whyItMatters ||
-              'This result adds information about this part of your health. It is interpreted together with related test results and your health history.'
-            : ''}
+                `Healthy knows this test by its LOINC code${latestCode ? `, ${latestCode}` : ''}, and has no guide for it yet.`}
         </LearnItem>
         <LearnItem title="What it may affect">
           {marker?.education?.whatItMayAffect || ''}
@@ -684,16 +733,6 @@ export function BiomarkerDetailView({
         <LearnItem title="What may be related to a change">
           {marker?.education?.whatMayBeRelatedToAChange || ''}
         </LearnItem>
-        {latestRange &&
-          (latestRange.low !== undefined || latestRange.high !== undefined) && (
-            <LearnItem title="Range source">
-              <RangeRegionLine
-                resolved={latestRange}
-                testID="biomarker-range-region"
-                style={styles.learnText}
-              />
-            </LearnItem>
-          )}
       </View>
     </>
   );
@@ -710,11 +749,11 @@ export function BiomarkerDetailView({
           text: formatDisplayDate(latestMeasurement.date),
           testID: 'biomarker-latest-date',
         },
-        ...(latestMeasurement.status
+        ...(latestMeasurement.zone
           ? [
               {
                 icon: CircleDot,
-                text: RANGE_STATUS_LABELS[latestMeasurement.status],
+                text: ZONE_LABELS[latestMeasurement.zone],
                 testID: 'biomarker-latest-status',
               },
             ]
@@ -736,10 +775,22 @@ export function BiomarkerDetailView({
       actions={
         selectedId ? undefined : (
           <ResourceActionDock
-            onAdd={() => setShowAddMenu((visible) => !visible)}
-            addLabel="Add record"
-            addTestID="floating-add-button"
-            addMenuExpanded={showAddMenu}
+            actions={[
+              {
+                label: 'Add record',
+                testID: 'floating-add-button',
+                icon: Plus,
+                onPress: () => setShowAddMenu((visible) => !visible),
+                primary: true,
+                expanded: showAddMenu,
+              },
+              {
+                label: 'Set range',
+                testID: 'biomarker-set-range',
+                icon: SlidersHorizontal,
+                onPress: () => openRangeForm(),
+              },
+            ]}
           />
         )
       }
@@ -885,11 +936,16 @@ function BiomarkerChart({
   measurements,
   low,
   high,
+  optimalLow,
+  optimalHigh,
   fill = false,
 }: {
   measurements: Measurement[];
   low?: number;
   high?: number;
+  /** An optimal part of the range: the rest of it is sufficient. */
+  optimalLow?: number;
+  optimalHigh?: number;
   /** Spans its column instead of stopping at 600px (desktop layouts). */
   fill?: boolean;
 }) {
@@ -937,14 +993,24 @@ function BiomarkerChart({
   const floorY = yFor(floor);
   const bandTop = yFor(high ?? max);
   const bandBottom = yFor(low ?? floor);
+  const hasOptimal =
+    hasRange && (optimalLow !== undefined || optimalHigh !== undefined);
+  const optimalTop = yFor(Math.min(optimalHigh ?? high ?? max, high ?? max));
+  const optimalBottom = yFor(
+    Math.max(optimalLow ?? low ?? floor, low ?? floor)
+  );
   /** Status of a value against the displayed range. */
-  const statusFor = (value: number): RangeStatus | undefined =>
+  const statusFor = (value: number): ZoneStatus | undefined =>
     !hasRange
       ? undefined
       : (low !== undefined && value < low) ||
           (high !== undefined && value > high)
         ? 'outOfRange'
-        : 'inRange';
+        : hasOptimal &&
+            ((optimalLow !== undefined && value < optimalLow) ||
+              (optimalHigh !== undefined && value > optimalHigh))
+          ? 'sufficient'
+          : 'inRange';
   const inset = 28;
   // Points are spaced by date, so gaps between tests show as gaps.
   const times = measurements.map(({ date }) => Date.parse(date));
@@ -1020,8 +1086,21 @@ function BiomarkerChart({
                 y={bandTop}
                 width={plotWidth}
                 height={bandBottom - bandTop}
-                fill={COLORS.light.inRangeWash}
+                fill={
+                  hasOptimal
+                    ? COLORS.light.sufficientWash
+                    : COLORS.light.inRangeWash
+                }
               />
+              {hasOptimal && (
+                <Rect
+                  x={axisX}
+                  y={optimalTop}
+                  width={plotWidth}
+                  height={optimalBottom - optimalTop}
+                  fill={COLORS.light.inRangeWash}
+                />
+              )}
               <Rect
                 x={axisX}
                 y={bandBottom}
@@ -1076,6 +1155,15 @@ function BiomarkerChart({
               y={bandTop}
               width={3}
               height={bandBottom - bandTop}
+              fill={hasOptimal ? COLORS.light.sufficient : COLORS.light.primary}
+            />
+          )}
+          {hasOptimal && (
+            <Rect
+              x={axisX - 3}
+              y={optimalTop}
+              width={3}
+              height={optimalBottom - optimalTop}
               fill={COLORS.light.primary}
             />
           )}
@@ -1175,13 +1263,21 @@ function BiomarkerChart({
   );
 }
 
-const STATUS_COLORS: Record<RangeStatus, string> = {
+/** Chart zones: a range's status, or sufficient beside its optimal part. */
+type ZoneStatus = RangeStatus | 'sufficient';
+const STATUS_COLORS: Record<ZoneStatus, string> = {
   outOfRange: COLORS.light.outOfRange,
   inRange: COLORS.light.primary,
+  sufficient: COLORS.light.sufficient,
 };
-const STATUS_TEXT_COLORS: Record<RangeStatus, string> = {
+const ZONE_LABELS: Record<ZoneStatus, string> = {
+  ...RANGE_STATUS_LABELS,
+  sufficient: 'Sufficient',
+};
+const STATUS_TEXT_COLORS: Record<ZoneStatus, string> = {
   outOfRange: COLORS.light.outOfRangeText,
   inRange: COLORS.light.primary,
+  sufficient: COLORS.light.textSecondary,
 };
 
 const styles = StyleSheet.create({

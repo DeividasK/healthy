@@ -308,11 +308,25 @@ test('keeps every record to its own profile on every screen', async ({
   await seedEveryResource(page);
   await seedTestReport(page, {
     patientId: 'shared-patient',
-    biomarkers: [{ name: 'Red Blood Cells', value: 4.5 }],
+    biomarkers: [
+      {
+        name: 'Red Blood Cells',
+        value: 4.5,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
+    ],
   });
   await seedTestPatient(page, { id: 'other-patient', givenName: 'Bob' });
   await seedTestReport(page, {
-    biomarkers: [{ name: 'Red Blood Cells', value: 6.1 }],
+    biomarkers: [
+      {
+        name: 'Red Blood Cells',
+        value: 6.1,
+        referenceLow: 3.92,
+        referenceHigh: 5.65,
+      },
+    ],
   });
   const switchTo = (id: string) =>
     bridge(page, (b, id) => b.setActivePatient(id), id);
