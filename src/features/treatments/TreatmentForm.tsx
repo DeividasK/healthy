@@ -99,6 +99,8 @@ export interface TreatmentFormProps {
   specialistSuggestions?: string[];
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
+  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  proposal?: boolean;
 }
 
 export function TreatmentForm({
@@ -108,6 +110,7 @@ export function TreatmentForm({
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
+  proposal = false,
 }: TreatmentFormProps) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [intent, setIntent] = useState<MedicationRequest['intent']>(
@@ -189,8 +192,9 @@ export function TreatmentForm({
         icon: Play,
         empty: null as Date | null,
         // New treatments start being taken today unless dismissed; usage of
-        // a saved treatment is recorded from its page.
-        initial: isEditing ? null : new Date(),
+        // a saved treatment is recorded from its page. A proposal starts
+        // only when its document says so.
+        initial: isEditing || proposal ? null : new Date(),
         added: () => new Date(),
         available: !isEditing,
       },
@@ -350,7 +354,11 @@ export function TreatmentForm({
           testID="treatment-form"
         >
           <ScreenHeading testID="treatment-form-title">
-            {isEditing ? 'Edit Treatment' : 'Add Treatment'}
+            {proposal
+              ? 'Edit Proposed Treatment'
+              : isEditing
+                ? 'Edit Treatment'
+                : 'Add Treatment'}
           </ScreenHeading>
           {errorMessage && (
             <FormErrorBanner
@@ -563,14 +571,20 @@ export function TreatmentForm({
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
-          saveLabel={isEditing ? 'Save changes' : 'Save treatment'}
+          saveLabel={
+            proposal
+              ? 'Update card'
+              : isEditing
+                ? 'Save changes'
+                : 'Save treatment'
+          }
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}
           saveTestID="save-treatment-button"
           // New treatments can be filled in from the user's own AI assistant.
           secondaryActions={
-            isEditing
+            isEditing || proposal
               ? []
               : [
                   {

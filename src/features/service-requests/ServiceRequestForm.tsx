@@ -108,6 +108,8 @@ export interface ServiceRequestFormProps {
   specialistSuggestions?: string[];
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
+  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  proposal?: boolean;
 }
 
 export function ServiceRequestForm({
@@ -118,6 +120,7 @@ export function ServiceRequestForm({
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
+  proposal = false,
 }: ServiceRequestFormProps) {
   const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -394,7 +397,11 @@ export function ServiceRequestForm({
           testID="service-request-form"
         >
           <ScreenHeading testID="service-request-form-title">
-            {isEditing ? 'Edit Service Request' : 'Add Service Request'}
+            {proposal
+              ? 'Edit Proposed Service Request'
+              : isEditing
+                ? 'Edit Service Request'
+                : 'Add Service Request'}
           </ScreenHeading>
           {errorMessage && (
             <FormErrorBanner
@@ -664,14 +671,20 @@ export function ServiceRequestForm({
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
-          saveLabel={isEditing ? 'Save changes' : 'Save service request'}
+          saveLabel={
+            proposal
+              ? 'Update card'
+              : isEditing
+                ? 'Save changes'
+                : 'Save service request'
+          }
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}
           saveTestID="save-service-request-button"
           // New requests can be filled in from the user's own AI assistant.
           secondaryActions={
-            isEditing
+            isEditing || proposal
               ? []
               : [
                   {

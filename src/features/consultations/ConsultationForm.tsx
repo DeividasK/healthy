@@ -53,7 +53,7 @@ import {
   type LinkSelection,
 } from '@/src/components/useLinkFields';
 import { useOptionalFields } from '@/src/components/useOptionalFields';
-import { formatLocalDate } from '@/src/utils/dateUtils';
+import { toFhirLocalDateTime } from '@/src/utils/dateUtils';
 import { COLORS } from '@/src/theme/colors';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllConditions } from '@/src/features/conditions/conditionService';
@@ -138,6 +138,8 @@ export interface ConsultationFormProps {
   ) => Promise<void>;
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
+  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  proposal?: boolean;
 }
 
 function showAlert(title: string, message: string) {
@@ -181,6 +183,7 @@ export function ConsultationForm({
   isEdit = false,
   onSave,
   linkFields = [],
+  proposal = false,
 }: ConsultationFormProps) {
   const links = useLinkFields(linkFields);
   const router = useRouter();
@@ -481,17 +484,7 @@ export function ConsultationForm({
 
     try {
       setIsSaving(true);
-      const formattedDate = formatLocalDate(date);
-      const localDate = new Date(date);
-      if (time) {
-        const [hours, minutes] = time.split(':').map(Number);
-        localDate.setHours(hours, minutes, 0, 0);
-      }
-      const offset = -localDate.getTimezoneOffset();
-      const zone = `${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0')}:${String(Math.abs(offset) % 60).padStart(2, '0')}`;
-      const fullDate = time
-        ? `${formattedDate}T${time}:00${zone}`
-        : formattedDate;
+      const fullDate = toFhirLocalDateTime(date, time);
 
       await onSave(
         {
@@ -567,7 +560,11 @@ export function ConsultationForm({
             keyboardShouldPersistTaps="handled"
           >
             <ScreenHeading testID="header-title">
-              {isEdit ? 'Edit Consultation' : 'New Consultation'}
+              {proposal
+                ? 'Edit Proposed Consultation'
+                : isEdit
+                  ? 'Edit Consultation'
+                  : 'New Consultation'}
             </ScreenHeading>
             {/* Consultation Title Input (Required) */}
             <FormField
@@ -900,11 +897,12 @@ export function ConsultationForm({
             addDisabled={menuOptions.length === 0}
             addTestID="add-option-button"
             onSave={handleSubmit}
+            saveLabel={proposal ? 'Update card' : undefined}
             isSaving={isSaving}
             hasChanges={hasChanges}
             // New consultations can be filled in from the user's own AI assistant.
             secondaryActions={
-              isEdit
+              isEdit || proposal
                 ? []
                 : [
                     {

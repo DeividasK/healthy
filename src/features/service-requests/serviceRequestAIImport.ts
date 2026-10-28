@@ -54,6 +54,34 @@ export interface ImportedServiceRequest {
   notes: string | null;
 }
 
+/** A service request reply's fields, one per line, as the AI's format shows them. */
+export function getServiceRequestAIFields(): string {
+  return `  "service": "Name of the requested service",
+  "category": "Imaging",
+  "intent": "order",
+  "status": "active",
+  "date": "YYYY-MM-DD",
+  "plannedDate": "YYYY-MM-DD",
+  "repeats": { "every": 4, "upToEvery": 6, "unit": "wk", "sessions": 3, "minutes": 30, "timeOfDay": "MORN" },
+  "requester": "Name of the doctor who requested it",
+  "instructions": "Instructions for the patient",
+  "reason": "Why it was requested",
+  "notes": "Anything else worth keeping"`;
+}
+
+/** The rules for a service request's fields, shared with the combined import. */
+export function getServiceRequestAIRules(): string {
+  return `- "service" names what was requested, for example "Abdominal ultrasound" or "Physiotherapy".
+- "category" is one of: ${CATEGORY_OPTIONS.map(({ label }) => `"${label}"`).join(', ')}.
+- "intent" is one of: ${describeAIOptions(INTENT_OPTIONS)}. Use "order" when a doctor ordered or referred it and "plan" when it was only recommended.
+- "status" is one of: ${describeAIOptions(STATUS_OPTIONS)}.
+- "date" is the day it was requested.
+- "plannedDate" is the day it is booked for, if it happens once.
+- "repeats" is only for a service that repeats, for example 3 sessions every 4 to 6 weeks; leave out "plannedDate" then. "every" is how often it repeats, "upToEvery" the longest interval when a range is given, and "unit" one of: ${describeAIOptions(UNIT_OPTIONS)}. "sessions" is how many times in total, "minutes" how long each time takes, and "timeOfDay" one of: ${describeAIOptions(OFFERED_WHEN.map((code) => ({ id: code, label: getWhenLabel(code) })))}, or a 24-hour time such as "07:30".
+- When the document gives a number of sessions but no interval, leave out "repeats" and say it in "instructions", for example "5 sessions".
+- "reason" is a short reason, for example a symptom or condition.`;
+}
+
 /**
  * Instructions the user gives their own AI assistant together with a referral
  * or order, so it replies in the format `parseServiceRequestAIReply` reads.
@@ -66,29 +94,12 @@ Reply with exactly one JSON code block in this format:
 \`\`\`json
 {
   "${SERVICE_REQUEST_AI_FORMAT_KEY}": ${SERVICE_REQUEST_AI_FORMAT_VERSION},
-  "service": "Name of the requested service",
-  "category": "Imaging",
-  "intent": "order",
-  "status": "active",
-  "date": "YYYY-MM-DD",
-  "plannedDate": "YYYY-MM-DD",
-  "repeats": { "every": 4, "upToEvery": 6, "unit": "wk", "sessions": 3, "minutes": 30, "timeOfDay": "MORN" },
-  "requester": "Name of the doctor who requested it",
-  "instructions": "Instructions for the patient",
-  "reason": "Why it was requested",
-  "notes": "Anything else worth keeping"
+${getServiceRequestAIFields()}
 }
 \`\`\`
 
 Rules:
-- "service" names what was requested, for example "Abdominal ultrasound" or "Physiotherapy".
-- "category" is one of: ${CATEGORY_OPTIONS.map(({ label }) => `"${label}"`).join(', ')}.
-- "intent" is one of: ${describeAIOptions(INTENT_OPTIONS)}. Use "order" when a doctor ordered or referred it and "plan" when it was only recommended.
-- "status" is one of: ${describeAIOptions(STATUS_OPTIONS)}.
-- "date" is the day it was requested.
-- "plannedDate" is the day it is booked for, if it happens once.
-- "repeats" is only for a service that repeats, for example 3 sessions every 4 to 6 weeks; leave out "plannedDate" then. "every" is how often it repeats, "upToEvery" the longest interval when a range is given, and "unit" one of: ${describeAIOptions(UNIT_OPTIONS)}. "sessions" is how many times in total, "minutes" how long each time takes, and "timeOfDay" one of: ${describeAIOptions(OFFERED_WHEN.map((code) => ({ id: code, label: getWhenLabel(code) })))}, or a 24-hour time such as "07:30".
-- "reason" is a short reason, for example a symptom or condition.
+${getServiceRequestAIRules()}
 - If the document requests several services, convert only the one I ask for, or else the first one, and list the others in a short note before the code block.
 - Numbers use a dot as the decimal separator.
 - Keep the document's language for names and text.
@@ -121,7 +132,14 @@ export function parseServiceRequestAIReply(
 ): AIImportResult<ImportedServiceRequest> {
   const read = readAIReply(text, 'a service request');
   if (!read.ok) return read;
-  const { reply } = read;
+  return readServiceRequestFields(read.reply, today);
+}
+
+/** Reads a service request's fields from a reply object, e.g. one record of a combined import. */
+export function readServiceRequestFields(
+  reply: Record<string, unknown>,
+  today: Date = new Date()
+): AIImportResult<ImportedServiceRequest> {
   const errors: string[] = [];
 
   const title = readText(reply.service);

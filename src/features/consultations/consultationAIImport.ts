@@ -28,6 +28,42 @@ export interface ImportedConsultation {
 }
 
 /**
+ * A consultation reply's fields, one per line, as the AI's format shows them.
+ * The combined import lists diagnoses as condition records instead.
+ */
+export function getConsultationAIFields({ withDiagnoses = true } = {}): string {
+  return `  "title": "Short name of the visit",
+  "status": "completed",
+  "date": "YYYY-MM-DD",
+  "time": "HH:MM",
+  "specialist": "Name of the doctor",
+  "serviceProvider": "Name of the clinic or hospital",
+  "serviceType": "Medical specialty",${
+    withDiagnoses
+      ? `
+  "diagnoses": [
+    { "name": "Diagnosis name", "icd10": "ICD-10 code" }
+  ],`
+      : ''
+  }
+  "notes": "Summary of the visit"`;
+}
+
+/** The rules for a consultation's fields, shared with the combined import. */
+export function getConsultationAIRules({ withDiagnoses = true } = {}): string {
+  return `- "title" names the visit, for example "Cardiology follow-up" or "Annual checkup".
+- "status" is "completed" for a visit that took place and "planned" for one that is booked for later.
+- "date" is the day of the visit and "time" its 24-hour start time. Leave "time" out if the document doesn't show it.
+- "specialist" is the doctor seen, "serviceProvider" the clinic or hospital, and "serviceType" the medical specialty, for example "Cardiology" or "General practice".${
+    withDiagnoses
+      ? `
+- Add one entry to "diagnoses" for each diagnosis made at the visit. Add "icd10" only when the document shows the diagnosis's ICD-10 code.`
+      : ''
+  }
+- "notes" summarizes the findings, advice and next steps in plain text.`;
+}
+
+/**
  * Instructions the user gives their own AI assistant together with a
  * consultation document (e.g. a visit summary or discharge letter), so it
  * replies in the format `parseConsultationAIReply` reads.
@@ -40,27 +76,12 @@ Reply with exactly one JSON code block in this format:
 \`\`\`json
 {
   "${CONSULTATION_AI_FORMAT_KEY}": ${CONSULTATION_AI_FORMAT_VERSION},
-  "title": "Short name of the visit",
-  "status": "completed",
-  "date": "YYYY-MM-DD",
-  "time": "HH:MM",
-  "specialist": "Name of the doctor",
-  "serviceProvider": "Name of the clinic or hospital",
-  "serviceType": "Medical specialty",
-  "diagnoses": [
-    { "name": "Diagnosis name", "icd10": "ICD-10 code" }
-  ],
-  "notes": "Summary of the visit"
+${getConsultationAIFields()}
 }
 \`\`\`
 
 Rules:
-- "title" names the visit, for example "Cardiology follow-up" or "Annual checkup".
-- "status" is "completed" for a visit that took place and "planned" for one that is booked for later.
-- "date" is the day of the visit and "time" its 24-hour start time. Leave "time" out if the document doesn't show it.
-- "specialist" is the doctor seen, "serviceProvider" the clinic or hospital, and "serviceType" the medical specialty, for example "Cardiology" or "General practice".
-- Add one entry to "diagnoses" for each diagnosis made at the visit. Add "icd10" only when the document shows the diagnosis's ICD-10 code.
-- "notes" summarizes the findings, advice and next steps in plain text.
+${getConsultationAIRules()}
 - If the document covers several visits, convert only the one I ask for, or else the latest one, and list the others in a short note before the code block.
 - Keep the document's language for names and text.
 - Leave out any field the document doesn't show. Don't add any other fields.`;
@@ -77,7 +98,14 @@ export function parseConsultationAIReply(
 ): AIImportResult<ImportedConsultation> {
   const read = readAIReply(text, 'a consultation');
   if (!read.ok) return read;
-  const { reply } = read;
+  return readConsultationFields(read.reply, today);
+}
+
+/** Reads a consultation's fields from a reply object, e.g. one record of a combined import. */
+export function readConsultationFields(
+  reply: Record<string, unknown>,
+  today: Date = new Date()
+): AIImportResult<ImportedConsultation> {
   const errors: string[] = [];
 
   const title = readText(reply.title);

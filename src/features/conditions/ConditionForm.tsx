@@ -132,6 +132,8 @@ export interface ConditionFormProps {
   ) => Promise<void>;
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
+  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  proposal?: boolean;
 }
 
 function showAlert(title: string, message: string) {
@@ -147,6 +149,7 @@ export function ConditionForm({
   isEdit = false,
   onSave,
   linkFields = [],
+  proposal = false,
 }: ConditionFormProps) {
   const router = useRouter();
   const links = useLinkFields(linkFields);
@@ -312,7 +315,11 @@ export function ConditionForm({
             keyboardShouldPersistTaps="handled"
           >
             <ScreenHeading>
-              {isEdit ? 'Edit Condition' : 'New Condition'}
+              {proposal
+                ? 'Edit Proposed Condition'
+                : isEdit
+                  ? 'Edit Condition'
+                  : 'New Condition'}
             </ScreenHeading>
             {/* Condition Name Section (Required) */}
             <FormField
@@ -533,6 +540,7 @@ export function ConditionForm({
             addDisabled={plusMenuOptions.length === 0}
             addTestID="add-option-button"
             onSave={handleSubmit}
+            saveLabel={proposal ? 'Update card' : undefined}
             isSaving={isSaving}
             hasChanges={hasChanges}
           />
