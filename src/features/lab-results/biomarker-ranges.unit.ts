@@ -262,3 +262,33 @@ test('reads every result against the range in effect on its day', () => {
   });
   expect(getObservationStatus(april, ranges)).toBe('Normal');
 });
+
+test('gives a bound result only the status its bound proves', () => {
+  const bound = (
+    comparator: '<' | '<=' | '>=' | '>',
+    value: number,
+    low?: number,
+    high?: number
+  ) =>
+    getObservationStatus(
+      hemoglobin('2026-01-10', value, {
+        valueQuantity: { value, comparator, code: 'g/L', unit: 'g/L' },
+        referenceRange: [
+          {
+            ...(low !== undefined && { low: { value: low, code: 'g/L' } }),
+            ...(high !== undefined && { high: { value: high, code: 'g/L' } }),
+          },
+        ],
+      })
+    );
+  expect(bound('<', 3, undefined, 35)).toBe('Normal');
+  expect(bound('<', 20, undefined, 10)).toBeUndefined();
+  expect(bound('<', 120, 130, 170)).toBe('Low');
+  expect(bound('<', 130, 130, 170)).toBe('Low');
+  expect(bound('<=', 130, 130, 170)).toBeUndefined();
+  expect(bound('<', 150, 130, 170)).toBeUndefined();
+  expect(bound('>', 180, 130, 170)).toBe('High');
+  expect(bound('>=', 170, 130, 170)).toBeUndefined();
+  expect(bound('>', 200, 130)).toBe('Normal');
+  expect(bound('>', 100, 130)).toBeUndefined();
+});

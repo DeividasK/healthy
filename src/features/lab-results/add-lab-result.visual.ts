@@ -126,3 +126,33 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     );
   });
 });
+
+for (const [layout, viewport] of [
+  ['mobile', undefined],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test(`Add Report View - Own test (${layout})`, async ({ page }, testInfo) => {
+    if (viewport) await page.setViewportSize(viewport);
+    await seedTestPatient(page);
+    await page.goto('/lab-result/add');
+    const searchInput = page.getByTestId('test-search-input');
+    await searchInput.fill('Telomere length');
+    await page.getByTestId('autocomplete-add-custom').waitFor();
+    await takeSnapshot(
+      page,
+      `Add Report View - Add own test from search (${layout})`,
+      testInfo
+    );
+
+    // Taking the snapshot moves focus away, which closes the list.
+    await searchInput.click();
+    await page.getByTestId('autocomplete-add-custom').click();
+    await page.getByTestId('marker-value-input-0').fill('6.8');
+    await page.getByTestId('marker-unit-input-0').fill('kb');
+    await takeSnapshot(
+      page,
+      `Add Report View - Own test card (${layout})`,
+      testInfo
+    );
+  });
+}
