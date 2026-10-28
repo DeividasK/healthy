@@ -1,0 +1,3 @@
+kind: Security
+body: The web app and site only run their own scripts and only talk to Google and Healthy's sign-in service, and the web app no longer loads Google's sign-in script when it doesn't use it.
+time: 2026-10-27T19:00:00.000000000Z
