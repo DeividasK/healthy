@@ -163,7 +163,9 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # Chromatic bills per snapshot. When every commit on the branch can't
       # change how the app looks (CI, tooling, docs), each one says so with a
-      # 'Chromatic: skip' trailer and the job passes without uploading any.
+      # 'Chromatic: skip' trailer. The visual tests don't run, and Chromatic
+      # marks the commit as passing (its required UI Tests check) without
+      # taking any snapshots.
       - name: Check for Chromatic Skip
         id: skip
         run: |
@@ -176,7 +178,6 @@ jobs:
           echo "Skipping visual tests: every commit on this branch has a 'Chromatic: skip' trailer."
           echo "chromatic=true" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-pnpm
-        if: ${{ !steps.skip.outputs.chromatic }}
         with:
           save-cache: false
       - name: Run Visual Tests
@@ -201,3 +202,8 @@ jobs:
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: pnpm chromatic:publish --exit-zero-on-changes
+      - name: Mark Chromatic as Passing
+        if: ${{ steps.skip.outputs.chromatic }}
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: pnpm chromatic:publish --skip
