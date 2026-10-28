@@ -73,17 +73,33 @@ export function LabsSummaryView() {
     DEFAULT_LABS_SUMMARY_FILTERS,
     parseLabsSummaryFilters
   );
-  // Home opens the summary with its own period, which becomes the saved one.
-  const homePeriod = isPeriod(period) ? period! : undefined;
+  // Home opens the summary with its own period, which becomes the saved one
+  // of the profile it was chosen for; a profile switch before it is saved
+  // drops it.
+  const [periodPatient, setPeriodPatient] = useState<string | null>(null);
+  const boundPatient =
+    period === undefined ? null : (periodPatient ?? activePatientId ?? null);
+  if (boundPatient !== periodPatient) setPeriodPatient(boundPatient);
+  const homePeriod =
+    isPeriod(period) && boundPatient === activePatientId ? period! : undefined;
   const filters = homePeriod
     ? { ...savedFilters, period: homePeriod }
     : savedFilters;
   useEffect(() => {
-    if (!filtersLoaded || period === undefined) return;
+    if (period === undefined || !activePatientId) return;
+    if (homePeriod && !filtersLoaded) return;
     if (homePeriod && homePeriod !== savedFilters.period)
       setFilters({ ...savedFilters, period: homePeriod });
     router.setParams({ period: undefined });
-  }, [filtersLoaded, period, homePeriod, savedFilters, setFilters, router]);
+  }, [
+    activePatientId,
+    filtersLoaded,
+    period,
+    homePeriod,
+    savedFilters,
+    setFilters,
+    router,
+  ]);
   const isCurrentPatient = data.patientId === activePatientId;
   const isLoading =
     isPatientLoading ||

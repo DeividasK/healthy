@@ -92,6 +92,22 @@ test('Home puts results beside conditions, and stacks them when one side is empt
   // Conditions sit to the right of the results, starting at the same height.
   expect(conditionBox.x).toBeGreaterThan(summaryBox.x + summaryBox.width);
   expect(Math.abs(conditionBox.y - summaryBox.y)).toBeLessThan(80);
+
+  // The overview's filters work and are kept apart from the Biomarkers page's.
+  await summary.getByTestId('labs-summary-filter-button').click();
+  const filters = page.getByTestId('labs-summary-filters');
+  await filters.getByRole('combobox', { name: 'Sort' }).selectOption('oldest');
+  await filters.getByTestId('labs-summary-filters-done').click();
+  const filterOn = { name: 'Filter latest results, filters on' };
+  await expect(summary.getByRole('button', filterOn)).toBeVisible();
+  await openRoute(page, '/');
+  await expect(summary.getByRole('button', filterOn)).toBeVisible();
+  await openRoute(page, '/labs-summary');
+  await expect(
+    page
+      .getByTestId('labs-summary-view')
+      .getByRole('button', { name: 'Filter latest results', exact: true })
+  ).toBeVisible();
 });
 
 /** Records whether the loading skeleton shows from now on. */
