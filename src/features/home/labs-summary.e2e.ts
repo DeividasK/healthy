@@ -289,7 +289,13 @@ test('the key and groups list only statuses with results; empty periods and inva
   await openRoute(page, '/labs-summary?period=invalid');
   await expect(page).toHaveURL(/labs-summary$/);
   await expect(view.getByTestId('labs-summary-total')).toHaveText('0');
-  await (await openFilters(page)).reset.click();
+  const saved = await openFilters(page);
+  await saved.reset.click();
+  await saved.done();
+  await expect(view.getByTestId('labs-summary-total')).toHaveText('2');
+  // A period Home chose for another profile is dropped.
+  await openRoute(page, '/labs-summary?period=6&patient=another-profile');
+  await expect(page).toHaveURL(/labs-summary$/);
   await expect(view.getByTestId('labs-summary-total')).toHaveText('2');
 });
 
