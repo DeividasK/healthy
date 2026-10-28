@@ -36,6 +36,7 @@ import {
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import { AutocompleteTextField } from '@/src/components/AutocompleteTextField';
@@ -651,6 +652,7 @@ export function ServiceRequestForm({
             );
           })}
           {links.fields}
+          <FieldRevealSpace />
         </ScrollView>
         <FloatingAddMenu
           visible={showPlusMenu}

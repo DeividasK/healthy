@@ -289,7 +289,6 @@ export function RestoreProfileView() {
                 ? undefined
                 : handleRestoreFromGoogleDrive
             }
-            accessibilityLabel="Restore from Google Drive"
             testID="restore-from-google-drive"
           />
           <ResourceRow
@@ -297,7 +296,6 @@ export function RestoreProfileView() {
             description="A .zip file exported from Healthy"
             leading={<RowIconDisc icon={Archive} />}
             onPress={actionLoading !== null ? undefined : handleRestoreFromFile}
-            accessibilityLabel="Restore from a backup file"
             testID="restore-from-file"
           />
         </View>

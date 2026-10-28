@@ -93,7 +93,7 @@ export function ActionDayPills({
         <TouchableOpacity
           testID="actions-day-label"
           accessibilityRole="button"
-          accessibilityLabel={`${formatLongDate(selected)}, open calendar`}
+          accessibilityLabel={`${getDayName(selected, today)}, open calendar`}
           style={styles.label}
           activeOpacity={0.6}
           onPress={onOpenCalendar}
@@ -117,7 +117,7 @@ export function ActionDayPills({
         <TouchableOpacity
           testID="actions-today-button"
           accessibilityRole="button"
-          accessibilityLabel="Go to today"
+          accessibilityLabel={`Go to today, ${formatLongDate(today)}`}
           style={styles.todayButton}
           activeOpacity={0.6}
           onPress={() => onSelect(today)}
@@ -508,3 +508,15 @@ const styles = StyleSheet.create({
     color: COLORS.light.foreground,
   },
 });
+
+/**
+ * The day label's text, then the full date when the label is relative, e.g.
+ * "Today, Tuesday, October 27". Voice control users say what they see, so
+ * the name starts with it (WCAG 2.5.3, label in name).
+ */
+function getDayName(date: string, today: string): string {
+  const label = formatDayLabel(date, today);
+  return label === 'Today' || label === 'Yesterday'
+    ? `${label}, ${formatLongDate(date)}`
+    : label;
+}

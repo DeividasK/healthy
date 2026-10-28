@@ -328,7 +328,6 @@ export function ViewConsultationView() {
                           index === 0
                             ? 'consultation-diagnosis-condition'
                             : `consultation-diagnosis-condition-${id}`,
-                        accessibilityLabel: `View condition: ${getConditionTitle(condition)}`,
                         onPress: () => router.push(`/condition/${id}`),
                       }
                     : { testID: `consultation-diagnosis-${index}` })}

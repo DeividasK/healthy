@@ -181,9 +181,9 @@ test('edits verification independently and roundtrips source and standard catego
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await openRoute(page, `/condition/${condition.id}`);
-  await expect(page.getByTestId('condition-category-0')).toHaveText(
-    'ESI kontekstas'
-  );
+  await expect(
+    page.getByTestId('condition-view').getByTestId('condition-category-0')
+  ).toHaveText('ESI kontekstas');
   await expect(
     page
       .getByTestId('condition-view')
@@ -198,9 +198,9 @@ test('edits verification independently and roundtrips source and standard catego
   await page.getByTestId('save-button').click();
   await expect(page.getByTestId('condition-title-input')).not.toBeVisible();
   await openRoute(page, `/condition/${condition.id}`);
-  await expect(page.getByTestId('condition-category-0')).toHaveText(
-    'Temporary'
-  );
+  await expect(
+    page.getByTestId('condition-view').getByTestId('condition-category-0')
+  ).toHaveText('Temporary');
   let saved = await page.evaluate(
     (id) => (window as any).__HEALTHY_TEST_BRIDGE__.getCondition(id),
     condition.id

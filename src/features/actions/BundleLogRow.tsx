@@ -104,8 +104,8 @@ export function BundleLogRow({
         testID={testID('row')}
         title={title}
         typeIcon={Group}
+        typeLabel="Bundle"
         meta={meta}
-        accessibilityLabel={`View bundle: ${title}`}
         onPress={onOpen}
         accessory={
           reorder ? (

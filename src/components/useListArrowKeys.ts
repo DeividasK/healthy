@@ -16,22 +16,16 @@ function choose(row: HTMLElement) {
 /**
  * Up and down arrows move through a list beside its detail (web), choosing
  * each row they reach and opening collapsed status groups on the way,
- * unless a field or dialog has the keys. Rows are the buttons in `#listId`
- * whose accessible name starts with `rowLabel`; the chosen one has
- * `aria-current`. The list ID is unique per screen, since the stack keeps
+ * unless a field or dialog has the keys. Rows are the elements in `#listId`
+ * matching the `row` selector; the chosen one has `aria-current`. The list ID is unique per screen, since the stack keeps
  * earlier screens in the page.
  */
-export function useListArrowKeys(
-  listId: string,
-  rowLabel: string,
-  enabled = true
-) {
+export function useListArrowKeys(listId: string, row: string, enabled = true) {
   // Only while this screen is in front: the stack keeps it mounted beneath
   // the screens opened from it.
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== 'web' || !enabled) return;
-      const row = `[aria-label^="${rowLabel}"]`;
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
         const target = event.target as HTMLElement | null;
@@ -64,6 +58,6 @@ export function useListArrowKeys(
       };
       window.addEventListener('keydown', onKeyDown);
       return () => window.removeEventListener('keydown', onKeyDown);
-    }, [listId, rowLabel, enabled])
+    }, [listId, row, enabled])
   );
 }

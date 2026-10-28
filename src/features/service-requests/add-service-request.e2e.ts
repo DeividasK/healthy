@@ -95,7 +95,7 @@ test.describe('Add Service Request Flow', () => {
     ).toBeVisible();
     await page
       .getByRole('button', {
-        name: 'View service request: Abdominal ultrasound',
+        name: /^Abdominal ultrasound/,
       })
       .click();
     await expect(page.getByTestId('service-request-title')).toHaveText(

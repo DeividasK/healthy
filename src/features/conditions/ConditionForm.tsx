@@ -29,6 +29,7 @@ import { NativeDatePicker } from '@/src/components/NativeDatePicker';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import {
   FieldRevealProvider,
+  FieldRevealSpace,
   useFieldReveal,
 } from '@/src/components/FieldReveal';
 import {
@@ -522,6 +523,7 @@ export function ConditionForm({
             )}
 
             {links.fields}
+            <FieldRevealSpace />
           </ScrollView>
 
           {/* Bottom Save Action */}

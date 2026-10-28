@@ -11,7 +11,7 @@ jobs:
       contents: read
     runs-on: ubuntu-26.04
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     steps:
       - name: Checkout code
