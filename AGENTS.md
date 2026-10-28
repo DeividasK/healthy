@@ -39,6 +39,7 @@ pnpm expo install --fix      # fix incompatible package versions
   - You **MUST NOT** write a new test if an existing visual test covers the changes/new additions.
   - You **MUST** call out new visual tests that will be added or ones that you expect to be affected if none will be added.
   - ONLY run if you update or alter the UI (screens, components, styles, themes). Do NOT re-run visual tests for non-visual changes (e.g. typing comments, types, config files that don't alter CSS).
+  - Chromatic bills per snapshot. A commit that cannot change how the app looks (CI workflows, tooling, docs) adds a `Chromatic: skip` trailer to its message. When every non-merge commit on a branch has it, CI skips the visual tests and the Chromatic upload and still reports the check green, and merging it to `main` publishes no new baseline. One commit without it runs Chromatic as usual. Never add it to a commit that touches app code, styles or visual tests.
   - Visual tests **MUST NOT** contain assertions (`expect(...)`). They should strictly navigate, prepare UI state, and call `takeSnapshot()`. All functional assertions belong in E2E tests (`*.e2e.ts`).
 - **E2E Tests (`pnpm test:e2e`)**:
   - You **MUST** write E2E tests for new views and user flows.

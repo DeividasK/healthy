@@ -161,13 +161,29 @@ jobs:
           fetch-depth: 0
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Chromatic bills per snapshot. When every commit on the branch can't
+      # change how the app looks (CI, tooling, docs), each one says so with a
+      # 'Chromatic: skip' trailer and the job passes without uploading any.
+      - name: Check for Chromatic Skip
+        id: skip
+        run: |
+          base=$(git merge-base origin/main HEAD)
+          commits=$(git rev-list --no-merges "$base..HEAD")
+          [ -n "$commits" ] || exit 0
+          for commit in $commits; do
+            git log -1 --format=%B "$commit" | grep -qiE '^Chromatic: *skip *$' || exit 0
+          done
+          echo "Skipping visual tests: every commit on this branch has a 'Chromatic: skip' trailer."
+          echo "chromatic=true" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-pnpm
+        if: ${{ !steps.skip.outputs.chromatic }}
         with:
           save-cache: false
       - name: Run Visual Tests
+        if: ${{ !steps.skip.outputs.chromatic }}
         run: pnpm test:visual
       - name: Upload Capture Timings
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !steps.skip.outputs.chromatic }}
         uses: actions/upload-artifact@v7
         with:
           name: visual-test-results
@@ -181,6 +197,7 @@ jobs:
           path: test-results/
           retention-days: 7
       - name: Publish to Chromatic
+        if: ${{ !steps.skip.outputs.chromatic }}
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: pnpm chromatic:publish --exit-zero-on-changes
