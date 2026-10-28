@@ -78,7 +78,7 @@ export function getServiceRequestAIRules(): string {
 - "date" is the day it was requested.
 - "plannedDate" is the day it is booked for, if it happens once.
 - "repeats" is only for a service that repeats, for example 3 sessions every 4 to 6 weeks; leave out "plannedDate" then. "every" is how often it repeats, "upToEvery" the longest interval when a range is given, and "unit" one of: ${describeAIOptions(UNIT_OPTIONS)}. "sessions" is how many times in total, "minutes" how long each time takes, and "timeOfDay" one of: ${describeAIOptions(OFFERED_WHEN.map((code) => ({ id: code, label: getWhenLabel(code) })))}, or a 24-hour time such as "07:30".
-- When the document gives a number of sessions but no interval, leave out "repeats" and say it in "instructions", for example "5 sessions".
+- When the document gives a number of sessions but no interval, for example "5 sessions", give only "sessions" (and "minutes" when known) in "repeats", with no "every" or "unit".
 - "reason" is a short reason, for example a symptom or condition.`;
 }
 
@@ -189,6 +189,7 @@ export function readServiceRequestFields(
     };
     // The form's own checks, for the details the reply gives.
     const problem = parseScheduleDraft(schedule, {
+      period: Boolean(schedule.period),
       periodMax: Boolean(schedule.periodMax),
       count: Boolean(schedule.count),
       duration: Boolean(schedule.duration),

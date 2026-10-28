@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Procedure, ServiceRequest } from 'fhir/r5';
+import { getDayStatus } from './actionDays';
 import {
   addPeriod,
   buildProcedureItems,
@@ -128,4 +129,30 @@ test('duration comes from the timing or a timed period', () => {
     })
   ).toBe(40);
   expect(getProcedureDuration(log('2026-09-01'))).toBeNull();
+});
+
+test('sessions with no interval are listed every day until all are done, as optional', () => {
+  const physio = request({ count: 2, duration: 45, durationUnit: 'min' });
+  const [first] = buildProcedureItems('2026-09-02', [physio], []);
+  expect(first).toMatchObject({
+    optional: true,
+    session: { number: 1, count: 2 },
+    plannedDuration: 45,
+  });
+  expect(first.due).toBeUndefined();
+  // Unanswered, it leaves the day with nothing else to log complete.
+  expect(
+    getDayStatus({ date: '2026-09-02', items: [], procedures: [first] })
+  ).toBe('none');
+  // The next day it is listed again, as the next session.
+  const logs = [log('2026-09-02')];
+  const [next] = buildProcedureItems('2026-09-03', [physio], logs);
+  expect(next.session).toEqual({ number: 2, count: 2 });
+  const [answered] = buildProcedureItems('2026-09-02', [physio], logs);
+  expect(
+    getDayStatus({ date: '2026-09-02', items: [], procedures: [answered] })
+  ).toBe('complete');
+  // Once every session is done, it is no longer listed.
+  logs.push(log('2026-09-03'));
+  expect(buildProcedureItems('2026-09-04', [physio], logs)).toEqual([]);
 });

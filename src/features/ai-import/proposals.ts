@@ -88,6 +88,7 @@ const toInput = (proposal: ImportedProposal): Proposal => {
       const schedule =
         draft &&
         parseScheduleDraft(draft, {
+          period: Boolean(draft.period),
           periodMax: Boolean(draft.periodMax),
           count: Boolean(draft.count),
           duration: Boolean(draft.duration),

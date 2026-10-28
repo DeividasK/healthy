@@ -96,11 +96,14 @@ export interface SeedServiceRequestOptions {
   reasonConditionIds?: string[];
   notes?: string;
   requesterName?: string;
-  /** How it repeats, e.g. `{ period: 1, periodUnit: 'd' }` for daily. */
+  /**
+   * How it repeats, e.g. `{ period: 1, periodUnit: 'd' }` for daily, or
+   * `{ count: 5 }` for sessions with no set interval.
+   */
   schedule?: {
-    period: number;
+    period?: number;
     periodMax?: number;
-    periodUnit: 'd' | 'wk' | 'mo';
+    periodUnit?: 'd' | 'wk' | 'mo';
     count?: number;
     duration?: number;
     when?: string;

@@ -53,7 +53,7 @@ const REPLY = `\`\`\`json\n${JSON.stringify({
       service: 'Individual physiotherapy',
       category: 'Procedure',
       intent: 'order',
-      instructions: '5 sessions',
+      repeats: { sessions: 5, minutes: 45 },
     },
     {
       type: 'treatment',
