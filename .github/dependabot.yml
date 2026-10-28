@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Keeps the pinned action SHAs current, one grouped pull request a week.
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Security updates only: Expo pins its packages to the SDK, so version
+  # bumps go through `expo install` instead.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 0
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']

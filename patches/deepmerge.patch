@@ -1,0 +1,69 @@
+diff --git a/dist/cjs.js b/dist/cjs.js
+index 7c36cbdd06cc22c92d590be3f87a08a91ca06b40..b4f3c4bdea02d76c60bfe51f63b1a66b48e42abd 100644
+--- a/dist/cjs.js
++++ b/dist/cjs.js
+@@ -80,10 +80,18 @@ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			// Assigning __proto__ would replace the result's prototype.
++			if (key === '__proto__') {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	getKeys(source).forEach(function(key) {
++		// Assigning __proto__ would replace the result's prototype.
++		if (key === '__proto__') {
++			return
++		}
+ 		if (propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+diff --git a/dist/umd.js b/dist/umd.js
+index 4071e7c56ec8e5273fe166f6e723ac460fab8b72..06565ebab93dc38d7f0874ae7921b556bcd3eb6a 100644
+--- a/dist/umd.js
++++ b/dist/umd.js
+@@ -84,10 +84,18 @@
+ 		var destination = {};
+ 		if (options.isMergeableObject(target)) {
+ 			getKeys(target).forEach(function(key) {
++			// Assigning __proto__ would replace the result's prototype.
++			if (key === '__proto__') {
++				return
++			}
+ 				destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 			});
+ 		}
+ 		getKeys(source).forEach(function(key) {
++		// Assigning __proto__ would replace the result's prototype.
++		if (key === '__proto__') {
++			return
++		}
+ 			if (propertyIsUnsafe(target, key)) {
+ 				return
+ 			}
+diff --git a/index.js b/index.js
+index 77968aed5d456cccc294f60912ef381fa1e52a7b..518bbaa23d9218542c851e8fc15608ddcd323d30 100644
+--- a/index.js
++++ b/index.js
+@@ -55,10 +55,18 @@ function mergeObject(target, source, options) {
+ 	var destination = {}
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			// Assigning __proto__ would replace the result's prototype.
++			if (key === '__proto__') {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options)
+ 		})
+ 	}
+ 	getKeys(source).forEach(function(key) {
++		// Assigning __proto__ would replace the result's prototype.
++		if (key === '__proto__') {
++			return
++		}
+ 		if (propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
