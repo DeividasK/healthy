@@ -5,76 +5,23 @@ on:
     branches: [main]
 
 jobs:
-  # A merged pull request whose every commit has a 'Chromatic: skip' trailer
-  # can't change how the app looks, so it publishes no new baseline.
-  chromatic-skip:
-    name: Check for Chromatic Skip
-    permissions:
-      contents: read
-      pull-requests: read
-    runs-on: ubuntu-26.04
-    outputs:
-      skip: ${{ steps.skip.outputs.skip }}
-    steps:
-      - id: skip
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].number // empty')
-          [ -n "$pr" ] || exit 0
-          verdicts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/commits" \
-            --jq '.[] | select(.parents | length == 1)
-              | if (.commit.message | split("\n") | any(test("^Chromatic: *skip *$"; "i"))) then "skip" else "run" end')
-          if [ -n "$verdicts" ] && ! grep -qx run <<< "$verdicts"; then
-            echo "Skipping the baseline: every commit in #$pr has a 'Chromatic: skip' trailer."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  visual:
-    name: Visual Snapshots (Auto-Accept)
-    needs: chromatic-skip
-    if: ${{ needs.chromatic-skip.outputs.skip != 'true' }}
+  # Chromatic takes baselines from the accepted build of each pull request's
+  # last commit (squash merges are matched through its GitHub app), and branches
+  # must be up to date before they merge, so main publishes no snapshots of its
+  # own. This job only saves the pnpm store that branch CI's Playwright
+  # containers restore.
+  pnpm-cache:
+    name: Cache pnpm Store
     permissions:
       contents: read
     runs-on: ubuntu-26.04
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --ipc=host
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          fetch-depth: 0
-
-      - name: Configure Git Safe Directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - uses: ./.github/actions/setup-pnpm
-
-      - name: Run Visual Tests
-        run: pnpm test:visual
-
-      - name: Upload Capture Timings
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-test-results
-          path: test-results/results.json
-          retention-days: 7
-
-      - name: Upload Test Results
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-test-report
-          path: test-results/
-          retention-days: 7
-
-      - name: Accept Snapshots in Chromatic
-        env:
-          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: pnpm chromatic:publish --auto-accept-changes=main
 
   # Saves the Gradle and ccache caches that branch CI builds restore.
   android:
