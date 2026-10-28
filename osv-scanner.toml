@@ -1,0 +1,6 @@
+# Advisories that OSV-based scanners (OpenSSF Scorecard) still report but that
+# are fixed here. Remove an entry once its package ships a fixed release.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+reason = "deepmerge has no fixed release; patches/deepmerge.patch fixes it."
