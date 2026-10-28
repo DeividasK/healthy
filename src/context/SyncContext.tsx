@@ -282,7 +282,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
     (async () => {
       try {
-        if (Platform.OS === 'web') {
+        // Only builds without the token service sign in through Google's
+        // script; the others never load it.
+        if (Platform.OS === 'web' && !hasGoogleTokenService()) {
           loadGisScript().catch((err) => {
             console.warn('Failed to preload GIS script:', err);
           });
