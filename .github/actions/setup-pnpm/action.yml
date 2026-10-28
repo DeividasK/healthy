@@ -1,0 +1,43 @@
+name: 'Setup pnpm'
+description: 'Install pnpm and dependencies on the Node.js the runner or container already has'
+
+# pnpm/setup installs every devEngines.runtime entry from package.json with
+# no way to opt out, so each job downloaded Node.js (14+ minutes inside the
+# Playwright container). pnpm/action-setup only installs pnpm, and pnpm itself
+# just warns about the version (onFail: warn).
+
+inputs:
+  save-cache:
+    description: 'Save the pnpm store at the end of the job'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: pnpm/action-setup@v6
+
+    - name: Get pnpm Store Path
+      id: store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm Store
+      if: ${{ inputs.save-cache == 'true' }}
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: ${{ runner.os }}-pnpm-store-
+
+    - name: Restore pnpm Store
+      if: ${{ inputs.save-cache != 'true' }}
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: ${{ runner.os }}-pnpm-store-
+
+    - name: Install Dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

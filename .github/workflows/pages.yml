@@ -56,9 +56,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - uses: pnpm/setup@v3
-        with:
-          cache: true
+      - uses: ./.github/actions/setup-pnpm
 
       # base_path is /healthy until the custom domain is set, then empty.
       - name: Setup Pages
