@@ -51,6 +51,8 @@ import {
 import { COLORS } from '@/src/theme/colors';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { getShareVariant } from '@/src/features/share-ai/ShareWithAIModal';
+import { BotMessageSquare, Plus } from 'lucide-react-native';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -684,6 +686,26 @@ export function HomeView() {
           addLabel="Add record"
           addTestID="floating-add-button"
           addMenuExpanded={showAddMenu}
+          actions={
+            hasAnyData && getShareVariant() === 'c'
+              ? [
+                  {
+                    label: 'Add record',
+                    testID: 'floating-add-button',
+                    icon: Plus,
+                    onPress: () => setShowAddMenu((visible) => !visible),
+                    primary: true,
+                    expanded: showAddMenu,
+                  },
+                  {
+                    label: 'Share with AI',
+                    testID: 'home-share-ai',
+                    icon: BotMessageSquare,
+                    onPress: () => router.push('/share-ai'),
+                  },
+                ]
+              : undefined
+          }
         />
       </View>
     </SafeAreaView>

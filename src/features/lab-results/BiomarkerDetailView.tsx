@@ -93,6 +93,12 @@ import {
 } from './biomarkerRanges';
 import { getChartScale } from './chartScale';
 import { CUSTOM_TEST_SYSTEM } from '@/src/data/biomarkers/customTests';
+import {
+  ShareWithAIModal,
+  getShareVariant,
+} from '@/src/features/share-ai/ShareWithAIModal';
+import { biomarkerShareText } from '@/src/features/share-ai/shareText';
+import { BotMessageSquare } from 'lucide-react-native';
 
 type Measurement = {
   date: string;
@@ -177,6 +183,8 @@ export function BiomarkerDetailView({
   const isWide = !selectedId && isWideWindow;
   const { activePatientId, isLoading: isPatientLoading } = useActivePatient();
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const shareVariant = getShareVariant();
   const [history, setHistory] = useState({
     patientId: '',
     reports: [] as Awaited<ReturnType<typeof getAllReports>>,
@@ -790,31 +798,68 @@ export function BiomarkerDetailView({
                 icon: SlidersHorizontal,
                 onPress: () => openRangeForm(),
               },
+              {
+                label: 'Share with AI',
+                testID: 'biomarker-share-ai',
+                icon: BotMessageSquare,
+                onPress: () =>
+                  shareVariant === 'c'
+                    ? router.push(
+                        `/share-ai?biomarker=${encodeURIComponent(id)}`
+                      )
+                    : setShowShare(true),
+              },
             ]}
           />
         )
       }
       modal={
         !selectedId && (
-          <FloatingAddMenu
-            visible={showAddMenu}
-            onClose={() => setShowAddMenu(false)}
-            options={[
-              {
-                id: 'lab-results',
-                label: 'Lab Results',
-                testID: 'menu-add-lab-results',
-                icon: (
-                  <FileText
-                    color={COLORS.light.primary}
-                    size={18}
-                    style={{ marginRight: 10 }}
-                  />
-                ),
-                onPress: () => router.push('/lab-result/add'),
-              },
-            ]}
-          />
+          <>
+            {showShare && (
+              <ShareWithAIModal
+                withOptions={shareVariant === 'b'}
+                fileName={`${title}.md`}
+                onClose={() => setShowShare(false)}
+                build={({ period, question }) =>
+                  biomarkerShareText({
+                    name: title,
+                    period,
+                    question,
+                    conditions: conditions.map(
+                      (condition) => condition.code?.text ?? ''
+                    ),
+                    measurements: displayedMeasurements.map((m) => ({
+                      date: m.date,
+                      value: m.value,
+                      unit: m.unit,
+                      range: m.range,
+                      status: m.zone,
+                    })),
+                  })
+                }
+              />
+            )}
+            <FloatingAddMenu
+              visible={showAddMenu}
+              onClose={() => setShowAddMenu(false)}
+              options={[
+                {
+                  id: 'lab-results',
+                  label: 'Lab Results',
+                  testID: 'menu-add-lab-results',
+                  icon: (
+                    <FileText
+                      color={COLORS.light.primary}
+                      size={18}
+                      style={{ marginRight: 10 }}
+                    />
+                  ),
+                  onPress: () => router.push('/lab-result/add'),
+                },
+              ]}
+            />
+          </>
         )
       }
     >
