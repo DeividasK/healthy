@@ -1,27 +1,5 @@
 import { formatDisplayDate } from '@/src/utils/dateUtils';
 
-/** What the user asks their AI, put above the records. */
-export const SHARE_QUESTIONS = [
-  {
-    id: 'explain',
-    label: 'Explain my results',
-    text: 'Explain these results in plain language. What stands out, and what might it mean?',
-  },
-  {
-    id: 'doctor',
-    label: 'What to ask my doctor',
-    text: 'Help me prepare for my next doctor visit: what should I ask about these records?',
-  },
-  {
-    id: 'trends',
-    label: 'Spot trends',
-    text: 'Look for trends and changes over time in these records, and say which ones matter most.',
-  },
-  { id: 'none', label: 'No question', text: '' },
-] as const;
-
-export type ShareQuestionId = (typeof SHARE_QUESTIONS)[number]['id'];
-
 /** How far back the shared records go. */
 export const SHARE_PERIODS = [
   { id: '1y', label: 'Last year', days: 365 },
@@ -67,13 +45,11 @@ export function inPeriod(date: string | undefined, period: SharePeriodId) {
   return Date.parse(date) >= Date.now() - days * 864e5;
 }
 
-function header(title: string, question: ShareQuestionId) {
-  const ask = SHARE_QUESTIONS.find(({ id }) => id === question)!.text;
+function header(title: string) {
   return [
     `# ${title}`,
     '',
-    ...(ask ? [ask, ''] : []),
-    `Shared from Healthy on ${formatDisplayDate(new Date().toISOString())}. Ranges are the ones my lab gave or I set myself. I'm not sharing my name.`,
+    `My health records, shared from the Healthy app on ${formatDisplayDate(new Date().toISOString())}. Ranges are the ones my lab gave or I set myself.`,
     '',
   ];
 }
@@ -84,13 +60,11 @@ export function biomarkerShareText({
   measurements,
   conditions,
   period,
-  question,
 }: {
   name: string;
   measurements: ShareMeasurement[];
   conditions: string[];
   period: SharePeriodId;
-  question: ShareQuestionId;
 }): string {
   const rows = measurements
     .filter(({ date }) => inPeriod(date, period))
@@ -101,7 +75,7 @@ export function biomarkerShareText({
         `| ${formatDisplayDate(m.date)} | ${m.value}${m.unit ? ` ${m.unit}` : ''} | ${formatRange(m.range)} | ${statusWord(m.status)} |`
     );
   return [
-    ...header(`My ${name} results`, question),
+    ...header(`My ${name} results`),
     '| Date | Result | Range | Status |',
     '| --- | --- | --- | --- |',
     ...rows,
@@ -120,13 +94,11 @@ export interface OverviewSection {
 /** Several kinds of records as text for an AI. */
 export function overviewShareText({
   sections,
-  question,
 }: {
-  sections: OverviewSection[];
-  question: ShareQuestionId;
+  sections: { title: string; lines: string[] }[];
 }): string {
   return [
-    ...header('My health records', question),
+    ...header('My health records'),
     ...sections.flatMap(({ title, lines }) => [
       `## ${title}`,
       '',

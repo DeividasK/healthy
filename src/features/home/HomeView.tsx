@@ -5,6 +5,8 @@ import {
   FolderPlus,
   ListChecks,
   Pill,
+  Plus,
+  Share as ShareIcon,
   Stethoscope,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -51,8 +53,6 @@ import {
 import { COLORS } from '@/src/theme/colors';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { getShareVariant } from '@/src/features/share-ai/ShareWithAIModal';
-import { BotMessageSquare, Plus } from 'lucide-react-native';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -687,7 +687,7 @@ export function HomeView() {
           addTestID="floating-add-button"
           addMenuExpanded={showAddMenu}
           actions={
-            hasAnyData && getShareVariant() === 'c'
+            hasAnyData
               ? [
                   {
                     label: 'Add record',
@@ -698,9 +698,9 @@ export function HomeView() {
                     expanded: showAddMenu,
                   },
                   {
-                    label: 'Share with AI',
-                    testID: 'home-share-ai',
-                    icon: BotMessageSquare,
+                    label: 'Share',
+                    testID: 'home-share',
+                    icon: ShareIcon,
                     onPress: () => router.push('/share-ai'),
                   },
                 ]
