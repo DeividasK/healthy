@@ -13,7 +13,11 @@ import {
   parseResultValue,
   type ResultComparator,
 } from './biomarkerMeasurements';
-import { unitKind, type LoincLabTests } from '@/src/data/loinc';
+import {
+  countPerLitreExponent,
+  unitKind,
+  type LoincLabTests,
+} from '@/src/data/loinc';
 import {
   isAbsent,
   parseAIValue,
@@ -94,7 +98,7 @@ Rules:
 - "time" is the 24-hour time the sample was collected. Leave "time" out if the report doesn't show it.
 - "serviceProvider" is the laboratory or clinic that did the tests. Leave it out if the report doesn't show it.
 - Add one entry to "results" for each test in the report with a numeric value. For a test in the list below, use its test id. For any other test, use its LOINC code as the test id (e.g. "2093-3") and copy its unit as reported. LOINC has separate codes for each kind of unit, so use the code for the unit the report gives: mass, like mg/dL, or amount of substance, like mmol/L.
-- "value" is a number with a dot as the decimal separator. Copy it exactly as reported: don't round or convert it.
+- "value" is a number with a dot as the decimal separator. Copy it exactly as reported, including a minus sign: don't round or convert it.
 - If the report gives a result only as a bound, like < 20.00 or > 90, write "value" as text with the sign, e.g. "<20.00" or ">90".
 - For a test in the list below, "unit" must be one of the units listed for it. Units written differently can mean the same unit: 10^9/L, x10E9/L and G/L are 10*9/L; 10^3/µL, K/µL and thou/µL are 10*3/uL; 10^12/L and T/L are 10*12/L; 10^6/µL and M/µL are 10*6/uL.
 - For a test that has no LOINC code, like NAD+ or telomere length, use "${OWN_TEST_ID}" as the test id, add "name" with the test's name as reported, and copy its unit as reported.
@@ -133,6 +137,18 @@ function findUnit(marker: RecordableBiomarker, unitText: string) {
     (option) =>
       normalizeUnit(option.label) === normalizeUnit(unitText) ||
       normalizeUnit(option.ucum) === normalizeUnit(unitText)
+  );
+}
+
+/**
+ * The test's own unit for a count written another way, e.g. 10*3/uL for a
+ * report's 10*9/L. The value is the same in both.
+ */
+function findSameCountUnit(marker: RecordableBiomarker, unitText: string) {
+  const exponent = countPerLitreExponent(unitText);
+  if (exponent === undefined) return undefined;
+  return marker.units.find(
+    (option) => countPerLitreExponent(option.ucum) === exponent
   );
 }
 
@@ -243,13 +259,14 @@ export function parseLabResultsAIReply(
           ? parseResultValue(item.value)
           : undefined;
       const value = bounded?.value ?? parseAIValue(item.value);
-      if (value === undefined || !Number.isFinite(value) || value < 0) {
+      if (value === undefined || !Number.isFinite(value)) {
         errors.push(`${marker.name} has no valid value.`);
         return;
       }
 
       const unit =
         findUnit(marker, unitText) ??
+        findSameCountUnit(marker, reportedUnit) ??
         // LOINC codes each kind of unit separately, so another test's
         // unit only fits if it measures the same kind of quantity.
         (!catalogMarker &&

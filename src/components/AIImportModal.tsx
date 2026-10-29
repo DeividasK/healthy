@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { ClipboardPaste, Sparkles } from 'lucide-react-native';
 import {
@@ -7,6 +7,10 @@ import {
   ModalActions,
   ModalButton,
 } from '@/src/components/CenteredModal';
+import {
+  COPY_CORNER_INSET,
+  CornerButton,
+} from '@/src/components/CopyCornerButton';
 import { FieldRevealProvider } from '@/src/components/FieldReveal';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { FormField, FormTextInput } from '@/src/components/FormField';
@@ -117,16 +121,12 @@ export function AIImportModal<T>({
               onChangeText={setReply}
               style={styles.reply}
             />
-            <TouchableOpacity
-              testID="ai-import-paste-button"
-              style={styles.pasteButton}
+            <CornerButton
+              icon={ClipboardPaste}
               onPress={handlePaste}
-              accessibilityRole="button"
               accessibilityLabel="Paste AI reply"
-              activeOpacity={0.7}
-            >
-              <ClipboardPaste size={18} color={COLORS.light.foreground} />
-            </TouchableOpacity>
+              testID="ai-import-paste-button"
+            />
           </View>
         </FormField>
         <ModalActions>
@@ -163,17 +163,6 @@ const styles = StyleSheet.create({
     maxHeight: 200,
     fontSize: 14,
     // Leaves room for the paste button in the top-right corner.
-    paddingRight: 52,
-  },
-  pasteButton: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 40,
-    height: 40,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.light.pillBackground,
+    paddingRight: COPY_CORNER_INSET,
   },
 });

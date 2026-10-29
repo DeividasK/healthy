@@ -60,6 +60,32 @@ export function unitKind(ucum: string): string {
   return [numerator, ...denominator].map(quantityKind).join('/');
 }
 
+const VOLUME_PREFIX_EXPONENT: Record<string, number> = {
+  '': 0,
+  d: -1,
+  m: -3,
+  u: -6,
+  n: -9,
+  p: -12,
+  f: -15,
+};
+
+/**
+ * The power of ten of a count per volume unit, in count per litre, e.g. 9
+ * for both 10*9/L and 10*3/uL, which are the same unit written two ways.
+ * Undefined for any other unit.
+ */
+export function countPerLitreExponent(ucum: string): number | undefined {
+  const match = ucum
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/\s/g, '')
+    .replace(/[µμ]/g, 'u')
+    .replace(/^[x×]/i, '')
+    .match(/^(?:10[*^](\d+))?\/([dmunpf]?)l$/i);
+  if (!match) return undefined;
+  return Number(match[1] ?? 0) - VOLUME_PREFIX_EXPONENT[match[2].toLowerCase()];
+}
+
 /**
  * A recordable biomarker for a LOINC test outside the catalog. Its units
  * don't convert into each other, and it has no catalog reference range.

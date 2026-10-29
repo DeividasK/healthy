@@ -129,6 +129,8 @@ test('reads values given as a bound and shows their sign', () => {
   expect(parseResultValue('< 20.00')).toEqual({ value: 20, comparator: '<' });
   expect(parseResultValue('≤3,5')).toEqual({ value: 3.5, comparator: '<=' });
   expect(parseResultValue('>=90')).toEqual({ value: 90, comparator: '>=' });
+  expect(parseResultValue('-0.33')).toEqual({ value: -0.33 });
+  expect(parseResultValue('> -2')).toEqual({ value: -2, comparator: '>' });
   expect(parseResultValue('<')).toBeUndefined();
   expect(parseResultValue('abc')).toBeUndefined();
   expect(

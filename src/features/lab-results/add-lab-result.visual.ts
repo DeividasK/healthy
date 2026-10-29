@@ -88,9 +88,22 @@ test.describe('Add Lab Result View - Visual Regression', () => {
     await takeSnapshot(page, 'Add Report View - Filled form', testInfo);
 
     await page.getByTestId('import-with-ai-button').click();
+    // Long enough to scroll, so the paste button shows beside the scrollbar.
+    const results = [
+      ['albumin', 'g/L'],
+      ['ferritin', 'ng/mL'],
+      ['glucose', 'mmol/L'],
+      ['iron', 'umol/L'],
+      ['unicorn', 'g/L'],
+    ]
+      .map(
+        ([test, unit]) =>
+          `    { "test": "${test}", "value": 1, "unit": "${unit}" }`
+      )
+      .join(',\n');
     await page
       .getByTestId('ai-import-reply-input')
-      .fill('{"date": "2026-09-20", "results": []}');
+      .fill(`{\n  "date": "2026-09-20",\n  "results": [\n${results}\n  ]\n}`);
     await page.getByTestId('ai-import-submit-button').click();
     await page.getByTestId('ai-import-errors').waitFor();
 

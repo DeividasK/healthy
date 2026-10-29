@@ -125,6 +125,12 @@ function OwnTestLabel({ style }: { style?: StyleProp<ViewStyle> }) {
 /** A typed limit as the app stores it: a decimal comma becomes a point. */
 const cleanLimit = (text: string) => text.trim().replace(',', '.');
 
+/** Drops characters matching `notAllowed`, keeping a minus sign only in front. */
+const keepSignedNumber = (text: string, notAllowed: RegExp) => {
+  const cleaned = text.replace(notAllowed, '');
+  return (cleaned.startsWith('-') ? '-' : '') + cleaned.replace(/-/g, '');
+};
+
 /** Checks the selected local date and optional time against the current time. */
 export function isDateTimeInFuture(
   date: Date,
@@ -497,7 +503,7 @@ export function LabResultForm({
   };
 
   const handleValueChange = (index: number, val: string) => {
-    const cleaned = val.replace(/[^0-9.]/g, '');
+    const cleaned = keepSignedNumber(val, /[^0-9.-]/g);
     setActiveItems((prev) =>
       prev.map((item, i) =>
         i === index ? { ...item, valueStr: cleaned } : item
@@ -514,7 +520,7 @@ export function LabResultForm({
     index: number,
     key: 'lowStr' | 'highStr',
     val: string
-  ) => updateItem(index, { [key]: val.replace(/[^0-9.,]/g, '') });
+  ) => updateItem(index, { [key]: keepSignedNumber(val, /[^0-9.,-]/g) });
 
   const handleSelectUnit = (index: number, unitLabel: string, ucum: string) => {
     setActiveItems((prev) =>
