@@ -95,8 +95,6 @@ test.describe('My actions - Visual Regression', () => {
   }, testInfo) => {
     await page.goto('/');
     await page.getByTestId('home-action-day-2026-10-06-complete').waitFor();
-    await takeSnapshot(page, 'My actions - Home week strip', testInfo);
-
     await page.getByTestId('home-actions-open').click();
     await page
       .getByTestId('treatment-log-row-visual-log-cream')

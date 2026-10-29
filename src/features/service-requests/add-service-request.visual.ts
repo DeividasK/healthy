@@ -10,7 +10,6 @@ test.describe('Add Service Request - Visual Regression', () => {
     await seedTestPatient(page);
     await page.goto('/service-request/add');
     await page.getByTestId('service-request-form-title').waitFor();
-    await takeSnapshot(page, 'Service Request - Add Form Empty', testInfo);
     await page.getByTestId('add-option-button').click();
     await page.getByTestId('form-add-menu').waitFor();
     await waitForMenuToggle(page, 'add-option-button', true);

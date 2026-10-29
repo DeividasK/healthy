@@ -9,11 +9,12 @@ import { useSingleColumnLayout } from '@/src/features/testing/testLayout';
 test.use({ freshApp: true });
 
 test.describe('App startup', () => {
-  test('shows the app header while the script loads, then the app takes over in place', async ({
+  test('shows the app header while the script loads and the database opens, then the app takes over in place', async ({
     page,
   }) => {
     await useSingleColumnLayout(page);
-    // Holds the app's script until the loading frame has been checked.
+    // Holds the app's script, then the database, so each loading frame can be
+    // checked.
     let releaseScript!: () => void;
     const scriptReleased = new Promise<void>((resolve) => {
       releaseScript = resolve;
@@ -22,6 +23,17 @@ test.describe('App startup', () => {
       await scriptReleased;
       await route.continue();
     });
+    let releaseDatabase!: () => void;
+    const databaseReleased = new Promise<void>((resolve) => {
+      releaseDatabase = resolve;
+    });
+    await page.route(
+      /expo-sqlite\/web\/worker|wa-sqlite\.wasm/,
+      async (route) => {
+        await databaseReleased;
+        await route.continue();
+      }
+    );
 
     await page.goto('/', { waitUntil: 'commit' });
     const shellLogo = page.locator('#app-shell-header svg');
@@ -38,6 +50,17 @@ test.describe('App startup', () => {
     expect(Math.abs(appBox.x - shellBox.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(appBox.y - shellBox.y)).toBeLessThanOrEqual(1);
     expect(appBox.width).toBeCloseTo(shellBox.width, 0);
+
+    // The header and placeholder rows show while the database opens.
+    await expect(page.getByTestId('app-header')).toBeVisible();
+    await expect(page.getByTestId('app-loading-skeleton')).toBeVisible();
+    // Screens wait for the profile, so nothing can be saved without one.
+    await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
+
+    releaseDatabase();
+    // A fresh install has no profile yet, so Home sends the user to Welcome.
+    await expect(page).toHaveURL(/\/welcome$/);
+    await expect(page.getByTestId('app-loading-skeleton')).toHaveCount(0);
   });
 
   test('keeps the sidebar in place on desktop while the app loads', async ({
@@ -90,35 +113,6 @@ test.describe('App startup', () => {
     await expect(page).toHaveURL(/\/welcome$/);
     await expect(placeholder).toHaveCount(0);
     await expect(page.getByTestId('app-header')).toBeVisible();
-  });
-
-  test('shows the header and placeholder rows while the database opens', async ({
-    page,
-  }) => {
-    await useSingleColumnLayout(page);
-    // Holds the SQLite worker so the database stays closed for now.
-    let releaseDatabase!: () => void;
-    const databaseReleased = new Promise<void>((resolve) => {
-      releaseDatabase = resolve;
-    });
-    await page.route(
-      /expo-sqlite\/web\/worker|wa-sqlite\.wasm/,
-      async (route) => {
-        await databaseReleased;
-        await route.continue();
-      }
-    );
-
-    await page.goto('/');
-    await expect(page.getByTestId('app-header')).toBeVisible();
-    await expect(page.getByTestId('app-loading-skeleton')).toBeVisible();
-    // Screens wait for the profile, so nothing can be saved without one.
-    await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
-
-    releaseDatabase();
-    // A fresh install has no profile yet, so Home sends the user to Welcome.
-    await expect(page).toHaveURL(/\/welcome$/);
-    await expect(page.getByTestId('app-loading-skeleton')).toHaveCount(0);
   });
 
   test('runs the schema repairs once per repair revision, not on every start', async ({

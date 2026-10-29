@@ -4,6 +4,7 @@ import {
   type SeedReportOptions,
   type SeedConsultationOptions,
 } from './testSeed';
+import type { RegimenDraft } from '@/src/features/treatments/regimen';
 
 let entityCounter = 0;
 
@@ -83,3 +84,34 @@ export function buildConsultationData(
     status: overrides?.status ?? 'completed',
   };
 }
+
+/**
+ * A once-daily regimen of one tablet at a part of the day (e.g. MORN) or a
+ * clock time (e.g. "07:30").
+ */
+export const onceDailyAt = (at: string): RegimenDraft => ({
+  phases: [
+    {
+      doses: [
+        {
+          amount: '1',
+          amountMax: '',
+          unit: '{tablet}',
+          route: '',
+          site: '',
+          patientInstruction: '',
+          timing: {
+            frequency: '1',
+            frequencyMax: '',
+            period: '1',
+            periodUnit: 'd',
+            when: /^\d/.test(at) ? '' : at,
+            timeOfDay: /^\d/.test(at) ? at : '',
+            boundsValue: '',
+            boundsUnit: 'd',
+          },
+        },
+      ],
+    },
+  ],
+});

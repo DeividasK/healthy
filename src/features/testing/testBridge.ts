@@ -193,6 +193,33 @@ export function setupTestBridge(
     if (href !== '/') router.push(href as Href);
   };
 
+  const setResetKey = async (key: number | null) => {
+    resetKey = key;
+    resetListeners.forEach((listener) => listener());
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    );
+  };
+
+  /**
+   * Unmounts every provider and screen, runs `whileUnmounted`, then mounts
+   * them anew, so they read the database and storage again as after a load.
+   */
+  const remount = async (whileUnmounted?: () => Promise<void>) => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    // Unmounted, the app's timers and listeners stop; sync work already
+    // started finishes before anything else happens.
+    const nextKey = (resetKey ?? 0) + 1;
+    await setResetKey(null);
+    await whenSyncIdle();
+    await whileUnmounted?.();
+    // A failed request's offline status would outlive the remount.
+    reportReachable();
+    // The Google sign-in mock counts popups from the page's load.
+    if ('__googleAuthPopups' in window) (window as any).__googleAuthPopups = 0;
+    await setResetKey(nextKey);
+  };
+
   (window as any).__HEALTHY_TEST_BRIDGE__ = {
     navigate,
     /**
@@ -205,49 +232,41 @@ export function setupTestBridge(
       // Clearing rows cannot undo schema changes; the runner reloads instead.
       if ((await schemaSignature()) !== (await bootSchema))
         throw new Error('The database schema changed since the app loaded');
-      (document.activeElement as HTMLElement | null)?.blur?.();
-      const setResetKey = async (key: number | null) => {
-        resetKey = key;
-        resetListeners.forEach((listener) => listener());
-        await new Promise((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(resolve))
+      await remount(async () => {
+        // Tests inject failures with temporary triggers; a reload drops them.
+        const db = await getDb();
+        const temporary = await db.getAllAsync<{ type: string; name: string }>(
+          "SELECT type, name FROM sqlite_temp_master WHERE type IN ('trigger', 'view', 'table') ORDER BY type = 'table'"
         );
-      };
-      // Unmounted, the app's timers and listeners stop; sync work already
-      // started finishes before anything is cleared.
-      const nextKey = (resetKey ?? 0) + 1;
-      await setResetKey(null);
-      await whenSyncIdle();
-      // Tests inject failures with temporary triggers; a reload drops them.
-      const db = await getDb();
-      const temporary = await db.getAllAsync<{ type: string; name: string }>(
-        "SELECT type, name FROM sqlite_temp_master WHERE type IN ('trigger', 'view', 'table') ORDER BY type = 'table'"
-      );
-      for (const { type, name } of temporary)
-        await db.execAsync(`DROP ${type} IF EXISTS temp."${name}";`);
-      await clearAllDatabaseTables();
-      // Errors a test expected would otherwise stay in the dev error toast.
-      if (process.env.NODE_ENV === 'development')
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only module, left out of production bundles
-        require('@expo/log-box/src/LogBox').default.clearAllLogs();
-      localStorage.clear();
-      sessionStorage.clear();
-      // A failed request's offline status would outlive the test.
-      reportReachable();
-      // The sync vault's key; it opens the database only per operation.
-      for (const { name } of await indexedDB.databases())
-        if (name)
-          await new Promise((resolve, reject) => {
-            const request = indexedDB.deleteDatabase(name);
-            request.onsuccess = resolve;
-            request.onerror = () => reject(request.error);
-          });
-      // A freshly loaded page treats its last input as a pointer.
-      document.dispatchEvent(new PointerEvent('pointerdown'));
-      await setResetKey(nextKey);
+        for (const { type, name } of temporary)
+          await db.execAsync(`DROP ${type} IF EXISTS temp."${name}";`);
+        await clearAllDatabaseTables();
+        // Errors a test expected would otherwise stay in the dev error toast.
+        if (process.env.NODE_ENV === 'development')
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only module, left out of production bundles
+          require('@expo/log-box/src/LogBox').default.clearAllLogs();
+        localStorage.clear();
+        sessionStorage.clear();
+        // The sync vault's key; it opens the database only per operation.
+        for (const { name } of await indexedDB.databases())
+          if (name)
+            await new Promise((resolve, reject) => {
+              const request = indexedDB.deleteDatabase(name);
+              request.onsuccess = resolve;
+              request.onerror = () => reject(request.error);
+            });
+        // A freshly loaded page treats its last input as a pointer.
+        document.dispatchEvent(new PointerEvent('pointerdown'));
+      });
       navigate('/profile/new');
       freshAfterReset = true;
     },
+    /**
+     * Mounts every provider and screen anew, keeping the database and
+     * storage, like restarting the app without reloading the page: e.g. so
+     * sync starts with a connection the bridge saved.
+     */
+    remountForTest: () => remount(),
     /** Whether the app is still where `resetForTest` left it. */
     isFreshAfterReset: () =>
       freshAfterReset && window.location.pathname === '/profile/new',

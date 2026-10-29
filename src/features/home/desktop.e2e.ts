@@ -6,6 +6,7 @@ import {
   seedTestCondition,
   seedTestConsultation,
   openRoute,
+  reopenRoute,
   expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
@@ -177,8 +178,8 @@ test('the biomarkers list opens each biomarker beside it', async ({ page }) => {
   );
   expect(await skeletonShown(page)).toBe(false);
 
-  // The selection survives a reload.
-  await page.reload();
+  // The selection comes back from the URL when the screen remounts.
+  await reopenRoute(page);
   await expect(
     page.getByTestId('labs-summary-view').getByTestId('biomarker-title')
   ).toHaveText('Hemoglobin (Hgb)');

@@ -151,23 +151,34 @@ export interface SeedBundleOptions {
   activityIds?: string[];
 }
 
-/** Seeds a treatment bundle (RequestOrchestration) through the real service. */
-export async function seedTestBundle(
+/**
+ * Calls a test bridge method inside the page once the app has set the
+ * bridge up, with arguments that survive serialization.
+ */
+export async function callBridge(
   page: Page,
-  { times = [], ...options }: SeedBundleOptions
+  method: string,
+  ...args: unknown[]
 ): Promise<any> {
   await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
   return await page.evaluate(
-    async (input) =>
-      await (window as any).__HEALTHY_TEST_BRIDGE__.seedBundle(input),
-    {
-      ...options,
-      times: times.map((time) =>
-        /^\d/.test(time) ? { kind: 'time', time } : { kind: 'when', code: time }
-      ),
-    }
+    ({ method, args }) =>
+      (window as any).__HEALTHY_TEST_BRIDGE__[method](...args),
+    { method, args }
   );
 }
+
+/** Seeds a treatment bundle (RequestOrchestration) through the real service. */
+export const seedTestBundle = (
+  page: Page,
+  { times = [], ...options }: SeedBundleOptions
+): Promise<any> =>
+  callBridge(page, 'seedBundle', {
+    ...options,
+    times: times.map((time) =>
+      /^\d/.test(time) ? { kind: 'time', time } : { kind: 'when', code: time }
+    ),
+  });
 
 /** One browser round trip, ordered service writes, no concurrent SQLite transactions. */
 export async function seedTestResources(
@@ -253,6 +264,17 @@ export async function reopenRoute(page: Page): Promise<void> {
   await openRoute(page, url.pathname + url.search);
 }
 
+/**
+ * Restarts the app in place, then opens `path`: every provider mounts anew
+ * and reads the database and storage again (e.g. a sync connection made
+ * through the bridge), without the reload that would cost a full boot and
+ * the worker's shared app. Keep `page.goto` for tests about a fresh boot.
+ */
+export async function restartApp(page: Page, path: string): Promise<void> {
+  await callBridge(page, 'remountForTest');
+  await openRoute(page, path);
+}
+
 /** Whether the shared app is still where its reset left it (see `page`). */
 const isFreshApp = (page: Page): Promise<boolean> =>
   page.evaluate(
@@ -289,92 +311,43 @@ export async function seedTestPatient(
   return patient;
 }
 
-/**
- * Seeds a Condition directly into SQLite via the test bridge.
- */
-export async function seedTestCondition(
+/** Seeds a Condition directly into SQLite via the test bridge. */
+export const seedTestCondition = (
   page: Page,
   options: SeedConditionOptions
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedCondition(opts);
-  }, options);
-}
+): Promise<any> => callBridge(page, 'seedCondition', options);
 
-/**
- * Seeds a DiagnosticReport directly into SQLite via the test bridge.
- */
-export async function seedTestReport(
+/** Seeds a DiagnosticReport directly into SQLite via the test bridge. */
+export const seedTestReport = (
   page: Page,
   options: SeedReportOptions
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedReport(opts);
-  }, options);
-}
+): Promise<any> => callBridge(page, 'seedReport', options);
 
-/**
- * Seeds a Consultation directly into SQLite via the test bridge.
- */
-export async function seedTestConsultation(
+/** Seeds a Consultation directly into SQLite via the test bridge. */
+export const seedTestConsultation = (
   page: Page,
   options: SeedConsultationOptions
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedConsultation(opts);
-  }, options);
-}
+): Promise<any> => callBridge(page, 'seedConsultation', options);
 
-/**
- * Fetches the Composition linked to a Consultation directly via the test bridge.
- */
-export async function getTestClinicalDocument(
+/** Fetches the Composition linked to a Consultation via the test bridge. */
+export const getTestClinicalDocument = (
   page: Page,
   consultationId: string
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (id) => {
-    return await (
-      window as any
-    ).__HEALTHY_TEST_BRIDGE__.getClinicalDocumentByConsultationId(id);
-  }, consultationId);
-}
+): Promise<any> =>
+  callBridge(page, 'getClinicalDocumentByConsultationId', consultationId);
 
-/**
- * Seeds a Treatment (MedicationRequest) directly into SQLite via the test bridge.
- */
-export async function seedTestTreatment(
+/** Seeds a Treatment (MedicationRequest) directly into SQLite via the test bridge. */
+export const seedTestTreatment = (
   page: Page,
   options: SeedTreatmentOptions
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedTreatment(opts);
-  }, options);
-}
+): Promise<any> => callBridge(page, 'seedTreatment', options);
 
-/**
- * Fetches a Treatment (MedicationRequest) directly via the test bridge.
- */
-export async function getTestTreatment(
+/** Fetches a Treatment (MedicationRequest) directly via the test bridge. */
+export const getTestTreatment = (
   page: Page,
   id: string,
   patientId?: string
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(
-    async ({ treatId, patId }) => {
-      return await (window as any).__HEALTHY_TEST_BRIDGE__.getTreatment(
-        treatId,
-        patId
-      );
-    },
-    { treatId: id, patId: patientId }
-  );
-}
+): Promise<any> => callBridge(page, 'getTreatment', id, patientId);
 
 /** LOINC code of the consultation document section that lists treatments. */
 export const TREATMENTS_SECTION_CODE = '10160-0';
@@ -389,68 +362,31 @@ export function findTreatmentsSection(document: any): any {
 }
 
 /** Seeds service request (ServiceRequest) through the real service. */
-export async function seedTestServiceRequest(
+export const seedTestServiceRequest = (
   page: Page,
   options: SeedServiceRequestOptions
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(async (opts) => {
-    return await (window as any).__HEALTHY_TEST_BRIDGE__.seedServiceRequest(
-      opts
-    );
-  }, options);
-}
+): Promise<any> => callBridge(page, 'seedServiceRequest', options);
 
 /** Fetches stored service request (ServiceRequest) via the test bridge. */
-export async function getTestServiceRequest(
+export const getTestServiceRequest = (
   page: Page,
   id: string,
   patientId?: string
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(
-    async ({ requestId, patId }) =>
-      await (window as any).__HEALTHY_TEST_BRIDGE__.getServiceRequest(
-        requestId,
-        patId
-      ),
-    { requestId: id, patId: patientId }
-  );
-}
+): Promise<any> => callBridge(page, 'getServiceRequest', id, patientId);
 
 /** Fetches a stored treatment log (MedicationAdministration) via the test bridge. */
-export async function getTestTreatmentLog(
+export const getTestTreatmentLog = (
   page: Page,
   id: string,
   patientId?: string
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(
-    async ({ logId, patId }) =>
-      await (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentLog(
-        logId,
-        patId
-      ),
-    { logId: id, patId: patientId }
-  );
-}
+): Promise<any> => callBridge(page, 'getTreatmentLog', id, patientId);
 
 /** Fetches a stored procedure log (Procedure) via the test bridge. */
-export async function getTestProcedureLog(
+export const getTestProcedureLog = (
   page: Page,
   id: string,
   patientId?: string
-): Promise<any> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(
-    async ({ logId, patId }) =>
-      await (window as any).__HEALTHY_TEST_BRIDGE__.getProcedureLog(
-        logId,
-        patId
-      ),
-    { logId: id, patId: patientId }
-  );
-}
+): Promise<any> => callBridge(page, 'getProcedureLog', id, patientId);
 
 /** Local YYYY-MM-DD of the browser's today plus `delta` days. */
 export async function getBrowserLocalDate(
@@ -493,14 +429,8 @@ export const evaluateBridge = <T>(
   );
 
 /** A treatment's usage periods (MedicationStatements) via the test bridge. */
-export async function getTestTreatmentUsage(
+export const getTestTreatmentUsage = (
   page: Page,
   treatmentId: string
-): Promise<any[]> {
-  await page.waitForFunction(() => !!(window as any).__HEALTHY_TEST_BRIDGE__);
-  return await page.evaluate(
-    (id) =>
-      (window as any).__HEALTHY_TEST_BRIDGE__.getTreatmentUsageStatements(id),
-    treatmentId
-  );
-}
+): Promise<any[]> =>
+  callBridge(page, 'getTreatmentUsageStatements', treatmentId);

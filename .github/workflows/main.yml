@@ -33,6 +33,10 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
+  # Branch builds take their baselines from main's builds. Chromatic matches a
+  # squash merge to its pull request only when it builds the squash commit on
+  # main, so without this job a branch inherits main's last build instead of
+  # the changes accepted on the merged pull request.
   visual:
     name: Visual Snapshots (Auto-Accept)
     needs: chromatic-skip

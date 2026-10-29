@@ -71,23 +71,11 @@ test.describe('Biomarker detail', () => {
         },
       ],
     });
-    {
-      const result = { date: '2026-10-01', value: '150', unit: 'g/L' };
-      await openRoute(page, '/lab-result/add');
-      await page.getByTestId('test-search-input').fill('Hemoglobin');
-      await page.getByTestId('autocomplete-item-cbc_hemoglobin').click();
-      await page.getByTestId('marker-value-input-0').fill(result.value);
-      await page
-        .getByTestId('unit-picker-button-0')
-        .locator('select')
-        .selectOption(result.unit);
-      await page
-        .getByTestId('date-picker-button')
-        .locator('input')
-        .fill(result.date);
-      await page.getByTestId('save-button').click();
-      await expect(page).toHaveURL(/\/$/);
-    }
+    // A later result in another unit, saved without a printed range.
+    await seedTestReport(page, {
+      date: '2026-10-01',
+      biomarkers: [{ name: 'Hemoglobin', value: 150, unit: 'g/L' }],
+    });
 
     const latestObservation = await page.evaluate(async () => {
       const bridge = (window as any).__HEALTHY_TEST_BRIDGE__;
@@ -102,6 +90,7 @@ test.describe('Biomarker detail', () => {
     });
     expect(latestObservation.referenceRange).toBeUndefined();
     expect(latestObservation.interpretation).toBeUndefined();
+    await openRoute(page, '/');
     await expect(
       page.getByTestId('labs-summary-grid-cell-718-7')
     ).toHaveAccessibleName('Hemoglobin (Hgb): In range');
@@ -173,8 +162,8 @@ test.describe('Biomarker detail', () => {
         [JSON.stringify(observation), id]
       );
     }, latestObservation.id);
-    // Reload: raw SQL emits no change event for the mounted Home to pick up.
-    await page.goto('/');
+    // Reopen Home: raw SQL emits no change event for a mounted screen to pick up.
+    await openRoute(page, '/');
     await expect(
       page.getByTestId('labs-summary-grid-cell-718-7')
     ).toHaveAccessibleName('Hemoglobin (Hgb): Out of range');

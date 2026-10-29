@@ -146,6 +146,8 @@ async function releaseSharedApp(
   } else {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await app.context!.unrouteAll({ behavior: 'ignoreErrors' });
+    // e.g. clipboard access a test granted.
+    await app.context!.clearPermissions();
   }
 }
 

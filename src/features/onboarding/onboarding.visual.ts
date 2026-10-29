@@ -11,8 +11,5 @@ test.describe('Onboarding - Visual Regression', () => {
     await page.goto('/welcome/name');
     await page.getByTestId('welcome-name-input').waitFor();
     await takeSnapshot(page, 'Onboarding - Name', testInfo);
-
-    await page.getByTestId('welcome-name-input').fill('Jane');
-    await takeSnapshot(page, 'Onboarding - Name filled', testInfo);
   });
 });

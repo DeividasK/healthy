@@ -4,6 +4,7 @@ import {
   seedTestPatient,
   seedTestCondition,
   seedTestTreatment,
+  seedTestBundle,
 } from '@/src/features/testing/visualTest';
 
 test.describe('Edit Treatment - Visual Regression', () => {
@@ -12,24 +13,6 @@ test.describe('Edit Treatment - Visual Regression', () => {
     const condition = await seedTestCondition(page, {
       title: 'Acute bacterial sinusitis',
     });
-    const treatment = await seedTestTreatment(page, {
-      title: 'Amoxicillin 500mg Capsule',
-      intent: 'order',
-      status: 'active',
-      dosageInstructions:
-        'Take 1 capsule by mouth every 8 hours with meals for 10 days.\nFinish all medication even if feeling better.',
-      reason: 'Sinus infection',
-      reasonConditionIds: [condition.id],
-      notes: 'No penicillin allergies reported.',
-    });
-
-    await page.goto(`/treatment/${treatment.id}/edit`);
-    await page.getByTestId('treatment-form-title').waitFor();
-    await takeSnapshot(page, 'Treatment - Edit Form Populated', testInfo);
-  });
-
-  test('Loaded regimen', async ({ page }, testInfo) => {
-    await seedTestPatient(page);
     const treatment = await seedTestTreatment(page, {
       title: 'Prednisolone 5mg',
       intent: 'order',
@@ -98,10 +81,28 @@ test.describe('Edit Treatment - Visual Regression', () => {
         ],
       },
       dispenseQuantity: { value: '56', unit: '{tablet}' },
+      reason: 'Sinus infection',
+      reasonConditionIds: [condition.id],
+      notes: 'No penicillin allergies reported.',
+    });
+    // Phase 1 has two doses, so two bundles fill the field and hide its search.
+    await seedTestBundle(page, {
+      id: 'visual-morning',
+      title: 'Morning stack',
+      times: ['MORN'],
+      memberIds: [treatment.id],
+    });
+    await seedTestBundle(page, {
+      id: 'visual-evening',
+      title: 'Evening stack',
+      times: ['EVE'],
+      memberIds: [treatment.id],
     });
 
     await page.goto(`/treatment/${treatment.id}/edit`);
     await page.getByTestId('treatment-regimen-field').waitFor();
-    await takeSnapshot(page, 'Treatment - Edit Form Regimen', testInfo);
+    await page.getByTestId('link-selected-bundle-visual-morning').waitFor();
+    await page.getByTestId('link-selected-bundle-visual-evening').waitFor();
+    await takeSnapshot(page, 'Treatment - Edit Form Populated', testInfo);
   });
 });

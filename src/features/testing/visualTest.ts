@@ -131,10 +131,24 @@ export async function takeSnapshot(
         .toBe(true);
     await blurAll();
     // Blur handlers close suggestion lists after a short delay (useDismissOnBlur).
-    await page.waitForTimeout(200);
+    await expect(
+      page.locator('[data-testid$="-autocomplete-list"]')
+    ).toHaveCount(0);
     await blurAll();
   }
   await growPageToContent(page);
+  // Wait for finite CSS animations and transitions to end: dialogs and menus
+  // fade in, and fields fade their border and ring when hover or focus
+  // leaves them (global.css). Endless ones, like spinners, never settle.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getComputedTiming().endTime === Infinity
+      )
+  );
   await takeChromaticSnapshot(page, name, testInfo);
   const pngDir = process.env.VISUAL_PNG_DIR;
   if (pngDir) {
@@ -145,7 +159,10 @@ export async function takeSnapshot(
 }
 /**
  * Waits until a dock menu toggle has settled open (x) or closed (+), so a
- * snapshot never catches the menu's state mid-update.
+ * snapshot never catches the menu's state mid-update. Besides
+ * `aria-expanded`, which flips before the animation runs, it waits for the
+ * toggle's `<testId>-icon` to finish its rotation (45deg open, none closed)
+ * and for the button's own animated scale and colours to stop changing.
  */
 export async function waitForMenuToggle(
   page: Page,
@@ -156,6 +173,40 @@ export async function waitForMenuToggle(
     'aria-expanded',
     String(expanded)
   );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async ({ testId, angle }) => {
+          const button = document.querySelector(`[data-testid="${testId}"]`);
+          const icon = document.querySelector(`[data-testid="${testId}-icon"]`);
+          if (!button || !icon) return false;
+          const read = () => {
+            const { transform, backgroundColor, borderColor } =
+              getComputedStyle(button);
+            return [transform, backgroundColor, borderColor].join('|');
+          };
+          const before = read();
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          );
+          const { a, b, c, d } = new DOMMatrix(
+            getComputedStyle(icon).transform
+          );
+          const radians = (angle * Math.PI) / 180;
+          const near = (value: number, target: number) =>
+            Math.abs(value - target) < 1e-3;
+          return (
+            read() === before &&
+            near(a, Math.cos(radians)) &&
+            near(b, Math.sin(radians)) &&
+            near(c, -Math.sin(radians)) &&
+            near(d, Math.cos(radians))
+          );
+        },
+        { testId, angle: expanded ? 45 : 0 }
+      )
+    )
+    .toBe(true);
 }
 
 /**

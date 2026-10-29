@@ -9,6 +9,7 @@ import {
   openSecondDevice,
   syncAllTestProfiles,
   evaluateBridge as bridge,
+  restartApp,
 } from '@/src/features/testing/testStorage';
 import type { Browser, Page, TestInfo } from '@playwright/test';
 
@@ -90,7 +91,8 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     );
     expect(await syncTestDevice(device)).toMatchObject({ pushed: 0 });
 
-    await device.goto('/profile');
+    // Remount so sync starts with the connection made through the bridge.
+    await restartApp(device, '/profile');
     const modal = device.getByTestId('profile-deleted-remotely-modal-card');
     await expect(modal).toBeVisible();
     await expect(
@@ -135,7 +137,8 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     const { second } = await deleteFromOtherDevice(page, browser, testInfo);
     const device = second.page;
 
-    await device.goto('/profile');
+    // Remount so sync starts with the connection made through the bridge.
+    await restartApp(device, '/profile');
     const modal = device.getByTestId('profile-deleted-remotely-modal-card');
     await modal.getByTestId('profile-deletion-restore-button').click();
     await expect(modal).toBeHidden();
@@ -166,7 +169,8 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     );
     const device = second.page;
 
-    await device.goto('/profile');
+    // Remount so sync starts with the connection made through the bridge.
+    await restartApp(device, '/profile');
     const modal = device.getByTestId('profile-deleted-remotely-modal-card');
     await modal.getByTestId('profile-deletion-keep-local-button').click();
     await expect(modal).toBeHidden();
