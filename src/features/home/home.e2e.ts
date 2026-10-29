@@ -371,11 +371,11 @@ test.describe('Shared header and island motion', () => {
     await expect(page.getByTestId('back-button')).toHaveCount(0);
     const background = page.getByTestId('action-dock-background');
     const primaryButton = page.getByTestId('floating-add-button');
-    await expect(background).toHaveCSS('opacity', '0');
-    // The + grows in while the island's background fades out, and the two
-    // animations can end a frame apart. Measure it once it is full size (its
-    // box, scale included, matches its layout size), as it is the size the
-    // island must keep through the route changes below.
+    // Home's island holds Add record and Share, so its background shows.
+    await expect(background).toHaveCSS('opacity', '1');
+    // Measure the + once it is full size (its box, scale included, matches
+    // its layout size), as it is the size the island must keep through the
+    // route changes below.
     await expect
       .poll(() =>
         primaryButton.evaluate((element: HTMLElement) => {
@@ -387,10 +387,7 @@ test.describe('Shared header and island motion', () => {
         })
       )
       .toBe(true);
-    const collapsedSize = (await background.boundingBox())!;
     const primarySize = (await primaryButton.boundingBox())!;
-    expect(collapsedSize.width).toBeLessThan(primarySize.width);
-    expect(collapsedSize.height).toBeLessThan(primarySize.height);
     // The logo sits in the middle of the header.
     const headerBox = (await header.boundingBox())!;
     const centredX = headerBox.x + (headerBox.width - 44) / 2;

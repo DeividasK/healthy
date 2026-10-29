@@ -276,6 +276,7 @@ export function ShareWithAIView() {
                 accessibilityState={{
                   checked: state === 'some' ? 'mixed' : state === 'all',
                 }}
+                aria-checked={state === 'some' ? 'mixed' : state === 'all'}
                 onPress={() =>
                   toggle(
                     items.map(({ key }) => key),
@@ -324,6 +325,7 @@ export function ShareWithAIView() {
                     accessibilityRole="checkbox"
                     accessibilityLabel={itemTitle}
                     accessibilityState={{ checked: isTicked }}
+                    aria-checked={isTicked}
                     onPress={() => toggle([key], !isTicked)}
                     activeOpacity={0.7}
                   >
