@@ -4,7 +4,7 @@ import {
   buildLabResultsAIInstructions,
   parseLabResultsAIReply,
 } from './labResultsAIImport';
-import { loadLoincLabTests } from '@/src/data/loinc';
+import { countPerLitreExponent, loadLoincLabTests } from '@/src/data/loinc';
 import {
   CUSTOM_TEST_SYSTEM,
   customTestBiomarker,
@@ -246,6 +246,12 @@ test('reads a count in the test’s unit written another way', async () => {
       unit.ucum,
     ])
   ).toEqual([['771-6', '0', '10*3/uL']]);
+  for (const unit of ['10*9/L', 'x10E9/L', 'G/L', '10^3/µL', 'K/µL', 'thou/uL'])
+    expect(countPerLitreExponent(unit)).toBe(9);
+  expect(countPerLitreExponent('T/L')).toBe(12);
+  // Grams and moles are not counts.
+  expect(countPerLitreExponent('g/L')).toBeUndefined();
+  expect(countPerLitreExponent('mmol/L')).toBeUndefined();
 });
 
 test('keeps a test with no LOINC code as the user’s own test', () => {

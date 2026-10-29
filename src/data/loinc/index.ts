@@ -70,20 +70,32 @@ const VOLUME_PREFIX_EXPONENT: Record<string, number> = {
   f: -15,
 };
 
+/** Count prefixes reports use for powers of ten. Case matters: g is grams. */
+const COUNT_PREFIX_EXPONENT: Record<string, number> = {
+  K: 3,
+  thou: 3,
+  M: 6,
+  G: 9,
+  T: 12,
+};
+
 /**
  * The power of ten of a count per volume unit, in count per litre, e.g. 9
- * for both 10*9/L and 10*3/uL, which are the same unit written two ways.
- * Undefined for any other unit.
+ * for 10*9/L, x10E9/L, G/L and 10*3/uL, which are the same unit written
+ * different ways. Undefined for any other unit.
  */
 export function countPerLitreExponent(ucum: string): number | undefined {
   const match = ucum
     .replace(/\{[^}]*\}/g, '')
     .replace(/\s/g, '')
     .replace(/[µμ]/g, 'u')
-    .replace(/^[x×]/i, '')
-    .match(/^(?:10[*^](\d+))?\/([dmunpf]?)l$/i);
+    .replace(/^[x×]/, '')
+    .match(/^(?:10[*^Ee](\d+)|(K|thou|M|G|T))?\/([dmunpf]?)[lL]$/);
   if (!match) return undefined;
-  return Number(match[1] ?? 0) - VOLUME_PREFIX_EXPONENT[match[2].toLowerCase()];
+  const count = match[1]
+    ? Number(match[1])
+    : (COUNT_PREFIX_EXPONENT[match[2] ?? ''] ?? 0);
+  return count - VOLUME_PREFIX_EXPONENT[match[3]];
 }
 
 /**
