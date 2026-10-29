@@ -6,6 +6,7 @@ import {
   ListChecks,
   Pill,
   Plus,
+  Share as ShareIcon,
   Sparkles,
   Stethoscope,
 } from 'lucide-react-native';
@@ -709,6 +710,12 @@ export function HomeView() {
                     icon: Plus,
                     expanded: showAddMenu,
                     onPress: () => setShowAddMenu((visible) => !visible),
+                  },
+                  {
+                    label: 'Share',
+                    testID: 'home-share',
+                    icon: ShareIcon,
+                    onPress: () => router.push('/share-ai'),
                   },
                 ]
               : []),

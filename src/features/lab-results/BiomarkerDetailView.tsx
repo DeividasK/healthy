@@ -21,6 +21,7 @@ import {
   Plus,
   SlidersHorizontal,
   Waypoints,
+  Share as ShareIcon,
 } from 'lucide-react-native';
 import Svg, {
   Circle,
@@ -789,6 +790,13 @@ export function BiomarkerDetailView({
                 testID: 'biomarker-set-range',
                 icon: SlidersHorizontal,
                 onPress: () => openRangeForm(),
+              },
+              {
+                label: 'Share',
+                testID: 'biomarker-share',
+                icon: ShareIcon,
+                onPress: () =>
+                  router.push(`/share-ai?biomarker=${encodeURIComponent(id)}`),
               },
             ]}
           />
