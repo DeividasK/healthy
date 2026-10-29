@@ -69,6 +69,16 @@ test.describe('Share with AI', () => {
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toContain('# My health records');
     expect(copied).toContain('Lisinopril 10mg');
+
+    // The preview box copies the same text from its corner.
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+    await page.getByTestId('share-ai-preview-copy-button').click();
+    await expect(
+      page.getByRole('button', { name: 'Shared text copied' })
+    ).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      copied
+    );
   });
 
   test('opens from a biomarker with its history and no treatments', async ({

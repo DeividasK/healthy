@@ -8,6 +8,10 @@ import {
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import {
+  COPY_CORNER_INSET,
+  CopyCornerButton,
+} from '@/src/components/CopyCornerButton';
 import { COLORS } from '@/src/theme/colors';
 import { estimateTokens } from './shareText';
 
@@ -66,14 +70,21 @@ export function SharePreview({
 }) {
   return (
     <View>
-      <ScrollView
-        style={[styles.preview, { maxHeight }]}
-        testID="share-ai-preview"
-      >
-        <Text style={styles.previewText} selectable>
-          {text}
-        </Text>
-      </ScrollView>
+      <View>
+        <ScrollView
+          style={[styles.preview, { maxHeight }]}
+          testID="share-ai-preview"
+        >
+          <Text style={styles.previewText} selectable>
+            {text}
+          </Text>
+        </ScrollView>
+        <CopyCornerButton
+          text={text}
+          label="shared text"
+          testID="share-ai-preview-copy-button"
+        />
+      </View>
       <Text style={styles.size}>
         About {estimateTokens(text).toLocaleString()} tokens
       </Text>
@@ -88,6 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: COLORS.light.card,
     padding: 12,
+    paddingRight: COPY_CORNER_INSET,
   },
   previewText: {
     fontFamily: Platform.select({
