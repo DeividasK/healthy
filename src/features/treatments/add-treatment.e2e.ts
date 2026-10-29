@@ -488,10 +488,11 @@ test.describe('Treatment form keyboard support', () => {
     await seedTestCondition(page, { title: 'Asthma' });
     await openRoute(page, '/');
     await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    // On Home the primary action is Import with AI.
     await page.keyboard.press('ControlOrMeta+Enter');
-    await expect(page.getByTestId('floating-add-menu')).toBeVisible();
-    await page.keyboard.press('ControlOrMeta+Enter');
-    await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
+    await expect(page.getByTestId('ai-import-modal-card')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
 
     await openRoute(page, '/treatment/add');
     await page.getByTestId('treatment-title-input').fill('Keyboard saved');

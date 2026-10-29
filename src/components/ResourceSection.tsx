@@ -193,14 +193,19 @@ export function ResourceRow({
     // image on its own, so there the kind leads the button's label instead.
     const webTypeLabel = Platform.OS === 'web' ? typeLabel : undefined;
     return (
-      <View style={styles.row} testID={testID}>
+      <View
+        style={[styles.row, { backgroundColor }]}
+        testID={testID}
+        aria-current={selected || undefined}
+      >
+        {selected && <SelectedRowMarker />}
         <TouchableOpacity
           testID={`${testID}-open`}
           accessibilityRole="button"
           accessibilityLabel={
             typeLabel && !webTypeLabel ? `${typeLabel}: ${title}` : undefined
           }
-          style={[styles.main, styles.mainPressable]}
+          style={[styles.main, styles.mainPressable, dimmed && styles.dimmed]}
           activeOpacity={0.6}
           onPress={onPress}
         >
@@ -218,6 +223,7 @@ export function ResourceRow({
           ) : (
             titleText
           )}
+          {description && <Text style={styles.description}>{description}</Text>}
           <ResourceMetaLine meta={meta} />
         </TouchableOpacity>
         {accessory}
@@ -401,8 +407,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    // A long item wraps within the row instead of running under its buttons.
+    flexShrink: 1,
   },
   metaText: {
+    flexShrink: 1,
     fontSize: 12,
     color: COLORS.light.mutedForeground,
   },

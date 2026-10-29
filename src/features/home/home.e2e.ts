@@ -310,11 +310,18 @@ test.describe('Home add menu keyboard navigation', () => {
     await seedTestCondition(page, { title: 'Asthma' });
   });
 
-  test('focuses the first option when opened with Cmd/Ctrl+Enter and cycles with arrows and Tab', async ({
+  test('focuses the first option when opened from the keyboard and cycles with arrows and Tab', async ({
     page,
   }) => {
-    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    const add = page.getByTestId('floating-add-button');
+    await expect(add).toBeVisible();
+    // Cmd/Ctrl+Enter runs the primary action, Import with AI.
     await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByTestId('ai-import-modal-card')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('ai-import-modal-card')).toHaveCount(0);
+    await add.focus();
+    await page.keyboard.press('Enter');
     const condition = page.getByTestId('menu-add-condition');
     const treatment = page.getByTestId('menu-add-treatment');
     const labResults = page.getByTestId('menu-add-lab-results');
@@ -337,7 +344,8 @@ test.describe('Home add menu keyboard navigation', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('floating-add-menu')).toHaveCount(0);
 
-    await page.keyboard.press('ControlOrMeta+Enter');
+    await add.focus();
+    await page.keyboard.press('Enter');
     await expect(condition).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
@@ -355,27 +363,20 @@ test.describe('Shared header and island motion', () => {
   test('keeps the shared header mounted, logo in the centre, and island transitions continuous', async ({
     page,
   }) => {
-    const condition = await seedTestCondition(page, {
-      title: 'Header navigation',
-    });
-    const consultation = await seedTestConsultation(page, {
-      conditionIds: [condition.id],
-      title: 'Dock navigation',
-      // Planned steps show on the timeline without clearing its filters.
-      status: 'planned',
-    });
+    // With no records yet, Import with AI is the island's only action.
     await openRoute(page, '/');
     const header = page.getByTestId('app-header');
     const logo = page.getByTestId('app-home-button');
     await expect(header).toBeVisible();
     await expect(page.getByTestId('back-button')).toHaveCount(0);
     const background = page.getByTestId('action-dock-background');
-    const primaryButton = page.getByTestId('floating-add-button');
-    // Home's island holds Add record and Share, so its background shows.
-    await expect(background).toHaveCSS('opacity', '1');
-    // Measure the + once it is full size (its box, scale included, matches
-    // its layout size), as it is the size the island must keep through the
-    // route changes below.
+    const primaryButton = page.getByTestId('home-import-with-ai-button');
+    await expect(page.getByTestId('floating-add-button')).toHaveCount(0);
+    await expect(background).toHaveCSS('opacity', '0');
+    // The primary grows in while the island's background fades out, and the two
+    // animations can end a frame apart. Measure it once it is full size (its
+    // box, scale included, matches its layout size), as it is the size the
+    // island must keep through the route changes below.
     await expect
       .poll(() =>
         primaryButton.evaluate((element: HTMLElement) => {
@@ -387,7 +388,22 @@ test.describe('Shared header and island motion', () => {
         })
       )
       .toBe(true);
+    const collapsedSize = (await background.boundingBox())!;
     const primarySize = (await primaryButton.boundingBox())!;
+    expect(collapsedSize.width).toBeLessThan(primarySize.width);
+    expect(collapsedSize.height).toBeLessThan(primarySize.height);
+    const condition = await seedTestCondition(page, {
+      title: 'Header navigation',
+    });
+    const consultation = await seedTestConsultation(page, {
+      conditionIds: [condition.id],
+      title: 'Dock navigation',
+      // Planned steps show on the timeline without clearing its filters.
+      status: 'planned',
+    });
+    // + joins the island with the first record.
+    await expect(page.getByTestId('floating-add-button')).toBeVisible();
+    await expect(background).toHaveCSS('opacity', '1');
     // The logo sits in the middle of the header.
     const headerBox = (await header.boundingBox())!;
     const centredX = headerBox.x + (headerBox.width - 44) / 2;
@@ -411,7 +427,9 @@ test.describe('Shared header and island motion', () => {
       )!;
       const state = {
         element,
-        primary: document.querySelector('[data-testid="floating-add-button"]'),
+        primary: document.querySelector(
+          '[data-testid="home-import-with-ai-button"]'
+        ),
         positions: [] as number[],
         heights: [] as number[],
         frame: 0,

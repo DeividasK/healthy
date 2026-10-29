@@ -7,6 +7,7 @@ import {
   Pill,
   Plus,
   Share as ShareIcon,
+  Sparkles,
   Stethoscope,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -53,6 +54,14 @@ import {
 import { COLORS } from '@/src/theme/colors';
 import { FloatingAddMenu } from '@/src/components/FloatingAddMenu';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
+import { AIImportModal } from '@/src/components/AIImportModal';
+import {
+  buildAIImportInstructions,
+  parseAIImportReply,
+} from '@/src/features/ai-import/aiImportFormat';
+import { startReview } from '@/src/features/ai-import/proposals';
+import { setReview } from '@/src/features/ai-import/reviewStore';
+import { toExistingConditions } from '@/src/features/ai-import/existingConditions';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
@@ -225,6 +234,7 @@ export function HomeView() {
 
   // Floating + menu state
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const [loadedPatientId, setLoadedPatientId] = useState(activePatientId);
   const activePatientIdRef = useRef(activePatientId);
@@ -678,24 +688,28 @@ export function HomeView() {
           ]}
         />
 
-        {/* The empty state's rows are how to start; + comes with the first record. */}
+        {/* Import with AI leads; the empty state's rows are how to start by
+            hand, so + comes with the first record. */}
         <ResourceActionDock
-          onAdd={
-            hasAnyData ? () => setShowAddMenu((visible) => !visible) : undefined
-          }
-          addLabel="Add record"
-          addTestID="floating-add-button"
-          addMenuExpanded={showAddMenu}
-          actions={
-            hasAnyData
+          actions={[
+            {
+              label: 'Import with AI',
+              testID: 'home-import-with-ai-button',
+              icon: Sparkles,
+              primary: true,
+              onPress: () => {
+                setShowAddMenu(false);
+                setShowAIImport(true);
+              },
+            },
+            ...(hasAnyData
               ? [
                   {
                     label: 'Add record',
                     testID: 'floating-add-button',
                     icon: Plus,
-                    onPress: () => setShowAddMenu((visible) => !visible),
-                    primary: true,
                     expanded: showAddMenu,
+                    onPress: () => setShowAddMenu((visible) => !visible),
                   },
                   {
                     label: 'Share',
@@ -704,9 +718,27 @@ export function HomeView() {
                     onPress: () => router.push('/share-ai'),
                   },
                 ]
-              : undefined
-          }
+              : []),
+          ]}
         />
+        {showAIImport && (
+          <AIImportModal
+            document="health document, such as a visit summary, referral or prescription"
+            outcome="check the records it found"
+            instructions={buildAIImportInstructions}
+            parse={(reply) => parseAIImportReply(reply)}
+            onClose={() => setShowAIImport(false)}
+            onImport={async (records) => {
+              const conditions = await getAllConditions(activePatientId);
+              setReview(
+                startReview(records, toExistingConditions(conditions)),
+                activePatientId
+              );
+              setShowAIImport(false);
+              router.push('/ai-import');
+            }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

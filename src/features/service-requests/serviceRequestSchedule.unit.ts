@@ -16,6 +16,7 @@ const draft = {
   time: '08:00',
 };
 const allShown = {
+  period: true,
   periodMax: true,
   count: true,
   duration: true,
@@ -87,6 +88,7 @@ test('parses shown fields and clears hidden ones', () => {
   });
   expect(
     parseScheduleDraft(draft, {
+      period: true,
       periodMax: false,
       count: false,
       duration: false,
@@ -138,4 +140,34 @@ test('keeps elements the form does not show', () => {
     period: 4,
     periodUnit: 'wk',
   });
+});
+
+test('sessions with no set interval', () => {
+  const sessions = { ...draft, period: '', periodUnit: '' };
+  const shown = { ...allShown, period: false, timeOfDay: false };
+  const schedule = parseScheduleDraft(sessions, shown);
+  expect(schedule).toMatchObject({
+    period: null,
+    periodMax: null,
+    periodUnit: null,
+    count: 3,
+    duration: 30,
+  });
+  expect(parseScheduleDraft({ ...sessions, count: '' }, shown)).toBe(
+    'Add how often it repeats or how many sessions'
+  );
+  expect(parseScheduleDraft(sessions, { ...shown, count: false })).toBe(
+    'Add how often it repeats or how many sessions'
+  );
+
+  // An interval removed from a stored schedule takes its frequency with it.
+  const repeat = withSchedule(
+    { frequency: 1, period: 4, periodMax: 6, periodUnit: 'wk', count: 3 },
+    schedule as Exclude<typeof schedule, string>
+  );
+  expect(repeat).toEqual({ count: 3, duration: 30, durationUnit: 'min' });
+  expect(formatScheduleRepeat(repeat)).toBe('3 sessions');
+  expect(formatScheduleText(repeat)).toBe('3 sessions, 30 min');
+  expect(formatScheduleText({ count: 1 })).toBe('1 session');
+  expect(formatScheduleText({})).toBeNull();
 });

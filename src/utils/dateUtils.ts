@@ -106,3 +106,19 @@ export function getAgeInYears(birthDate: string, today = new Date()): number {
   if (beforeBirthday) age -= 1;
   return Math.max(0, age);
 }
+
+/**
+ * A local day and optional HH:MM time as a FHIR value: the date alone, or a
+ * date-time with the device's timezone offset on that day.
+ */
+export function toFhirLocalDateTime(date: Date, time?: string | null): string {
+  const day = formatLocalDate(date);
+  if (!time) return day;
+  const local = new Date(date);
+  const [hours, minutes] = time.split(':').map(Number);
+  local.setHours(hours, minutes, 0, 0);
+  const offset = -local.getTimezoneOffset();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const zone = `${offset >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+  return `${day}T${time}:00${zone}`;
+}

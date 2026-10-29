@@ -172,9 +172,10 @@ test.describe('Add Service Request Flow', () => {
     // Schedule details are offered once it repeats; a schedule and a planned
     // date exclude each other.
     await page.getByTestId('add-option-button').click();
-    await expect(
-      page.getByTestId('menu-add-service-request-count')
-    ).toHaveCount(0);
+    for (const field of ['periodMax', 'duration'])
+      await expect(
+        page.getByTestId(`menu-add-service-request-${field}`)
+      ).toHaveCount(0);
     await page.getByTestId('menu-add-service-request-repeats').click();
     for (const field of ['periodMax', 'count', 'duration', 'timeOfDay']) {
       await page.getByTestId('add-option-button').click();
@@ -261,11 +262,32 @@ test.describe('Add Service Request Flow', () => {
     });
     expect(edited.occurrenceTiming.repeat.duration).toBeUndefined();
 
+    // Without an interval, the sessions stay: they are booked as they come.
     await openRoute(page, `/service-request/${id}/edit`);
     await page.getByTestId('remove-service-request-repeats-button').click();
-    await expect(page.getByTestId('service-request-count-input')).toHaveCount(
-      0
+    await expect(
+      page.getByTestId('service-request-period-max-input')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('service-request-count-input')).toHaveValue(
+      '4'
     );
+    await page.getByTestId('save-service-request-button').click();
+    await expect(page.getByTestId('service-request-schedule')).toHaveText(
+      '4 sessions'
+    );
+    expect((await getTestServiceRequest(page, id)).occurrenceTiming).toEqual({
+      repeat: {
+        count: 4,
+        boundsPeriod: { start: '2026-09-01' },
+        when: ['HS'],
+      },
+    });
+
+    await openRoute(page, `/service-request/${id}/edit`);
+    await page.getByTestId('remove-service-request-count-button').click();
+    await expect(
+      page.getByTestId('service-request-time-of-day-select')
+    ).toHaveCount(0);
     await page.getByTestId('add-option-button').click();
     await expect(
       page.getByTestId('menu-add-service-request-plannedDate')
