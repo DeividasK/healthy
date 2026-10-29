@@ -13,7 +13,6 @@ import {
   CopyCornerButton,
 } from '@/src/components/CopyCornerButton';
 import { COLORS } from '@/src/theme/colors';
-import { estimateTokens } from './shareText';
 
 const COPIED_FEEDBACK_MS = 2000;
 
@@ -85,9 +84,6 @@ export function SharePreview({
           testID="share-ai-preview-copy-button"
         />
       </View>
-      <Text style={styles.size}>
-        About {estimateTokens(text).toLocaleString()} tokens
-      </Text>
     </View>
   );
 }
@@ -109,10 +105,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: COLORS.light.foreground,
-  },
-  size: {
-    fontSize: 12,
-    color: COLORS.light.mutedForeground,
-    marginTop: 6,
   },
 });

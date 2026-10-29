@@ -61,7 +61,3 @@ export function overviewShareText({
     .join('\n')
     .trimEnd();
 }
-
-/** Rough size in AI tokens, about four characters each. */
-export const estimateTokens = (text: string) =>
-  Math.max(1, Math.round(text.length / 4));
