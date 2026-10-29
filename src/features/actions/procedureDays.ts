@@ -15,11 +15,14 @@ import type { TreatmentLogAnswer } from './actionDays';
 type ScheduleUnit = 'd' | 'wk' | 'mo';
 const SCHEDULE_UNITS: ScheduleUnit[] = ['d', 'wk', 'mo'];
 
-/** How often a service request repeats (its `occurrenceTiming.repeat`). */
+/**
+ * How often a service request repeats (its `occurrenceTiming.repeat`).
+ * Sessions booked as they come have a `count` and no `period`.
+ */
 export interface RequestSchedule {
-  period: number;
+  period?: number;
   periodMax?: number;
-  unit: ScheduleUnit;
+  unit?: ScheduleUnit;
   /** How many times in all, when limited. */
   count?: number;
   /** Planned minutes each time. */
@@ -45,17 +48,22 @@ export function getRequestSchedule(
 ): RequestSchedule | null {
   const repeat = request.occurrenceTiming?.repeat;
   const unit = repeat?.periodUnit as ScheduleUnit | undefined;
-  if (!repeat?.period || repeat.period <= 0 || !unit) return null;
-  if (!SCHEDULE_UNITS.includes(unit)) return null;
+  const hasInterval = Boolean(
+    repeat?.period && repeat.period > 0 && unit && SCHEDULE_UNITS.includes(unit)
+  );
+  if (!repeat || (!hasInterval && !(repeat.count && repeat.count > 0)))
+    return null;
   const start = (repeat.boundsPeriod?.start ?? request.authoredOn)?.slice(
     0,
     10
   );
   if (!start) return null;
   return {
-    period: repeat.period,
-    ...(repeat.periodMax && { periodMax: repeat.periodMax }),
-    unit,
+    ...(hasInterval && {
+      period: repeat.period,
+      ...(repeat.periodMax && { periodMax: repeat.periodMax }),
+      unit,
+    }),
     ...(repeat.count && { count: repeat.count }),
     ...(repeat.duration !== undefined && {
       duration: toMinutes(repeat.duration, repeat.durationUnit),
@@ -142,13 +150,19 @@ export interface ProcedureItem {
   session?: { number: number; count: number };
   /** The window it is due in after the last session, when it repeats. */
   due?: { from: string; to?: string };
+  /**
+   * Sessions with no set interval are listed every day until all are done,
+   * to log on the day one happens; unanswered, they leave the day complete.
+   */
+  optional?: boolean;
 }
 
 /**
  * The scheduled requests to answer on a day. A request is due from its start
  * while sessions remain (`count`), once its period has passed since the last
  * completed session; an answer given that day keeps it listed. "Not done"
- * answers are not sessions.
+ * answers are not sessions. Sessions with no interval are listed every day
+ * while some remain, as optional.
  */
 export function buildProcedureItems(
   date: string,
@@ -176,7 +190,11 @@ export function buildProcedureItems(
       .filter((day): day is string => Boolean(day) && day! < date)
       .sort();
     const last = sessions[sessions.length - 1];
-    const next = last && addPeriod(last, schedule.period, schedule.unit);
+    const next =
+      last &&
+      schedule.period &&
+      schedule.unit &&
+      addPeriod(last, schedule.period, schedule.unit);
     const isDue =
       DUE_STATUSES.includes(request.status) &&
       date >= schedule.start &&
@@ -206,10 +224,11 @@ export function buildProcedureItems(
         due: {
           from: next,
           ...(schedule.periodMax && {
-            to: addPeriod(last, schedule.periodMax, schedule.unit),
+            to: addPeriod(last, schedule.periodMax, schedule.unit!),
           }),
         },
       }),
+      ...(!schedule.period && { optional: true }),
     });
   }
   return items;

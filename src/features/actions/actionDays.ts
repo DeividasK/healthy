@@ -240,14 +240,16 @@ export const getTreatmentLogId = (
 /**
  * How far a day is logged: `none` when nothing is due, `empty` before any
  * answer, `partial` while some are missing and `complete` once all are given.
- * `future` days cannot be logged yet.
+ * `future` days cannot be logged yet. Optional sessions count only once
+ * answered.
  */
 export type DayStatus = 'none' | 'empty' | 'partial' | 'complete' | 'future';
 
 export function getDayStatus(day?: ActionDay): DayStatus {
-  const answers = [...(day?.items ?? []), ...(day?.procedures ?? [])].map(
-    (item) => item.answer
-  );
+  const answers = [
+    ...(day?.items ?? []),
+    ...(day?.procedures ?? []).filter((item) => !item.optional || item.answer),
+  ].map((item) => item.answer);
   if (!answers.length) return 'none';
   const answered = answers.filter(Boolean).length;
   if (!answered) return 'empty';

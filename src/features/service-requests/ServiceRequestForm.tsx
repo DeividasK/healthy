@@ -69,8 +69,10 @@ import {
 } from './serviceRequestAIImport';
 import { CONTENT_COLUMN } from '@/src/theme/layout';
 
-/** Fields that only apply to a request that repeats. */
-const SCHEDULE_DETAILS = ['periodMax', 'count', 'duration', 'timeOfDay'];
+/** Fields that only apply to a request that repeats at an interval. */
+const INTERVAL_DETAILS = ['periodMax'];
+/** Fields that apply to a schedule: an interval or a number of sessions. */
+const SESSION_DETAILS = ['duration', 'timeOfDay'];
 
 export interface ServiceRequestFormValues {
   id?: string;
@@ -108,6 +110,10 @@ export interface ServiceRequestFormProps {
   specialistSuggestions?: string[];
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
+  /** Edits a record the AI proposed: the change goes back to its row, unsaved. */
+  proposal?: boolean;
+  /** Shown under a proposal's title, e.g. where in the document it came from. */
+  proposalContext?: React.ReactNode;
 }
 
 export function ServiceRequestForm({
@@ -118,6 +124,8 @@ export function ServiceRequestForm({
   isEditing = false,
   specialistSuggestions = [],
   linkFields = [],
+  proposal = false,
+  proposalContext,
 }: ServiceRequestFormProps) {
   const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -145,7 +153,7 @@ export function ServiceRequestForm({
         icon: CalendarClock,
         empty: null as Date | null,
         initial: initialValues?.plannedDate || null,
-        excludes: ['repeats'],
+        excludes: ['repeats', 'count'],
       },
       repeats: {
         label: 'Repeats Every',
@@ -169,6 +177,8 @@ export function ServiceRequestForm({
         icon: ListOrdered,
         empty: '',
         initial: draft?.count,
+        // Sessions booked as they come need no interval.
+        excludes: ['plannedDate'],
       },
       duration: {
         label: 'Duration (Minutes)',
@@ -254,17 +264,30 @@ export function ServiceRequestForm({
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showAIImport, setShowAIImport] = useState(false);
-  // Schedule details are offered once the request repeats.
+  // Schedule details are offered once the request repeats or has sessions.
+  const hasSchedule = visibleFields.repeats || visibleFields.count;
   const options = [
     ...fields.menuOptions.filter(
-      (option) => visibleFields.repeats || !SCHEDULE_DETAILS.includes(option.id)
+      (option) =>
+        (visibleFields.repeats || !INTERVAL_DETAILS.includes(option.id)) &&
+        (hasSchedule || !SESSION_DETAILS.includes(option.id))
     ),
     ...links.menuOptions,
   ];
+  const removeDetails = (ids: string[]) => {
+    for (const id of ids) fields.remove(id as (typeof fields.order)[number]);
+  };
   const removeRepeats = () => {
     fields.remove('repeats');
-    for (const id of SCHEDULE_DETAILS)
-      fields.remove(id as (typeof fields.order)[number]);
+    removeDetails(
+      visibleFields.count
+        ? INTERVAL_DETAILS
+        : [...INTERVAL_DETAILS, ...SESSION_DETAILS]
+    );
+  };
+  const removeCount = () => {
+    fields.remove('count');
+    if (!visibleFields.repeats) removeDetails(SESSION_DETAILS);
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -289,7 +312,10 @@ export function ServiceRequestForm({
       }),
       ...(schedule && {
         plannedDate: null,
-        repeats: { period: schedule.period, periodUnit: schedule.periodUnit },
+        // Sessions with no interval leave Repeats every hidden.
+        repeats: schedule.period
+          ? { period: schedule.period, periodUnit: schedule.periodUnit }
+          : { period: '', periodUnit: 'd' },
         periodMax: schedule.periodMax,
         count: schedule.count,
         duration: schedule.duration,
@@ -310,7 +336,7 @@ export function ServiceRequestForm({
       setErrorMessage('Service is required');
       return;
     }
-    const schedule = visibleFields.repeats
+    const schedule = hasSchedule
       ? parseScheduleDraft(
           {
             ...repeats,
@@ -321,6 +347,7 @@ export function ServiceRequestForm({
             time: timeOfDay.time,
           },
           {
+            period: visibleFields.repeats,
             periodMax: visibleFields.periodMax,
             count: visibleFields.count,
             duration: visibleFields.duration,
@@ -394,8 +421,13 @@ export function ServiceRequestForm({
           testID="service-request-form"
         >
           <ScreenHeading testID="service-request-form-title">
-            {isEditing ? 'Edit Service Request' : 'Add Service Request'}
+            {proposal
+              ? 'Edit Proposed Service Request'
+              : isEditing
+                ? 'Edit Service Request'
+                : 'Add Service Request'}
           </ScreenHeading>
+          {proposalContext}
           {errorMessage && (
             <FormErrorBanner
               message={errorMessage}
@@ -545,7 +577,12 @@ export function ServiceRequestForm({
                 duration: 'service-request-duration-input',
               }[id];
               return (
-                <FormField key={id} {...fieldProps} nativeID={inputID}>
+                <FormField
+                  key={id}
+                  {...fieldProps}
+                  {...(id === 'count' && { onRemove: removeCount })}
+                  nativeID={inputID}
+                >
                   <NumberInput
                     id={inputID}
                     name={id}
@@ -664,14 +701,16 @@ export function ServiceRequestForm({
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
-          saveLabel={isEditing ? 'Save changes' : 'Save service request'}
+          saveLabel={
+            isEditing || proposal ? 'Save changes' : 'Save service request'
+          }
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}
           saveTestID="save-service-request-button"
           // New requests can be filled in from the user's own AI assistant.
           secondaryActions={
-            isEditing
+            isEditing || proposal
               ? []
               : [
                   {

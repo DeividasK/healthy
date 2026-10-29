@@ -146,4 +146,48 @@ test.describe('Journal: scheduled procedures and activities', () => {
     await page.getByTestId('service-request-session-1').click();
     await expect(page).toHaveURL(new RegExp(`date=${firstSession}`));
   });
+
+  test('lists sessions with no interval every day until all are done, without asking for them', async ({
+    page,
+  }) => {
+    const authored = await getBrowserLocalDate(page, -10);
+    const yesterday = await getBrowserLocalDate(page, -1);
+    const today = await getBrowserLocalDate(page);
+    await seedTestResources(page, {
+      serviceRequests: [
+        {
+          id: 'physio',
+          title: 'Individual physiotherapy',
+          category: '71388002',
+          status: 'active',
+          authoredOn: authored,
+          schedule: { count: 2, duration: 45 },
+        },
+      ],
+      procedureLogs: [
+        { serviceRequestId: 'physio', date: yesterday, answer: 'taken' },
+      ],
+    });
+
+    await openRoute(page, '/');
+    // Listed, but a day without a session is not left partly logged.
+    await expect(
+      page.getByTestId(`home-action-day-${today}`)
+    ).toHaveAccessibleName(/Nothing to log$/);
+    await openRoute(page, '/journal');
+    await expect(page.getByTestId('procedure-log-session-physio')).toHaveText(
+      'Session 2 of 2'
+    );
+    await expect(page.getByTestId('procedure-log-due-physio')).toHaveCount(0);
+    await page.getByTestId('procedure-log-taken-physio').click();
+    await expect(
+      page.getByTestId('procedure-log-taken-physio')
+    ).toHaveAttribute('aria-checked', 'true');
+
+    await openRoute(page, '/service-request/physio');
+    await expect(page.getByTestId('service-request-schedule')).toHaveText(
+      '2 sessions'
+    );
+    await expect(page.getByTestId('service-request-session-2')).toBeVisible();
+  });
 });

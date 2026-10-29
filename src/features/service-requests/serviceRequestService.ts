@@ -194,7 +194,7 @@ export async function createOrUpdateServiceRequest(
             input.schedule
           ),
         };
-      } else if (request.occurrenceTiming?.repeat?.period) {
+      } else if (request.occurrenceTiming && getScheduleRepeat(request)) {
         // Other timing elements (e.g. event dates) are kept.
         const { repeat: _repeat, ...timing } = request.occurrenceTiming;
         if (Object.keys(timing).length) request.occurrenceTiming = timing;

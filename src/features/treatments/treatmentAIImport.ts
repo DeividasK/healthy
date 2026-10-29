@@ -92,20 +92,9 @@ function matchAmountUnit(value: unknown) {
   );
 }
 
-/**
- * Instructions the user gives their own AI assistant together with a
- * prescription or treatment plan, so it replies in the format
- * `parseTreatmentAIReply` reads.
- */
-export function buildTreatmentAIInstructions(): string {
-  return `I want to add a treatment (a medication or supplement) to my health app. Read the document I'm sharing with you (for example a prescription, a medication label or a visit summary) and convert it into the format below.
-
-Reply with exactly one JSON code block in this format:
-
-\`\`\`json
-{
-  "${TREATMENT_AI_FORMAT_KEY}": ${TREATMENT_AI_FORMAT_VERSION},
-  "name": "Medication name and strength",
+/** A treatment reply's fields, one per line, as the AI's format shows them. */
+export function getTreatmentAIFields(): string {
+  return `  "name": "Medication name and strength",
   "intent": "order",
   "status": "active",
   "date": "YYYY-MM-DD",
@@ -120,12 +109,12 @@ Reply with exactly one JSON code block in this format:
   "dosage": "Dosage instructions as text",
   "quantity": { "value": 30, "unit": "tablet" },
   "reason": "Why it was prescribed",
-  "notes": "Anything else worth keeping"
+  "notes": "Anything else worth keeping"`;
 }
-\`\`\`
 
-Rules:
-- "name" is the medication's name with its strength and form, for example "Amoxicillin 500 mg capsules".
+/** The rules for a treatment's fields, shared with the combined import. */
+export function getTreatmentAIRules(): string {
+  return `- "name" is the medication's name with its strength and form, for example "Amoxicillin 500 mg capsules".
 - "intent" is one of: ${describeAIOptions(INTENT_OPTIONS)}. Use "order" for a prescription and "plan" for a recommendation.
 - "status" is one of: ${describeAIOptions(STATUS_OPTIONS)}.
 - "date" is the day it was prescribed or recommended.
@@ -136,7 +125,28 @@ Rules:
 - "courseLength" is how long the phase lasts, in "courseUnit": one of ${describeAIOptions(COURSE_UNIT_OPTIONS)}. Leave both out when it is taken until further notice.
 - "site" is where on the body it is applied, and "instructions" any instructions for that dose, for example "Take with food".
 - Give "dosage" as text only when the dosing can't be described as a regimen, and leave out "regimen" then.
-- "quantity" is how much is dispensed, with a unit from the dose units.
+- "quantity" is how much is dispensed, with a unit from the dose units.`;
+}
+
+/**
+ * Instructions the user gives their own AI assistant together with a
+ * prescription or treatment plan, so it replies in the format
+ * `parseTreatmentAIReply` reads.
+ */
+export function buildTreatmentAIInstructions(): string {
+  return `I want to add a treatment (a medication or supplement) to my health app. Read the document I'm sharing with you (for example a prescription, a medication label or a visit summary) and convert it into the format below.
+
+Reply with exactly one JSON code block in this format:
+
+\`\`\`json
+{
+  "${TREATMENT_AI_FORMAT_KEY}": ${TREATMENT_AI_FORMAT_VERSION},
+${getTreatmentAIFields()}
+}
+\`\`\`
+
+Rules:
+${getTreatmentAIRules()}
 - If the document has several treatments, convert only the one I ask for, or else the first one, and list the others in a short note before the code block.
 - Numbers use a dot as the decimal separator.
 - Keep the document's language for names and text.
@@ -153,7 +163,14 @@ export function parseTreatmentAIReply(
 ): AIImportResult<ImportedTreatment> {
   const read = readAIReply(text, 'a treatment');
   if (!read.ok) return read;
-  const { reply } = read;
+  return readTreatmentFields(read.reply, today);
+}
+
+/** Reads a treatment's fields from a reply object, e.g. one record of a combined import. */
+export function readTreatmentFields(
+  reply: Record<string, unknown>,
+  today: Date = new Date()
+): AIImportResult<ImportedTreatment> {
   const errors: string[] = [];
 
   const title = readText(reply.name);

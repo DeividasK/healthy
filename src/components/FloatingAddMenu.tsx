@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -34,6 +40,17 @@ const menuExit = FadeOutDown.duration(200)
   .withTargetValues({ translateY: 12 })
   .reduceMotion(ReduceMotion.System);
 
+/** Where a menu opens from a + that is not in the dock. */
+export interface MenuPlacement {
+  /** The + button's centre from the window's centre, in px. */
+  shift: number;
+  /** The menu's bottom edge from the window's bottom, in px. */
+  bottom: number;
+}
+
+/** Opens the menus inside it above their own + instead of the dock's. */
+export const MenuPlacementContext = createContext<MenuPlacement | null>(null);
+
 interface FloatingAddMenuProps {
   visible: boolean;
   onClose: () => void;
@@ -56,7 +73,9 @@ export function FloatingAddMenu({
   const fieldReveal = useFieldRevealContext();
   const itemRefs = useRef<(View | null)[]>([]);
   // Center the menu on the + that opened it, keeping a 16px screen gutter.
-  const anchor = useDockMenuAnchor();
+  const placement = useContext(MenuPlacementContext);
+  const dockAnchor = useDockMenuAnchor();
+  const anchor = placement?.shift ?? dockAnchor;
   const [menuWidth, setMenuWidth] = useState(0);
   const maxShift = Math.max(0, (screenWidth - menuWidth) / 2 - 16);
   const shift = Math.max(-maxShift, Math.min(maxShift, anchor));
@@ -130,7 +149,10 @@ export function FloatingAddMenu({
         style={[
           styles.menu,
           {
-            bottom: bottomOffset ?? getActionDockMenuOffset(insets.bottom),
+            bottom:
+              bottomOffset ??
+              placement?.bottom ??
+              getActionDockMenuOffset(insets.bottom),
             // Grow with the longest label, but keep a gutter to the screen edges.
             maxWidth: screenWidth - 32,
             // Margins rather than a transform: the entering and exiting
