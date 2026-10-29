@@ -1,0 +1,3 @@
+kind: Fixed
+body: Lab results can be negative, like an atherogenic index of -0.33, both in the form and when importing with AI. Importing with AI also accepts a count written in another unit for the same amount, like 10*9/L for 10*3/uL, and the copy and paste buttons in text boxes no longer cover the scrollbar.
+time: 2026-10-29T12:00:00.000000000Z

@@ -4,7 +4,7 @@ import {
   buildLabResultsAIInstructions,
   parseLabResultsAIReply,
 } from './labResultsAIImport';
-import { loadLoincLabTests } from '@/src/data/loinc';
+import { countPerLitreExponent, loadLoincLabTests } from '@/src/data/loinc';
 import {
   CUSTOM_TEST_SYSTEM,
   customTestBiomarker,
@@ -226,6 +226,34 @@ test('reads tests outside the catalog by LOINC code, keeping the reported unit',
   ).toBe(false);
 });
 
+test('reads a count in the test’s unit written another way', async () => {
+  const result = parseLabResultsAIReply(
+    JSON.stringify({
+      date: '2026-01-30',
+      results: [
+        // 10*9/L and 10*3/uL are the same count per volume.
+        { test: '771-6', value: 0, unit: 'x10^9/L' },
+      ],
+    }),
+    today,
+    await loadLoincLabTests()
+  );
+  if (!result.ok) throw new Error(result.errors.join('\n'));
+  expect(
+    result.data.results.map(({ marker, value, unit }) => [
+      marker.id,
+      value,
+      unit.ucum,
+    ])
+  ).toEqual([['771-6', '0', '10*3/uL']]);
+  for (const unit of ['10*9/L', 'x10E9/L', 'G/L', '10^3/µL', 'K/µL', 'thou/uL'])
+    expect(countPerLitreExponent(unit)).toBe(9);
+  expect(countPerLitreExponent('T/L')).toBe(12);
+  // Grams and moles are not counts.
+  expect(countPerLitreExponent('g/L')).toBeUndefined();
+  expect(countPerLitreExponent('mmol/L')).toBeUndefined();
+});
+
 test('keeps a test with no LOINC code as the user’s own test', () => {
   const reply = `\`\`\`json
 {
@@ -269,6 +297,29 @@ test('instructions list the user’s own tests so the AI reuses their names', ()
   expect(instructions).toContain(
     'My own tests, already in the app. For the same test, use "own" with exactly this name:\n- NAD+. Unit: µM\n- Telomere length. Unit: kb'
   );
+});
+
+test('keeps negative results, like an atherogenic index below zero', () => {
+  const result = parseLabResultsAIReply(
+    `{"healthyLabResults": 1, "date": "2026-06-01", "results": [
+      { "test": "own", "name": "Aterogeniškumo indeksas", "value": -0.33, "unit": "Skaičius", "high": "0.1" },
+      { "test": "own", "name": "Base excess", "value": "-1,5", "unit": "mmol/L", "low": "-2", "high": "2" }
+    ]}`,
+    today
+  );
+  if (!result.ok) throw new Error(result.errors.join('\n'));
+  expect(
+    result.data.results.map(({ marker, value, low, high }) => [
+      marker.name,
+      value,
+      low,
+      high,
+    ])
+  ).toEqual([
+    ['Aterogeniškumo indeksas', '-0.33', undefined, '0.1'],
+    ['Base excess', '-1.5', '-2', '2'],
+  ]);
+  expect(buildLabResultsAIInstructions()).toContain('including a minus sign');
 });
 
 test('keeps the sign of a result given only as a bound', () => {

@@ -125,6 +125,25 @@ function OwnTestLabel({ style }: { style?: StyleProp<ViewStyle> }) {
 /** A typed limit as the app stores it: a decimal comma becomes a point. */
 const cleanLimit = (text: string) => text.trim().replace(',', '.');
 
+/**
+ * Drops characters matching `notAllowed`, keeping a minus sign only in front.
+ * A minus sign pasted from a report (U+2212) counts as one.
+ */
+const keepSignedNumber = (text: string, notAllowed: RegExp) => {
+  const cleaned = text.replace(/\u2212/g, '-').replace(notAllowed, '');
+  return (cleaned.startsWith('-') ? '-' : '') + cleaned.replace(/-/g, '');
+};
+
+/**
+ * A number keyboard with a minus key. iOS has no signed number pad, and the
+ * web's decimal keyboard is the closest there.
+ */
+const SIGNED_NUMBER_KEYBOARD = Platform.select({
+  ios: 'numbers-and-punctuation',
+  android: 'numeric',
+  default: 'decimal-pad',
+} as const);
+
 /** Checks the selected local date and optional time against the current time. */
 export function isDateTimeInFuture(
   date: Date,
@@ -497,7 +516,7 @@ export function LabResultForm({
   };
 
   const handleValueChange = (index: number, val: string) => {
-    const cleaned = val.replace(/[^0-9.]/g, '');
+    const cleaned = keepSignedNumber(val, /[^0-9.,-]/g);
     setActiveItems((prev) =>
       prev.map((item, i) =>
         i === index ? { ...item, valueStr: cleaned } : item
@@ -514,7 +533,7 @@ export function LabResultForm({
     index: number,
     key: 'lowStr' | 'highStr',
     val: string
-  ) => updateItem(index, { [key]: val.replace(/[^0-9.,]/g, '') });
+  ) => updateItem(index, { [key]: keepSignedNumber(val, /[^0-9.,-]/g) });
 
   const handleSelectUnit = (index: number, unitLabel: string, ucum: string) => {
     setActiveItems((prev) =>
@@ -828,7 +847,7 @@ export function LabResultForm({
                       style={styles.valueInput}
                       placeholder="Value"
                       placeholderTextColor={COLORS.light.placeholderInput}
-                      keyboardType="decimal-pad"
+                      keyboardType={SIGNED_NUMBER_KEYBOARD}
                       value={item.valueStr}
                       onChangeText={(val) => handleValueChange(index, val)}
                     />
@@ -870,7 +889,7 @@ export function LabResultForm({
                       style={styles.rangeInput}
                       placeholder="Lower"
                       placeholderTextColor={COLORS.light.placeholderInput}
-                      keyboardType="decimal-pad"
+                      keyboardType={SIGNED_NUMBER_KEYBOARD}
                       value={item.lowStr}
                       onChangeText={(val) =>
                         handleLimitChange(index, 'lowStr', val)
@@ -885,7 +904,7 @@ export function LabResultForm({
                       style={styles.rangeInput}
                       placeholder="Upper"
                       placeholderTextColor={COLORS.light.placeholderInput}
-                      keyboardType="decimal-pad"
+                      keyboardType={SIGNED_NUMBER_KEYBOARD}
                       value={item.highStr}
                       onChangeText={(val) =>
                         handleLimitChange(index, 'highStr', val)

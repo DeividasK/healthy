@@ -1,17 +1,90 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Check, Copy } from 'lucide-react-native';
+import { Check, Copy, type LucideIcon } from 'lucide-react-native';
 import { COLORS } from '@/src/theme/colors';
 
 const COPIED_FEEDBACK_MS = 2000;
+const CORNER_OFFSET = 8;
 
 /** Space a box leaves on its right for the button. */
 export const COPY_CORNER_INSET = 60;
 
 /**
- * Copies `text`, from the top-right corner of a box of copyable text. The box
- * keeps `COPY_CORNER_INSET` free on its right so the text never runs under it.
+ * Width of the scrollbar the box before `button` shows on its right, or 0 when
+ * it has none or its scrollbar overlays the content (phones, macOS default).
+ */
+function useSiblingScrollbarWidth(button: React.RefObject<unknown>) {
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof ResizeObserver === 'undefined') return;
+    const box = (button.current as HTMLElement | null)?.previousElementSibling;
+    if (!(box instanceof HTMLElement)) return;
+    const measure = () => {
+      const style = getComputedStyle(box);
+      setWidth(
+        Math.max(
+          0,
+          box.offsetWidth -
+            box.clientWidth -
+            parseFloat(style.borderLeftWidth) -
+            parseFloat(style.borderRightWidth)
+        )
+      );
+    };
+    measure();
+    // The content box shrinks when a scrollbar appears, e.g. as text is typed.
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [button]);
+
+  return width;
+}
+
+/**
+ * A button in the top-right corner of a box of text. Render it right after the
+ * box, both inside a wrapping View; the box keeps `COPY_CORNER_INSET` free on
+ * its right so the text never runs under it. When the box scrolls, the button
+ * sits beside its scrollbar rather than over it.
+ */
+export function CornerButton({
+  icon: Icon,
+  iconColor = COLORS.light.foreground,
+  onPress,
+  disabled,
+  accessibilityLabel,
+  testID,
+}: {
+  icon: LucideIcon;
+  iconColor?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityLabel: string;
+  testID: string;
+}) {
+  const ref = useRef<React.ComponentRef<typeof TouchableOpacity>>(null);
+  const scrollbarWidth = useSiblingScrollbarWidth(ref);
+  return (
+    <TouchableOpacity
+      ref={ref}
+      testID={testID}
+      style={[styles.button, { right: CORNER_OFFSET + scrollbarWidth }]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      activeOpacity={0.7}
+    >
+      <Icon size={18} color={iconColor} />
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Copies `text`, from the top-right corner of a box of copyable text. Placed
+ * like `CornerButton`.
  */
 export function CopyCornerButton({
   text,
@@ -45,29 +118,21 @@ export function CopyCornerButton({
 
   const name = label.charAt(0).toUpperCase() + label.slice(1);
   return (
-    <TouchableOpacity
-      testID={testID}
-      style={styles.button}
+    <CornerButton
+      icon={copied ? Check : Copy}
+      iconColor={copied ? COLORS.light.primary : COLORS.light.foreground}
       onPress={handleCopy}
       disabled={!text}
-      accessibilityRole="button"
       accessibilityLabel={copied ? `${name} copied` : `Copy ${label}`}
-      activeOpacity={0.7}
-    >
-      {copied ? (
-        <Check size={18} color={COLORS.light.primary} />
-      ) : (
-        <Copy size={18} color={COLORS.light.foreground} />
-      )}
-    </TouchableOpacity>
+      testID={testID}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   button: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: CORNER_OFFSET,
     width: 36,
     height: 36,
     borderRadius: 8,

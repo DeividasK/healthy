@@ -207,8 +207,8 @@ export function getValueComparator(observation?: Observation): string {
 
 /**
  * Reads a value as written in a report: a number, optionally after a
- * bound sign, e.g. "14.2", "< 20.00", "≤3" or ">=5". Accepts a comma as the
- * decimal separator.
+ * bound sign, e.g. "14.2", "-0.33", "< 20.00", "≤3" or ">=5". Accepts a comma
+ * as the decimal separator.
  */
 export function parseResultValue(
   text: string
@@ -216,7 +216,7 @@ export function parseResultValue(
   const match = text
     .trim()
     .replace(',', '.')
-    .match(/^(<=|>=|<|>|≤|≥)?\s*(\d+(?:\.\d+)?)$/);
+    .match(/^(<=|>=|<|>|≤|≥)?\s*(-?\d+(?:\.\d+)?)$/);
   if (!match) return undefined;
   const sign = match[1];
   const comparator = (sign === '≤' ? '<=' : sign === '≥' ? '>=' : sign) as
