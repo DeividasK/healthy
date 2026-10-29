@@ -16,6 +16,7 @@ async function seedRecords(page: Page) {
   await seedTestPatient(page);
   await seedTestReport(page, {
     date: '2026-09-01',
+    serviceProviderName: 'Northside Lab',
     biomarkers: [
       {
         name: 'Hemoglobin',
@@ -91,7 +92,10 @@ test.describe('Share with AI', () => {
     await expect(page).toHaveURL(/\/share-ai\?biomarker=718-7$/);
 
     const preview = page.getByTestId('share-ai-preview');
-    await expect(preview).toContainText('14.5');
+    // Each result gives its range and the lab that printed it.
+    await expect(preview).toContainText(
+      '| Sep 1, 2026 | 14.5 g/dL | 11.6–16.6 | Northside Lab |'
+    );
     await expect(preview).toContainText('Left Knee Pain');
     await expect(preview).not.toContainText('Lisinopril 10mg');
     await expect(

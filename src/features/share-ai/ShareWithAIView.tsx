@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
@@ -13,7 +13,7 @@ import {
   Share as ShareIcon,
   type LucideIcon,
 } from 'lucide-react-native';
-import type { Condition, MedicationRequest } from 'fhir/r5';
+import type { Condition, MedicationRequest, Observation } from 'fhir/r5';
 import type { DiagnosticReportRecord } from '@/src/database/types';
 import { ResourceViewLayout } from '@/src/components/ResourceViewLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
@@ -22,8 +22,17 @@ import { NativeSelect } from '@/src/components/NativeSelect';
 import { getBiomarkerKey } from '@/src/data/biomarkers';
 import {
   getObservationMarker,
+  getObservationUnitCode,
   isSupportedObservation,
 } from '@/src/features/lab-results/biomarkerMeasurements';
+import {
+  formatLimits,
+  hasLimits,
+  rangeInUnit,
+  rangeOn,
+  reportedRangeEntry,
+} from '@/src/features/lab-results/biomarkerRanges';
+import { isOrganizationReference } from '@/src/utils/fhirUtils';
 import { withCalculatedObservations } from '@/src/features/lab-results/calculatedBiomarkers';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { getAllReports } from '@/src/features/lab-results/diagnosticReportService';
@@ -60,7 +69,13 @@ interface ShareGroup {
   title: string;
   icon: LucideIcon;
   items: ShareItem[];
+  /** Column names when the group's lines are table rows. */
+  columns?: string[];
 }
+
+/** A shared table row; a pipe inside a cell would split it. */
+const tableRow = (cells: string[]) =>
+  `| ${cells.map((cell) => cell.replaceAll('|', '/')).join(' | ')} |`;
 
 const quantity = (o: { valueQuantity?: { value?: number; unit?: string } }) =>
   o.valueQuantity?.value !== undefined
@@ -131,6 +146,33 @@ export function ShareWithAIView() {
 
   // Records loaded for another profile are never shown or shared.
   const records = data?.patientId === activePatientId ? data : null;
+
+  /**
+   * A result's range in its own unit and where the range came from: the lab
+   * named on the report it was printed on, or the user.
+   */
+  const rangeOf = useCallback(
+    (observation: Observation, date: string, reportId?: string) => {
+      const marker = getObservationMarker(observation);
+      const history = marker ? ranges?.[getBiomarkerKey(marker)] : undefined;
+      const entry = history?.length
+        ? rangeOn(history, date)
+        : reportedRangeEntry(observation, date, reportId);
+      const inUnit =
+        entry &&
+        rangeInUnit(entry, getObservationUnitCode(observation), marker);
+      if (!entry || !inUnit || !hasLimits(inUnit))
+        return { range: '', from: '' };
+      const lab = records?.reports
+        .find(({ report }) => report.id === entry.reportId)
+        ?.report.performer?.find(isOrganizationReference)?.display;
+      return {
+        range: formatLimits(inUnit.low, inUnit.high),
+        from: entry.source === 'user' ? 'Set by me' : (lab ?? 'Lab report'),
+      };
+    },
+    [ranges, records]
+  );
   const loadError =
     failedPatientId === activePatientId
       ? "Couldn't load your records. Please try again."
@@ -144,6 +186,7 @@ export function ShareWithAIView() {
         .flatMap(({ report, observations }) =>
           observations.filter(isSupportedObservation).map((observation) => ({
             observation,
+            reportId: report.id,
             date:
               observation.effectiveDateTime ?? report.effectiveDateTime ?? '',
           }))
@@ -160,14 +203,25 @@ export function ShareWithAIView() {
         id: 'history',
         title: `${name} history`,
         icon: FlaskConical,
+        columns: ['Date', 'Result', 'Range', 'Range from'],
         items: rows
           .filter(({ date }) => inPeriod(date, period))
-          .map(({ observation, date }) => ({
-            key: `history:${observation.id}`,
-            title: formatDisplayDate(date),
-            meta: quantity(observation),
-            line: `- ${formatDisplayDate(date)}: ${quantity(observation)}`,
-          })),
+          .map(({ observation, date, reportId }) => {
+            const { range, from } = rangeOf(observation, date, reportId);
+            return {
+              key: `history:${observation.id}`,
+              title: formatDisplayDate(date),
+              meta: [quantity(observation), range && `range ${range}`]
+                .filter(Boolean)
+                .join(', '),
+              line: tableRow([
+                formatDisplayDate(date),
+                quantity(observation),
+                range,
+                from,
+              ]),
+            };
+          }),
       });
     }
     all.push({
@@ -204,21 +258,38 @@ export function ShareWithAIView() {
         id: 'biomarkers',
         title: 'Latest biomarkers',
         icon: FlaskConical,
+        columns: [
+          'Biomarker',
+          'Result',
+          'Status',
+          'Range',
+          'Range from',
+          'Date',
+        ],
         items: latestBiomarkers(records.reports, -Infinity, ranges)
           .filter(({ date }) => inPeriod(date, period))
           .map((b) => {
-            const meta = [
-              quantity(b.observation),
-              statusWord(b.status),
-              b.date ? formatDisplayDate(b.date) : '',
-            ]
-              .filter(Boolean)
-              .join(', ');
+            const date = b.date ? formatDisplayDate(b.date) : '';
+            const { range, from } = rangeOf(b.observation, b.date ?? '');
             return {
               key: `biomarkers:${b.id}`,
               title: b.name,
-              meta,
-              line: `- ${b.name}: ${meta}`,
+              meta: [
+                quantity(b.observation),
+                statusWord(b.status),
+                range && `range ${range}`,
+                date,
+              ]
+                .filter(Boolean)
+                .join(', '),
+              line: tableRow([
+                b.name,
+                quantity(b.observation),
+                statusWord(b.status),
+                range,
+                from,
+                date,
+              ]),
             };
           }),
       });
@@ -245,14 +316,15 @@ export function ShareWithAIView() {
         }),
     });
     return all.filter(({ items }) => items.length > 0);
-  }, [records, biomarker, period, ranges]);
+  }, [records, biomarker, period, ranges, rangeOf]);
 
   const text = useMemo(
     () =>
       overviewShareText({
         sections: groups
-          .map(({ title, items }) => ({
+          .map(({ title, items, columns }) => ({
             title,
+            columns,
             lines: items
               .filter(({ key }) => !unticked.has(key))
               .map(({ line }) => line),
