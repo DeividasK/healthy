@@ -12,15 +12,18 @@ import {
  * `occurrenceTiming.repeat`: `period`, `periodMax` and `periodUnit` for how
  * often, `count` for how many times, `duration` (minutes) for how long, and
  * `when` or `timeOfDay` for the time of day. Other timing elements are kept.
+ * Sessions booked as they come (e.g. 5 physiotherapy sessions) have a
+ * `count` and no `period`.
  */
 
 export type ScheduleUnit = 'd' | 'wk' | 'mo';
 
 /** What the service request form sets on the schedule. */
 export interface ServiceRequestSchedule {
-  period: number;
+  /** How often it repeats; null for sessions with no set interval. */
+  period: number | null;
   periodMax?: number | null;
-  periodUnit: ScheduleUnit;
+  periodUnit: ScheduleUnit | null;
   count?: number | null;
   /** Minutes each time. */
   duration?: number | null;
@@ -51,13 +54,16 @@ const UNIT_LABELS: Record<ScheduleUnit, [string, string]> = {
 const isScheduleUnit = (unit?: string): unit is ScheduleUnit =>
   Boolean(unit && unit in UNIT_LABELS);
 
-/** The request's repeat, when it has a schedule. */
+/** The request's repeat, when it has a schedule: an interval or sessions. */
 export const getScheduleRepeat = (
   request: ServiceRequest
-): TimingRepeat | undefined =>
-  request.occurrenceTiming?.repeat?.period
-    ? request.occurrenceTiming.repeat
-    : undefined;
+): TimingRepeat | undefined => {
+  const repeat = request.occurrenceTiming?.repeat;
+  return repeat?.period || repeat?.count ? repeat : undefined;
+};
+
+const formatSessions = (count: number) =>
+  `${count} ${count === 1 ? 'session' : 'sessions'}`;
 
 const toMinutes = (repeat: TimingRepeat) =>
   repeat.duration === undefined
@@ -68,10 +74,11 @@ const toMinutes = (repeat: TimingRepeat) =>
         ? repeat.duration
         : undefined;
 
-/** e.g. "3 sessions, every 4–6 weeks" or "Every day". */
+/** e.g. "3 sessions, every 4–6 weeks", "Every day" or "5 sessions". */
 export function formatScheduleRepeat(repeat: TimingRepeat): string | null {
   const { period, periodMax, periodUnit, count } = repeat;
-  if (!period || !isScheduleUnit(periodUnit)) return null;
+  if (!period) return count ? formatSessions(count) : null;
+  if (!isScheduleUnit(periodUnit)) return null;
   const [singular, plural] = UNIT_LABELS[periodUnit];
   const every =
     periodMax && periodMax !== period
@@ -80,7 +87,7 @@ export function formatScheduleRepeat(repeat: TimingRepeat): string | null {
         ? `every ${singular}`
         : `every ${period} ${plural}`;
   if (!count) return every[0].toUpperCase() + every.slice(1);
-  return `${count} ${count === 1 ? 'session' : 'sessions'}, ${every}`;
+  return `${formatSessions(count)}, ${every}`;
 }
 
 /** e.g. "30 min". */
@@ -94,18 +101,26 @@ export function formatScheduleDuration(repeat: TimingRepeat): string | null {
 
 /**
  * The schedule in words, worded like a treatment's dose: e.g. "10 min in the
- * evening", "45 min, every 2 days" or "3 sessions, every 4–6 weeks".
- * `withoutTime` leaves out the time of day, e.g. under a bundle's time.
+ * evening", "45 min, every 2 days", "3 sessions, every 4–6 weeks" or
+ * "5 sessions, 45 min". `withoutTime` leaves out the time of day, e.g. under
+ * a bundle's time.
  */
 export function formatScheduleText(
   repeat: TimingRepeat,
   { withoutTime = false }: { withoutTime?: boolean } = {}
 ): string | null {
   const { period, periodMax, periodUnit, count } = repeat;
-  if (!period || !isScheduleUnit(periodUnit)) return null;
-  const [singular, plural] = UNIT_LABELS[periodUnit];
   const duration = formatScheduleDuration(repeat);
   const time = withoutTime ? undefined : formatTimePhrase(repeat);
+  // Sessions with no interval, worded without a frequency.
+  if (!period) {
+    const text = [count && formatSessions(count), duration, time]
+      .filter(Boolean)
+      .join(', ');
+    return text ? text[0].toUpperCase() + text.slice(1) : null;
+  }
+  if (!isScheduleUnit(periodUnit)) return null;
+  const [singular, plural] = UNIT_LABELS[periodUnit];
   const frequency =
     periodMax && periodMax !== period
       ? `every ${period}–${periodMax} ${plural}`
@@ -118,15 +133,10 @@ export function formatScheduleText(
     period === 1 && periodUnit === 'd' && !periodMax && (!!time || withoutTime);
   const parts = isDailyAtTime
     ? [
-        count && `${count} ${count === 1 ? 'session' : 'sessions'}`,
+        count && formatSessions(count),
         [duration, time].filter(Boolean).join(' '),
       ]
-    : [
-        count && `${count} ${count === 1 ? 'session' : 'sessions'}`,
-        duration,
-        frequency,
-        time,
-      ];
+    : [count && formatSessions(count), duration, frequency, time];
   const text = parts.filter(Boolean).join(', ') || frequency;
   return text[0].toUpperCase() + text.slice(1);
 }
@@ -165,27 +175,33 @@ const parseNumber = (text: string) => {
 
 /**
  * The schedule for the form's shown fields, or an error message. Hidden
- * fields are cleared.
+ * fields are cleared. Without `period` (repeats every), it needs sessions.
  */
 export function parseScheduleDraft(
   draft: ScheduleDraft,
   shown: {
+    period: boolean;
     periodMax: boolean;
     count: boolean;
     duration: boolean;
     timeOfDay: boolean;
   }
 ): ServiceRequestSchedule | string {
-  const period = parseNumber(draft.period);
-  if (period === null || !Number.isFinite(period) || period <= 0)
-    return 'Repeats every must be more than 0';
-  if (!isScheduleUnit(draft.periodUnit)) return 'Choose how often it repeats';
-  const periodMax = shown.periodMax ? parseNumber(draft.periodMax) : null;
-  if (periodMax !== null && !(periodMax >= period))
+  const period = shown.period ? parseNumber(draft.period) : null;
+  if (shown.period) {
+    if (period === null || !Number.isFinite(period) || period <= 0)
+      return 'Repeats every must be more than 0';
+    if (!isScheduleUnit(draft.periodUnit)) return 'Choose how often it repeats';
+  }
+  const periodMax =
+    period !== null && shown.periodMax ? parseNumber(draft.periodMax) : null;
+  if (periodMax !== null && !(periodMax >= period!))
     return 'Up to must be at least the repeat interval';
   const count = shown.count ? parseNumber(draft.count) : null;
   if (count !== null && !(Number.isInteger(count) && count > 0))
     return 'Sessions must be a whole number above 0';
+  if (period === null && count === null)
+    return 'Add how often it repeats or how many sessions';
   const duration = shown.duration ? parseNumber(draft.duration) : null;
   if (duration !== null && !(Number.isFinite(duration) && duration >= 0))
     return 'Duration must be 0 minutes or more';
@@ -193,7 +209,10 @@ export function parseScheduleDraft(
   return {
     period,
     periodMax,
-    periodUnit: draft.periodUnit,
+    periodUnit:
+      period !== null && isScheduleUnit(draft.periodUnit)
+        ? draft.periodUnit
+        : null,
     count,
     duration,
     when: shown.timeOfDay && !isTime ? draft.timeChoice || null : null,
@@ -203,15 +222,14 @@ export function parseScheduleDraft(
 
 /**
  * The repeat with the schedule's values. Elements the form does not show are
- * kept; a new repeat happens once per period (`frequency: 1`).
+ * kept; a new repeat happens once per period (`frequency: 1`). Sessions with
+ * no interval have no period or frequency.
  */
 export function withSchedule(
   existing: TimingRepeat | undefined,
   schedule: ServiceRequestSchedule
 ): TimingRepeat {
-  const repeat: TimingRepeat = existing ? { ...existing } : { frequency: 1 };
-  repeat.period = schedule.period;
-  repeat.periodUnit = schedule.periodUnit;
+  const repeat: TimingRepeat = existing ? { ...existing } : {};
   const set = <K extends keyof TimingRepeat>(
     key: K,
     value: TimingRepeat[K] | null | undefined
@@ -219,6 +237,10 @@ export function withSchedule(
     if (value === null || value === undefined) delete repeat[key];
     else repeat[key] = value;
   };
+  set('period', schedule.period);
+  const hasInterval = schedule.period != null;
+  set('periodUnit', hasInterval ? schedule.periodUnit : null);
+  set('frequency', hasInterval ? (existing?.frequency ?? 1) : null);
   set('periodMax', schedule.periodMax);
   set('count', schedule.count);
   set('duration', schedule.duration);

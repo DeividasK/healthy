@@ -25,9 +25,12 @@ export function AIImportModal<T>({
   parse,
   onClose,
   onImport,
+  outcome = 'fill in the form',
 }: {
   /** What the user shares with the AI, e.g. "lab report". */
   document: string;
+  /** What pasting the reply does, e.g. "fill in the form". */
+  outcome?: string;
   /** Builds the instructions copied for the AI. */
   instructions: () => string;
   /** Reads the AI's reply, or lists its problems. */
@@ -83,7 +86,7 @@ export function AIImportModal<T>({
       <FieldRevealProvider value={null}>
         <Text style={styles.description}>
           Copy the instructions and send them to your AI assistant together with
-          your {document}. Then paste its reply below to fill in the form.
+          your {document}. Then paste its reply below to {outcome}.
         </Text>
         <View style={styles.copy}>
           <ModalButton

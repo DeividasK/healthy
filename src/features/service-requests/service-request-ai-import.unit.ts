@@ -98,6 +98,18 @@ test('reads how a request repeats', () => {
   });
 });
 
+test('reads sessions with no set interval', () => {
+  expect(
+    parseServiceRequestAIReply(
+      '{"service":"Individual physiotherapy","repeats":{"sessions":5,"minutes":45}}',
+      today
+    )
+  ).toMatchObject({
+    ok: true,
+    data: { schedule: { period: '', count: '5', duration: '45' } },
+  });
+});
+
 test('lists every problem in the reply', () => {
   expect(
     parseServiceRequestAIReply(
@@ -130,7 +142,7 @@ test('lists every problem in the reply', () => {
     ok: false,
     errors: [
       'The time of day must be one of: Morning, Noon, Afternoon, Evening, Bedtime, or a time such as 07:30.',
-      'Repeats every must be more than 0.',
+      'Add how often it repeats or how many sessions.',
     ],
   });
 });
