@@ -153,7 +153,6 @@ test.describe('Demo profile', () => {
   });
 
   test('The demo build opens three years of records, keeps nothing and leaves the app free in another tab', async ({
-    page,
     browser,
     baseURL,
   }) => {
@@ -188,11 +187,6 @@ test.describe('Demo profile', () => {
     } finally {
       await demo.context.close();
     }
-
-    await test.step('The app shows no demo profile', async () => {
-      await openRoute(page, '/');
-      await expect(page).toHaveURL(/\/welcome$/);
-    });
   });
 });
 

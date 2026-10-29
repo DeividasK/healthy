@@ -30,12 +30,19 @@ test.describe('Edit Consultation View - Visual Regression', () => {
     await page.goto(`/consultation/${cons.id}/edit`);
     await page.getByTestId('consultation-title-input').waitFor();
     await page.getByTestId('diagnosis-1-title-input').waitFor();
-    await page.getByTestId('diagnosis-1-add').click();
-    await page.getByTestId('diagnosis-option-code').click();
-    await page.getByTestId('diagnosis-options-menu').waitFor({
-      state: 'detached',
-    });
-    await page.getByTestId('diagnosis-1-code-input').fill('L21');
+    // Optional diagnosis fields are added from the + next to its heading
+    for (const [field, value] of [
+      ['system', 'http://hl7.org/fhir/sid/icd-10'],
+      ['code', 'L21'],
+      ['display', 'Seborrhoeic dermatitis'],
+    ]) {
+      await page.getByTestId('diagnosis-1-add').click();
+      await page.getByTestId(`diagnosis-option-${field}`).click();
+      await page.getByTestId('diagnosis-options-menu').waitFor({
+        state: 'detached',
+      });
+      await page.getByTestId(`diagnosis-1-${field}-input`).fill(value);
+    }
     await takeSnapshot(
       page,
       'Consultation View - Edit Existing Mode',

@@ -169,9 +169,9 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # Chromatic bills per snapshot. When every commit on the branch can't
       # change how the app looks (CI, tooling, docs), each one says so with a
-      # 'Chromatic: skip' trailer. The visual tests don't run, and Chromatic
-      # marks the commit as passing (its required UI Tests check) without
-      # taking any snapshots.
+      # 'Chromatic: skip' trailer, or is Dependabot bumping action SHAs under
+      # .github/. The visual tests don't run, and Chromatic marks the commit as
+      # passing (its required UI Tests check) without taking any snapshots.
       - name: Check for Chromatic Skip
         id: skip
         run: |
@@ -179,9 +179,13 @@ jobs:
           commits=$(git rev-list --no-merges "$base..HEAD")
           [ -n "$commits" ] || exit 0
           for commit in $commits; do
-            git log -1 --format=%B "$commit" | grep -qiE '^Chromatic: *skip *$' || exit 0
+            git log -1 --format=%B "$commit" | grep -qiE '^Chromatic: *skip *$' && continue
+            [ "$(git log -1 --format=%an "$commit")" = 'dependabot[bot]' ] || exit 0
+            git diff --name-only "$commit^" "$commit" | grep -qv '^\.github/' && exit 0
+            # A Playwright image bump renders differently, so it still runs.
+            git diff "$commit^" "$commit" | grep -qE '^[-+][^-+].*image:' && exit 0
           done
-          echo "Skipping visual tests: every commit on this branch has a 'Chromatic: skip' trailer."
+          echo "Skipping visual tests: no commit on this branch can change how the app looks."
           echo "chromatic=true" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-pnpm
         with:

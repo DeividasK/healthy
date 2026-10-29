@@ -3,16 +3,16 @@ import {
   test,
   expect,
   seedTestPatient,
+  bootstrapApp,
+  restartApp,
 } from '@/src/features/testing/testStorage';
 import { connectTestSync } from '@/src/features/testing/mockGoogleDrive';
 
-// Loading the app is what these tests are about.
-test.use({ freshApp: true });
-
 test.describe('Installable web app', () => {
   test('links a manifest with home-screen icons', async ({ page, request }) => {
-    // The app adds the link on any screen, with or without a profile.
-    await page.goto('/');
+    // The app links the manifest when it starts, on any screen, with or
+    // without a profile.
+    await bootstrapApp(page);
 
     const href = await page
       .locator('link[rel="manifest"]')
@@ -59,10 +59,8 @@ test.describe('Installable web app', () => {
       await page.route(google, failLookup);
       // The browser logs each request that cannot reach Google.
       consoleMonitor.ignore('net::ERR_NAME_NOT_RESOLVED');
-      // A fake clock, so the next reachability check need not be waited out.
-      await page.clock.install();
-      // Reload so the app's sync on start runs with the bridge's connection.
-      await page.goto('/profile');
+      // Remount so sync starts with the connection made through the bridge.
+      await restartApp(page, '/profile');
       await expect(indicator).toBeVisible();
       await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 

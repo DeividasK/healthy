@@ -75,7 +75,12 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     page,
     browser,
   }, testInfo) => {
-    const { second } = await deleteFromOtherDevice(page, browser, testInfo);
+    // A profile that stopped syncing with its cloud copy deleted is held the
+    // same way as one deleted outright, which the tests below and the
+    // sync-devices tail (applyHeldProfileDeletion) cover.
+    const { second } = await deleteFromOtherDevice(page, browser, testInfo, {
+      deletion: 'stop-syncing',
+    });
     const device = second.page;
 
     // The deletion waits for the user: records stay and edits stay local.
@@ -102,11 +107,11 @@ test.describe('Profile deleted from Google Drive on another device', () => {
       'shared-patient'
     );
 
-    // It cannot be dismissed without a choice.
+    // It cannot be dismissed without a choice, and a restart brings it back.
     await device.keyboard.press('Escape');
     await device.mouse.click(5, 5);
     await expect(modal).toBeVisible();
-    await device.reload();
+    await restartApp(device, '/profile');
     await expect(modal).toBeVisible();
 
     // Deleting asks for confirmation first.
@@ -190,20 +195,6 @@ test.describe('Profile deleted from Google Drive on another device', () => {
     expect(await bridge(page, (b) => b.listRestorableProfiles())).toEqual([
       ALICE,
     ]);
-    await second.close();
-  });
-
-  test('also asks when the profile stopped syncing with its cloud copy deleted', async ({
-    page,
-    browser,
-  }, testInfo) => {
-    const { second } = await deleteFromOtherDevice(page, browser, testInfo, {
-      deletion: 'stop-syncing',
-    });
-    expect(
-      await bridge(second.page, (b) => b.listProfileDeletionHolds())
-    ).toEqual([ALICE]);
-    expect(await conditionIds(second.page)).toHaveLength(2);
     await second.close();
   });
 });
