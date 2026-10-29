@@ -8,6 +8,8 @@ import {
   seedTestServiceRequest,
   seedTestTreatment,
   openRoute,
+  restartApp,
+  getBrowserLocalDate,
   showAllTimelineSteps,
 } from '@/src/features/testing/testStorage';
 
@@ -159,29 +161,28 @@ test.describe('View Condition', () => {
   test('filters the timeline by status, type and time period', async ({
     page,
   }) => {
-    await page.clock.setFixedTime(new Date('2026-10-19T10:00:00'));
     const condition = await seedTestCondition(page, { title: 'Knee pain' });
     await seedTestConsultation(page, {
       title: 'MRI review',
       conditionIds: [condition.id],
-      date: '2026-11-03',
+      date: await getBrowserLocalDate(page, 15),
       status: 'planned',
     });
     await seedTestConsultation(page, {
       title: 'Orthopaedic review',
       conditionIds: [condition.id],
-      date: '2026-10-04',
+      date: await getBrowserLocalDate(page, -15),
       status: 'completed',
     });
     await seedTestServiceRequest(page, {
       title: 'Knee MRI',
-      authoredOn: '2026-10-04',
+      authoredOn: await getBrowserLocalDate(page, -15),
       status: 'active',
       reasonConditionIds: [condition.id],
     });
     await seedTestTreatment(page, {
       title: 'Ibuprofen 400mg',
-      authoredOn: '2026-03-02',
+      authoredOn: await getBrowserLocalDate(page, -230),
       status: 'on-hold',
       reasonConditionIds: [condition.id],
     });
@@ -249,7 +250,7 @@ test.describe('View Condition', () => {
     await expect(button).toBeVisible();
 
     await test.step('remembers the filters after a restart', async () => {
-      await page.reload();
+      await restartApp(page, `/condition/${condition.id}`);
       await expect(count).toHaveText('0');
       await expect(button).toHaveAccessibleName('Filter timeline, filters on');
       await button.click();

@@ -56,8 +56,8 @@ test.describe('Settings', () => {
     );
     expect(dirty).toHaveLength(1);
 
-    await page.reload();
-    await page.getByTestId('settings-header-button').click();
+    // A newly opened settings screen reads the time back from the database.
+    await openRoute(page, '/settings');
     await page.getByTestId('settings-times-of-day-toggle').click();
     await expect(page.getByTestId('settings-time-EVE')).toContainText('19:15');
   });

@@ -3,16 +3,22 @@ name: Main
 on:
   push:
     branches: [main]
+  # A manual run always publishes, to restore a missing baseline.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  # A merged pull request whose every commit has a 'Chromatic: skip' trailer
-  # can't change how the app looks, so it publishes no new baseline.
+  # A merged pull request that can't change how the app looks publishes no new
+  # baseline: every commit has a 'Chromatic: skip' trailer, or is Dependabot
+  # bumping action SHAs under .github/. The skip only holds while main's last
+  # visual build succeeded, so a missing or failed baseline is never carried
+  # forward.
   chromatic-skip:
     name: Check for Chromatic Skip
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     runs-on: ubuntu-26.04
@@ -23,15 +29,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          [ "$GITHUB_EVENT_NAME" = push ] || exit 0
           pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].number // empty')
           [ -n "$pr" ] || exit 0
-          verdicts=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/commits" \
-            --jq '.[] | select(.parents | length == 1)
-              | if (.commit.message | split("\n") | any(test("^Chromatic: *skip *$"; "i"))) then "skip" else "run" end')
-          if [ -n "$verdicts" ] && ! grep -qx run <<< "$verdicts"; then
-            echo "Skipping the baseline: every commit in #$pr has a 'Chromatic: skip' trailer."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          commits=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/commits" \
+            --jq '.[] | select(.parents | length == 1) | .sha')
+          [ -n "$commits" ] || exit 0
+          for sha in $commits; do
+            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha")
+            jq -r .commit.message <<< "$commit" | grep -qiE '^Chromatic: *skip *$' && continue
+            # A Playwright image bump renders differently, so it still runs.
+            jq -e '.author.login == "dependabot[bot]"
+              and all(.files[]; (.filename | startswith(".github/"))
+                and ((.patch // "") | test("(^|\n)[-+][^\n]*image:") | not))' <<< "$commit" > /dev/null || exit 0
+          done
+          visual=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/main.yml/runs?branch=main&per_page=50" \
+            --jq ".workflow_runs[] | select(.run_number < $GITHUB_RUN_NUMBER) | .id" |
+            while read -r run; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" \
+                --jq '[.jobs[] | select(.name == "Visual Snapshots (Auto-Accept)") | .conclusion // "pending"][0] // "missing"'
+            done | grep -vxm1 skipped || true)
+          if [ "$visual" != success ]; then
+            echo "Publishing: main's last visual build is ${visual:-missing}, so it is no baseline to keep."
+            exit 0
           fi
+          echo "Skipping the baseline: no commit in #$pr can change how the app looks."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
 
   # Branch builds take their baselines from main's builds. Chromatic matches a
   # squash merge to its pull request only when it builds the squash commit on

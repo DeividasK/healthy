@@ -298,8 +298,6 @@ test.describe('New condition form keyboard support', () => {
 });
 
 test.describe('Condition form island', () => {
-  // Checks the + rotating into a close icon, so it runs with full motion.
-  test.use({ reducedMotion: 'no-preference' });
   test.beforeEach(async ({ page }) => {
     await seedTestPatient(page);
   });
@@ -313,13 +311,11 @@ test.describe('Condition form island', () => {
     const menu = page.getByTestId('form-add-menu');
     await expect(menu).toBeVisible();
     await expect(add).toHaveAttribute('aria-label', 'Close add menu');
-    await expect
-      .poll(() =>
-        page
-          .getByTestId('add-option-button-icon')
-          .evaluate((element) => getComputedStyle(element).transform)
-      )
-      .not.toBe('none');
+    // Reduced motion turns the + straight to 45deg.
+    await expect(page.getByTestId('add-option-button-icon')).toHaveCSS(
+      'transform',
+      'matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)'
+    );
     await expect
       .poll(async () => {
         const menuBox = (await menu.boundingBox())!;

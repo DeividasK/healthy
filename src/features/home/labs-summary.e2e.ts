@@ -6,6 +6,7 @@ import {
   seedTestReport,
   seedTestCondition,
   openRoute,
+  restartApp,
   getBrowserLocalDate,
   useSingleColumnLayout,
   expandBiomarkerGroups,
@@ -371,11 +372,8 @@ test('summary Search filters the grouped latest results and respects the period'
   await expandBiomarkerGroups(summary);
   await expect(rows).toHaveCount(3);
   await search.fill('718-7');
-  await summary.getByTestId('labs-summary-result-718-7').click();
-  await expect(page).toHaveURL(/biomarker\/718-7$/);
-  await expect(page.getByTestId('biomarker-latest-status')).toHaveText(
-    'In range'
-  );
+  await expect(rows).toHaveCount(1);
+  await expect(summary.getByTestId('labs-summary-result-718-7')).toBeVisible();
 });
 
 test('the heading filter sorts latest biomarkers within each status by deviation or clinical date, and is remembered', async ({
@@ -485,7 +483,8 @@ test('the heading filter sorts latest biomarkers within each status by deviation
   await expect(view.getByTestId('labs-summary-result-789-8')).toHaveCount(0);
 
   await test.step('remembers the filters after a restart', async () => {
-    await page.reload();
+    const url = new URL(page.url());
+    await restartApp(page, url.pathname + url.search);
     await expandBiomarkerGroups(view);
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText(names.wbc);

@@ -7,6 +7,7 @@ import {
   seedTestConsultation,
   openRoute,
   reopenRoute,
+  restartApp,
   expandBiomarkerGroups,
 } from '@/src/features/testing/testStorage';
 
@@ -101,7 +102,8 @@ test('Home puts results beside conditions, and stacks them when one side is empt
   await filters.getByTestId('labs-summary-filters-done').click();
   const filterOn = { name: 'Filter latest results, filters on' };
   await expect(summary.getByRole('button', filterOn)).toBeVisible();
-  await page.reload();
+  const url = new URL(page.url());
+  await restartApp(page, url.pathname + url.search);
   await expect(summary.getByRole('button', filterOn)).toBeVisible();
   await openRoute(page, '/labs-summary');
   await expect(
@@ -241,17 +243,7 @@ test('a biomarker page puts the chart and results beside the explanation', async
   page,
 }) => {
   await seedResults(page);
-  await openRoute(page, '/labs-summary');
-  const view = page.getByTestId('labs-summary-view');
-  await expandBiomarkerGroups(view.getByTestId('labs-summary'));
-  await view
-    .getByRole('button', { name: 'View biomarker: Hemoglobin' })
-    .first()
-    .click();
-  await expect(page).toHaveURL(/labs-summary\?.*biomarker=/);
-  const url = new URL(page.url());
-  const id = url.searchParams.get('biomarker');
-  await openRoute(page, `/biomarker/${id}`);
+  await openRoute(page, '/biomarker/718-7');
   const biomarker = page.getByTestId('biomarker-view');
   const latest = biomarker.getByTestId('biomarker-latest');
   await expect(latest).toBeVisible();

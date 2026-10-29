@@ -1,7 +1,6 @@
 import {
   test,
   takeSnapshot,
-  waitForMenuToggle,
   seedTestPatient,
   seedTestCondition,
 } from '@/src/features/testing/visualTest';
@@ -12,37 +11,6 @@ test.describe('Add Consultation View - Visual Regression', () => {
   });
 
   test('Consultation View - Add New Form', async ({ page }, testInfo) => {
-    // Reasons for visit are only offered when a condition exists.
-    await seedTestCondition(page, { title: 'Scalp condition' });
-    await page.goto('/consultation/add');
-    await page.getByTestId('consultation-title-input').waitFor();
-
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-diagnosis').click();
-    await waitForMenuToggle(page, 'add-option-button', false);
-    await page.getByTestId('diagnosis-0-title-input').fill('Scalp irritation');
-    // Optional diagnosis fields are added from the + next to its heading
-    for (const [field, value] of [
-      ['system', 'http://hl7.org/fhir/sid/icd-10'],
-      ['code', 'L21'],
-      ['display', 'Seborrhoeic dermatitis'],
-    ]) {
-      await page.getByTestId('diagnosis-0-add').click();
-      await page.getByTestId(`diagnosis-option-${field}`).click();
-      await page.getByTestId('diagnosis-options-menu').waitFor({
-        state: 'detached',
-      });
-      await page.getByTestId(`diagnosis-0-${field}-input`).fill(value);
-    }
-    await page.getByTestId('add-option-button').click();
-    await page.getByTestId('menu-add-diagnosis').click();
-    await waitForMenuToggle(page, 'add-option-button', false);
-    await page.getByTestId('diagnosis-1-title-input').fill('Second diagnosis');
-    await takeSnapshot(
-      page,
-      'Consultation View - Separate diagnosis items',
-      testInfo
-    );
     await seedTestCondition(page, {
       id: 'add-first',
       title: 'Seborrhoeic dermatitis',

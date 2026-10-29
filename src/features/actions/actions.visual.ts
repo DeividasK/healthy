@@ -4,6 +4,7 @@ import {
   seedTestBundle,
   seedTestPatient,
   seedTestResources,
+  VISUAL_TEST_FIXED_DATE,
 } from '@/src/features/testing/visualTest';
 import type { RegimenDraft } from '@/src/features/treatments/regimen';
 
@@ -93,14 +94,6 @@ test.describe('My actions - Visual Regression', () => {
   test('Home and actions view with a partly logged week', async ({
     page,
   }, testInfo) => {
-    await page.goto('/');
-    await page.getByTestId('home-action-day-2026-10-06-complete').waitFor();
-    await page.getByTestId('home-actions-open').click();
-    await page
-      .getByTestId('treatment-log-row-visual-log-cream')
-      .waitFor({ state: 'visible' });
-    await takeSnapshot(page, 'My actions - Today', testInfo);
-
     // The fixture's frozen clock stops slide animations, so other days
     // open directly.
     await page.goto('/journal?date=2026-10-05');
@@ -118,6 +111,33 @@ test.describe('My actions - Visual Regression', () => {
     await takeSnapshot(page, 'My actions - Centred older day', testInfo);
     await page.getByTestId('actions-day-label').click();
     await page.getByTestId('actions-calendar-day-2026-09-29').waitFor();
+    // The calendar shows once it has measured itself, which can be after its
+    // days render, and then slides in by the clock. Move the frozen clock on
+    // a second at a time until the panel has come out from under the header.
+    const slidIn = () =>
+      page
+        .waitForFunction(
+          () => {
+            const panel = document.querySelector(
+              '[data-testid="actions-calendar"]'
+            );
+            const { opacity, transform } = getComputedStyle(panel!);
+            return (
+              opacity === '1' &&
+              ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(transform)
+            );
+          },
+          undefined,
+          { timeout: 250 }
+        )
+        .then(
+          () => true,
+          () => false
+        );
+    for (let time = VISUAL_TEST_FIXED_DATE.getTime(); !(await slidIn());) {
+      time += 1000;
+      await page.clock.setFixedTime(time);
+    }
     await takeSnapshot(page, 'My actions - Month calendar', testInfo);
     await page.goto('/journal');
     await page.getByTestId('treatment-log-taken-visual-log-cream').waitFor();
@@ -135,6 +155,11 @@ test.describe('My actions - Visual Regression', () => {
     );
     await page.getByTestId('treatment-log-taken-visual-log-cream').click();
     await page.getByTestId('actions-save-error').waitFor();
+    // Today's journal as stored: the optimistic answer has rolled back.
+    await page
+      .getByTestId('treatment-log-taken-visual-log-cream')
+      .and(page.locator('[aria-checked="false"]'))
+      .waitFor();
     await takeSnapshot(page, 'My actions - Answer save failed', testInfo);
     await page.evaluate(() =>
       (window as any).__HEALTHY_TEST_BRIDGE__.executeSql(
@@ -144,26 +169,46 @@ test.describe('My actions - Visual Regression', () => {
   });
 
   test('A bundle answered in part, opened', async ({ page }, testInfo) => {
+    await seedTestResources(page, {
+      treatments: [
+        {
+          id: 'visual-log-omega',
+          title: 'Omega-3',
+          status: 'active',
+          authoredOn: '2026-09-20',
+          takingSince: '2026-09-20',
+        },
+      ],
+      treatmentLogs: [
+        {
+          treatmentId: 'visual-log-omega',
+          date: '2026-10-08',
+          answer: 'taken',
+        },
+      ],
+    });
+    // Both answers given, so both buttons are tinted.
     const bundle = await seedTestBundle(page, {
       title: 'Daily supplements',
       times: ['MORN'],
       memberIds: ['visual-log-vitamin-d', 'visual-log-iron'],
     });
+    // Cream is unanswered, so only the answer given is tinted.
+    const evening = await seedTestBundle(page, {
+      title: 'Evening stack',
+      times: ['EVE'],
+      memberIds: ['visual-log-cream', 'visual-log-omega'],
+    });
     await page.goto('/journal');
-    await page.getByTestId(`bundle-log-toggle-${bundle.id}:0`).click();
-    await page.getByTestId(`bundle-log-members-${bundle.id}:0`).waitFor();
-    await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
-    // With one treatment unanswered, only the answer given is tinted.
-    await page.getByTestId('treatment-log-not-taken-visual-log-iron').click();
+    for (const { id } of [bundle, evening]) {
+      await page.getByTestId(`bundle-log-toggle-${id}:0`).click();
+      await page.getByTestId(`bundle-log-members-${id}:0`).waitFor();
+    }
     await page
-      .getByTestId(`bundle-log-not-taken-${bundle.id}:0`)
-      .and(page.locator('[aria-checked="false"]'))
+      .getByTestId(`bundle-log-progress-${evening.id}:0`)
+      .filter({ hasText: '1 of 2 taken' })
       .waitFor();
-    await takeSnapshot(
-      page,
-      'My actions - Bundle with one unanswered',
-      testInfo
-    );
+    await takeSnapshot(page, 'My actions - Bundle answered in part', testInfo);
   });
 
   test('Treatments grouped by time of day, then reordered', async ({

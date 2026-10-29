@@ -95,7 +95,7 @@
     "test:e2e:smoke": "playwright test --project=chromium --grep @smoke",
     "test:e2e:mobile": "playwright test --project=mobile-chrome",
     "test:visual": "playwright test --project=visual",
-    "site:screens": "VISUAL_PNG_SCALE=2 VISUAL_PNG_DIR=.site-screens playwright test --project=visual biomarker-detail lab-result-view add-report-view my-actions && node scripts/site-screens.mjs",
+    "site:screens": "rm -rf .site-screens && VISUAL_PNG_SCALE=2 VISUAL_PNG_DIR=.site-screens playwright test --project=visual biomarker-detail view-lab-result add-lab-result actions/actions && node scripts/site-screens.mjs",
     "chromatic:publish": "chromatic --playwright",
     "loinc:update": "node scripts/loinc-update.mjs",
     "lint": "expo lint",
