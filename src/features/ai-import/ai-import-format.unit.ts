@@ -226,7 +226,7 @@ test('a skipped consultation leaves its records unlinked from a visit', () => {
       conditions: [{ ref: 'knee' }],
     },
   ]);
-  // The cards say so before saving.
+  // The rows say so before saving.
   const physio = skipped.proposals.find((p) => p.ref === 'physio')!;
   expect(
     getProposalLinks(skipped, physio).map(({ role, target, dropped }) => [

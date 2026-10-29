@@ -138,8 +138,10 @@ export interface ConsultationFormProps {
   ) => Promise<void>;
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
-  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  /** Edits a record the AI proposed: the change goes back to its row, unsaved. */
   proposal?: boolean;
+  /** Shown under a proposal's title, e.g. where in the document it came from. */
+  proposalContext?: React.ReactNode;
 }
 
 function showAlert(title: string, message: string) {
@@ -184,6 +186,7 @@ export function ConsultationForm({
   onSave,
   linkFields = [],
   proposal = false,
+  proposalContext,
 }: ConsultationFormProps) {
   const links = useLinkFields(linkFields);
   const router = useRouter();
@@ -512,10 +515,14 @@ export function ConsultationForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      goBackOr(
-        router,
-        selectedConditionIds[0] ? `/condition/${selectedConditionIds[0]}` : '/'
-      );
+      // A proposal's view decides where to go once it is saved.
+      if (!proposal)
+        goBackOr(
+          router,
+          selectedConditionIds[0]
+            ? `/condition/${selectedConditionIds[0]}`
+            : '/'
+        );
     } catch (err) {
       console.error('Failed to save consultation:', err);
       showAlert('Error', 'Failed to save consultation. Please try again.');
@@ -566,6 +573,7 @@ export function ConsultationForm({
                   ? 'Edit Consultation'
                   : 'New Consultation'}
             </ScreenHeading>
+            {proposalContext}
             {/* Consultation Title Input (Required) */}
             <FormField
               label="Consultation / Service"
@@ -897,7 +905,7 @@ export function ConsultationForm({
             addDisabled={menuOptions.length === 0}
             addTestID="add-option-button"
             onSave={handleSubmit}
-            saveLabel={proposal ? 'Update card' : undefined}
+            saveLabel={proposal ? 'Save changes' : undefined}
             isSaving={isSaving}
             hasChanges={hasChanges}
             // New consultations can be filled in from the user's own AI assistant.

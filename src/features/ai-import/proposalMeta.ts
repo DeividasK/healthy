@@ -61,7 +61,7 @@ const formatDate = (date: string) =>
 const labelOf = (options: { id: string; label: string }[], id?: string) =>
   options.find((option) => option.id === id)?.label ?? id;
 
-/** The card's meta line, worded like the record's own rows once saved. */
+/** The row's meta line, worded like the record's own rows once saved. */
 export function getProposalMeta(proposal: Proposal): ResourceMeta[] {
   const meta: ResourceMeta[] = [];
   const add = (icon: LucideIcon, text: string | null | undefined) => {
@@ -136,7 +136,7 @@ export function getProposalMeta(proposal: Proposal): ResourceMeta[] {
   return meta;
 }
 
-/** Dosing lines shown under a treatment card's meta. */
+/** Dosing lines shown under a treatment row's meta. */
 export function getProposalDosing(proposal: Proposal): string[] {
   if (proposal.kind !== 'treatment') return [];
   return formatDosingLines(

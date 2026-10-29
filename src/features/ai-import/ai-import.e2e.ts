@@ -49,6 +49,7 @@ const RECORDS = [
     service: 'Movement assessment',
     category: 'Procedure',
     intent: 'order',
+    source: '3.12. Follow-up',
   },
   {
     type: 'treatment',
@@ -77,15 +78,35 @@ async function importReply(page: Page, text = reply()) {
   await expect(page.getByTestId('ai-import-review')).toBeVisible();
 }
 
-const card = (page: Page, ref: string) =>
-  page.getByTestId(`ai-import-card-${ref}`);
+const row = (page: Page, ref: string) =>
+  page.getByTestId(`ai-import-row-${ref}`);
+
+const ANSWERS = { accept: 'taken', skip: 'not-taken' } as const;
+
+/** A row's accept (✓) or skip (✕) button; pressed again, it undoes. */
+const answer = (page: Page, ref: string, decision: 'accept' | 'skip') =>
+  page.getByTestId(`ai-import-row-${ANSWERS[decision]}-${ref}`);
 
 async function decideAll(
   page: Page,
   decisions: Record<string, 'accept' | 'skip'>
 ) {
   for (const [ref, decision] of Object.entries(decisions))
-    await page.getByTestId(`ai-import-card-${ref}-${decision}`).click();
+    await answer(page, ref, decision).click();
+}
+
+/** Desktop edits a row beside the list; a phone opens its own screen. */
+const isWide = (page: Page) => (page.viewportSize()?.width ?? 0) >= 1200;
+
+async function openRow(page: Page, ref: string) {
+  await page.getByTestId(`ai-import-row-${ref}-open`).click();
+  if (!isWide(page))
+    await expect(page).toHaveURL(new RegExp(`/ai-import/edit\\?ref=${ref}$`));
+}
+
+async function saveEdit(page: Page, saveTestID: string) {
+  await page.getByTestId(saveTestID).click();
+  if (!isWide(page)) await expect(page).toHaveURL(/\/ai-import$/);
 }
 
 /** Every stored record of a table for the patient, parsed. */
@@ -118,24 +139,24 @@ test.describe('Import with AI', () => {
     await expect(page.getByTestId('ai-import-progress')).toHaveText(
       '0 of 5 accepted · 5 to check'
     );
-    await expect(card(page, 'physio-links')).toHaveText(
-      /Planned in Physical medicine consultation.*Reason: Soft tissue overuse disorder/
+    await expect(row(page, 'physio')).toContainText(
+      'Planned in Physical medicine consultation'
     );
-    await expect(card(page, 'knee-links')).toHaveText(
+    await expect(row(page, 'physio')).toContainText(
+      'Reason: Soft tissue overuse disorder'
+    );
+    await expect(row(page, 'knee')).toContainText(
       'Diagnosed in Physical medicine consultation'
     );
-    await expect(card(page, 'visit-links')).toHaveText(
+    await expect(row(page, 'visit')).toContainText(
       'Diagnosis: Soft tissue overuse disorder'
     );
-    await expect(card(page, 'physio')).toContainText(
-      'From “3.11. Non-drug treatment”'
-    );
-    await expect(card(page, 'gel')).toContainText(
+    await expect(row(page, 'gel')).toContainText(
       'Apply to the knee twice a day'
     );
     await checkA11y(page, { include: '[data-testid="ai-import-review"]' });
 
-    // Nothing can be added until every card is checked.
+    // Nothing can be added until every row is checked.
     const add = page.getByTestId('ai-import-add-button');
     await decideAll(page, {
       visit: 'accept',
@@ -144,9 +165,11 @@ test.describe('Import with AI', () => {
     });
     await expect(add).toBeDisabled();
 
-    // A card is edited in its full form; the change returns to the card.
-    await page.getByTestId('ai-import-card-checkup-edit').click();
-    await expect(page).toHaveURL(/\/ai-import\/edit\?ref=checkup$/);
+    // A row opens its full form; the change returns to the row.
+    await openRow(page, 'checkup');
+    await expect(page.getByTestId('ai-import-edit-source')).toHaveText(
+      'From “3.12. Follow-up” in your document'
+    );
     await expect(page.getByTestId('service-request-form-title')).toHaveText(
       'Edit Proposed Service Request'
     );
@@ -157,13 +180,10 @@ test.describe('Import with AI', () => {
     await page
       .getByTestId('service-request-title-input')
       .fill('3D movement assessment');
-    await page.getByTestId('save-service-request-button').click();
-    await expect(page).toHaveURL(/\/ai-import$/);
-    await expect(card(page, 'checkup-title')).toHaveText(
-      '3D movement assessment'
-    );
+    await saveEdit(page, 'save-service-request-button');
+    await expect(row(page, 'checkup')).toContainText('3D movement assessment');
     // The decisions made before editing are kept.
-    await expect(card(page, 'visit-decision')).toHaveText('Accepted');
+    await expect(answer(page, 'visit', 'accept')).toBeChecked();
 
     await decideAll(page, { checkup: 'accept', gel: 'accept' });
     await expect(page.getByTestId('ai-import-progress')).toHaveText(
@@ -211,19 +231,20 @@ test.describe('Import with AI', () => {
     page,
   }) => {
     await importReply(page);
-    await page.getByTestId('ai-import-card-visit-skip').click();
-    await expect(card(page, 'visit-decision')).toHaveText('Skipped');
-    // Every card linked to it says so before anything is saved.
+    await answer(page, 'visit', 'skip').click();
+    await expect(answer(page, 'visit', 'skip')).toBeChecked();
+    // Every row linked to it says so before anything is saved.
     for (const ref of ['knee', 'physio', 'checkup', 'gel'])
-      await expect(card(page, `${ref}-links`)).toContainText(
+      await expect(row(page, ref)).toContainText(
         'Not linked: Physical medicine consultation is skipped'
       );
-    // Undo brings the link back.
-    await page.getByTestId('ai-import-card-visit-undo').click();
-    await expect(card(page, 'physio-links')).toContainText(
+    // Pressing ✕ again undoes the skip and brings the link back.
+    await answer(page, 'visit', 'skip').click();
+    await expect(answer(page, 'visit', 'skip')).not.toBeChecked();
+    await expect(row(page, 'physio')).toContainText(
       'Planned in Physical medicine consultation'
     );
-    await page.getByTestId('ai-import-card-visit-skip').click();
+    await answer(page, 'visit', 'skip').click();
 
     await decideAll(page, {
       knee: 'accept',
@@ -248,11 +269,11 @@ test.describe('Import with AI', () => {
     page,
   }) => {
     await importReply(page);
-    await page.getByTestId('ai-import-card-knee-skip').click();
-    await expect(card(page, 'visit-links')).toHaveText(
+    await answer(page, 'knee', 'skip').click();
+    await expect(row(page, 'visit')).toContainText(
       'Not linked: Soft tissue overuse disorder is skipped'
     );
-    await expect(card(page, 'physio-links')).toContainText(
+    await expect(row(page, 'physio')).toContainText(
       'Not linked: Soft tissue overuse disorder is skipped'
     );
     await decideAll(page, {
@@ -282,7 +303,15 @@ test.describe('Import with AI', () => {
       title: 'Soft tissue overuse disorder',
     });
     await importReply(page);
-    await expect(card(page, 'knee-existing')).toHaveValue(existing.id!);
+    await expect(row(page, 'knee')).toContainText(
+      'Saved as your Soft tissue overuse disorder'
+    );
+    // The diagnosis's form says which condition it is saved as.
+    await openRow(page, 'knee');
+    await expect(page.getByTestId('ai-import-existing-knee')).toHaveValue(
+      existing.id!
+    );
+    if (!isWide(page)) await page.goBack();
     await decideAll(page, {
       visit: 'accept',
       knee: 'accept',
@@ -330,11 +359,11 @@ test.describe('Import with AI', () => {
         },
       ])
     );
-    await page.getByTestId('ai-import-card-vitd-edit').click();
+    await openRow(page, 'vitd');
     await page.getByTestId('treatment-title-input').fill('Vitamin D3 2000 IU');
-    await page.getByTestId('save-treatment-button').click();
-    await expect(card(page, 'vitd-title')).toHaveText('Vitamin D3 2000 IU');
-    await page.getByTestId('ai-import-card-vitd-accept').click();
+    await saveEdit(page, 'save-treatment-button');
+    await expect(row(page, 'vitd')).toContainText('Vitamin D3 2000 IU');
+    await answer(page, 'vitd', 'accept').click();
     await page.getByTestId('ai-import-add-button').click();
     await expect(page).toHaveURL(/\/$/);
 
@@ -344,6 +373,38 @@ test.describe('Import with AI', () => {
     expect(
       treatment.dosageInstruction[0].doseAndRate[0].doseQuantity
     ).toMatchObject({ value: 1 });
+  });
+
+  test('desktop keeps an edit made beside the list when another row opens or the records are added', async ({
+    page,
+  }) => {
+    test.skip(!isWide(page), 'Phones edit a row on its own screen.');
+    await importReply(page);
+    // The first row to check opens beside the list.
+    await expect(row(page, 'visit')).toHaveAttribute('aria-current', 'true');
+    await page.getByTestId('consultation-title-input').fill('Knee visit');
+    await page.getByTestId('ai-import-row-physio-open').click();
+    await expect(row(page, 'physio')).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByTestId('service-request-form-title')).toBeVisible();
+    await expect(row(page, 'visit')).toContainText('Knee visit');
+
+    await page
+      .getByTestId('service-request-title-input')
+      .fill('Physiotherapy, 5 sessions');
+    await decideAll(page, {
+      visit: 'accept',
+      knee: 'accept',
+      physio: 'accept',
+      checkup: 'skip',
+      gel: 'skip',
+    });
+    await page.getByTestId('ai-import-add-button').click();
+    await expect(page).toHaveURL(/\/consultation\/cons-/);
+    await expect(page.getByTestId('consultation-view')).toContainText(
+      'Knee visit'
+    );
+    const [request] = await stored(page, 'service_requests');
+    expect(request.code.concept.text).toBe('Physiotherapy, 5 sessions');
   });
 
   test('lists every problem in a reply that cannot be read', async ({

@@ -1,36 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check, Link2, Unlink, UserCheck } from 'lucide-react-native';
 import {
-  Check,
-  Link2,
-  Pencil,
-  Quote,
-  Undo2,
-  Unlink,
-  X,
-  type LucideIcon,
-} from 'lucide-react-native';
-import type { Condition } from 'fhir/r5';
+  InlineFormContext,
+  type InlineForm,
+} from '@/src/components/FormActionDock';
+import {
+  MenuPlacementContext,
+  type MenuPlacement,
+} from '@/src/components/FloatingAddMenu';
 import { FormErrorBanner } from '@/src/components/FormErrorBanner';
-import { IconDisc } from '@/src/components/IconDisc';
-import { NativeSelect } from '@/src/components/NativeSelect';
+import { ListDetailLayout } from '@/src/components/ListDetailLayout';
 import { ResourceActionDock } from '@/src/components/ResourceActionDock';
-import { ResourceMetaLine } from '@/src/components/ResourceSection';
+import {
+  ResourceRow,
+  ResourceSection,
+  type ResourceMeta,
+} from '@/src/components/ResourceSection';
 import { ScreenHeading } from '@/src/components/ScreenHeading';
-import { getAllConditions } from '@/src/features/conditions/conditionService';
+import { AnswerButtons } from '@/src/features/actions/AnswerButtons';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { COLORS } from '@/src/theme/colors';
 import { CONTENT_COLUMN, useIsWideLayout } from '@/src/theme/layout';
-import { getConditionTitle } from '@/src/utils/fhirUtils';
+import type { ProposalKind } from './aiImportFormat';
 import { saveReview } from './aiImportSave';
+import { EditProposalView } from './EditProposalView';
+import { useExistingConditions } from './existingConditions';
 import {
   countDecisions,
   findExistingConditions,
@@ -46,74 +43,89 @@ import {
   getProposalDosing,
   getProposalMeta,
 } from './proposalMeta';
-import {
-  chooseExistingCondition,
-  decide,
-  setReview,
-  useReview,
-} from './reviewStore';
+import { decide, getReview, setReview, useReview } from './reviewStore';
 
-/** The patient's conditions as the review matches them. */
-export const toExistingConditions = (
-  conditions: Condition[]
-): ExistingCondition[] =>
-  conditions.map((condition) => ({
-    id: condition.id!,
-    title: getConditionTitle(condition),
-    code: condition.code?.coding?.[0]?.code,
-    system: condition.code?.coding?.[0]?.system,
-  }));
+const SECTIONS: { kind: ProposalKind; title: string }[] = [
+  { kind: 'consultation', title: 'Consultations' },
+  { kind: 'condition', title: 'Diagnoses' },
+  { kind: 'serviceRequest', title: 'Service requests' },
+  { kind: 'treatment', title: 'Treatments' },
+];
 
 /**
- * The records the user's AI proposed from a document, as cards to accept,
- * skip or edit. Nothing is saved until every card is decided and the user
- * adds the accepted ones, together and linked.
+ * The records the user's AI proposed from a document, as rows to accept or
+ * skip, grouped by kind. A row opens its edit form, beside the list on
+ * desktop. Nothing is saved until every row is decided and the user adds the
+ * accepted ones, together and linked.
  */
 export function AIImportReviewView() {
   const router = useRouter();
   const { activePatientId } = useActivePatient();
   const review = useReview(activePatientId);
   const wide = useIsWideLayout();
-  const [existing, setExisting] = useState<ExistingCondition[]>([]);
+  const existing = useExistingConditions(activePatientId);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getAllConditions(activePatientId)
-      .then((conditions) => {
-        if (!cancelled) setExisting(toExistingConditions(conditions));
-      })
-      .catch((err) => console.warn('Failed to load conditions:', err));
-    return () => {
-      cancelled = true;
-    };
-  }, [activePatientId]);
+  // Desktop starts on the first row to check, and stays on the chosen row
+  // while rows are decided.
+  const [selectedRef, setSelectedRef] = useState(
+    () =>
+      review?.proposals.find(
+        (proposal) => review.decisions[proposal.ref] === 'proposed'
+      )?.ref
+  );
+  // The form beside the list, and what to do once it is saved.
+  const form = useRef<InlineForm | null>(null);
+  const screen = useRef<View>(null);
+  const afterSave = useRef<(() => void) | null>(null);
+  // Reopens the form once saved, so its changes become its starting point.
+  const [formVersion, setFormVersion] = useState(0);
+  const [menuPlacement, setMenuPlacement] = useState<MenuPlacement | null>(
+    null
+  );
+  const inlineForm = useMemo(
+    () => ({
+      bind: (inline: InlineForm) => {
+        form.current = inline;
+      },
+      // Menus centre on the screen beside the sidebar, so the form's + menu
+      // is placed from the screen's middle and bottom.
+      placeMenu: (add: { x: number; y: number; width: number }) =>
+        screen.current?.measureInWindow((x, y, width, height) =>
+          setMenuPlacement({
+            shift: add.x + add.width / 2 - (x + width / 2),
+            bottom: y + height - add.y + 8,
+          })
+        ),
+    }),
+    []
+  );
 
   if (!review)
     return (
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-        <View style={styles.column}>
+        <ScrollView contentContainerStyle={styles.column}>
           <ScreenHeading>Check what AI found</ScreenHeading>
           <Text style={styles.summary} testID="ai-import-review-empty">
             There is nothing to check. Use Import with AI on Home to add records
             from a document.
           </Text>
-        </View>
+        </ScrollView>
         <ResourceActionDock showBack />
       </SafeAreaView>
     );
 
   const { accepted, undecided, total } = countDecisions(review);
-  const [first, ...rest] = review.proposals;
-  // Records from a visit are grouped under it when it leads the import.
-  const grouped = first.kind === 'consultation' && rest.length > 0;
+  const selected =
+    review.proposals.find((proposal) => proposal.ref === selectedRef) ??
+    review.proposals[0];
 
   const handleSave = async () => {
     setError(null);
     setIsSaving(true);
     try {
-      const saved = await saveReview(review, activePatientId);
+      // The latest review, with any edit the form beside it just saved.
+      const saved = await saveReview(getReview() ?? review, activePatientId);
       setReview(null);
       router.replace(
         saved.consultationId ? `/consultation/${saved.consultationId}` : '/'
@@ -125,84 +137,136 @@ export function AIImportReviewView() {
     }
   };
 
-  const card = (proposal: Proposal) => (
-    <ProposalCard
-      key={proposal.ref}
-      proposal={proposal}
-      review={review}
-      existing={existing}
-      onEdit={() =>
-        router.push({
-          pathname: '/ai-import/edit',
-          params: { ref: proposal.ref },
-        })
-      }
+  // Unsaved changes in the form beside the list are saved, not lost; if they
+  // are not valid the form shows why and stays open.
+  const afterForm = (next: () => void) => {
+    if (wide && form.current?.hasChanges) {
+      afterSave.current = next;
+      form.current.save();
+    } else next();
+  };
+  const handleFormSaved = () => {
+    setFormVersion((version) => version + 1);
+    const next = afterSave.current;
+    afterSave.current = null;
+    next?.();
+  };
+
+  const open = (proposal: Proposal) => {
+    if (wide) {
+      if (proposal.ref !== selected.ref)
+        afterForm(() => setSelectedRef(proposal.ref));
+    } else
+      router.push({
+        pathname: '/ai-import/edit',
+        params: { ref: proposal.ref },
+      });
+  };
+
+  const list = (
+    <>
+      {review.summary && (
+        <Text style={styles.summary} testID="ai-import-summary">
+          {review.summary}
+        </Text>
+      )}
+      <Text style={styles.progress} testID="ai-import-progress">
+        {[
+          `${accepted} of ${total} accepted`,
+          undecided > 0 && `${undecided} to check`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
+      {error && <FormErrorBanner message={error} testID="ai-import-error" />}
+      {SECTIONS.map(({ kind, title }) => {
+        const proposals = review.proposals.filter(
+          (proposal) => proposal.kind === kind
+        );
+        return (
+          <ResourceSection
+            key={kind}
+            icon={PROPOSAL_KINDS[kind].icon}
+            title={title}
+            count={proposals.length}
+            testID={`ai-import-section-${kind}`}
+          >
+            {proposals.map((proposal) => (
+              <ProposalRow
+                key={proposal.ref}
+                proposal={proposal}
+                review={review}
+                existing={existing}
+                selected={wide && proposal.ref === selected.ref}
+                onOpen={() => open(proposal)}
+              />
+            ))}
+          </ResourceSection>
+        );
+      })}
+    </>
+  );
+
+  const dock = (
+    <ResourceActionDock
+      showBack
+      actions={[
+        {
+          label:
+            undecided > 0
+              ? `Accept or skip ${undecided} more to add records`
+              : `Add ${accepted} ${accepted === 1 ? 'record' : 'records'}`,
+          testID: 'ai-import-add-button',
+          icon: Check,
+          primary: true,
+          disabled: undecided > 0 || accepted === 0,
+          busy: isSaving,
+          onPress: () => afterForm(handleSave),
+        },
+      ]}
     />
   );
+
+  if (wide)
+    return (
+      <SafeAreaView
+        ref={screen}
+        style={styles.safeArea}
+        edges={['left', 'right', 'bottom']}
+      >
+        <ListDetailLayout
+          title="Check what AI found"
+          listId="ai-import-list"
+          rowSelector='[data-testid^="ai-import-row-"][data-testid$="-open"]'
+          testID="ai-import-review"
+          list={list}
+          detail={
+            <InlineFormContext.Provider value={inlineForm}>
+              <MenuPlacementContext.Provider value={menuPlacement}>
+                <EditProposalView
+                  key={`${selected.ref}-${formVersion}`}
+                  proposalRef={selected.ref}
+                  onDone={handleFormSaved}
+                />
+              </MenuPlacementContext.Provider>
+            </InlineFormContext.Provider>
+          }
+          dock={dock}
+        />
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.column, wide && styles.wideColumn]}
+        contentContainerStyle={styles.column}
         testID="ai-import-review"
       >
         <ScreenHeading>Check what AI found</ScreenHeading>
-        {review.summary && (
-          <Text style={styles.summary} testID="ai-import-summary">
-            {review.summary}
-          </Text>
-        )}
-        <Text style={styles.progress} testID="ai-import-progress">
-          {[
-            `${accepted} of ${total} accepted`,
-            undecided > 0 && `${undecided} to check`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </Text>
-        {error && <FormErrorBanner message={error} testID="ai-import-error" />}
-        {grouped ? (
-          <>
-            {card(first)}
-            <Text style={styles.groupLabel} accessibilityRole="header">
-              From this visit
-            </Text>
-            <View style={wide && styles.grid}>
-              {rest.map((proposal) => (
-                <View key={proposal.ref} style={wide && styles.gridItem}>
-                  {card(proposal)}
-                </View>
-              ))}
-            </View>
-          </>
-        ) : (
-          <View style={wide && styles.grid}>
-            {review.proposals.map((proposal) => (
-              <View key={proposal.ref} style={wide && styles.gridItem}>
-                {card(proposal)}
-              </View>
-            ))}
-          </View>
-        )}
+        {list}
       </ScrollView>
-      <ResourceActionDock
-        showBack
-        actions={[
-          {
-            label:
-              undecided > 0
-                ? `Accept or skip ${undecided} more ${undecided === 1 ? 'card' : 'cards'} to add records`
-                : `Add ${accepted} ${accepted === 1 ? 'record' : 'records'}`,
-            testID: 'ai-import-add-button',
-            icon: Check,
-            primary: true,
-            disabled: undecided > 0 || accepted === 0,
-            busy: isSaving,
-            onPress: handleSave,
-          },
-        ]}
-      />
+      {dock}
     </SafeAreaView>
   );
 }
@@ -218,223 +282,90 @@ function linkText(proposal: Proposal, { role, target, dropped }: ProposalLink) {
     : `Planned in ${title}`;
 }
 
-function ProposalCard({
+const ANSWERS: Record<Decision, 'taken' | 'not-taken' | null> = {
+  accepted: 'taken',
+  skipped: 'not-taken',
+  proposed: null,
+};
+
+/**
+ * A proposed record as a list row: its details and links, with skip (✕) and
+ * accept (✓) like a journal row. Pressing the chosen button again undoes it.
+ */
+function ProposalRow({
   proposal,
   review,
   existing,
-  onEdit,
+  selected,
+  onOpen,
 }: {
   proposal: Proposal;
   review: Review;
   existing: ExistingCondition[];
-  onEdit: () => void;
+  selected: boolean;
+  onOpen: () => void;
 }) {
   const decision = review.decisions[proposal.ref];
-  const kind = PROPOSAL_KINDS[proposal.kind];
-  const testID = `ai-import-card-${proposal.ref}`;
-  const links = getProposalLinks(review, proposal);
+  const chosenExisting = review.existingConditions[proposal.ref];
+  const match =
+    proposal.kind === 'condition' && chosenExisting
+      ? findExistingConditions(proposal.input, existing).find(
+          (condition) => condition.id === chosenExisting
+        )
+      : undefined;
   const dosing = getProposalDosing(proposal);
-  const matches =
-    proposal.kind === 'condition'
-      ? findExistingConditions(proposal.input, existing)
-      : [];
-  const chosenExisting = review.existingConditions[proposal.ref] ?? '';
-
+  const meta: ResourceMeta[] = [
+    ...getProposalMeta(proposal),
+    ...(match
+      ? [{ icon: UserCheck, text: `Saved as your ${match.title}` }]
+      : []),
+    ...getProposalLinks(review, proposal).map((link) => ({
+      icon: link.dropped ? Unlink : Link2,
+      text: linkText(proposal, link),
+      // A lost link is a warning in words and icon, not colour alone.
+      ...(link.dropped && { tone: 'warning' as const }),
+    })),
+  ];
   return (
-    <View
-      style={[
-        styles.card,
-        decision === 'accepted' && styles.cardAccepted,
-        decision === 'skipped' && styles.cardSkipped,
-      ]}
-      testID={testID}
-    >
-      <View
-        style={[
-          styles.content,
-          decision === 'skipped' && styles.contentSkipped,
-        ]}
-      >
-        <View style={styles.typeLine}>
-          <IconDisc icon={kind.icon} size={32} />
-          <Text style={styles.typeText}>{kind.label.toUpperCase()}</Text>
-        </View>
-        <Text style={styles.cardTitle} testID={`${testID}-title`}>
-          {proposal.input.title}
-        </Text>
-        <ResourceMetaLine meta={getProposalMeta(proposal)} />
-        {dosing.map((line) => (
-          <Text key={line} style={styles.dosing}>
-            {line}
-          </Text>
-        ))}
-        {links.length > 0 && (
-          <View style={styles.links} testID={`${testID}-links`}>
-            {links.map((link) => {
-              const Icon = link.dropped ? Unlink : Link2;
-              return (
-                <View
-                  key={`${link.role}-${link.target.ref}`}
-                  style={styles.linkRow}
-                >
-                  <Icon
-                    size={14}
-                    color={
-                      link.dropped ? COLORS.light.muted : COLORS.light.primary
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.linkText,
-                      link.dropped && styles.linkDropped,
-                    ]}
-                  >
-                    {linkText(proposal, link)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-        {matches.length > 0 && (
-          <View style={styles.existing}>
-            <Text style={styles.existingLabel}>Save as</Text>
-            <NativeSelect
-              testID={`${testID}-existing`}
-              name={`existing-${proposal.ref}`}
-              label="Save as"
-              value={chosenExisting}
-              options={[
-                ...matches.map((match) => ({
-                  id: match.id,
-                  label: `Your condition: ${match.title}`,
-                })),
-                { id: '', label: 'New condition' },
-              ]}
-              onChange={(id) =>
-                chooseExistingCondition(proposal.ref, id || null)
-              }
-            />
-          </View>
-        )}
-        {proposal.source && (
-          <View style={styles.sourceRow}>
-            <Quote size={13} color={COLORS.light.muted} />
-            <Text style={styles.sourceText}>From “{proposal.source}”</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.actions}>
-        {decision === 'proposed' ? (
-          <>
-            <CardButton
-              label="Skip"
-              icon={X}
-              testID={`${testID}-skip`}
-              accessibilityLabel={`Skip ${proposal.input.title}`}
-              onPress={() => decide(proposal.ref, 'skipped')}
-            />
-            <CardButton
-              label="Edit"
-              icon={Pencil}
-              testID={`${testID}-edit`}
-              accessibilityLabel={`Edit ${proposal.input.title}`}
-              onPress={onEdit}
-            />
-            <CardButton
-              label="Accept"
-              icon={Check}
-              primary
-              testID={`${testID}-accept`}
-              accessibilityLabel={`Accept ${proposal.input.title}`}
-              onPress={() => decide(proposal.ref, 'accepted')}
-            />
-          </>
-        ) : (
-          <>
-            <DecisionStatus decision={decision} testID={`${testID}-decision`} />
-            <CardButton
-              label="Undo"
-              icon={Undo2}
-              testID={`${testID}-undo`}
-              accessibilityLabel={`Undo ${decision === 'accepted' ? 'accepting' : 'skipping'} ${proposal.input.title}`}
-              onPress={() => decide(proposal.ref, 'proposed')}
-            />
-          </>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function CardButton({
-  label,
-  icon: Icon,
-  primary,
-  testID,
-  accessibilityLabel,
-  onPress,
-}: {
-  label: string;
-  icon: LucideIcon;
-  primary?: boolean;
-  testID: string;
-  accessibilityLabel: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      testID={testID}
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={[styles.button, primary && styles.buttonPrimary]}
-    >
-      <Icon
-        size={16}
-        color={
-          primary ? COLORS.light.primaryForeground : COLORS.light.foreground
-        }
-      />
-      <Text style={[styles.buttonText, primary && styles.buttonTextPrimary]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-/** The card's decision as text: an icon and a word, never colour alone. */
-function DecisionStatus({
-  decision,
-  testID,
-}: {
-  decision: Exclude<Decision, 'proposed'>;
-  testID: string;
-}) {
-  const accepted = decision === 'accepted';
-  const Icon = accepted ? Check : X;
-  const color = accepted ? COLORS.light.primary : COLORS.light.mutedForeground;
-  return (
-    <View style={styles.status}>
-      <Icon size={16} color={color} />
-      <Text style={[styles.statusText, { color }]} testID={testID}>
-        {accepted ? 'Accepted' : 'Skipped'}
-      </Text>
-    </View>
+    <ResourceRow
+      testID={`ai-import-row-${proposal.ref}`}
+      title={proposal.input.title}
+      description={dosing.length ? dosing.join(' · ') : undefined}
+      meta={meta}
+      dimmed={decision === 'skipped'}
+      selected={selected}
+      onPress={onOpen}
+      accessory={
+        <AnswerButtons
+          answer={ANSWERS[decision]}
+          name={proposal.input.title}
+          labels={{ taken: 'accepted', notTaken: 'skipped' }}
+          testIDPrefix={{ prefix: 'ai-import-row', rowId: proposal.ref }}
+          onAnswer={(answer) =>
+            decide(
+              proposal.ref,
+              answer === 'taken'
+                ? 'accepted'
+                : answer === 'not-taken'
+                  ? 'skipped'
+                  : 'proposed'
+            )
+          }
+        />
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.light.background },
   scroll: { flex: 1 },
-  column: { ...CONTENT_COLUMN, padding: 16, paddingBottom: 132 },
-  wideColumn: { maxWidth: 1000 },
+  column: { ...CONTENT_COLUMN, padding: 20, paddingBottom: 132 },
   summary: {
     fontSize: 15,
     lineHeight: 22,
     color: COLORS.light.mutedForeground,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   progress: {
     fontSize: 13,
@@ -442,100 +373,4 @@ const styles = StyleSheet.create({
     color: COLORS.light.mutedForeground,
     marginBottom: 12,
   },
-  groupLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.light.mutedForeground,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  gridItem: { width: '48%', flexGrow: 1 },
-  card: {
-    backgroundColor: COLORS.light.card,
-    borderWidth: 1,
-    borderColor: COLORS.light.cardBorder,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    gap: 8,
-  },
-  // Decisions also show as a badge with a word and an icon, not by colour alone.
-  cardAccepted: {
-    borderColor: COLORS.light.primary,
-    borderWidth: 2,
-    padding: 15,
-  },
-  cardSkipped: { borderStyle: 'dashed' },
-  content: { gap: 8 },
-  // Only the record fades; its Undo stays fully visible.
-  contentSkipped: { opacity: 0.6 },
-  typeLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: COLORS.light.mutedForeground,
-  },
-  cardTitle: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  dosing: { fontSize: 14, lineHeight: 20, color: COLORS.light.foreground },
-  links: { gap: 4 },
-  linkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  linkText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.light.primary,
-  },
-  linkDropped: { color: COLORS.light.mutedForeground },
-  existing: { gap: 4 },
-  existingLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.light.mutedForeground,
-  },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sourceText: {
-    flex: 1,
-    fontSize: 13,
-    fontStyle: 'italic',
-    color: COLORS.light.mutedForeground,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    height: 40,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: COLORS.light.border,
-    backgroundColor: COLORS.light.card,
-  },
-  buttonPrimary: {
-    backgroundColor: COLORS.light.primary,
-    borderColor: COLORS.light.primary,
-    marginLeft: 'auto',
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.light.foreground,
-  },
-  buttonTextPrimary: { color: COLORS.light.primaryForeground },
-  // Grows to put Undo on the right, where Accept was.
-  status: { flexDirection: 'row', alignItems: 'center', gap: 6, flexGrow: 1 },
-  statusText: { fontSize: 14, fontWeight: '600' },
 });

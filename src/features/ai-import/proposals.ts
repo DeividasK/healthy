@@ -182,7 +182,7 @@ export function findExistingConditions(
   );
 }
 
-/** A link a card shows: to another proposal, or dropped because it is skipped. */
+/** A link a row shows: to another proposal, or dropped because it is skipped. */
 export interface ProposalLink {
   role: 'consultation' | 'diagnosis' | 'reason';
   /** The linked proposal. */
@@ -191,7 +191,7 @@ export interface ProposalLink {
   dropped: boolean;
 }
 
-/** The links a proposal's card shows, in the order consultation, conditions. */
+/** The links a proposal's row shows, in the order consultation, conditions. */
 export function getProposalLinks(
   review: Review,
   proposal: Proposal

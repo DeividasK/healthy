@@ -84,13 +84,17 @@ for (const desktop of [false, true]) {
       await seedTestPatient(page);
     });
 
-    test('cards to check, then some decided', async ({ page }, testInfo) => {
+    test('rows to check, then some decided', async ({ page }, testInfo) => {
       await openReview(page);
       await takeSnapshot(page, `AI import review - ${layout}`, testInfo);
-      await page.getByTestId('ai-import-card-visit-skip').click();
-      await page.getByTestId('ai-import-card-physio-accept').click();
-      await page.getByTestId('ai-import-card-gel-skip').click();
-      await page.getByTestId('ai-import-card-gel-decision').waitFor();
+      await page.getByTestId('ai-import-row-not-taken-visit').click();
+      await page.getByTestId('ai-import-row-taken-physio').click();
+      await page.getByTestId('ai-import-row-not-taken-gel').click();
+      await page
+        .locator(
+          '[data-testid="ai-import-row-not-taken-gel"][aria-checked="true"]'
+        )
+        .waitFor();
       await takeSnapshot(
         page,
         `AI import review - skipped visit - ${layout}`,
@@ -98,16 +102,14 @@ for (const desktop of [false, true]) {
       );
     });
 
-    // Desktop shares these cards and the full forms with mobile.
-    if (desktop) return;
-
     test('a condition the patient already has', async ({ page }, testInfo) => {
       await seedTestCondition(page, {
         title: 'Soft tissue overuse disorder',
         onsetDate: '2026-09-30',
       });
       await openReview(page);
-      await page.getByTestId('ai-import-card-knee-existing').waitFor();
+      await page.getByTestId('ai-import-row-knee-open').click();
+      await page.getByTestId('ai-import-existing-knee').waitFor();
       await takeSnapshot(
         page,
         `AI import review - existing condition - ${layout}`,
@@ -117,7 +119,7 @@ for (const desktop of [false, true]) {
 
     test('editing a proposed record', async ({ page }, testInfo) => {
       await openReview(page);
-      await page.getByTestId('ai-import-card-physio-edit').click();
+      await page.getByTestId('ai-import-row-physio-open').click();
       await page.getByTestId('service-request-title-input').waitFor();
       await takeSnapshot(
         page,

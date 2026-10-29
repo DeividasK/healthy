@@ -99,8 +99,10 @@ export interface TreatmentFormProps {
   specialistSuggestions?: string[];
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
-  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  /** Edits a record the AI proposed: the change goes back to its row, unsaved. */
   proposal?: boolean;
+  /** Shown under a proposal's title, e.g. where in the document it came from. */
+  proposalContext?: React.ReactNode;
 }
 
 export function TreatmentForm({
@@ -111,6 +113,7 @@ export function TreatmentForm({
   specialistSuggestions = [],
   linkFields = [],
   proposal = false,
+  proposalContext,
 }: TreatmentFormProps) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [intent, setIntent] = useState<MedicationRequest['intent']>(
@@ -360,6 +363,7 @@ export function TreatmentForm({
                 ? 'Edit Treatment'
                 : 'Add Treatment'}
           </ScreenHeading>
+          {proposalContext}
           {errorMessage && (
             <FormErrorBanner
               message={errorMessage}
@@ -571,13 +575,7 @@ export function TreatmentForm({
           onAdd={() => setShowPlusMenu((visible) => !visible)}
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
-          saveLabel={
-            proposal
-              ? 'Update card'
-              : isEditing
-                ? 'Save changes'
-                : 'Save treatment'
-          }
+          saveLabel={isEditing || proposal ? 'Save changes' : 'Save treatment'}
           onSave={handleSubmit}
           isSaving={isSubmitting}
           hasChanges={hasChanges}

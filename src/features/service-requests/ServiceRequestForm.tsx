@@ -110,8 +110,10 @@ export interface ServiceRequestFormProps {
   specialistSuggestions?: string[];
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
-  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  /** Edits a record the AI proposed: the change goes back to its row, unsaved. */
   proposal?: boolean;
+  /** Shown under a proposal's title, e.g. where in the document it came from. */
+  proposalContext?: React.ReactNode;
 }
 
 export function ServiceRequestForm({
@@ -123,6 +125,7 @@ export function ServiceRequestForm({
   specialistSuggestions = [],
   linkFields = [],
   proposal = false,
+  proposalContext,
 }: ServiceRequestFormProps) {
   const links = useLinkFields(linkFields);
   const [title, setTitle] = useState(initialValues?.title || '');
@@ -424,6 +427,7 @@ export function ServiceRequestForm({
                 ? 'Edit Service Request'
                 : 'Add Service Request'}
           </ScreenHeading>
+          {proposalContext}
           {errorMessage && (
             <FormErrorBanner
               message={errorMessage}
@@ -698,11 +702,7 @@ export function ServiceRequestForm({
           addExpanded={showPlusMenu}
           addDisabled={!options.length}
           saveLabel={
-            proposal
-              ? 'Update card'
-              : isEditing
-                ? 'Save changes'
-                : 'Save service request'
+            isEditing || proposal ? 'Save changes' : 'Save service request'
           }
           onSave={handleSubmit}
           isSaving={isSubmitting}

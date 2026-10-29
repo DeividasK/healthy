@@ -132,8 +132,10 @@ export interface ConditionFormProps {
   ) => Promise<void>;
   /** Related resources this form can link to (edit only). */
   linkFields?: LinkFieldConfig[];
-  /** Edits a record the AI proposed: the change goes back to its card, unsaved. */
+  /** Edits a record the AI proposed: the change goes back to its row, unsaved. */
   proposal?: boolean;
+  /** Shown under a proposal's title, e.g. where in the document it came from. */
+  proposalContext?: React.ReactNode;
 }
 
 function showAlert(title: string, message: string) {
@@ -150,6 +152,7 @@ export function ConditionForm({
   onSave,
   linkFields = [],
   proposal = false,
+  proposalContext,
 }: ConditionFormProps) {
   const router = useRouter();
   const links = useLinkFields(linkFields);
@@ -291,7 +294,8 @@ export function ConditionForm({
         (document.activeElement as HTMLElement)?.blur?.();
       }
 
-      goBackOr(router, '/');
+      // A proposal's view decides where to go once it is saved.
+      if (!proposal) goBackOr(router, '/');
     } catch (err) {
       console.error('Failed to save condition:', err);
       showAlert('Error', 'Failed to save condition. Please try again.');
@@ -321,6 +325,7 @@ export function ConditionForm({
                   ? 'Edit Condition'
                   : 'New Condition'}
             </ScreenHeading>
+            {proposalContext}
             {/* Condition Name Section (Required) */}
             <FormField
               label="Condition"
@@ -540,7 +545,7 @@ export function ConditionForm({
             addDisabled={plusMenuOptions.length === 0}
             addTestID="add-option-button"
             onSave={handleSubmit}
-            saveLabel={proposal ? 'Update card' : undefined}
+            saveLabel={proposal ? 'Save changes' : undefined}
             isSaving={isSaving}
             hasChanges={hasChanges}
           />

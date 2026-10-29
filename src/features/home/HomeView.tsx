@@ -60,7 +60,7 @@ import {
 } from '@/src/features/ai-import/aiImportFormat';
 import { startReview } from '@/src/features/ai-import/proposals';
 import { setReview } from '@/src/features/ai-import/reviewStore';
-import { toExistingConditions } from '@/src/features/ai-import/AIImportReviewView';
+import { toExistingConditions } from '@/src/features/ai-import/existingConditions';
 import { ResourceSkeleton } from '@/src/components/ResourceSkeleton';
 import { useActivePatient } from '@/src/features/profile/ActivePatientContext';
 import { getAllPatients } from '@/src/features/profile/patientService';
