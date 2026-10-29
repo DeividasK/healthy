@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '@/src/utils/dateUtils';
+import { formatDisplayDate, formatLocalDate } from '@/src/utils/dateUtils';
 
 /** How far back the shared records go. */
 export const SHARE_PERIODS = [
@@ -49,7 +49,7 @@ function header(title: string) {
   return [
     `# ${title}`,
     '',
-    `My health records, shared from the Healthy app on ${formatDisplayDate(new Date().toISOString())}. Ranges are the ones my lab gave or I set myself.`,
+    `My health records, shared from the Healthy app on ${formatDisplayDate(formatLocalDate(new Date()))}. Ranges are the ones my lab gave or I set myself.`,
     '',
   ];
 }

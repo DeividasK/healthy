@@ -20,7 +20,12 @@ import { ResourceActionDock } from '@/src/components/ResourceActionDock';
 import { FilterGroup, FilterGroups } from '@/src/components/FilterControls';
 import { NativeSelect } from '@/src/components/NativeSelect';
 import { getBiomarkerKey } from '@/src/data/biomarkers';
-import { getObservationMarker } from '@/src/features/lab-results/biomarkerMeasurements';
+import {
+  getObservationMarker,
+  isSupportedObservation,
+} from '@/src/features/lab-results/biomarkerMeasurements';
+import { withCalculatedObservations } from '@/src/features/lab-results/calculatedBiomarkers';
+import { FormErrorBanner } from '@/src/components/FormErrorBanner';
 import { getAllReports } from '@/src/features/lab-results/diagnosticReportService';
 import { useBiomarkerRanges } from '@/src/features/lab-results/useBiomarkerRanges';
 import { latestBiomarkers } from '@/src/features/home/LabsSummary';
@@ -82,10 +87,12 @@ export function ShareWithAIView() {
   const ranges = useBiomarkerRanges();
   const isWide = useIsWideLayout();
   const [data, setData] = useState<{
+    patientId: string;
     reports: DiagnosticReportRecord[];
     conditions: Condition[];
     treatments: MedicationRequest[];
   } | null>(null);
+  const [failedPatientId, setFailedPatientId] = useState<string | null>(null);
   const [period, setPeriod] = useState<SharePeriodId>('all');
   /** Items the user unticked; everything else is shared. */
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
@@ -93,31 +100,49 @@ export function ShareWithAIView() {
 
   useEffect(() => {
     if (!activePatientId) return;
-    void Promise.all([
+    let active = true;
+    Promise.all([
       getAllReports(activePatientId),
       fetchAllConditionRecords(activePatientId),
       fetchAllMedicationRequestRecords(activePatientId),
-    ]).then(([reports, conditions, treatments]) => {
-      setData({
-        reports,
-        conditions,
-        treatments: treatments.map(({ request }) => request),
+    ])
+      .then(([reports, conditions, treatments]) => {
+        if (!active) return;
+        setData({
+          patientId: activePatientId,
+          reports,
+          conditions,
+          treatments: treatments.map(({ request }) => request),
+        });
+        // From a biomarker's page, its history and conditions start ticked.
+        if (biomarker)
+          setUnticked(
+            new Set(treatments.map(({ request }) => `treatments:${request.id}`))
+          );
+      })
+      .catch((err) => {
+        console.error('Failed to load records to share:', err);
+        if (active) setFailedPatientId(activePatientId);
       });
-      // From a biomarker's page, its history and conditions start ticked.
-      if (biomarker)
-        setUnticked(
-          new Set(treatments.map(({ request }) => `treatments:${request.id}`))
-        );
-    });
+    return () => {
+      active = false;
+    };
   }, [activePatientId, biomarker]);
 
+  // Records loaded for another profile are never shown or shared.
+  const records = data?.patientId === activePatientId ? data : null;
+  const loadError =
+    failedPatientId === activePatientId
+      ? "Couldn't load your records. Please try again."
+      : null;
+
   const groups = useMemo<ShareGroup[]>(() => {
-    if (!data) return [];
+    if (!records) return [];
     const all: ShareGroup[] = [];
     if (biomarker) {
-      const rows = data.reports
+      const rows = withCalculatedObservations(records.reports)
         .flatMap(({ report, observations }) =>
-          observations.map((observation) => ({
+          observations.filter(isSupportedObservation).map((observation) => ({
             observation,
             date:
               observation.effectiveDateTime ?? report.effectiveDateTime ?? '',
@@ -149,7 +174,7 @@ export function ShareWithAIView() {
       id: 'conditions',
       title: 'Conditions',
       icon: FolderPlus,
-      items: data.conditions
+      items: records.conditions
         .filter(
           (c) =>
             inPeriod(c.onsetDateTime, period) ||
@@ -179,7 +204,7 @@ export function ShareWithAIView() {
         id: 'biomarkers',
         title: 'Latest biomarkers',
         icon: FlaskConical,
-        items: latestBiomarkers(data.reports, -Infinity, ranges)
+        items: latestBiomarkers(records.reports, -Infinity, ranges)
           .filter(({ date }) => inPeriod(date, period))
           .map((b) => {
             const meta = [
@@ -201,24 +226,26 @@ export function ShareWithAIView() {
       id: 'treatments',
       title: 'Treatments',
       icon: Pill,
-      items: data.treatments.map((t) => {
-        const meta = [
-          capitalise(t.status),
-          t.dosageInstruction?.[0]?.text ?? '',
-        ]
-          .filter(Boolean)
-          .join(', ');
-        const name = t.medication?.concept?.text ?? 'Treatment';
-        return {
-          key: `treatments:${t.id}`,
-          title: name,
-          meta,
-          line: `- ${name}: ${[t.status, t.dosageInstruction?.[0]?.text].filter(Boolean).join(', ')}`,
-        };
-      }),
+      items: records.treatments
+        .filter((t) => t.status === 'active' || inPeriod(t.authoredOn, period))
+        .map((t) => {
+          const meta = [
+            capitalise(t.status),
+            t.dosageInstruction?.[0]?.text ?? '',
+          ]
+            .filter(Boolean)
+            .join(', ');
+          const name = t.medication?.concept?.text ?? 'Treatment';
+          return {
+            key: `treatments:${t.id}`,
+            title: name,
+            meta,
+            line: `- ${name}: ${[t.status, t.dosageInstruction?.[0]?.text].filter(Boolean).join(', ')}`,
+          };
+        }),
     });
     return all.filter(({ items }) => items.length > 0);
-  }, [data, biomarker, period, ranges]);
+  }, [records, biomarker, period, ranges]);
 
   const text = useMemo(
     () =>
@@ -357,7 +384,7 @@ export function ShareWithAIView() {
       testID="share-ai-view"
       title="Share with AI"
       wide={isWide}
-      isLoading={!data}
+      isLoading={!records && !loadError}
       actions={
         <ResourceActionDock
           actions={[
@@ -378,6 +405,9 @@ export function ShareWithAIView() {
         />
       }
     >
+      {loadError ? (
+        <FormErrorBanner message={loadError} testID="share-ai-load-error" />
+      ) : null}
       <Text style={styles.description}>
         Tick what to share, then send it to Claude, ChatGPT or any AI and ask
         your question there. Your name isn&apos;t included.
