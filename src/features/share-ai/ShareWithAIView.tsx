@@ -480,10 +480,6 @@ export function ShareWithAIView() {
       {loadError ? (
         <FormErrorBanner message={loadError} testID="share-ai-load-error" />
       ) : null}
-      <Text style={styles.description}>
-        Tick what to share, then send it to Claude, ChatGPT or any AI and ask
-        your question there. Your name isn&apos;t included.
-      </Text>
       {isWide ? (
         <View style={styles.columns}>
           <View style={styles.column}>{list}</View>
@@ -505,12 +501,6 @@ export function ShareWithAIView() {
 }
 
 const styles = StyleSheet.create({
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.light.mutedForeground,
-    marginBottom: 16,
-  },
   group: {
     marginTop: 20,
     borderTopWidth: 1,
