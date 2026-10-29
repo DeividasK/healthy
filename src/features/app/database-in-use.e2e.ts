@@ -30,9 +30,8 @@ test.describe('Database open in another tab', () => {
     await page.close();
     await expect(secondTab.getByTestId('database-in-use')).toHaveCount(0);
     await expect(secondTab.getByTestId('start-your-record')).toBeVisible();
-    await secondTab.goto('/profile');
-    await expect(secondTab.getByTestId('profile-display-name')).toHaveText(
-      'John Doe'
+    await expect(secondTab.getByTestId('start-your-record-heading')).toHaveText(
+      'Hi, John'
     );
   });
 });

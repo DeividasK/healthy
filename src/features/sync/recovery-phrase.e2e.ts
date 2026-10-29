@@ -263,7 +263,8 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     page,
     browser,
   }, testInfo) => {
-    // Opens two more devices.
+    // Opens two more devices, and on the first of them leaves the account and
+    // signs in again.
     test.slow();
     await seedTestPatient(page, { id: 'alice', givenName: 'Alice' });
     const { store, phrase } = await connectTestSync(page);
@@ -276,6 +277,24 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     await openRoute(device, '/profile');
     await device.getByTestId('backup-switch').click();
     await expect(device).toHaveURL(/\/sync\/restore/);
+
+    // The account can be left without the phrase, then signed in to again.
+    await device.getByTestId('back-button').click();
+    await device.getByTestId('disconnect-locked-sync-button').click();
+    await expect(
+      device.getByTestId('disconnect-locked-sync-button')
+    ).toHaveCount(0);
+    expect(await savedConfig(device)).toBeNull();
+    // Leaving never touches the other account's synced data.
+    expect([...store.files.values()].some((f) => f.name === 'vault.json')).toBe(
+      true
+    );
+    await expect(device.getByTestId('backup-status-text')).toHaveText(
+      'Off · records are only on this device'
+    );
+    await device.getByTestId('backup-switch').click();
+    await expect(device).toHaveURL(/\/sync\/restore/);
+
     await device.clock.install();
     await device.getByTestId('forgot-recovery-phrase-button').click();
     await device.clock.runFor(5000);
@@ -308,33 +327,6 @@ test.describe('Google Drive sync with a recovery phrase', () => {
     // The device holding the old phrase learns that the data was reset.
     await expect(syncTestDevice(page)).rejects.toThrow('removed or reset');
     await restored.close();
-  });
-
-  test('leaves a Google account whose phrase is not known', async ({
-    page,
-    browser,
-  }, testInfo) => {
-    await seedTestPatient(page);
-    const { store } = await connectTestSync(page);
-
-    const { page: device, close } = await openSecondDevice(browser, testInfo);
-    await mockGoogleDrive(device, store);
-    await mockGoogleAuthRoutes(device);
-    await seedTestPatient(device);
-    await openRoute(device, '/profile');
-    await device.getByTestId('backup-switch').click();
-    await expect(device).toHaveURL(/\/sync\/restore/);
-    await device.getByTestId('back-button').click();
-    await device.getByTestId('disconnect-locked-sync-button').click();
-    await expect(
-      device.getByTestId('disconnect-locked-sync-button')
-    ).toHaveCount(0);
-    expect(await savedConfig(device)).toBeNull();
-    // Leaving never touches the other account's synced data.
-    expect([...store.files.values()].some((f) => f.name === 'vault.json')).toBe(
-      true
-    );
-    await close();
   });
 
   test('explains when Google Drive holds no synced records', async ({
@@ -430,10 +422,19 @@ test.describe('Google Drive sync with a recovery phrase', () => {
       await expect(page.getByTestId('connected-user-email')).toHaveText(
         'bob@gmail.com'
       );
-      // The sync that runs on start is refused first.
+      // The sync that runs on start is refused first. It may refresh the token
+      // and retry once, so wait until it has finished: the header shows it
+      // syncing from before its first request until it gives up.
       await expect
         .poll(() => store.requests.length)
         .toBeGreaterThan(requestsBefore);
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          )
+      );
+      await expect(page.getByTestId('sync-header-indicator')).toHaveCount(0);
 
       // Once Google refuses a token, automatic syncs stop asking for one.
       const driveRequests: string[] = [];

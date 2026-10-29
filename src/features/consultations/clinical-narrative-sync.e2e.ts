@@ -8,6 +8,7 @@ import {
   getTestClinicalDocument,
   connectTestSync,
   syncTestDevice,
+  restartApp,
 } from '@/src/features/testing/testStorage';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
@@ -339,8 +340,8 @@ test.describe('Clinical Narrative and Composition Sync', () => {
         JSON.stringify(['deleted-legacy-visit'])
       );
     });
-    // The queues are imported when the app starts.
-    await page.reload();
+    // The queues are imported when the app (SyncProvider) starts.
+    await restartApp(page, '/');
     await expect(page.getByTestId('profile-header-button')).toBeVisible();
     await expect
       .poll(() =>
@@ -349,7 +350,7 @@ test.describe('Clinical Narrative and Composition Sync', () => {
         )
       )
       .toBeNull();
-    await page.reload();
+    await restartApp(page, '/');
     await expect(page.getByTestId('profile-header-button')).toBeVisible();
     expect(await deletionChanges(page)).toEqual([
       {

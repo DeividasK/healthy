@@ -87,6 +87,15 @@ test.describe('Sync between devices', () => {
     const { store, phrase } = await connectTestSync(page);
     await syncTestDevice(page);
     const second = await openSecondDevice(browser, testInfo);
+    // Applying synced changes (connecting applies the device's own) moves a
+    // device's change clock up to its page's time, and earlier tests may have
+    // fast-forwarded the two pages' fake clocks by different amounts. Put
+    // them in step, so that the later edit is also later on the clock.
+    const ahead =
+      (await page.evaluate(() => Date.now())) -
+      (await second.page.evaluate(() => Date.now()));
+    const behind = ahead > 0 ? second.page : page;
+    if (ahead) await behind.clock.fastForward(Math.abs(ahead));
 
     await test.step('Replicates every resource and keeps Drive encrypted', async () => {
       const contents = driveContents(store);
@@ -324,8 +333,17 @@ test.describe('Sync between devices', () => {
     const before = uploads();
 
     await page.getByTestId('treatment-log-taken-vitamin-d').click();
-    // Saves upload about 2 s later; the next poll is a minute away.
-    await expect.poll(uploads, { timeout: 15_000 }).toBeGreaterThan(before);
+    await expect
+      .poll(() =>
+        bridge(page, (b) =>
+          b.querySql('SELECT COUNT(*) AS n FROM medication_administrations')
+        )
+      )
+      .toEqual([{ n: 1 }]);
+    // The save scheduled its upload 2 s out, which the fake clock fires now;
+    // the next poll is still a minute away.
+    await page.clock.fastForward(2100);
+    await expect.poll(uploads).toBeGreaterThan(before);
 
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);

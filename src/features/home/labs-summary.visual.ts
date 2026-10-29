@@ -4,7 +4,6 @@ import {
   seedTestPatient,
   seedTestReport,
 } from '@/src/features/testing/visualTest';
-import { expandBiomarkerGroups } from '@/src/features/testing/testSections';
 
 test('Labs Summary page - full and filtered latest results', async ({
   page,
@@ -42,11 +41,10 @@ test('Labs Summary page - full and filtered latest results', async ({
   });
   await page.goto('/labs-summary');
   const view = page.getByTestId('labs-summary-view');
-  await view.getByTestId('labs-summary-groups-inRange-toggle').waitFor();
-  await takeSnapshot(page, 'Labs Summary - collapsed groups', testInfo);
-  await expandBiomarkerGroups(view.getByTestId('labs-summary'));
-  await view.getByTestId('labs-summary-result-718-7').waitFor();
-  await takeSnapshot(page, 'Labs Summary - all biomarkers', testInfo);
+  // Out of range open beside the folded In range group.
+  await view.getByTestId('labs-summary-groups-outOfRange-toggle').click();
+  await view.getByTestId('labs-summary-result-6690-2').waitFor();
+  await takeSnapshot(page, 'Labs Summary - groups', testInfo);
   await view.getByTestId('labs-summary-filter-button').click();
   const filters = page.getByTestId('labs-summary-filters');
   await filters
@@ -56,11 +54,6 @@ test('Labs Summary page - full and filtered latest results', async ({
   await takeSnapshot(page, 'Labs Summary - filters', testInfo);
   await filters.getByTestId('labs-summary-filters-done').click();
   await filters.waitFor({ state: 'hidden' });
-  await takeSnapshot(
-    page,
-    'Labs Summary - last 6 months, oldest first',
-    testInfo
-  );
   const search = view.getByRole('textbox', { name: 'Search', exact: true });
   await search.fill('Hemoglobin');
   await view.getByTestId('labs-summary-result-718-7').waitFor();
