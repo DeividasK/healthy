@@ -111,14 +111,33 @@ test.describe('My actions - Visual Regression', () => {
     await takeSnapshot(page, 'My actions - Centred older day', testInfo);
     await page.getByTestId('actions-day-label').click();
     await page.getByTestId('actions-calendar-day-2026-09-29').waitFor();
-    // The calendar slides in by the clock, so move the frozen clock past the
-    // slide and wait until the panel has come out from under the header.
-    await page.clock.setFixedTime(VISUAL_TEST_FIXED_DATE.getTime() + 1000);
-    await page.waitForFunction(() => {
-      const panel = document.querySelector('[data-testid="actions-calendar"]');
-      const { transform } = getComputedStyle(panel!);
-      return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
-    });
+    // The calendar shows once it has measured itself, which can be after its
+    // days render, and then slides in by the clock. Move the frozen clock on
+    // a second at a time until the panel has come out from under the header.
+    const slidIn = () =>
+      page
+        .waitForFunction(
+          () => {
+            const panel = document.querySelector(
+              '[data-testid="actions-calendar"]'
+            );
+            const { opacity, transform } = getComputedStyle(panel!);
+            return (
+              opacity === '1' &&
+              ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(transform)
+            );
+          },
+          undefined,
+          { timeout: 250 }
+        )
+        .then(
+          () => true,
+          () => false
+        );
+    for (let time = VISUAL_TEST_FIXED_DATE.getTime(); !(await slidIn());) {
+      time += 1000;
+      await page.clock.setFixedTime(time);
+    }
     await takeSnapshot(page, 'My actions - Month calendar', testInfo);
     await page.goto('/journal');
     await page.getByTestId('treatment-log-taken-visual-log-cream').waitFor();

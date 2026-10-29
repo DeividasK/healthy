@@ -340,10 +340,15 @@ test.describe('Sync between devices', () => {
         )
       )
       .toEqual([{ n: 1 }]);
-    // The save scheduled its upload 2 s out, which the fake clock fires now;
-    // the next poll is still a minute away.
-    await page.clock.fastForward(2100);
-    await expect.poll(uploads).toBeGreaterThan(before);
+    // The save schedules its upload 2 s out once its transaction is done, so
+    // fast-forward the fake clock past that until it goes out; the next poll
+    // is still a minute away.
+    await expect
+      .poll(async () => {
+        await page.clock.fastForward(2100);
+        return uploads();
+      })
+      .toBeGreaterThan(before);
 
     const second = await openSecondDevice(browser, testInfo);
     await bootstrapApp(second.page);
