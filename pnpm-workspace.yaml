@@ -11,7 +11,6 @@ allowBuilds:
 
 patchedDependencies:
   '@expo/metro-config': patches/@expo__metro-config.patch
-  deepmerge: patches/deepmerge.patch
   expo-sqlite: patches/expo-sqlite.patch
   query-string: patches/query-string.patch
 
@@ -49,3 +48,11 @@ overrides:
   # decoding of malformed input). 0.5 is ESM only, so the query-string patch
   # reads its default export.
   decode-uri-component: ^0.5.1
+  # Expo's CLI, config, config-plugins, fingerprint and metro-config ask for
+  # glob@13 (AbortSignal timeout bypass), whose minimatch@10 can also be slowed
+  # by crafted patterns. glob 14 keeps the glob/globSync API they use and
+  # brings minimatch 11.
+  'glob@>=9 <14.0.2': ^14.0.3
+  # @expo/fingerprint@0.20.14 asks for minimatch@10 (crafted patterns can slow
+  # matching). It only builds Minimatch objects and calls match(), which 11 keeps.
+  '@expo/fingerprint>minimatch': ^11.0.3

@@ -2,7 +2,7 @@ diff --git a/build/serializer/serializeChunks.js b/build/serializer/serializeChu
 index 10c8ce32a04cc7f05f28d95347fa7127dd6600f8..9581fe61215a0d2a244e52fcef67c2361784d60d 100644
 --- a/build/serializer/serializeChunks.js
 +++ b/build/serializer/serializeChunks.js
-@@ -519,6 +519,9 @@ function gatherChunks(runtimePremodules, chunks, settings, preModules, graph, op
+@@ -476,6 +476,9 @@ function gatherChunks(runtimePremodules, chunks, settings, preModules, graph, op
              else if (asyncType &&
                  // Workers require standalone bundles even when ordinary chunk splitting is disabled.
                  (isWorker || splitChunks)) {
