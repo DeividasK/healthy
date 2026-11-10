@@ -10,7 +10,15 @@
 export const DEMO_BUILD_SESSION_KEY = 'healthy-demo-build';
 
 function demoBuildInSession(): boolean {
-  if (typeof sessionStorage === 'undefined' || !__DEV__) return false;
+  // Node 25+ has its own sessionStorage, and E2E specs import this file in
+  // Node, where Metro's __DEV__ global does not exist.
+  if (
+    typeof sessionStorage === 'undefined' ||
+    typeof __DEV__ === 'undefined' ||
+    !__DEV__
+  ) {
+    return false;
+  }
   try {
     return sessionStorage.getItem(DEMO_BUILD_SESSION_KEY) === '1';
   } catch {

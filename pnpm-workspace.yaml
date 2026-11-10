@@ -11,7 +11,6 @@ allowBuilds:
 
 patchedDependencies:
   '@expo/metro-config': patches/@expo__metro-config.patch
-  deepmerge: patches/deepmerge.patch
   expo-sqlite: patches/expo-sqlite.patch
   query-string: patches/query-string.patch
 
