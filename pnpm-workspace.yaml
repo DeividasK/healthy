@@ -39,8 +39,9 @@ overrides:
   # storybook@10.6.4 allows esbuild@0.27, whose dev server can read any file
   # on Windows.
   esbuild: ^0.28.1
-  # @expo/cli@57.0.32 pins node-forge@1.4.0 (RSA signature forgery).
-  node-forge: ^1.4.1
+  # @expo/cli pins node-forge@1.4.0 (RSA signature forgery; 1.4.3 also fixes
+  # TLS client crashes, header-trimming ReDoS and Ed25519 small-order keys).
+  node-forge: ^1.4.3
   # @expo/cli@57.0.32 pins zod@3 (memory exhaustion on large arrays). The CLI
   # only builds simple dev tools schemas, which zod 4 still supports.
   '@expo/cli>zod': ^4.6.6
