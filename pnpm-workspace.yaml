@@ -23,8 +23,17 @@ minimumReleaseAgeExclude:
   - expo@57.0.31
   - '@expo/ui@57.0.26'
   - expo-network@57.0.3
-  - expo-router@57.0.29
-  - expo-sharing@57.0.24
+  - expo-router@57.0.32
+  - expo-sharing@57.0.27
+  - '@expo/metro-runtime@57.0.19'
+  - expo-constants@57.0.25
+  - expo-dev-client@57.0.22
+  - expo-dev-launcher@57.0.23
+  - expo-dev-menu@57.0.22
+  - expo-image-manipulator@57.0.23
+  - expo-image-picker@57.0.22
+  - expo-splash-screen@57.0.12
+  - expo-sqlite@57.0.7
 
 # Security fixes for transitive deps whose parents pin a vulnerable version. Drop each entry once the parent ships the fix.
 overrides:
