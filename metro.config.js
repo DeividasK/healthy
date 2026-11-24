@@ -1,3 +1,4 @@
+const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
@@ -14,6 +15,18 @@ config.resolver.blockList = [
   /.*\.visual\.[jt]sx?$/,
   /.*\.unit\.[jt]sx?$/,
 ];
+
+// babel/lucide-per-icon-imports.js maps icon names to the files of the
+// installed lucide version (icons get renamed and keep the old name as an
+// alias), so cached transforms must not outlive that version. The package
+// exports no package.json; its CommonJS entry sits in dist/cjs.
+const lucideVersion = require(
+  path.join(
+    path.dirname(require.resolve('lucide-react-native')),
+    '../../package.json'
+  )
+).version;
+config.cacheVersion = `${config.cacheVersion}-lucide-${lucideVersion}`;
 
 // Enable WebAssembly asset bundling for expo-sqlite web support
 config.resolver.assetExts = [...(config.resolver.assetExts || []), 'wasm'];
